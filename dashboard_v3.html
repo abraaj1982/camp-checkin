@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Camp Check-In Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --sap-blue: #0A6ED4;
+  --sap-green: #107E3E;
+  --sap-orange: #E87722;
+  --sap-red: #C30C13;
+  --sap-gray: #6C757D;
+  --sap-text: #32363A;
+  --sap-bg: #F8F9FA;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Roboto', sans-serif;
+  background: linear-gradient(135deg, #E8F4FD 0%, var(--sap-bg) 100%);
+  color: var(--sap-text);
+  min-height: 100vh;
+}
+
+.topbar {
+  background: linear-gradient(135deg, var(--sap-blue) 0%, #0052A3 100%);
+  color: white;
+  padding: 24px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.topbar h1 { font-size: 28px; font-weight: 400; margin-bottom: 4px; }
+.topbar-subtitle { font-size: 13px; opacity: 0.9; }
+.topbar-time { font-size: 12px; opacity: 0.8; margin-top: 8px; }
+
+.container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+
+.tiles-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.tile {
+  background: white;
+  border-radius: 4px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  border: 1px solid #D3D3D3;
+  text-align: center;
+  transition: all 0.3s;
+}
+
+.tile:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+}
+
+.tile-icon { font-size: 32px; margin-bottom: 12px; }
+
+.tile-title {
+  font-size: 12px;
+  color: var(--sap-gray);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.tile-value {
+  font-family: 'Roboto Mono', monospace;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--sap-blue);
+}
+
+.tile-subtitle { font-size: 11px; color: var(--sap-gray); margin-top: 8px; }
+
+.panel {
+  background: white;
+  border-radius: 4px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  border: 1px solid #D3D3D3;
+  overflow: hidden;
+}
+
+.panel-header {
+  background: linear-gradient(135deg, #F5FAFD 0%, var(--sap-bg) 100%);
+  border-bottom: 1px solid #D3D3D3;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.panel-header-icon { font-size: 20px; color: var(--sap-blue); }
+
+.panel-header-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--sap-text);
+}
+
+.panel-body { padding: 20px; }
+
+.bus-card {
+  background: white;
+  border: 1px solid #D3D3D3;
+  border-radius: 4px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.bus-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.bus-name { font-size: 14px; font-weight: 600; color: var(--sap-blue); }
+
+.remaining {
+  background: #E8F4FD;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sap-blue);
+}
+
+.bus-stats { display: flex; gap: 16px; font-size: 12px; margin-bottom: 12px; }
+
+.bus-stat { display: flex; flex-direction: column; align-items: center; }
+
+.bus-stat-label { color: var(--sap-gray); font-size: 10px; text-transform: uppercase; }
+
+.bus-stat-value { font-size: 16px; font-weight: 700; color: var(--sap-blue); }
+
+.progress-bar {
+  height: 6px;
+  background: #EEEFF0;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--sap-blue);
+  transition: width 0.3s;
+}
+
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.stat-box {
+  background: var(--sap-bg);
+  padding: 12px;
+  border-radius: 2px;
+  border-left: 3px solid var(--sap-blue);
+}
+
+.stat-label {
+  font-size: 11px;
+  color: var(--sap-gray);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.stat-value {
+  font-family: 'Roboto Mono', monospace;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--sap-text);
+}
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead { background: var(--sap-bg); }
+
+th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 500;
+  font-size: 12px;
+  text-transform: uppercase;
+  border-bottom: 1px solid #D3D3D3;
+}
+
+td { padding: 12px 16px; border-bottom: 1px solid #EEEFF0; }
+tbody tr:hover { background: #F5FAFD; }
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 2px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.badge-dup { background: #FADAD4; color: var(--sap-red); }
+
+.status-ok { color: var(--sap-green); font-weight: 600; }
+
+@media (max-width: 768px) {
+  .tiles-grid { grid-template-columns: repeat(2, 1fr); }
+  .bus-stats { flex-wrap: wrap; }
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>🏕️ Camp Check-In Dashboard</h1>
+  <div class="topbar-subtitle">Real-Time Bus Management System</div>
+  <div class="topbar-time" id="currentTime"></div>
+</div>
+
+<div class="container">
+
+  <!-- STATS -->
+  <div class="tiles-grid">
+    <div class="tile">
+      <div class="tile-icon">👥</div>
+      <div class="tile-title">Total Students</div>
+      <div class="tile-value" id="totalStudents">—</div>
+      <div class="tile-subtitle">Registered</div>
+    </div>
+    <div class="tile">
+      <div class="tile-icon">✅</div>
+      <div class="tile-title">Checked In</div>
+      <div class="tile-value" style="color:var(--sap-green)" id="checkedInCount">—</div>
+      <div class="tile-subtitle">Boarded</div>
+    </div>
+    <div class="tile">
+      <div class="tile-icon">⏳</div>
+      <div class="tile-title">Waiting</div>
+      <div class="tile-value" style="color:var(--sap-orange)" id="waitingCount">—</div>
+      <div class="tile-subtitle">Not arrived</div>
+    </div>
+    <div class="tile">
+      <div class="tile-icon">⚠️</div>
+      <div class="tile-title">Duplicates</div>
+      <div class="tile-value" style="color:var(--sap-red)" id="duplicateCount">—</div>
+      <div class="tile-subtitle">Warnings</div>
+    </div>
+  </div>
+
+  <!-- PROGRESS -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-header-icon">📊</span>
+      <span class="panel-header-title">Overall Progress</span>
+    </div>
+    <div class="panel-body">
+      <div class="stats-row">
+        <div class="stat-box">
+          <div class="stat-label">Check-In Rate</div>
+          <div class="stat-value" id="checkinRate">0%</div>
+        </div>
+        <div class="stat-box" style="border-left-color:var(--sap-orange)">
+          <div class="stat-label">Waiting Rate</div>
+          <div class="stat-value" id="waitingRate">0%</div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+        <span style="font-weight:500">Check-In Progress</span>
+        <span style="font-size:12px;color:var(--sap-gray)" id="progressPercent">0%</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill" style="width:0%"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BUS -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-header-icon">🚌</span>
+      <span class="panel-header-title">Bus Distribution & Remaining</span>
+    </div>
+    <div class="panel-body" id="busDistribution">
+      <p style="text-align:center;color:var(--sap-gray)">Loading data...</p>
+    </div>
+  </div>
+
+  <!-- DUPLICATES -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-header-icon">⚠️</span>
+      <span class="panel-header-title">Duplicate Check-Ins</span>
+    </div>
+    <div class="panel-body">
+      <table>
+        <thead>
+          <tr><th>Student ID</th><th>Name</th><th>Count</th></tr>
+        </thead>
+        <tbody id="duplicatesTable">
+          <tr><td colspan="3" style="text-align:center;color:var(--sap-gray)" class="status-ok">✓ No duplicates detected</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div style="text-align:center;padding:20px;color:var(--sap-gray);font-size:12px">
+    🔄 Auto-refresh every 15 seconds | Last updated: <span id="lastUpdate">--:--:--</span>
+  </div>
+
+</div>
+
+<script>
+// ===== CLOCK =====
+function updateTime() {
+  var now = new Date();
+  document.getElementById('currentTime').textContent = now.toLocaleTimeString('en-US');
+  document.getElementById('lastUpdate').textContent = now.toLocaleTimeString('en-US');
+}
+setInterval(updateTime, 1000);
+updateTime();
+
+// ===== JSONP CALLBACK - هذا يتجاوز CORS تماماً =====
+function handleSheetData(response) {
+  if (!response || !response.table || !response.table.rows) {
+    document.getElementById('busDistribution').innerHTML =
+      '<p style="text-align:center;color:red">No data found</p>';
+    return;
+  }
+
+  var rows = response.table.rows;
+  var total = 0, checkedIn = 0, waiting = 0;
+  var busMap = {};
+  var checkinIds = {};
+  var duplicates = [];
+
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i];
+    var cells = row.c;
+    
+    // A=StudentID, B=Name, C=Team, D=Bus, E=Contact, F=Class, G=Photo, H=CheckIn, I=CheckOut, J=Status
+    var id = cells[0] ? String(cells[0].v) : '';
+    var name = cells[1] ? String(cells[1].v) : '';
+    var bus = cells[3] ? String(cells[3].v) : '';
+    var checkInTime = cells[7] ? String(cells[7].v) : '';
+
+    if (!id || id === '' || id === 'Student ID') continue;
+
+    total++;
+
+    var busKey = bus || 'Unknown';
+    if (!busMap[busKey]) {
+      busMap[busKey] = { checkedIn: 0, capacity: 0 };
+    }
+    busMap[busKey].capacity++;
+
+    if (checkInTime && checkInTime !== '') {
+      checkedIn++;
+      busMap[busKey].checkedIn++;
+
+      if (checkinIds[id]) {
+        checkinIds[id].count++;
+        if (checkinIds[id].count === 2) {
+          duplicates.push({ id: id, name: name, count: checkinIds[id].count });
+        }
+      } else {
+        checkinIds[id] = { id: id, name: name, count: 1 };
+      }
+    } else {
+      waiting++;
+    }
+  }
+
+  // === UPDATE TILES ===
+  document.getElementById('totalStudents').textContent = total;
+  document.getElementById('checkedInCount').textContent = checkedIn;
+  document.getElementById('waitingCount').textContent = waiting;
+  document.getElementById('duplicateCount').textContent = duplicates.length;
+
+  // === UPDATE PROGRESS ===
+  var checkinRate = total > 0 ? Math.round((checkedIn / total) * 100) : 0;
+  var waitingRate = total > 0 ? Math.round((waiting / total) * 100) : 0;
+  document.getElementById('checkinRate').textContent = checkinRate + '%';
+  document.getElementById('waitingRate').textContent = waitingRate + '%';
+  document.getElementById('progressPercent').textContent = checkinRate + '%';
+  document.getElementById('progressFill').style.width = checkinRate + '%';
+
+  // === UPDATE BUS DISTRIBUTION ===
+  var busDiv = document.getElementById('busDistribution');
+  busDiv.innerHTML = '';
+
+  var busKeys = Object.keys(busMap).sort();
+  for (var b = 0; b < busKeys.length; b++) {
+    var key = busKeys[b];
+    var busData = busMap[key];
+    var remaining = busData.capacity - busData.checkedIn;
+    var pct = busData.capacity > 0 ? Math.round((busData.checkedIn / busData.capacity) * 100) : 0;
+
+    var card = document.createElement('div');
+    card.className = 'bus-card';
+    card.innerHTML =
+      '<div class="bus-card-header">' +
+        '<div class="bus-name">🚌 Bus ' + key + '</div>' +
+        '<div class="remaining">Remaining: ' + remaining + '/' + busData.capacity + '</div>' +
+      '</div>' +
+      '<div class="bus-stats">' +
+        '<div class="bus-stat"><div class="bus-stat-label">Checked In</div><div class="bus-stat-value">' + busData.checkedIn + '</div></div>' +
+        '<div class="bus-stat"><div class="bus-stat-label">Capacity</div><div class="bus-stat-value">' + busData.capacity + '</div></div>' +
+        '<div class="bus-stat"><div class="bus-stat-label">Occupancy</div><div class="bus-stat-value">' + pct + '%</div></div>' +
+      '</div>' +
+      '<div class="progress-bar"><div class="progress-fill" style="width:' + pct + '%"></div></div>';
+    busDiv.appendChild(card);
+  }
+
+  // === UPDATE DUPLICATES TABLE ===
+  var dupTable = document.getElementById('duplicatesTable');
+  if (duplicates.length === 0) {
+    dupTable.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--sap-green)" class="status-ok">✓ No duplicates detected</td></tr>';
+  } else {
+    dupTable.innerHTML = '';
+    for (var d = 0; d < duplicates.length; d++) {
+      var dup = duplicates[d];
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td><strong>' + dup.id + '</strong></td>' +
+        '<td>' + dup.name + '</td>' +
+        '<td><span class="badge badge-dup">⚠️ ' + dup.count + 'x</span></td>';
+      dupTable.appendChild(tr);
+    }
+  }
+}
+
+// ===== LOAD DATA VIA JSONP (NO CORS!) =====
+function loadData() {
+  // Remove old script tags
+  var oldScripts = document.querySelectorAll('script[data-jsonp]');
+  for (var s = 0; s < oldScripts.length; s++) {
+    oldScripts[s].remove();
+  }
+
+  var sheetId = '1N1ZZtUyxAKfyc9UbqI0qfzhB8BLbk4abo60jCkEmHPE';
+  var url = 'https://docs.google.com/spreadsheets/d/' + sheetId + '/gviz/tq?tqx=responseHandler:handleSheetData&sheet=Bus';
+
+  var script = document.createElement('script');
+  script.setAttribute('data-jsonp', 'true');
+  script.src = url;
+  script.onerror = function() {
+    document.getElementById('busDistribution').innerHTML =
+      '<p style="text-align:center;color:red">Failed to load data. Check internet connection.</p>';
+  };
+  document.body.appendChild(script);
+}
+
+// ===== AUTO REFRESH =====
+loadData();
+setInterval(loadData, 15000);
+</script>
+
+</body>
+</html>
