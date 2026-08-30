@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QR Codes - Ready to Print</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Roboto', sans-serif;
+  background: #F8F9FA;
+  padding: 20px;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 30px;
+  background: linear-gradient(135deg, #0A6ED4 0%, #0052A3 100%);
+  color: white;
+  padding: 20px;
+  border-radius: 8px;
+}
+
+.header h1 { font-size: 24px; margin-bottom: 5px; }
+
+.controls {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.controls button {
+  padding: 12px 20px;
+  margin: 5px;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  background: #0A6ED4;
+  color: white;
+  transition: all 0.3s;
+}
+
+.controls button:hover {
+  background: #0052A3;
+  transform: translateY(-2px);
+}
+
+.qr-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.qr-card {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  border: 1px solid #D3D3D3;
+  text-align: center;
+  page-break-inside: avoid;
+}
+
+.qr-card.checked-in {
+  background: #E8F5E9;
+  border-color: #4CAF50;
+}
+
+.student-id {
+  font-size: 20px;
+  font-weight: 700;
+  color: #0A6ED4;
+  margin-bottom: 5px;
+}
+
+.student-name {
+  font-size: 14px;
+  color: #32363A;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.bus-class {
+  font-size: 12px;
+  color: #6C757D;
+  margin-bottom: 15px;
+}
+
+.qrcode {
+  display: flex;
+  justify-content: center;
+  margin: 15px 0;
+}
+
+.qrcode img {
+  max-width: 180px;
+  height: auto;
+}
+
+.status {
+  font-size: 12px;
+  padding: 8px;
+  margin-top: 10px;
+  border-radius: 4px;
+  background: #FFF3E0;
+  color: #E87722;
+}
+
+.status.checked {
+  background: #E8F5E9;
+  color: #107E3E;
+}
+
+@media print {
+  body { background: white; }
+  .header { page-break-after: avoid; }
+  .controls { display: none; }
+  .qr-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .qr-card { padding: 15px; margin-bottom: 10px; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🎫 QR Codes - Test Data</h1>
+  <p>20 طالب عشوائي للاختبار والطباعة</p>
+</div>
+
+<div class="controls">
+  <button onclick="window.print()">🖨️ اطبع الكل</button>
+  <button onclick="location.reload()">🔄 تحديث</button>
+</div>
+
+<div class="qr-grid" id="qrGrid"></div>
+
+<script>
+// Sample data - 20 students
+const students = [
+  { id: '1205', name: 'ابراهيم جسام موسى', bus: '1', class: '9' },
+  { id: '1018', name: 'الحسن احمد محمد', bus: '2', class: '9' },
+  { id: '1130', name: 'علي حسن محمد امين', bus: '2', class: '7' },
+  { id: '1145', name: 'شذى يوسف عبدالحسين', bus: '3', class: '7' },
+  { id: '1100', name: 'علي مصطفى مفضل', bus: '1', class: '9' },
+  { id: '1231', name: 'مهدي هاني فاحسين', bus: '2', class: '9' },
+  { id: '1159', name: 'محمد علي حسن', bus: '3', class: '8' },
+  { id: '1250', name: 'حسين محمد اسماعيل', bus: '1', class: '9' },
+  { id: '1081', name: 'علي ياسين محمد', bus: '4', class: '7' },
+  { id: '1248', name: 'عبدالله عمر عبدالله', bus: '2', class: '8' },
+  { id: '1229', name: 'علي حسن عديان', bus: '3', class: '9' },
+  { id: '1163', name: 'مصطفى مثير احمد', bus: '5', class: '9' },
+  { id: '1180', name: 'علي هلال حسن', bus: '1', class: '9' },
+  { id: '838', name: 'علي زهير عديان', bus: '2', class: '7' },
+  { id: '1017', name: 'علي احمد مال الله', bus: '3', class: '11' },
+  { id: '1242', name: 'عبدالله ابراهيم عبدالله', bus: '4', class: '10' },
+  { id: '1026', name: 'حسين صادق توفيق', bus: '1', class: '9' },
+  { id: '1185', name: 'صادق حسين صادق آل حمد', bus: '2', class: '7' },
+  { id: '959', name: 'مهدي نايف الشريري', bus: '3', class: '8' },
+  { id: '788', name: 'علي علي الموالي', bus: '5', class: '7' }
+];
+
+function generateAllQRs() {
+  const grid = document.getElementById('qrGrid');
+  grid.innerHTML = '';
+
+  students.forEach((student, index) => {
+    const card = document.createElement('div');
+    card.className = 'qr-card';
+    card.id = `card-${student.id}`;
+    
+    card.innerHTML = `
+      <div class="student-id">${student.id}</div>
+      <div class="student-name">${student.name}</div>
+      <div class="bus-class">Bus ${student.bus} | Class ${student.class}</div>
+      <div class="qrcode" id="qr-${student.id}"></div>
+      <div class="status">⏳ Waiting</div>
+    `;
+    
+    grid.appendChild(card);
+
+    // Generate QR code
+    new QRCode(document.getElementById(`qr-${student.id}`), {
+      text: student.id,
+      width: 180,
+      height: 180,
+      colorDark: '#0A6ED4',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.H
+    });
+  });
+
+  // Simulate check-in for demonstration
+  setTimeout(() => {
+    const randomStudent = students[Math.floor(Math.random() * students.length)];
+    markAsCheckedIn(randomStudent.id);
+  }, 2000);
+}
+
+function markAsCheckedIn(studentId) {
+  const card = document.getElementById(`card-${studentId}`);
+  if (card) {
+    card.classList.add('checked-in');
+    const status = card.querySelector('.status');
+    status.textContent = '✅ Checked In';
+    status.classList.add('checked');
+  }
+}
+
+// Generate all QRs on page load
+window.addEventListener('load', generateAllQRs);
+
+// Simulate scanning for demonstration
+document.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') {
+    const randomStudent = students[Math.floor(Math.random() * students.length)];
+    markAsCheckedIn(randomStudent.id);
+  }
+});
+</script>
+
+</body>
+</html>
