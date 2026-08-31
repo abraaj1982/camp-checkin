@@ -195,14 +195,15 @@ select:focus, input:focus {
 }
 
 .student-avatar {
-  width: 180px;
-  height: 180px;
+  width: 240px;
+  height: 240px;
   border-radius: 12px;
   margin: 0 auto 20px;
   object-fit: cover;
-  border: 4px solid var(--sap-blue);
-  box-shadow: 0 8px 24px rgba(10, 110, 212, 0.3);
+  border: 6px solid var(--sap-blue);
+  box-shadow: 0 12px 32px rgba(10, 110, 212, 0.4);
   transition: transform 0.3s ease;
+  background: var(--sap-bg);
 }
 
 .student-name {
@@ -394,6 +395,23 @@ fieldset:disabled {
   animation: flash-success 0.6s ease-out;
 }
 
+/* ===== VERIFY IDENTITY ===== */
+#verifyIdentityBtn {
+  box-shadow: 0 4px 12px rgba(16, 126, 62, 0.3);
+  font-size: 16px;
+}
+
+#verifyIdentityBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(16, 126, 62, 0.4);
+}
+
+#verifyIdentityBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
 /* ===== PRINT STYLES ===== */
 @media print {
   .topbar button { display: none; }
@@ -415,8 +433,8 @@ fieldset:disabled {
   <!-- TOPBAR -->
   <div class="topbar">
     <div>
-      <h1>🏕️ Teaching Activity Camp</h1>
-      <p>Supervisor Station | Real-Time Check-In System</p>
+      <h1>🏕️ Teaching Activity Camp - مخيم نشاط التدريس</h1>
+      <p>Supervisor Station | Real-Time Check-In System | محطة المشرفين</p>
     </div>
     <button onclick="window.print()" style="position: absolute; top: 20px; right: 20px; padding: 8px 16px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; border-radius: 4px; cursor: pointer; font-weight: 600;">🖨️ Print</button>
   </div>
@@ -482,7 +500,18 @@ fieldset:disabled {
 
   <!-- STUDENT INFORMATION -->
   <div id="studentInfo" class="student-info">
-    <img id="studentAvatar" class="student-avatar" src="" alt="Student Avatar">
+    <div style="position: relative; margin-bottom: 20px;">
+      <img id="studentAvatar" class="student-avatar" src="" alt="Student Avatar">
+      <div style="text-align: center; margin-top: 12px;">
+        <button class="btn btn-primary" id="verifyIdentityBtn" style="width: auto; padding: 10px 24px; background: var(--sap-green); font-weight: 600;">
+          ✅ Verify Identity & Proceed
+        </button>
+        <div style="font-size: 12px; color: var(--sap-gray); margin-top: 8px;">
+          Compare photo with student's face
+        </div>
+      </div>
+    </div>
+
     <div class="student-name" id="studentNameDisplay"></div>
 
     <div class="student-meta">
@@ -546,6 +575,7 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzgefJhXNF4PRen
 let html5QrcodeScanner = null;
 let currentStudent = null;
 let cameraStarted = false;
+let identityVerified = false;
 
 // Update Date & Time
 function updateDateTime() {
@@ -553,6 +583,18 @@ function updateDateTime() {
   const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
   document.getElementById('dateTime').value = now.toLocaleString('en-US', options);
 }
+
+// Verify Identity Button
+document.getElementById('verifyIdentityBtn').addEventListener('click', function() {
+  identityVerified = true;
+  this.textContent = '✅ Identity Verified!';
+  this.disabled = true;
+  this.style.background = 'var(--sap-green)';
+  showAlert('Identity Verified', 'success', '✅ Photo verified. You can now proceed with Check-In/Out.');
+  setTimeout(() => {
+    document.getElementById('actionButtons').scrollIntoView({ behavior: 'smooth' });
+  }, 300);
+});
 
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
@@ -704,10 +746,19 @@ function displayStudent(student) {
   document.getElementById('studentClassDisplay').textContent = student.className;
   document.getElementById('studentTeamDisplay').textContent = student.teamName;
   document.getElementById('studentBusDisplay').textContent = student.busNumber;
+
+  // Reset identity verification
+  identityVerified = false;
+  const verifyBtn = document.getElementById('verifyIdentityBtn');
+  verifyBtn.textContent = '✅ Verify Identity & Proceed';
+  verifyBtn.disabled = false;
+  verifyBtn.style.background = 'var(--sap-green)';
+
+  // Load student photo
   document.getElementById('studentAvatar').src = student.photoUrl;
   document.getElementById('studentAvatar').onerror = function() {
     this.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(
-      '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><rect width="120" height="120" fill="%23E8F4FD"/><text x="50%" y="55%" font-size="48" text-anchor="middle" fill="%230A6ED4">👤</text></svg>'
+      '<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240"><rect width="240" height="240" fill="%23E8F4FD"/><circle cx="120" cy="80" r="40" fill="%230A6ED4"/><ellipse cx="120" cy="170" rx="60" ry="50" fill="%230A6ED4"/></svg>'
     );
   };
   document.getElementById('studentIdInput').value = student.studentId;
@@ -717,7 +768,10 @@ function displayStudent(student) {
   infoBox.classList.remove('scan-flash');
   void infoBox.offsetWidth; // restart animation
   infoBox.classList.add('scan-flash');
+
+  // Show action buttons but keep them disabled until identity is verified
   document.getElementById('actionButtons').style.display = 'block';
+  setActionButtonsDisabled(true);
 }
 
 // Check for Duplicate
@@ -757,6 +811,11 @@ document.getElementById('withdrawnBtn').addEventListener('click', function() {
 // Save Check-In/Out
 function saveCheckInOut(action) {
   if (!currentStudent) return;
+
+  if (!identityVerified) {
+    showAlert('Identity Not Verified', 'warning', '⚠️ Please verify the student\'s identity first by clicking "Verify Identity & Proceed"');
+    return;
+  }
 
   setActionButtonsDisabled(true);
   showLoading(true);
@@ -811,6 +870,7 @@ document.getElementById('resetBtn').addEventListener('click', function() {
 
 function resetStudent() {
   currentStudent = null;
+  identityVerified = false;
   document.getElementById('studentInfo').classList.remove('show');
   document.getElementById('actionButtons').style.display = 'none';
   document.getElementById('studentIdInput').value = '';
