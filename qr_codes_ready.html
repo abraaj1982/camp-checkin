@@ -129,13 +129,14 @@ body {
 <body>
 
 <div class="header">
-  <h1>🎫 QR Codes - Test Data</h1>
-  <p>20 طالب عشوائي للاختبار والطباعة</p>
+  <h1>🎫 Teaching Activity Camp - QR Codes</h1>
+  <p>مخيم نشاط التدريس | 20 Student QR Codes for Print & Testing</p>
 </div>
 
 <div class="controls">
-  <button onclick="window.print()">🖨️ اطبع الكل</button>
-  <button onclick="location.reload()">🔄 تحديث</button>
+  <button onclick="window.print()">🖨️ Print All</button>
+  <button onclick="location.reload()">🔄 Refresh</button>
+  <button onclick="exportQRPDF()">📥 Export PDF</button>
 </div>
 
 <div class="qr-grid" id="qrGrid"></div>
@@ -222,7 +223,37 @@ document.addEventListener('keypress', (e) => {
     markAsCheckedIn(randomStudent.id);
   }
 });
+
+// Export as PDF
+function exportQRPDF() {
+  const element = document.getElementById('qrGrid');
+  if (!window.html2pdf) {
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+    document.head.appendChild(script);
+    script.onload = function() {
+      const opt = {
+        margin: 5,
+        filename: `Teaching_Activity_Camp_QR_Codes_${new Date().toISOString().split('T')[0]}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
+      };
+      window.html2pdf().set(opt).from(element).save();
+    };
+  } else {
+    const opt = {
+      margin: 5,
+      filename: `Teaching_Activity_Camp_QR_Codes_${new Date().toISOString().split('T')[0]}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2 },
+      jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
+    };
+    window.html2pdf().set(opt).from(element).save();
+  }
+}
 </script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
 </body>
 </html>

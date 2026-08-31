@@ -478,6 +478,23 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* ===== PRINT STYLES ===== */
+@media print {
+  .sidebar { display: none; }
+  .main-content { margin-left: 0; }
+  .topbar-right button { display: none; }
+  .content { padding: 20px; }
+  .tiles-grid { page-break-after: avoid; }
+  .dashboard-row { page-break-inside: avoid; }
+  .activity-panel { page-break-inside: avoid; }
+  body { background: white; }
+  .tile, .chart-panel, .activity-panel {
+    box-shadow: none;
+    border: 1px solid #999;
+    page-break-inside: avoid;
+  }
+}
 </style>
 </head>
 <body>
@@ -486,7 +503,7 @@ body {
 <div class="sidebar">
   <div class="sidebar-header">
     <div class="sidebar-logo">🏕️</div>
-    <div class="sidebar-title">Camp Check-In</div>
+    <div class="sidebar-title">Teaching Activity Camp</div>
   </div>
 
   <ul class="sidebar-nav">
@@ -519,6 +536,10 @@ body {
       <div>
         <div class="topbar-time" id="currentTime">--:-- --</div>
         <div class="last-updated">Last updated: just now</div>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button onclick="window.print()" style="padding: 8px 16px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600;">🖨️ Print</button>
+        <button onclick="exportPDF()" style="padding: 8px 16px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600;">📥 Export PDF</button>
       </div>
     </div>
   </div>
@@ -844,6 +865,29 @@ function updateTime() {
   document.getElementById('currentTime').textContent = `${hours}:${mins}:${secs}`;
 }
 
+function exportPDF() {
+  const element = document.querySelector('.content');
+  const opt = {
+    margin: 10,
+    filename: `Teaching_Activity_Camp_Report_${new Date().toISOString().split('T')[0]}.pdf`,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2 },
+    jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
+  };
+
+  // Load html2pdf library if not already loaded
+  if (!window.html2pdf) {
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+    document.head.appendChild(script);
+    script.onload = function() {
+      window.html2pdf().set(opt).from(element).save();
+    };
+  } else {
+    window.html2pdf().set(opt).from(element).save();
+  }
+}
+
 // Load data
 function loadData() {
   const script = document.createElement('script');
@@ -856,6 +900,7 @@ loadData();
 setInterval(loadData, 5000);
 setInterval(updateTime, 1000);
 </script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
 </body>
 </html>
