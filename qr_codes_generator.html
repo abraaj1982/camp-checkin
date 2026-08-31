@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QR Code Generator - Live Data</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Roboto', sans-serif;
+  background: linear-gradient(135deg, #0A6ED4 0%, #0052A3 100%);
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 30px;
+  background: white;
+  padding: 30px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.header h1 {
+  font-size: 32px;
+  color: #0A6ED4;
+  margin-bottom: 10px;
+}
+
+.header p {
+  font-size: 14px;
+  color: #6C757D;
+  margin-bottom: 20px;
+}
+
+.controls {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.controls button {
+  padding: 12px 20px;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  background: #0A6ED4;
+  color: white;
+  transition: all 0.3s;
+}
+
+.controls button:hover {
+  background: #0052A3;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.controls button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.status {
+  text-align: center;
+  padding: 15px;
+  background: white;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  font-size: 13px;
+  color: #0A6ED4;
+}
+
+.status.loading {
+  background: #E8F4FD;
+  color: #0A6ED4;
+}
+
+.status.error {
+  background: #FADAD4;
+  color: #C30C13;
+}
+
+.status.success {
+  background: #E1F5EB;
+  color: #107E3E;
+}
+
+.qr-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.qr-card {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 1px solid #D3D3D3;
+  text-align: center;
+  transition: all 0.3s;
+  page-break-inside: avoid;
+}
+
+.qr-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+}
+
+.student-id {
+  font-size: 20px;
+  font-weight: 700;
+  color: #0A6ED4;
+  margin-bottom: 5px;
+}
+
+.student-name {
+  font-size: 14px;
+  color: #32363A;
+  margin-bottom: 8px;
+  font-weight: 500;
+  word-break: break-word;
+}
+
+.bus-class {
+  font-size: 12px;
+  color: #6C757D;
+  margin-bottom: 15px;
+}
+
+.qrcode {
+  display: flex;
+  justify-content: center;
+  margin: 15px 0;
+}
+
+.qrcode img {
+  max-width: 180px;
+  height: auto;
+}
+
+.badge {
+  display: inline-block;
+  padding: 6px 12px;
+  background: #E8F4FD;
+  color: #0A6ED4;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 10px;
+}
+
+.no-data {
+  background: white;
+  padding: 40px;
+  border-radius: 8px;
+  text-align: center;
+  color: #6C757D;
+}
+
+.no-data h2 {
+  color: #C30C13;
+  margin-bottom: 10px;
+}
+
+@media print {
+  body { background: white; }
+  .header { page-break-after: avoid; }
+  .controls { display: none; }
+  .status { display: none; }
+  .qr-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .qr-card { padding: 15px; margin-bottom: 10px; }
+}
+
+@media (max-width: 768px) {
+  .qr-grid { grid-template-columns: repeat(2, 1fr); }
+  .header h1 { font-size: 24px; }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <div class="header">
+    <h1>🎫 QR Code Generator</h1>
+    <p>Camp Check-In - Live Data from Google Sheets</p>
+    <div style="font-size: 12px; color: #6C757D;">
+      Reading from: <strong>Sheet ID: 1N1ZZtUyxAKfyc9UbqI0qfzhB8BLbk4abo60jCkEmHPE</strong>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="printBtn" onclick="window.print()">🖨️ Print All</button>
+    <button id="refreshBtn" onclick="loadData()">🔄 Refresh</button>
+    <button id="downloadBtn" onclick="downloadPDF()">📥 Download PDF</button>
+  </div>
+
+  <div id="status" class="status loading">⏳ Loading data from Google Sheets...</div>
+
+  <div class="qr-grid" id="qrGrid">
+    <div class="no-data">
+      <h2>Loading...</h2>
+      <p>Please wait while we fetch the data from Google Sheets</p>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+<script>
+const SHEET_ID = '1N1ZZtUyxAKfyc9UbqI0qfzhB8BLbk4abo60jCkEmHPE';
+const MAX_STUDENTS = 15; // عدد الطلبة للتجربة
+
+// ===== JSONP CALLBACK =====
+function handleQRData(response) {
+  if (!response || !response.table || !response.table.rows) {
+    showStatus('❌ No data found', 'error');
+    document.getElementById('qrGrid').innerHTML =
+      '<div class="no-data"><h2>No Data</h2><p>Could not fetch student data. Make sure the sheet is public.</p></div>';
+    return;
+  }
+
+  const rows = response.table.rows;
+  const students = [];
+
+  // اقرأ أول 15 طالب
+  for (let i = 0; i < Math.min(rows.length, MAX_STUDENTS); i++) {
+    const cells = rows[i].c;
+
+    // A=StudentID, B=Name, C=Team, D=Bus, E=Contact, F=Class, G=Photo, H=CheckIn, I=CheckOut, J=Status
+    const id = cells[0] ? String(cells[0].v).trim() : '';
+    const name = cells[1] ? String(cells[1].v).trim() : '';
+    const bus = cells[3] ? String(cells[3].v).trim() : '';
+    const className = cells[5] ? String(cells[5].v).trim() : '';
+
+    if (!id || id === 'Student ID') continue;
+
+    students.push({
+      id: id,
+      name: name,
+      bus: bus || 'N/A',
+      class: className || 'N/A'
+    });
+  }
+
+  if (students.length === 0) {
+    showStatus('❌ No valid students found', 'error');
+    document.getElementById('qrGrid').innerHTML =
+      '<div class="no-data"><h2>No Students</h2><p>Could not parse any student records.</p></div>';
+    return;
+  }
+
+  generateQRCodes(students);
+  showStatus(`✅ Loaded ${students.length} students successfully!`, 'success');
+}
+
+function generateQRCodes(students) {
+  const grid = document.getElementById('qrGrid');
+  grid.innerHTML = '';
+
+  students.forEach((student, index) => {
+    const card = document.createElement('div');
+    card.className = 'qr-card';
+    card.id = `card-${student.id}`;
+
+    card.innerHTML = `
+      <div class="student-id">${student.id}</div>
+      <div class="student-name">${student.name}</div>
+      <div class="bus-class">Bus ${student.bus} | Class ${student.class}</div>
+      <div class="qrcode" id="qr-${student.id}"></div>
+      <div class="badge">Camp Check-In</div>
+    `;
+
+    grid.appendChild(card);
+
+    // توليد QR code - يحتوي على معرّف الطالب فقط
+    setTimeout(() => {
+      new QRCode(document.getElementById(`qr-${student.id}`), {
+        text: student.id,
+        width: 180,
+        height: 180,
+        colorDark: '#0A6ED4',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.H
+      });
+    }, index * 50); // تأخير صغير لتجنب التأخيرات
+  });
+}
+
+function showStatus(message, type = 'success') {
+  const statusEl = document.getElementById('status');
+  statusEl.textContent = message;
+  statusEl.className = 'status ' + type;
+}
+
+function loadData() {
+  showStatus('⏳ Loading data from Google Sheets...', 'loading');
+
+  // حذف السكريبت القديم
+  const oldScript = document.querySelector('script[data-jsonp="qr"]');
+  if (oldScript) oldScript.remove();
+
+  // بناء رابط جديد
+  const url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID +
+    '/gviz/tq?tqx=responseHandler:handleQRData&sheet=Bus';
+
+  const script = document.createElement('script');
+  script.setAttribute('data-jsonp', 'qr');
+  script.src = url;
+  script.onerror = function() {
+    showStatus('❌ Failed to load data. Check internet connection or sheet permissions.', 'error');
+    document.getElementById('qrGrid').innerHTML =
+      '<div class="no-data"><h2>Connection Error</h2><p>Make sure the Google Sheet is public and accessible.</p></div>';
+  };
+  document.body.appendChild(script);
+}
+
+function downloadPDF() {
+  const element = document.getElementById('qrGrid');
+  const opt = {
+    margin: 10,
+    filename: 'qr_codes_' + new Date().toISOString().split('T')[0] + '.pdf',
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2 },
+    jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
+  };
+  html2pdf().set(opt).from(element).save();
+}
+
+// تحميل البيانات عند فتح الصفحة
+window.addEventListener('load', loadData);
+</script>
+
+</body>
+</html>
