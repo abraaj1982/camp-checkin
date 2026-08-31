@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Camp Check-In Supervisor Portal</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsqrcode/0.0.1/jsqrcode.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.4/html5-qrcode.min.js"></script>
 <style>
 :root {
@@ -142,6 +141,12 @@ select:focus, input:focus {
 
 .btn-primary:active {
   transform: scale(0.98);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .btn-success {
@@ -355,6 +360,38 @@ textarea:focus {
   border-color: var(--sap-blue);
   box-shadow: 0 0 0 3px rgba(10, 110, 212, 0.1);
 }
+
+/* ===== SCAN HINT / LOCK STATE ===== */
+.hint {
+  font-size: 12px;
+  color: var(--sap-gray);
+  margin-top: 8px;
+}
+
+.hint-warning {
+  color: var(--sap-orange);
+  font-weight: 500;
+}
+
+fieldset {
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+fieldset:disabled {
+  opacity: 0.55;
+}
+
+/* Flash feedback when a QR scan resolves */
+@keyframes flash-success {
+  0% { box-shadow: 0 0 0 0 rgba(16, 126, 62, 0.5); }
+  100% { box-shadow: 0 0 0 16px rgba(16, 126, 62, 0); }
+}
+
+.student-info.scan-flash {
+  animation: flash-success 0.6s ease-out;
+}
 </style>
 </head>
 <body>
@@ -404,23 +441,26 @@ textarea:focus {
       <span>QR Code Scanner</span>
     </div>
 
-    <button class="btn btn-primary" id="startCameraBtn">
-      📱 Start Camera
-    </button>
+    <fieldset id="scanFieldset" disabled>
+      <button class="btn btn-primary" id="startCameraBtn">
+        📱 Start Camera
+      </button>
 
-    <div id="qr-reader" style="margin-top: 20px;"></div>
-    <div class="camera-placeholder" id="cameraPlaceholder">
-      📱 Camera will appear here
-    </div>
+      <div id="qr-reader" style="margin-top: 20px;"></div>
+      <div class="camera-placeholder" id="cameraPlaceholder">
+        📱 Camera will appear here
+      </div>
 
-    <div class="form-group">
-      <label>Or Enter Student ID Manually</label>
-      <input type="text" id="studentIdInput" placeholder="Enter Student ID (e.g., 1205)">
-    </div>
+      <div class="form-group">
+        <label>Or Enter Student ID Manually</label>
+        <input type="text" id="studentIdInput" placeholder="Enter Student ID (e.g., 1205)" inputmode="numeric" autocomplete="off">
+      </div>
 
-    <button class="btn btn-primary" id="searchBtn" style="margin-top: 12px;">
-      🔍 Search Student
-    </button>
+      <button class="btn btn-primary" id="searchBtn" style="margin-top: 12px;">
+        🔍 Search Student
+      </button>
+    </fieldset>
+    <div class="hint hint-warning" id="scanLockHint">⚠️ Select your name above to unlock the scanner</div>
   </div>
 
   <!-- STUDENT INFORMATION -->
@@ -501,7 +541,7 @@ function updateDateTime() {
 document.addEventListener('DOMContentLoaded', function() {
   updateDateTime();
   setInterval(updateDateTime, 1000);
-  
+
   // Load saved supervisor name
   const savedSupervisor = localStorage.getItem('supervisorName');
   if (savedSupervisor) {
@@ -509,7 +549,16 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('supervisorName').disabled = true;
     document.getElementById('changeSupervisorBtn').style.display = 'block';
   }
+
+  updateScanLock();
 });
+
+// Enable/disable the scanner based on whether a supervisor is selected
+function updateScanLock() {
+  const hasSupervisor = !!document.getElementById('supervisorName').value;
+  document.getElementById('scanFieldset').disabled = !hasSupervisor;
+  document.getElementById('scanLockHint').style.display = hasSupervisor ? 'none' : 'block';
+}
 
 // Change Supervisor
 document.getElementById('changeSupervisorBtn').addEventListener('click', function() {
@@ -517,6 +566,9 @@ document.getElementById('changeSupervisorBtn').addEventListener('click', functio
   document.getElementById('supervisorName').value = '';
   document.getElementById('supervisorName').disabled = false;
   document.getElementById('changeSupervisorBtn').style.display = 'none';
+  stopQRScanner();
+  resetStudent();
+  updateScanLock();
 });
 
 // Save supervisor name
@@ -527,6 +579,7 @@ document.getElementById('supervisorName').addEventListener('change', function() 
     document.getElementById('changeSupervisorBtn').style.display = 'block';
     showAlert('✅ Name Saved', 'success', 'You can now start scanning QR codes!');
   }
+  updateScanLock();
 });
 
 // Start Camera
@@ -545,6 +598,14 @@ document.getElementById('searchBtn').addEventListener('click', function() {
     searchStudent(studentId);
   } else {
     showAlert('Please enter a Student ID', 'error');
+  }
+});
+
+// Enter key in the manual ID field triggers a search
+document.getElementById('studentIdInput').addEventListener('keypress', function(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    document.getElementById('searchBtn').click();
   }
 });
 
@@ -577,6 +638,7 @@ function stopQRScanner() {
 function onQRCodeScanned(result) {
   const studentId = result.trim();
   if (studentId) {
+    if (navigator.vibrate) navigator.vibrate(120);
     searchStudent(studentId);
     stopQRScanner();
   }
@@ -593,12 +655,14 @@ function searchStudent(studentId) {
     return;
   }
 
+  document.getElementById('searchBtn').disabled = true;
   showLoading(true);
 
   fetch(`${APPS_SCRIPT_URL}?action=lookup&studentId=${encodeURIComponent(studentId)}`)
     .then(res => res.json())
     .then(data => {
       showLoading(false);
+      document.getElementById('searchBtn').disabled = false;
 
       if (data.found) {
         currentStudent = data;
@@ -611,6 +675,7 @@ function searchStudent(studentId) {
     })
     .catch(err => {
       showLoading(false);
+      document.getElementById('searchBtn').disabled = false;
       showAlert('Error searching student: ' + err.message, 'error');
     });
 }
@@ -623,9 +688,18 @@ function displayStudent(student) {
   document.getElementById('studentTeamDisplay').textContent = student.teamName;
   document.getElementById('studentBusDisplay').textContent = student.busNumber;
   document.getElementById('studentAvatar').src = student.photoUrl;
+  document.getElementById('studentAvatar').onerror = function() {
+    this.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><rect width="120" height="120" fill="%23E8F4FD"/><text x="50%" y="55%" font-size="48" text-anchor="middle" fill="%230A6ED4">👤</text></svg>'
+    );
+  };
   document.getElementById('studentIdInput').value = student.studentId;
 
-  document.getElementById('studentInfo').classList.add('show');
+  const infoBox = document.getElementById('studentInfo');
+  infoBox.classList.add('show');
+  infoBox.classList.remove('scan-flash');
+  void infoBox.offsetWidth; // restart animation
+  infoBox.classList.add('scan-flash');
   document.getElementById('actionButtons').style.display = 'block';
 }
 
@@ -667,6 +741,7 @@ document.getElementById('withdrawnBtn').addEventListener('click', function() {
 function saveCheckInOut(action) {
   if (!currentStudent) return;
 
+  setActionButtonsDisabled(true);
   showLoading(true);
 
   const data = {
@@ -695,13 +770,21 @@ function saveCheckInOut(action) {
           resetStudent();
         }, 2000);
       } else {
+        setActionButtonsDisabled(false);
         showAlert('Error saving data', 'error', data.error);
       }
     })
     .catch(err => {
       showLoading(false);
+      setActionButtonsDisabled(false);
       showAlert('Error: ' + err.message, 'error');
     });
+}
+
+function setActionButtonsDisabled(disabled) {
+  ['checkInBtn', 'checkOutBtn', 'withdrawnBtn'].forEach(id => {
+    document.getElementById(id).disabled = disabled;
+  });
 }
 
 // Reset
@@ -715,6 +798,7 @@ function resetStudent() {
   document.getElementById('actionButtons').style.display = 'none';
   document.getElementById('studentIdInput').value = '';
   document.getElementById('notesInput').value = '';
+  setActionButtonsDisabled(false);
   clearAlerts();
 }
 

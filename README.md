@@ -38,10 +38,13 @@ https://abraaj1982.github.io/camp-checkin/dashboard_v3.html
 **المميزات:**
 - 📈 إحصائيات حية Real-Time
 - 👥 عدد الطلبة الكلي
-- ✅ عدد المسجلين (Checked In)
+- ✅ عدد الموجودين في الباص الآن (On Bus)
 - ⏳ عدد المنتظرين (Waiting)
-- ⚠️ الطلبة المكررين (Duplicates)
-- 🚌 توزيع الطلبة على الباصات
+- 🚪 عدد من غادر الباص (Left)
+- ⛔ عدد المنسحبين (Withdrawn)
+- ⚠️ تنبيه المسح المكرر لنفس الطالب (Duplicates) - مبني على سجل CheckInLog
+- 🕒 سجل آخر العمليات (Recent Activity)
+- 🚌 توزيع الطلبة على الباصات مع الشواغر المتبقية
 - 📊 نسب الإشغال لكل باص
 - 🔄 تحديث تلقائي كل 15 ثانية
 
@@ -90,10 +93,10 @@ https://docs.google.com/spreadsheets/d/1N1ZZtUyxAKfyc9UbqI0qfzhB8BLbk4abo60jCkEm
 ```
 camp-checkin/
 ├── README.md                          # هذا الملف
-├── supervisor_app_professional.html   # تطبيق المشرفين
+├── supervisor_app_professional.html   # تطبيق المشرفين (مسح QR + Check-In/Out)
 ├── dashboard_v3.html                  # لوحة التحكم
-├── AppsScript_Final_v2.gs             # Google Apps Script
-└── (ملفات قديمة)
+├── qr_codes_ready.html                # توليد QR Codes للطباعة (بيانات تجريبية)
+└── AppsScript_Final_v2.gs             # Google Apps Script (Backend)
 ```
 
 ---

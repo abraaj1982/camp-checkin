@@ -211,6 +211,9 @@ tbody tr:hover { background: #F5FAFD; }
 }
 
 .badge-dup { background: #FADAD4; color: var(--sap-red); }
+.badge-checkin { background: #E1F5EB; color: var(--sap-green); }
+.badge-checkout { background: #FEF0E8; color: var(--sap-orange); }
+.badge-withdrawn { background: #EEEFF0; color: var(--sap-gray); }
 
 .status-ok { color: var(--sap-green); font-weight: 600; }
 
@@ -240,9 +243,9 @@ tbody tr:hover { background: #F5FAFD; }
     </div>
     <div class="tile">
       <div class="tile-icon">✅</div>
-      <div class="tile-title">Checked In</div>
+      <div class="tile-title">On Bus</div>
       <div class="tile-value" style="color:var(--sap-green)" id="checkedInCount">—</div>
-      <div class="tile-subtitle">Boarded</div>
+      <div class="tile-subtitle">Currently boarded</div>
     </div>
     <div class="tile">
       <div class="tile-icon">⏳</div>
@@ -251,10 +254,22 @@ tbody tr:hover { background: #F5FAFD; }
       <div class="tile-subtitle">Not arrived</div>
     </div>
     <div class="tile">
+      <div class="tile-icon">🚪</div>
+      <div class="tile-title">Left Bus</div>
+      <div class="tile-value" id="leftCount">—</div>
+      <div class="tile-subtitle">Checked out</div>
+    </div>
+    <div class="tile">
+      <div class="tile-icon">⛔</div>
+      <div class="tile-title">Withdrawn</div>
+      <div class="tile-value" style="color:var(--sap-gray)" id="withdrawnCount">—</div>
+      <div class="tile-subtitle">Cancelled</div>
+    </div>
+    <div class="tile">
       <div class="tile-icon">⚠️</div>
       <div class="tile-title">Duplicates</div>
       <div class="tile-value" style="color:var(--sap-red)" id="duplicateCount">—</div>
-      <div class="tile-subtitle">Warnings</div>
+      <div class="tile-subtitle">Repeated check-ins</div>
     </div>
   </div>
 
@@ -305,10 +320,28 @@ tbody tr:hover { background: #F5FAFD; }
     <div class="panel-body">
       <table>
         <thead>
-          <tr><th>Student ID</th><th>Name</th><th>Count</th></tr>
+          <tr><th>Student ID</th><th>Name</th><th>Times Checked In</th></tr>
         </thead>
         <tbody id="duplicatesTable">
-          <tr><td colspan="3" style="text-align:center;color:var(--sap-gray)" class="status-ok">✓ No duplicates detected</td></tr>
+          <tr><td colspan="3" style="text-align:center;color:var(--sap-gray)">Loading data...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- RECENT ACTIVITY -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-header-icon">🕒</span>
+      <span class="panel-header-title">Recent Activity</span>
+    </div>
+    <div class="panel-body">
+      <table>
+        <thead>
+          <tr><th>Time</th><th>Student</th><th>Action</th><th>Bus</th><th>Supervisor</th></tr>
+        </thead>
+        <tbody id="activityTable">
+          <tr><td colspan="5" style="text-align:center;color:var(--sap-gray)">Loading data...</td></tr>
         </tbody>
       </table>
     </div>
@@ -330,7 +363,9 @@ function updateTime() {
 setInterval(updateTime, 1000);
 updateTime();
 
-// ===== JSONP CALLBACK - هذا يتجاوز CORS تماماً =====
+var SHEET_ID = '1N1ZZtUyxAKfyc9UbqI0qfzhB8BLbk4abo60jCkEmHPE';
+
+// ===== JSONP CALLBACK for the "Bus" sheet - هذا يتجاوز CORS تماماً =====
 function handleSheetData(response) {
   if (!response || !response.table || !response.table.rows) {
     document.getElementById('busDistribution').innerHTML =
@@ -339,20 +374,19 @@ function handleSheetData(response) {
   }
 
   var rows = response.table.rows;
-  var total = 0, checkedIn = 0, waiting = 0;
+  var total = 0, onBus = 0, waiting = 0, left = 0, withdrawn = 0;
   var busMap = {};
-  var checkinIds = {};
-  var duplicates = [];
 
   for (var i = 0; i < rows.length; i++) {
     var row = rows[i];
     var cells = row.c;
-    
+
     // A=StudentID, B=Name, C=Team, D=Bus, E=Contact, F=Class, G=Photo, H=CheckIn, I=CheckOut, J=Status
     var id = cells[0] ? String(cells[0].v) : '';
-    var name = cells[1] ? String(cells[1].v) : '';
     var bus = cells[3] ? String(cells[3].v) : '';
     var checkInTime = cells[7] ? String(cells[7].v) : '';
+    var checkOutTime = cells[8] ? String(cells[8].v) : '';
+    var status = cells[9] ? String(cells[9].v).trim() : '';
 
     if (!id || id === '' || id === 'Student ID') continue;
 
@@ -360,35 +394,35 @@ function handleSheetData(response) {
 
     var busKey = bus || 'Unknown';
     if (!busMap[busKey]) {
-      busMap[busKey] = { checkedIn: 0, capacity: 0 };
+      busMap[busKey] = { onBus: 0, left: 0, withdrawn: 0, waiting: 0, capacity: 0 };
     }
     busMap[busKey].capacity++;
 
-    if (checkInTime && checkInTime !== '') {
-      checkedIn++;
-      busMap[busKey].checkedIn++;
-
-      if (checkinIds[id]) {
-        checkinIds[id].count++;
-        if (checkinIds[id].count === 2) {
-          duplicates.push({ id: id, name: name, count: checkinIds[id].count });
-        }
-      } else {
-        checkinIds[id] = { id: id, name: name, count: 1 };
-      }
+    if (status === 'Withdrawn') {
+      withdrawn++;
+      busMap[busKey].withdrawn++;
+    } else if (status === 'Left' || (checkOutTime && checkOutTime !== '')) {
+      left++;
+      busMap[busKey].left++;
+    } else if (status === 'In Bus' || (checkInTime && checkInTime !== '')) {
+      onBus++;
+      busMap[busKey].onBus++;
     } else {
       waiting++;
+      busMap[busKey].waiting++;
     }
   }
 
   // === UPDATE TILES ===
   document.getElementById('totalStudents').textContent = total;
-  document.getElementById('checkedInCount').textContent = checkedIn;
+  document.getElementById('checkedInCount').textContent = onBus;
   document.getElementById('waitingCount').textContent = waiting;
-  document.getElementById('duplicateCount').textContent = duplicates.length;
+  document.getElementById('leftCount').textContent = left;
+  document.getElementById('withdrawnCount').textContent = withdrawn;
 
   // === UPDATE PROGRESS ===
-  var checkinRate = total > 0 ? Math.round((checkedIn / total) * 100) : 0;
+  var boardedSoFar = onBus + left;
+  var checkinRate = total > 0 ? Math.round((boardedSoFar / total) * 100) : 0;
   var waitingRate = total > 0 ? Math.round((waiting / total) * 100) : 0;
   document.getElementById('checkinRate').textContent = checkinRate + '%';
   document.getElementById('waitingRate').textContent = waitingRate + '%';
@@ -403,8 +437,8 @@ function handleSheetData(response) {
   for (var b = 0; b < busKeys.length; b++) {
     var key = busKeys[b];
     var busData = busMap[key];
-    var remaining = busData.capacity - busData.checkedIn;
-    var pct = busData.capacity > 0 ? Math.round((busData.checkedIn / busData.capacity) * 100) : 0;
+    var remaining = busData.waiting;
+    var pct = busData.capacity > 0 ? Math.round(((busData.onBus + busData.left) / busData.capacity) * 100) : 0;
 
     var card = document.createElement('div');
     card.className = 'bus-card';
@@ -414,51 +448,120 @@ function handleSheetData(response) {
         '<div class="remaining">Remaining: ' + remaining + '/' + busData.capacity + '</div>' +
       '</div>' +
       '<div class="bus-stats">' +
-        '<div class="bus-stat"><div class="bus-stat-label">Checked In</div><div class="bus-stat-value">' + busData.checkedIn + '</div></div>' +
+        '<div class="bus-stat"><div class="bus-stat-label">On Bus</div><div class="bus-stat-value">' + busData.onBus + '</div></div>' +
+        '<div class="bus-stat"><div class="bus-stat-label">Left</div><div class="bus-stat-value">' + busData.left + '</div></div>' +
+        '<div class="bus-stat"><div class="bus-stat-label">Withdrawn</div><div class="bus-stat-value">' + busData.withdrawn + '</div></div>' +
         '<div class="bus-stat"><div class="bus-stat-label">Capacity</div><div class="bus-stat-value">' + busData.capacity + '</div></div>' +
         '<div class="bus-stat"><div class="bus-stat-label">Occupancy</div><div class="bus-stat-value">' + pct + '%</div></div>' +
       '</div>' +
       '<div class="progress-bar"><div class="progress-fill" style="width:' + pct + '%"></div></div>';
     busDiv.appendChild(card);
   }
+}
 
-  // === UPDATE DUPLICATES TABLE ===
+// ===== JSONP CALLBACK for the "CheckInLog" sheet =====
+// Columns written by AppsScript_Final_v2.gs: Timestamp, StudentID, Name, Bus, Supervisor, Action, Notes
+function handleLogData(response) {
+  if (!response || !response.table || !response.table.rows) {
+    document.getElementById('duplicatesTable').innerHTML =
+      '<tr><td colspan="3" style="text-align:center;color:red">No log data found</td></tr>';
+    document.getElementById('activityTable').innerHTML =
+      '<tr><td colspan="5" style="text-align:center;color:red">No log data found</td></tr>';
+    return;
+  }
+
+  var rows = response.table.rows;
+  var checkinCounts = {};
+  var entries = [];
+
+  for (var i = 0; i < rows.length; i++) {
+    var cells = rows[i].c;
+    var timestamp = cells[0] ? String(cells[0].f || cells[0].v) : '';
+    var studentId = cells[1] ? String(cells[1].v) : '';
+    var name = cells[2] ? String(cells[2].v) : '';
+    var bus = cells[3] ? String(cells[3].v) : '';
+    var supervisor = cells[4] ? String(cells[4].v) : '';
+    var action = cells[5] ? String(cells[5].v) : '';
+
+    if (!studentId) continue;
+
+    entries.push({ timestamp: timestamp, studentId: studentId, name: name, bus: bus, supervisor: supervisor, action: action });
+
+    if (action === 'check-in') {
+      if (!checkinCounts[studentId]) {
+        checkinCounts[studentId] = { id: studentId, name: name, count: 0 };
+      }
+      checkinCounts[studentId].count++;
+    }
+  }
+
+  // === DUPLICATES: students scanned as check-in more than once ===
+  var duplicates = Object.keys(checkinCounts)
+    .map(function(id) { return checkinCounts[id]; })
+    .filter(function(d) { return d.count > 1; });
+
+  document.getElementById('duplicateCount').textContent = duplicates.length;
+
   var dupTable = document.getElementById('duplicatesTable');
   if (duplicates.length === 0) {
     dupTable.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--sap-green)" class="status-ok">✓ No duplicates detected</td></tr>';
   } else {
     dupTable.innerHTML = '';
-    for (var d = 0; d < duplicates.length; d++) {
-      var dup = duplicates[d];
+    duplicates.forEach(function(dup) {
       var tr = document.createElement('tr');
       tr.innerHTML =
         '<td><strong>' + dup.id + '</strong></td>' +
         '<td>' + dup.name + '</td>' +
         '<td><span class="badge badge-dup">⚠️ ' + dup.count + 'x</span></td>';
       dupTable.appendChild(tr);
-    }
+    });
+  }
+
+  // === RECENT ACTIVITY: last 10 log entries, newest first ===
+  var recent = entries.slice(-10).reverse();
+  var actTable = document.getElementById('activityTable');
+  if (recent.length === 0) {
+    actTable.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--sap-gray)">No activity yet</td></tr>';
+  } else {
+    actTable.innerHTML = '';
+    recent.forEach(function(e) {
+      var badgeClass = e.action === 'check-in' ? 'badge-checkin' : e.action === 'check-out' ? 'badge-checkout' : 'badge-withdrawn';
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td>' + e.timestamp + '</td>' +
+        '<td><strong>' + e.name + '</strong> (' + e.studentId + ')</td>' +
+        '<td><span class="badge ' + badgeClass + '">' + e.action + '</span></td>' +
+        '<td>Bus ' + e.bus + '</td>' +
+        '<td>' + e.supervisor + '</td>';
+      actTable.appendChild(tr);
+    });
   }
 }
 
 // ===== LOAD DATA VIA JSONP (NO CORS!) =====
-function loadData() {
-  // Remove old script tags
-  var oldScripts = document.querySelectorAll('script[data-jsonp]');
-  for (var s = 0; s < oldScripts.length; s++) {
-    oldScripts[s].remove();
-  }
+function loadJsonp(sheetName, callbackName, onError) {
+  var oldScript = document.querySelector('script[data-jsonp="' + sheetName + '"]');
+  if (oldScript) oldScript.remove();
 
-  var sheetId = '1N1ZZtUyxAKfyc9UbqI0qfzhB8BLbk4abo60jCkEmHPE';
-  var url = 'https://docs.google.com/spreadsheets/d/' + sheetId + '/gviz/tq?tqx=responseHandler:handleSheetData&sheet=Bus';
+  var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID +
+    '/gviz/tq?tqx=responseHandler:' + callbackName + '&sheet=' + encodeURIComponent(sheetName);
 
   var script = document.createElement('script');
-  script.setAttribute('data-jsonp', 'true');
+  script.setAttribute('data-jsonp', sheetName);
   script.src = url;
-  script.onerror = function() {
+  script.onerror = onError;
+  document.body.appendChild(script);
+}
+
+function loadData() {
+  loadJsonp('Bus', 'handleSheetData', function() {
     document.getElementById('busDistribution').innerHTML =
       '<p style="text-align:center;color:red">Failed to load data. Check internet connection.</p>';
-  };
-  document.body.appendChild(script);
+  });
+  loadJsonp('CheckInLog', 'handleLogData', function() {
+    document.getElementById('activityTable').innerHTML =
+      '<tr><td colspan="5" style="text-align:center;color:red">Failed to load activity log.</td></tr>';
+  });
 }
 
 // ===== AUTO REFRESH =====
