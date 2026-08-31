@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Camp Check-In - Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --sap-blue: #0A6ED4;
+  --sap-green: #107E3E;
+  --sap-orange: #E87722;
+  --sap-red: #C30C13;
+  --sap-gray: #6C757D;
+  --sap-text: #32363A;
+  --sap-bg: #F8F9FA;
+  --sidebar-bg: #1A2340;
+  --sidebar-text: #FFFFFF;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  font-family: 'Roboto', sans-serif;
+  background: var(--sap-bg);
+  color: var(--sap-text);
+  display: flex;
+  flex-direction: row;
+}
+
+/* ===== SIDEBAR ===== */
+.sidebar {
+  width: 260px;
+  background: var(--sidebar-bg);
+  color: var(--sidebar-text);
+  padding: 20px 0;
+  overflow-y: auto;
+  box-shadow: 2px 0 8px rgba(0,0,0,0.15);
+  position: fixed;
+  height: 100vh;
+  left: 0;
+  top: 0;
+}
+
+.sidebar-header {
+  padding: 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.sidebar-logo {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--sap-blue);
+  margin-bottom: 8px;
+}
+
+.sidebar-title {
+  font-size: 12px;
+  color: rgba(255,255,255,0.7);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.sidebar-nav {
+  list-style: none;
+  padding: 0;
+}
+
+.sidebar-nav li {
+  margin: 0;
+}
+
+.sidebar-nav a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  color: rgba(255,255,255,0.7);
+  text-decoration: none;
+  transition: all 0.2s;
+  font-size: 14px;
+}
+
+.sidebar-nav a:hover,
+.sidebar-nav a.active {
+  background: var(--sap-blue);
+  color: white;
+  padding-left: 24px;
+}
+
+.sidebar-user {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  right: 20px;
+  padding: 12px;
+  background: rgba(10, 110, 212, 0.1);
+  border-radius: 4px;
+  text-align: center;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  padding-top: 20px;
+  margin-top: 20px;
+}
+
+.sidebar-user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--sap-blue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
+  margin: 0 auto 8px;
+}
+
+.sidebar-user-name {
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.sidebar-user-status {
+  font-size: 11px;
+  color: var(--sap-green);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.sidebar-user-status::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  background: var(--sap-green);
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* ===== MAIN CONTENT ===== */
+.main-content {
+  flex: 1;
+  margin-left: 260px;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.topbar {
+  background: linear-gradient(135deg, var(--sap-blue) 0%, #0052A3 100%);
+  color: white;
+  padding: 20px 30px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.topbar-left h1 {
+  font-size: 24px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.topbar-subtitle {
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  font-size: 13px;
+}
+
+.topbar-time {
+  opacity: 0.9;
+}
+
+.last-updated {
+  font-size: 11px;
+  opacity: 0.8;
+  color: rgba(255,255,255,0.8);
+}
+
+/* ===== CONTENT AREA ===== */
+.content {
+  flex: 1;
+  padding: 30px;
+  overflow-y: auto;
+}
+
+.tiles-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.tile {
+  background: white;
+  border-radius: 4px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  border: 1px solid #D3D3D3;
+  text-align: center;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.tile::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--sap-blue);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.3s ease;
+}
+
+.tile:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(0,0,0,0.12);
+}
+
+.tile:hover::before {
+  transform: scaleX(1);
+}
+
+.tile-icon {
+  font-size: 36px;
+  margin-bottom: 12px;
+}
+
+.tile-title {
+  font-size: 11px;
+  color: var(--sap-gray);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.tile-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--sap-text);
+  margin-bottom: 4px;
+}
+
+.tile-subtitle {
+  font-size: 12px;
+  color: var(--sap-gray);
+}
+
+/* Tile colors */
+.tile-onbus .tile-icon { color: var(--sap-green); }
+.tile-onbus .tile-value { color: var(--sap-green); }
+
+.tile-waiting .tile-icon { color: var(--sap-orange); }
+.tile-waiting .tile-value { color: var(--sap-orange); }
+
+.tile-left .tile-icon { color: var(--sap-blue); }
+.tile-left .tile-value { color: var(--sap-blue); }
+
+.tile-withdrawn .tile-icon { color: var(--sap-red); }
+.tile-withdrawn .tile-value { color: var(--sap-red); }
+
+.tile-total .tile-icon { color: var(--sap-blue); }
+.tile-total .tile-value { color: var(--sap-blue); }
+
+.tile-duplicates .tile-icon { color: #F57C00; }
+.tile-duplicates .tile-value { color: #F57C00; }
+
+/* ===== TWO COLUMN LAYOUT ===== */
+.dashboard-row {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.chart-panel {
+  background: white;
+  border-radius: 4px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  border: 1px solid #D3D3D3;
+}
+
+.panel-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sap-text);
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ===== PIE CHART ===== */
+.pie-chart-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  height: 280px;
+}
+
+.pie-chart-svg {
+  width: 200px;
+  height: 200px;
+}
+
+.pie-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.legend-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+
+.legend-text {
+  flex: 1;
+}
+
+.legend-value {
+  font-weight: 600;
+  color: var(--sap-text);
+}
+
+.legend-percent {
+  font-size: 11px;
+  color: var(--sap-gray);
+}
+
+/* ===== ACTIVITY TABLE ===== */
+.activity-panel {
+  background: white;
+  border-radius: 4px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  border: 1px solid #D3D3D3;
+  margin-bottom: 30px;
+}
+
+.activity-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.activity-table th {
+  background: var(--sap-bg);
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--sap-gray);
+  text-transform: uppercase;
+  border-bottom: 2px solid #D3D3D3;
+}
+
+.activity-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #D3D3D3;
+  font-size: 13px;
+}
+
+.activity-table tr:hover {
+  background: rgba(10, 110, 212, 0.02);
+}
+
+.activity-table tr:last-child td {
+  border-bottom: none;
+}
+
+.student-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--sap-bg);
+}
+
+.badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.badge-checkin {
+  background: rgba(16, 126, 62, 0.1);
+  color: var(--sap-green);
+}
+
+.badge-checkout {
+  background: rgba(232, 119, 34, 0.1);
+  color: var(--sap-orange);
+}
+
+.badge-withdrawn {
+  background: rgba(195, 12, 19, 0.1);
+  color: var(--sap-red);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 8px;
+}
+
+.status-dot.green { background: var(--sap-green); }
+.status-dot.orange { background: var(--sap-orange); }
+.status-dot.red { background: var(--sap-red); }
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 1200px) {
+  .dashboard-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    width: 0;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    z-index: 1000;
+  }
+
+  .sidebar.open {
+    width: 260px;
+    transform: translateX(0);
+  }
+
+  .main-content {
+    margin-left: 0;
+  }
+
+  .tiles-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  .content {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .tiles-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="sidebar-header">
+    <div class="sidebar-logo">🏕️</div>
+    <div class="sidebar-title">Camp Check-In</div>
+  </div>
+
+  <ul class="sidebar-nav">
+    <li><a href="#" class="active">📊 Dashboard</a></li>
+    <li><a href="#">📱 QR Scanner</a></li>
+    <li><a href="#">👥 Students</a></li>
+    <li><a href="#">👨‍👩‍👧 Parents</a></li>
+    <li><a href="#">👫 Groups</a></li>
+    <li><a href="#">📈 Reports</a></li>
+    <li><a href="#">📋 Check-In Log</a></li>
+    <li><a href="#">⚙️ Settings</a></li>
+  </ul>
+
+  <div class="sidebar-user">
+    <div class="sidebar-user-avatar">A</div>
+    <div class="sidebar-user-name">Admin</div>
+    <div class="sidebar-user-status">Online</div>
+  </div>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="main-content">
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <h1>Dashboard</h1>
+      <div class="topbar-subtitle">Real-time Camp Check-In Statistics</div>
+    </div>
+    <div class="topbar-right">
+      <div>
+        <div class="topbar-time" id="currentTime">--:-- --</div>
+        <div class="last-updated">Last updated: just now</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTENT AREA -->
+  <div class="content">
+    <!-- STATISTICS TILES -->
+    <div class="tiles-grid">
+      <div class="tile tile-total">
+        <div class="tile-icon">👥</div>
+        <div class="tile-title">Total Students</div>
+        <div class="tile-value" id="totalCount">0</div>
+        <div class="tile-subtitle">Registered</div>
+      </div>
+
+      <div class="tile tile-onbus">
+        <div class="tile-icon">✅</div>
+        <div class="tile-title">On Bus</div>
+        <div class="tile-value" id="onBusCount">0</div>
+        <div class="tile-subtitle">Checked In</div>
+      </div>
+
+      <div class="tile tile-waiting">
+        <div class="tile-icon">⏳</div>
+        <div class="tile-title">Waiting</div>
+        <div class="tile-value" id="waitingCount">0</div>
+        <div class="tile-subtitle">Not boarded yet</div>
+      </div>
+
+      <div class="tile tile-left">
+        <div class="tile-icon">🚪</div>
+        <div class="tile-title">Left Bus</div>
+        <div class="tile-value" id="leftCount">0</div>
+        <div class="tile-subtitle">Checked Out</div>
+      </div>
+
+      <div class="tile tile-withdrawn">
+        <div class="tile-icon">⛔</div>
+        <div class="tile-title">Withdrawn</div>
+        <div class="tile-value" id="withdrawnCount">0</div>
+        <div class="tile-subtitle">Not attending</div>
+      </div>
+
+      <div class="tile tile-duplicates">
+        <div class="tile-icon">⚠️</div>
+        <div class="tile-title">Duplicates</div>
+        <div class="tile-value" id="duplicatesCount">0</div>
+        <div class="tile-subtitle">Repeat scans</div>
+      </div>
+    </div>
+
+    <!-- CHART & ACTIVITY ROW -->
+    <div class="dashboard-row">
+      <!-- PIE CHART -->
+      <div class="chart-panel">
+        <div class="panel-title">📊 Check-In Status</div>
+        <div class="pie-chart-container">
+          <svg class="pie-chart-svg" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="40" fill="none" stroke="#E0E0E0" stroke-width="10"/>
+            <circle id="pieOnBus" cx="50" cy="50" r="40" fill="none" stroke="#107E3E" stroke-width="10"
+              stroke-dasharray="0 251" stroke-dashoffset="0" transform="rotate(-90 50 50)"
+              style="transition: stroke-dasharray 0.3s ease;"/>
+            <circle id="pieWaiting" cx="50" cy="50" r="40" fill="none" stroke="#E87722" stroke-width="10"
+              stroke-dasharray="0 251" stroke-dashoffset="0" transform="rotate(0 50 50)"
+              style="transition: stroke-dasharray 0.3s ease;"/>
+            <text x="50" y="55" text-anchor="middle" font-size="14" font-weight="bold" fill="#32363A">0%</text>
+          </svg>
+
+          <div class="pie-legend">
+            <div class="legend-item">
+              <div class="legend-color" style="background: #107E3E;"></div>
+              <div class="legend-text">
+                <div class="legend-value">On Bus</div>
+                <div class="legend-percent"><span id="legendOnBus">0</span> (0%)</div>
+              </div>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color" style="background: #E87722;"></div>
+              <div class="legend-text">
+                <div class="legend-value">Waiting</div>
+                <div class="legend-percent"><span id="legendWaiting">0</span> (0%)</div>
+              </div>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color" style="background: #C30C13;"></div>
+              <div class="legend-text">
+                <div class="legend-value">Left Bus</div>
+                <div class="legend-percent"><span id="legendLeft">0</span> (0%)</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RECENT ACTIVITY -->
+      <div class="chart-panel">
+        <div class="panel-title">🕒 Recent Activity</div>
+        <div style="overflow-x: auto;">
+          <table class="activity-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Student</th>
+                <th>Parent</th>
+                <th>Team</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="activityBody">
+              <tr><td colspan="5" style="text-align: center; color: #6C757D;">No activity yet</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- BUS DISTRIBUTION -->
+    <div class="activity-panel">
+      <div class="panel-title">🚌 Bus Distribution</div>
+      <div style="overflow-x: auto;">
+        <table class="activity-table">
+          <thead>
+            <tr>
+              <th>Bus #</th>
+              <th>Capacity</th>
+              <th>On Bus</th>
+              <th>Left</th>
+              <th>Withdrawn</th>
+              <th>Occupancy</th>
+              <th>Available</th>
+            </tr>
+          </thead>
+          <tbody id="busBody">
+            <tr><td colspan="7" style="text-align: center; color: #6C757D;">Loading bus data...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SHEET_ID = '1N1ZZtUyxAKfyc9UbqI0qfzhB8BLbk4abo60jCkEmHPE';
+const BUS_CAPACITY = { 1: 60, 2: 60, 3: 60, 4: 60, 5: 60 };
+let allStudents = [];
+
+function handleCheckInData(response) {
+  if (!response || !response.table || !response.table.rows) {
+    console.error('No data found');
+    return;
+  }
+
+  allStudents = [];
+  const rows = response.table.rows;
+
+  for (let i = 1; i < rows.length; i++) {
+    const cells = rows[i].c;
+    if (!cells || !cells[0]) continue;
+
+    const id = String(cells[0].v || '').trim();
+    if (!id) continue;
+
+    allStudents.push({
+      id: id,
+      name: String(cells[1]?.v || '').trim(),
+      team: String(cells[2]?.v || '').trim(),
+      bus: String(cells[3]?.v || '').trim(),
+      contact: String(cells[4]?.v || '').trim(),
+      className: String(cells[5]?.v || '').trim(),
+      photoUrl: String(cells[6]?.v || '').trim(),
+      checkInTime: cells[7]?.v ? String(cells[7].v).trim() : '',
+      checkOutTime: cells[8]?.v ? String(cells[8].v).trim() : '',
+      status: String(cells[9]?.v || 'Waiting').trim()
+    });
+  }
+
+  updateDashboard();
+}
+
+function updateDashboard() {
+  if (allStudents.length === 0) return;
+
+  // Calculate statistics
+  const onBus = allStudents.filter(s => s.status === 'In Bus').length;
+  const waiting = allStudents.filter(s => s.status === 'Waiting').length;
+  const left = allStudents.filter(s => s.status === 'Left').length;
+  const withdrawn = allStudents.filter(s => s.status === 'Withdrawn').length;
+  const total = allStudents.length;
+
+  // Count duplicates from CheckInLog
+  let duplicates = 0;
+  fetch('https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/gviz/tq?tqx=responseHandler:handleCheckInLog&sheet=CheckInLog')
+    .then(() => {})
+    .catch(() => {});
+
+  // Update tiles
+  document.getElementById('totalCount').textContent = total;
+  document.getElementById('onBusCount').textContent = onBus;
+  document.getElementById('waitingCount').textContent = waiting;
+  document.getElementById('leftCount').textContent = left;
+  document.getElementById('withdrawnCount').textContent = withdrawn;
+  document.getElementById('duplicatesCount').textContent = duplicates;
+
+  // Update pie chart
+  const onBusPercent = total > 0 ? (onBus / total * 100).toFixed(1) : 0;
+  const waitingPercent = total > 0 ? (waiting / total * 100).toFixed(1) : 0;
+  const leftPercent = total > 0 ? (left / total * 100).toFixed(1) : 0;
+
+  const circumference = 2 * Math.PI * 40;
+  const onBusDash = (onBusPercent / 100) * circumference;
+  const waitingDash = (waitingPercent / 100) * circumference;
+
+  document.getElementById('pieOnBus').setAttribute('stroke-dasharray', `${onBusDash} ${circumference}`);
+  document.getElementById('pieWaiting').setAttribute('stroke-dasharray', `${waitingDash} ${circumference}`);
+  document.getElementById('pieWaiting').setAttribute('stroke-dashoffset', -onBusDash);
+
+  document.querySelector('.pie-chart-svg text').textContent = onBusPercent + '%';
+  document.getElementById('legendOnBus').textContent = onBus;
+  document.getElementById('legendWaiting').textContent = waiting;
+  document.getElementById('legendLeft').textContent = left;
+
+  // Update activity table
+  updateActivityTable();
+  updateBusDistribution();
+  updateTime();
+}
+
+function updateActivityTable() {
+  const logUrl = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/gviz/tq?tqx=responseHandler:handleActivityLog&sheet=CheckInLog';
+  const script = document.createElement('script');
+  script.src = logUrl;
+  document.body.appendChild(script);
+}
+
+function handleActivityLog(response) {
+  if (!response || !response.table || !response.table.rows) return;
+
+  const rows = response.table.rows;
+  const activities = [];
+
+  for (let i = Math.max(0, rows.length - 10); i < rows.length; i++) {
+    const cells = rows[i].c;
+    if (!cells) continue;
+
+    const time = cells[0]?.v ? String(cells[0].v).trim() : '';
+    const studentId = cells[1]?.v ? String(cells[1].v).trim() : '';
+    const action = cells[4]?.v ? String(cells[4].v).trim() : '';
+
+    const student = allStudents.find(s => s.id === studentId);
+    if (student) {
+      activities.push({
+        time: time,
+        name: student.name,
+        contact: student.contact,
+        team: student.team,
+        action: action
+      });
+    }
+  }
+
+  const tbody = document.getElementById('activityBody');
+  tbody.innerHTML = activities.reverse().map(act => `
+    <tr>
+      <td>${act.time}</td>
+      <td><strong>${act.name}</strong></td>
+      <td>${act.contact}</td>
+      <td>${act.team}</td>
+      <td>
+        <span class="badge ${
+          act.action.includes('check-in') ? 'badge-checkin' :
+          act.action.includes('check-out') ? 'badge-checkout' :
+          'badge-withdrawn'
+        }">${act.action}</span>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function updateBusDistribution() {
+  const busList = { '1': {}, '2': {}, '3': {}, '4': {}, '5': {} };
+
+  allStudents.forEach(s => {
+    if (!busList[s.bus]) busList[s.bus] = {};
+    busList[s.bus].total = (busList[s.bus].total || 0) + 1;
+    if (s.status === 'In Bus') busList[s.bus].onBus = (busList[s.bus].onBus || 0) + 1;
+    if (s.status === 'Left') busList[s.bus].left = (busList[s.bus].left || 0) + 1;
+    if (s.status === 'Withdrawn') busList[s.bus].withdrawn = (busList[s.bus].withdrawn || 0) + 1;
+  });
+
+  const tbody = document.getElementById('busBody');
+  tbody.innerHTML = Object.entries(busList).map(([busNum, data]) => {
+    const capacity = BUS_CAPACITY[busNum] || 60;
+    const onBus = data.onBus || 0;
+    const left = data.left || 0;
+    const withdrawn = data.withdrawn || 0;
+    const occupancy = ((onBus / capacity) * 100).toFixed(1);
+    const available = capacity - onBus;
+
+    return `
+      <tr>
+        <td><strong>Bus ${busNum}</strong></td>
+        <td>${capacity}</td>
+        <td><span class="status-dot green"></span>${onBus}</td>
+        <td><span class="status-dot orange"></span>${left}</td>
+        <td><span class="status-dot red"></span>${withdrawn}</td>
+        <td>
+          <div style="background: #E0E0E0; height: 6px; border-radius: 3px; overflow: hidden;">
+            <div style="background: #107E3E; height: 100%; width: ${occupancy}%;"></div>
+          </div>
+          ${occupancy}%
+        </td>
+        <td>${available}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function updateTime() {
+  const now = new Date();
+  const hours = String(now.getHours()).padStart(2, '0');
+  const mins = String(now.getMinutes()).padStart(2, '0');
+  const secs = String(now.getSeconds()).padStart(2, '0');
+  document.getElementById('currentTime').textContent = `${hours}:${mins}:${secs}`;
+}
+
+// Load data
+function loadData() {
+  const script = document.createElement('script');
+  script.src = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/gviz/tq?tqx=responseHandler:handleCheckInData&sheet=Bus';
+  document.body.appendChild(script);
+}
+
+// Update every 5 seconds (faster than before)
+loadData();
+setInterval(loadData, 5000);
+setInterval(updateTime, 1000);
+</script>
+
+</body>
+</html>
