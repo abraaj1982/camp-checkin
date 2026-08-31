@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Camp Check-In Supervisor Portal</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.4/html5-qrcode.min.js"></script>
+<style>
+:root {
+  --sap-blue: #0A6ED4;
+  --sap-green: #107E3E;
+  --sap-red: #C30C13;
+  --sap-gray: #6C757D;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Segoe UI', Roboto, sans-serif;
+  background: linear-gradient(135deg, #E8F4FD 0%, #F8F9FA 100%);
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.container { max-width: 900px; margin: 0 auto; }
+
+.topbar {
+  background: linear-gradient(135deg, var(--sap-blue) 0%, #0052A3 100%);
+  color: white;
+  padding: 20px;
+  border-radius: 4px;
+  margin-bottom: 30px;
+}
+
+.topbar h1 { font-size: 24px; margin-bottom: 10px; }
+
+.panel {
+  background: white;
+  padding: 20px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+label {
+  display: block;
+  font-size: 12px;
+  color: var(--sap-gray);
+  text-transform: uppercase;
+  margin-bottom: 5px;
+  font-weight: 600;
+}
+
+input, select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #D3D3D3;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+input:focus, select:focus {
+  outline: none;
+  border-color: var(--sap-blue);
+  box-shadow: 0 0 0 3px rgba(10, 110, 212, 0.1);
+}
+
+button {
+  padding: 12px 20px;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.btn-primary {
+  background: var(--sap-blue);
+  color: white;
+  width: 100%;
+}
+
+.btn-primary:hover {
+  background: #0052A3;
+}
+
+.btn-success {
+  background: var(--sap-green);
+  color: white;
+}
+
+.btn-success:hover {
+  background: #0A5C2E;
+}
+
+.btn-danger {
+  background: var(--sap-red);
+  color: white;
+}
+
+.student-info {
+  background: #F5FAFD;
+  padding: 15px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+  border-left: 4px solid var(--sap-blue);
+}
+
+.student-photo {
+  width: 100px;
+  height: 100px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+}
+
+.status-found { background: #E8F5E9; color: var(--sap-green); padding: 10px; border-radius: 4px; }
+.status-not-found { background: #FFEBEE; color: var(--sap-red); padding: 10px; border-radius: 4px; }
+
+.hidden { display: none; }
+
+#qr-reader { width: 100%; margin: 20px 0; }
+
+.button-group { display: flex; gap: 10px; flex-wrap: wrap; }
+.button-group button { flex: 1; min-width: 120px; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="topbar">
+    <h1>🏕️ Camp Check-In Supervisor</h1>
+    <p>Real-Time Student Registration System</p>
+  </div>
+
+  <!-- SUPERVISOR SELECT -->
+  <div class="panel">
+    <div class="form-group">
+      <label>Select Supervisor</label>
+      <select id="supervisorSelect">
+        <option value="">-- Choose Supervisor --</option>
+        <option value="Yasser Mustafa">Yasser Mustafa</option>
+        <option value="Mohammed Ismail">Mohammed Ismail</option>
+        <option value="Abbas Abdul Rab">Abbas Abdul Rab</option>
+        <option value="Hussain Mustafa">Hussain Mustafa</option>
+        <option value="Hamza">Hamza</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- QR SCANNER -->
+  <div class="panel">
+    <h3>📱 Scan QR Code or Enter Student ID</h3>
+    <div id="qr-reader" style="width:100%;"></div>
+    <div class="form-group">
+      <label>Or Enter Student ID Manually</label>
+      <input type="text" id="studentIdInput" placeholder="e.g., 1205">
+    </div>
+    <button class="btn-primary" onclick="searchStudent()">🔍 Search Student</button>
+  </div>
+
+  <!-- STUDENT INFO -->
+  <div class="panel" id="studentPanel" style="display:none;">
+    <div id="studentInfo"></div>
+    <div class="button-group">
+      <button class="btn-success" onclick="checkIn()">✅ Check-In</button>
+      <button class="btn-danger" onclick="checkOut()">🚪 Check-Out</button>
+      <button class="btn-danger" onclick="withdrawn()">⛔ Withdrawn</button>
+    </div>
+  </div>
+
+  <div id="message" style="margin-top: 20px; padding: 15px; border-radius: 4px; display: none;"></div>
+</div>
+
+<script>
+const SHEET_ID = '1N1ZZtUyxAKfyc9UbqI0qfzhB8BLbk4abo60jCkEmHPE';
+let sheetData = [];
+let currentStudent = null;
+
+// Load sheet data on page load
+window.addEventListener('load', () => {
+  loadSheetData();
+  loadSupervisor();
+  initQRScanner();
+});
+
+function loadSheetData() {
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=responseHandler:processData&gid=24867675`;
+  
+  window.processData = function(response) {
+    if (response.table && response.table.rows) {
+      sheetData = response.table.rows;
+      console.log('Data loaded:', sheetData.length, 'students');
+    }
+  };
+  
+  const script = document.createElement('script');
+  script.src = url;
+  document.body.appendChild(script);
+}
+
+function initQRScanner() {
+  const html5QrcodeScanner = new Html5QrcodeScanner('qr-reader', { fps: 10, qrbox: 250 }, false);
+  html5QrcodeScanner.render(onScanSuccess, onScanError);
+}
+
+function onScanSuccess(decodedText) {
+  document.getElementById('studentIdInput').value = decodedText;
+  searchStudent();
+}
+
+function onScanError(error) {
+  console.log('QR Error:', error);
+}
+
+function searchStudent() {
+  const studentId = document.getElementById('studentIdInput').value.trim();
+  if (!studentId) {
+    showMessage('Please enter Student ID', 'error');
+    return;
+  }
+
+  const student = sheetData.find(row => {
+    const id = row.c[0] ? row.c[0].v.toString().trim() : '';
+    return id === studentId;
+  });
+
+  if (!student) {
+    showMessage('❌ Student not found', 'error');
+    document.getElementById('studentPanel').style.display = 'none';
+    return;
+  }
+
+  currentStudent = {
+    id: student.c[0].v,
+    name: student.c[1].v || '',
+    team: student.c[2].v || '',
+    bus: student.c[3].v || '',
+    phone: student.c[4].v || '',
+    class: student.c[5].v || '',
+    photo: student.c[6].v || '',
+    checkInTime: student.c[7].v || '',
+    checkOutTime: student.c[8].v || '',
+    status: student.c[9].v || 'Waiting'
+  };
+
+  displayStudent();
+}
+
+function displayStudent() {
+  const info = `
+    <div class="student-info">
+      <h3>${currentStudent.name}</h3>
+      <p><strong>ID:</strong> ${currentStudent.id}</p>
+      <p><strong>Team:</strong> ${currentStudent.team}</p>
+      <p><strong>Bus:</strong> ${currentStudent.bus}</p>
+      <p><strong>Class:</strong> ${currentStudent.class}</p>
+      <p><strong>Status:</strong> ${currentStudent.status}</p>
+      ${currentStudent.photo ? `<img src="${currentStudent.photo}" class="student-photo" alt="Photo">` : ''}
+    </div>
+  `;
+  
+  document.getElementById('studentInfo').innerHTML = info;
+  document.getElementById('studentPanel').style.display = 'block';
+  showMessage('✅ Student found!', 'success');
+}
+
+function checkIn() {
+  const supervisor = document.getElementById('supervisorSelect').value;
+  if (!supervisor) {
+    showMessage('⚠️ Please select supervisor', 'error');
+    return;
+  }
+  showMessage(`✅ Check-In recorded for ${currentStudent.name}`, 'success');
+  setTimeout(() => resetForm(), 2000);
+}
+
+function checkOut() {
+  const supervisor = document.getElementById('supervisorSelect').value;
+  if (!supervisor) {
+    showMessage('⚠️ Please select supervisor', 'error');
+    return;
+  }
+  showMessage(`✅ Check-Out recorded for ${currentStudent.name}`, 'success');
+  setTimeout(() => resetForm(), 2000);
+}
+
+function withdrawn() {
+  const supervisor = document.getElementById('supervisorSelect').value;
+  if (!supervisor) {
+    showMessage('⚠️ Please select supervisor', 'error');
+    return;
+  }
+  showMessage(`✅ Withdrawn recorded for ${currentStudent.name}`, 'success');
+  setTimeout(() => resetForm(), 2000);
+}
+
+function resetForm() {
+  document.getElementById('studentIdInput').value = '';
+  document.getElementById('studentPanel').style.display = 'none';
+  document.getElementById('message').style.display = 'none';
+}
+
+function showMessage(text, type) {
+  const msg = document.getElementById('message');
+  msg.textContent = text;
+  msg.className = type === 'success' ? 'status-found' : 'status-not-found';
+  msg.style.display = 'block';
+}
+
+function loadSupervisor() {
+  const saved = localStorage.getItem('supervisor');
+  if (saved) {
+    document.getElementById('supervisorSelect').value = saved;
+  }
+}
+
+document.getElementById('supervisorSelect').addEventListener('change', (e) => {
+  localStorage.setItem('supervisor', e.target.value);
+});
+</script>
+
+</body>
+</html>
