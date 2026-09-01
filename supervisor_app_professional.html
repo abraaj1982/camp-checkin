@@ -412,6 +412,51 @@ fieldset:disabled {
   transform: none;
 }
 
+/* ===== AUTOCOMPLETE DROPDOWN ===== */
+.autocomplete-container {
+  position: relative;
+  width: 100%;
+}
+
+.autocomplete-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid var(--sap-border);
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  max-height: 300px;
+  overflow-y: auto;
+  display: none;
+  z-index: 10;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.autocomplete-dropdown.show {
+  display: block;
+}
+
+.autocomplete-item {
+  padding: 12px;
+  border-bottom: 1px solid var(--sap-border);
+  cursor: pointer;
+  transition: background 0.2s;
+  font-size: 14px;
+  color: var(--sap-text);
+}
+
+.autocomplete-item:hover {
+  background: var(--sap-bg);
+}
+
+.autocomplete-item.highlighted {
+  background: #E8F4FD;
+  color: var(--sap-blue);
+  font-weight: 500;
+}
+
 /* ===== PRINT STYLES ===== */
 @media print {
   .topbar button { display: none; }
@@ -484,6 +529,14 @@ fieldset:disabled {
       <div id="qr-reader" style="margin-top: 20px;"></div>
       <div class="camera-placeholder" id="cameraPlaceholder">
         📱 Camera will appear here
+      </div>
+
+      <div class="form-group">
+        <label>Or Search by Student Name</label>
+        <div class="autocomplete-container">
+          <input type="text" id="studentNameInput" placeholder="Enter student name (e.g., محمد علي)" autocomplete="off">
+          <div class="autocomplete-dropdown" id="autocompleteDropdown"></div>
+        </div>
       </div>
 
       <div class="form-group">
@@ -576,6 +629,7 @@ let html5QrcodeScanner = null;
 let currentStudent = null;
 let cameraStarted = false;
 let identityVerified = false;
+let allStudents = [];
 
 // Update Date & Time
 function updateDateTime() {
@@ -591,10 +645,23 @@ document.getElementById('verifyIdentityBtn').addEventListener('click', function(
   this.disabled = true;
   this.style.background = 'var(--sap-green)';
   showAlert('Identity Verified', 'success', '✅ Photo verified. You can now proceed with Check-In/Out.');
+  setActionButtonsDisabled(false);
   setTimeout(() => {
     document.getElementById('actionButtons').scrollIntoView({ behavior: 'smooth' });
   }, 300);
 });
+
+// Load all students for name search
+function loadAllStudents() {
+  fetch(`${APPS_SCRIPT_URL}?action=getAllStudents`)
+    .then(res => res.json())
+    .then(data => {
+      if (data.students) {
+        allStudents = data.students;
+      }
+    })
+    .catch(err => console.log('Could not load all students:', err.message));
+}
 
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
@@ -610,7 +677,64 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   updateScanLock();
+  loadAllStudents();
+  setupNameSearch();
 });
+
+// Setup Name Search with Autocomplete
+function setupNameSearch() {
+  const nameInput = document.getElementById('studentNameInput');
+  const dropdown = document.getElementById('autocompleteDropdown');
+
+  nameInput.addEventListener('input', function() {
+    const query = this.value.trim().toLowerCase();
+
+    if (query.length < 2) {
+      dropdown.classList.remove('show');
+      return;
+    }
+
+    const matches = allStudents.filter(student =>
+      student.name.toLowerCase().includes(query) ||
+      student.id.includes(query)
+    ).slice(0, 10);
+
+    if (matches.length === 0) {
+      dropdown.classList.remove('show');
+      return;
+    }
+
+    dropdown.innerHTML = matches.map((student, index) => `
+      <div class="autocomplete-item" data-id="${student.id}" data-name="${student.name}">
+        <strong>${student.name}</strong> (ID: ${student.id}) - Bus ${student.bus}, Class ${student.class}
+      </div>
+    `).join('');
+
+    dropdown.classList.add('show');
+
+    document.querySelectorAll('.autocomplete-item').forEach(item => {
+      item.addEventListener('click', function() {
+        const studentId = this.getAttribute('data-id');
+        nameInput.value = this.getAttribute('data-name');
+        dropdown.classList.remove('show');
+        searchStudent(studentId);
+      });
+    });
+  });
+
+  document.addEventListener('click', function(e) {
+    if (e.target !== nameInput && !dropdown.contains(e.target)) {
+      dropdown.classList.remove('show');
+    }
+  });
+
+  nameInput.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      dropdown.classList.remove('show');
+    }
+  });
+}
 
 // Enable/disable the scanner based on whether a supervisor is selected
 function updateScanLock() {
