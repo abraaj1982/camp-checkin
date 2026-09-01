@@ -634,6 +634,7 @@ fieldset:disabled {
       </button>
     </fieldset>
     <div class="hint hint-warning" id="scanLockHint">⚠️ Select your name above to unlock the scanner</div>
+    <div class="hint" id="dataStatus" style="margin-top: 8px;"></div>
   </div>
 
   <!-- STUDENT INFORMATION -->
@@ -731,6 +732,8 @@ let currentStudent = null;
 let cameraStarted = false;
 let identityVerified = false;
 let allStudents = [];
+let allCheckIns = [];
+let dataReady = false;
 let activityLog = JSON.parse(sessionStorage.getItem('activityLog') || '[]');
 
 // Update Date & Time
@@ -752,16 +755,39 @@ document.getElementById('verifyIdentityBtn').addEventListener('click', function(
   }, 300);
 });
 
-// Load all students for name search
-function loadAllStudents() {
-  fetch(`${APPS_SCRIPT_URL}?action=getAllStudents`)
+// Load all students + check-in records once, so searches are instant afterwards
+function loadAllData() {
+  showDataStatus('⏳ Loading student data...', true);
+  fetch(`${APPS_SCRIPT_URL}?action=getDashboardData`)
     .then(res => res.json())
     .then(data => {
-      if (data.students) {
-        allStudents = data.students;
-      }
+      allStudents = data.students || [];
+      allCheckIns = data.records || [];
+      dataReady = true;
+      showDataStatus(`✅ ${allStudents.length} students loaded — search is instant`, false);
     })
-    .catch(err => console.log('Could not load all students:', err.message));
+    .catch(err => {
+      showDataStatus('⚠️ Could not preload data — searches will be slower. Retrying...', true);
+      setTimeout(loadAllData, 4000);
+    });
+}
+
+function showDataStatus(text, loading) {
+  const el = document.getElementById('dataStatus');
+  if (!el) return;
+  el.textContent = text;
+  el.style.color = loading ? 'var(--sap-orange)' : 'var(--sap-green)';
+}
+
+// Compute a student's current status from the locally cached check-in records
+function getLocalCheckInLog(studentId) {
+  let checkedIn = false, checkedOut = false, checkInTime = '', checkOutTime = '';
+  for (const rec of allCheckIns) {
+    if (rec.studentId !== String(studentId)) continue;
+    if (rec.action === 'Check-In') { checkedIn = true; checkInTime = rec.timestamp; }
+    if (rec.action === 'Check-Out') { checkedOut = true; checkOutTime = rec.timestamp; }
+  }
+  return { checkedIn, checkedOut, checkInTime, checkOutTime };
 }
 
 // Initialize
@@ -778,7 +804,7 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   updateScanLock();
-  loadAllStudents();
+  loadAllData();
   setupNameSearch();
   renderActivityLog();
 });
@@ -940,6 +966,36 @@ function searchStudent(studentId) {
     return;
   }
 
+  studentId = String(studentId).trim();
+
+  // Instant local lookup (no network round-trip) once data is preloaded
+  if (dataReady) {
+    const student = allStudents.find(s => s.id === studentId);
+    if (student) {
+      const log = getLocalCheckInLog(studentId);
+      const data = {
+        found: true,
+        studentId: student.id,
+        name: student.name,
+        teamName: student.name,
+        busNumber: student.bus,
+        className: student.class,
+        alreadyCheckedIn: log.checkedIn,
+        alreadyCheckedOut: log.checkedOut,
+        checkInTime: log.checkInTime,
+        checkOutTime: log.checkOutTime
+      };
+      currentStudent = data;
+      displayStudent(data);
+      checkForDuplicate(data);
+    } else {
+      showAlert('Student not found! Please check the ID and try again.', 'error');
+      resetStudent();
+    }
+    return;
+  }
+
+  // Fallback: data not preloaded yet, ask the server directly
   document.getElementById('searchBtn').disabled = true;
   showLoading(true);
 
@@ -1077,6 +1133,17 @@ function saveCheckInOut(action) {
         showAlert(message, 'success', `Student: ${currentStudent.name} - Time: ${data.timestamp}`);
 
         addToActivityLog(currentStudent.name, currentStudent.studentId, action, data.timestamp);
+
+        // Keep local cache in sync so the next search reflects this instantly
+        const actionLabel = action === 'check-in' ? 'Check-In' : action === 'check-out' ? 'Check-Out' : 'Withdrawn';
+        allCheckIns.push({
+          studentId: String(currentStudent.studentId),
+          action: actionLabel,
+          timestamp: data.timestamp,
+          supervisor: document.getElementById('supervisorName').value,
+          bus: currentStudent.busNumber,
+          notes: document.getElementById('notesInput').value
+        });
 
         setTimeout(() => {
           resetStudent();
