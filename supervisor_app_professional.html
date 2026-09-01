@@ -457,6 +457,91 @@ fieldset:disabled {
   font-weight: 500;
 }
 
+/* ===== RECENT ACTIVITY LOG ===== */
+.activity-log {
+  margin-top: 24px;
+}
+
+.activity-log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.activity-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: white;
+  border: 1px solid var(--sap-border);
+  border-left: 4px solid var(--sap-green);
+  border-radius: 4px;
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  animation: slideIn 0.3s ease-out;
+}
+
+.activity-item.check-out {
+  border-left-color: var(--sap-orange);
+}
+
+.activity-item.withdrawn {
+  border-left-color: var(--sap-red);
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.activity-item-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.activity-item-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--sap-text);
+}
+
+.activity-item-details {
+  font-size: 12px;
+  color: var(--sap-gray);
+  margin-top: 2px;
+}
+
+.activity-item-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.activity-item-badge.check-in {
+  background: #E1F5EB;
+  color: var(--sap-green);
+}
+
+.activity-item-badge.check-out {
+  background: #FEF0E8;
+  color: var(--sap-orange);
+}
+
+.activity-item-badge.withdrawn {
+  background: #FADAD4;
+  color: var(--sap-red);
+}
+
+.activity-empty {
+  text-align: center;
+  color: var(--sap-gray);
+  font-size: 13px;
+  padding: 20px;
+}
+
 /* ===== PRINT STYLES ===== */
 @media print {
   .topbar button { display: none; }
@@ -480,7 +565,6 @@ fieldset:disabled {
     <div>
       <h1>🏕️ Teaching Activity Camp - مخيم نشاط التدريس</h1>
       <p>Supervisor Station | Real-Time Check-In System | محطة المشرفين</p>
-      <p style="font-size: 10px; opacity: 0.7; margin-top: 4px;" id="versionMarker">Build v3.0</p>
     </div>
     <button onclick="window.print()" style="position: absolute; top: 20px; right: 20px; padding: 8px 16px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; border-radius: 4px; cursor: pointer; font-weight: 600;">🖨️ Print</button>
   </div>
@@ -621,21 +705,33 @@ fieldset:disabled {
     </button>
   </div>
 
+  <!-- RECENT ACTIVITY LOG -->
+  <div class="card activity-log">
+    <div class="activity-log-header">
+      <div class="card-title" style="margin-bottom: 0;">
+        <span class="card-title-icon">📋</span>
+        <span>Recent Check-Ins (This Session)</span>
+      </div>
+      <button class="btn" id="clearLogBtn" style="width: auto; padding: 6px 12px; font-size: 12px; background: #6C757D; color: white;">
+        🗑️ Clear
+      </button>
+    </div>
+    <div id="activityLogList">
+      <div class="activity-empty">No check-ins recorded yet in this session.</div>
+    </div>
+  </div>
+
 </div>
 
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby-zWXmIfZgCftyGwey4CDXDT3IzW8MhqPqoRuyHmFuyrOkGyhralUaV423y-UyEJLO4A/exec';
-
-// Global error catcher - surfaces any hidden JS error immediately
-window.addEventListener('error', function(e) {
-  alert('PAGE ERROR: ' + e.message + ' (line ' + e.lineno + ')');
-});
 
 let html5QrcodeScanner = null;
 let currentStudent = null;
 let cameraStarted = false;
 let identityVerified = false;
 let allStudents = [];
+let activityLog = JSON.parse(sessionStorage.getItem('activityLog') || '[]');
 
 // Update Date & Time
 function updateDateTime() {
@@ -684,6 +780,7 @@ document.addEventListener('DOMContentLoaded', function() {
   updateScanLock();
   loadAllStudents();
   setupNameSearch();
+  renderActivityLog();
 });
 
 // Setup Name Search with Autocomplete
@@ -921,46 +1018,33 @@ function checkForDuplicate(student) {
 
 // Check-In
 document.getElementById('checkInBtn').addEventListener('click', function(e) {
-  try {
-    e.preventDefault();
-    alert('DEBUG: Check-In button clicked. identityVerified=' + identityVerified + ', currentStudent=' + (currentStudent ? currentStudent.studentId : 'null'));
-    if (identityVerified && currentStudent) {
-      saveCheckInOut('check-in');
-    } else {
-      showAlert('⚠️ Please verify identity first', 'warning');
-    }
-  } catch (err) {
-    alert('ERROR in Check-In: ' + err.message);
+  e.preventDefault();
+  if (identityVerified && currentStudent) {
+    saveCheckInOut('check-in');
+  } else {
+    showAlert('⚠️ Please verify identity first', 'warning');
   }
 });
 
 // Check-Out
 document.getElementById('checkOutBtn').addEventListener('click', function(e) {
-  try {
-    e.preventDefault();
-    if (identityVerified && currentStudent) {
-      saveCheckInOut('check-out');
-    } else {
-      showAlert('⚠️ Please verify identity first', 'warning');
-    }
-  } catch (err) {
-    alert('ERROR in Check-Out: ' + err.message);
+  e.preventDefault();
+  if (identityVerified && currentStudent) {
+    saveCheckInOut('check-out');
+  } else {
+    showAlert('⚠️ Please verify identity first', 'warning');
   }
 });
 
 // Withdrawn
 document.getElementById('withdrawnBtn').addEventListener('click', function(e) {
-  try {
-    e.preventDefault();
-    if (identityVerified && currentStudent) {
-      if (confirm('Are you sure you want to mark this student as withdrawn?')) {
-        saveCheckInOut('withdrawn');
-      }
-    } else {
-      showAlert('⚠️ Please verify identity first', 'warning');
+  e.preventDefault();
+  if (identityVerified && currentStudent) {
+    if (confirm('Are you sure you want to mark this student as withdrawn?')) {
+      saveCheckInOut('withdrawn');
     }
-  } catch (err) {
-    alert('ERROR in Withdrawn: ' + err.message);
+  } else {
+    showAlert('⚠️ Please verify identity first', 'warning');
   }
 });
 
@@ -992,6 +1076,8 @@ function saveCheckInOut(action) {
                        '⛔ Withdrawn Recorded';
         showAlert(message, 'success', `Student: ${currentStudent.name} - Time: ${data.timestamp}`);
 
+        addToActivityLog(currentStudent.name, currentStudent.studentId, action, data.timestamp);
+
         setTimeout(() => {
           resetStudent();
         }, 2000);
@@ -1004,6 +1090,43 @@ function saveCheckInOut(action) {
       showAlert('Error: ' + err.message, 'error');
     });
 }
+
+// Recent Activity Log
+function addToActivityLog(name, studentId, action, timestamp) {
+  activityLog.unshift({ name, studentId, action, timestamp });
+  activityLog = activityLog.slice(0, 20);
+  sessionStorage.setItem('activityLog', JSON.stringify(activityLog));
+  renderActivityLog();
+}
+
+function renderActivityLog() {
+  const list = document.getElementById('activityLogList');
+
+  if (activityLog.length === 0) {
+    list.innerHTML = '<div class="activity-empty">No check-ins recorded yet in this session.</div>';
+    return;
+  }
+
+  const labels = { 'check-in': '✅ Check-In', 'check-out': '🚪 Check-Out', 'withdrawn': '⛔ Withdrawn' };
+
+  list.innerHTML = activityLog.map(item => `
+    <div class="activity-item ${item.action}">
+      <div class="activity-item-info">
+        <div class="activity-item-name">${item.name}</div>
+        <div class="activity-item-details">ID: ${item.studentId} | ${item.timestamp}</div>
+      </div>
+      <div class="activity-item-badge ${item.action}">${labels[item.action] || item.action}</div>
+    </div>
+  `).join('');
+}
+
+document.getElementById('clearLogBtn').addEventListener('click', function() {
+  if (confirm('Clear the recent check-ins list?')) {
+    activityLog = [];
+    sessionStorage.removeItem('activityLog');
+    renderActivityLog();
+  }
+});
 
 // Reset
 document.getElementById('resetBtn').addEventListener('click', function() {
