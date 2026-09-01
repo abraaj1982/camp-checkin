@@ -70,10 +70,6 @@ body {
   padding: 0;
 }
 
-.sidebar-nav li {
-  margin: 0;
-}
-
 .sidebar-nav a {
   display: flex;
   align-items: center;
@@ -188,6 +184,24 @@ body {
   font-size: 11px;
   opacity: 0.8;
   color: rgba(255,255,255,0.8);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #4CD964;
+  display: inline-block;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(76, 217, 100, 0.6); }
+  70% { box-shadow: 0 0 0 6px rgba(76, 217, 100, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(76, 217, 100, 0); }
 }
 
 /* ===== CONTENT AREA ===== */
@@ -257,6 +271,7 @@ body {
   font-weight: 700;
   color: var(--sap-text);
   margin-bottom: 4px;
+  transition: color 0.2s;
 }
 
 .tile-subtitle {
@@ -264,7 +279,6 @@ body {
   color: var(--sap-gray);
 }
 
-/* Tile colors */
 .tile-onbus .tile-icon { color: var(--sap-green); }
 .tile-onbus .tile-value { color: var(--sap-green); }
 
@@ -279,9 +293,6 @@ body {
 
 .tile-total .tile-icon { color: var(--sap-blue); }
 .tile-total .tile-value { color: var(--sap-blue); }
-
-.tile-duplicates .tile-icon { color: #F57C00; }
-.tile-duplicates .tile-value { color: #F57C00; }
 
 /* ===== TWO COLUMN LAYOUT ===== */
 .dashboard-row {
@@ -341,9 +352,7 @@ body {
   border-radius: 2px;
 }
 
-.legend-text {
-  flex: 1;
-}
+.legend-text { flex: 1; }
 
 .legend-value {
   font-weight: 600;
@@ -395,14 +404,6 @@ body {
   border-bottom: none;
 }
 
-.student-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  object-fit: cover;
-  background: var(--sap-bg);
-}
-
 .badge {
   display: inline-block;
   padding: 4px 12px;
@@ -412,20 +413,10 @@ body {
   text-transform: uppercase;
 }
 
-.badge-checkin {
-  background: rgba(16, 126, 62, 0.1);
-  color: var(--sap-green);
-}
-
-.badge-checkout {
-  background: rgba(232, 119, 34, 0.1);
-  color: var(--sap-orange);
-}
-
-.badge-withdrawn {
-  background: rgba(195, 12, 19, 0.1);
-  color: var(--sap-red);
-}
+.badge-checkin { background: rgba(16, 126, 62, 0.1); color: var(--sap-green); }
+.badge-checkout { background: rgba(232, 119, 34, 0.1); color: var(--sap-orange); }
+.badge-withdrawn { background: rgba(195, 12, 19, 0.1); color: var(--sap-red); }
+.badge-waiting { background: rgba(108, 117, 125, 0.12); color: var(--sap-gray); }
 
 .status-dot {
   width: 8px;
@@ -438,12 +429,116 @@ body {
 .status-dot.green { background: var(--sap-green); }
 .status-dot.orange { background: var(--sap-orange); }
 .status-dot.red { background: var(--sap-red); }
+.status-dot.gray { background: var(--sap-gray); }
+
+/* ===== BUS GROUPS (per-bus student rosters) ===== */
+.bus-groups-panel {
+  background: white;
+  border-radius: 4px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  border: 1px solid #D3D3D3;
+  margin-bottom: 30px;
+}
+
+.bus-search {
+  width: 100%;
+  max-width: 320px;
+  padding: 10px 14px;
+  border: 1px solid var(--sap-border, #D3D3D3);
+  border-radius: 4px;
+  font-size: 13px;
+  margin-bottom: 20px;
+}
+
+.bus-group {
+  border: 1px solid #D3D3D3;
+  border-radius: 4px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.bus-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  background: var(--sap-bg);
+  cursor: pointer;
+  user-select: none;
+}
+
+.bus-group-header:hover { background: #EEF2F6; }
+
+.bus-group-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.bus-group-counts {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.count-chip {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 12px;
+}
+
+.count-chip.onbus { background: rgba(16,126,62,0.12); color: var(--sap-green); }
+.count-chip.waiting { background: rgba(232,119,34,0.12); color: var(--sap-orange); }
+.count-chip.left { background: rgba(10,110,212,0.12); color: var(--sap-blue); }
+.count-chip.withdrawn { background: rgba(195,12,19,0.12); color: var(--sap-red); }
+
+.bus-group-toggle {
+  font-size: 12px;
+  color: var(--sap-gray);
+  transition: transform 0.2s;
+}
+
+.bus-group.open .bus-group-toggle { transform: rotate(180deg); }
+
+.bus-group-body {
+  display: none;
+  padding: 0;
+}
+
+.bus-group.open .bus-group-body { display: block; }
+
+.student-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 18px;
+  border-top: 1px solid #EDEDED;
+  font-size: 13px;
+}
+
+.student-row-name {
+  font-weight: 500;
+}
+
+.student-row-id {
+  color: var(--sap-gray);
+  font-size: 11px;
+  margin-left: 6px;
+}
+
+.student-row-time {
+  color: var(--sap-gray);
+  font-size: 11px;
+  margin-top: 2px;
+}
 
 /* ===== RESPONSIVE ===== */
 @media (max-width: 1200px) {
-  .dashboard-row {
-    grid-template-columns: 1fr;
-  }
+  .dashboard-row { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 768px) {
@@ -453,30 +548,15 @@ body {
     transition: transform 0.3s ease;
     z-index: 1000;
   }
-
-  .sidebar.open {
-    width: 260px;
-    transform: translateX(0);
-  }
-
-  .main-content {
-    margin-left: 0;
-  }
-
-  .tiles-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
-  }
-
-  .content {
-    padding: 16px;
-  }
+  .sidebar.open { width: 260px; transform: translateX(0); }
+  .main-content { margin-left: 0; }
+  .tiles-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .content { padding: 16px; }
+  .bus-group-title { font-size: 13px; }
 }
 
 @media (max-width: 480px) {
-  .tiles-grid {
-    grid-template-columns: 1fr;
-  }
+  .tiles-grid { grid-template-columns: 1fr; }
 }
 
 /* ===== PRINT STYLES ===== */
@@ -487,9 +567,10 @@ body {
   .content { padding: 20px; }
   .tiles-grid { page-break-after: avoid; }
   .dashboard-row { page-break-inside: avoid; }
-  .activity-panel { page-break-inside: avoid; }
+  .activity-panel, .bus-groups-panel { page-break-inside: avoid; }
+  .bus-group-body { display: block !important; }
   body { background: white; }
-  .tile, .chart-panel, .activity-panel {
+  .tile, .chart-panel, .activity-panel, .bus-groups-panel {
     box-shadow: none;
     border: 1px solid #999;
     page-break-inside: avoid;
@@ -508,13 +589,9 @@ body {
 
   <ul class="sidebar-nav">
     <li><a href="#" class="active">📊 Dashboard</a></li>
-    <li><a href="#">📱 QR Scanner</a></li>
-    <li><a href="#">👥 Students</a></li>
-    <li><a href="#">👨‍👩‍👧 Parents</a></li>
-    <li><a href="#">👫 Groups</a></li>
-    <li><a href="#">📈 Reports</a></li>
-    <li><a href="#">📋 Check-In Log</a></li>
-    <li><a href="#">⚙️ Settings</a></li>
+    <li><a href="supervisor_app_professional.html">📱 QR Scanner</a></li>
+    <li><a href="#buses">🚌 Bus Groups</a></li>
+    <li><a href="#activity">🕒 Activity Log</a></li>
   </ul>
 
   <div class="sidebar-user">
@@ -535,7 +612,7 @@ body {
     <div class="topbar-right">
       <div>
         <div class="topbar-time" id="currentTime">--:-- --</div>
-        <div class="last-updated">Last updated: just now</div>
+        <div class="last-updated"><span class="live-dot"></span> <span id="lastUpdated">Loading...</span></div>
       </div>
       <div style="display: flex; gap: 8px;">
         <button onclick="window.print()" style="padding: 8px 16px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600;">🖨️ Print</button>
@@ -582,13 +659,6 @@ body {
         <div class="tile-value" id="withdrawnCount">0</div>
         <div class="tile-subtitle">Not attending</div>
       </div>
-
-      <div class="tile tile-duplicates">
-        <div class="tile-icon">⚠️</div>
-        <div class="tile-title">Duplicates</div>
-        <div class="tile-value" id="duplicatesCount">0</div>
-        <div class="tile-subtitle">Repeat scans</div>
-      </div>
     </div>
 
     <!-- CHART & ACTIVITY ROW -->
@@ -624,7 +694,7 @@ body {
               </div>
             </div>
             <div class="legend-item">
-              <div class="legend-color" style="background: #C30C13;"></div>
+              <div class="legend-color" style="background: #0A6ED4;"></div>
               <div class="legend-text">
                 <div class="legend-value">Left Bus</div>
                 <div class="legend-percent"><span id="legendLeft">0</span> (0%)</div>
@@ -635,7 +705,7 @@ body {
       </div>
 
       <!-- RECENT ACTIVITY -->
-      <div class="chart-panel">
+      <div class="chart-panel" id="activity">
         <div class="panel-title">🕒 Recent Activity</div>
         <div style="overflow-x: auto;">
           <table class="activity-table">
@@ -643,33 +713,33 @@ body {
               <tr>
                 <th>Time</th>
                 <th>Student</th>
-                <th>Parent</th>
-                <th>Team</th>
+                <th>Bus</th>
+                <th>Supervisor</th>
                 <th>Action</th>
               </tr>
             </thead>
             <tbody id="activityBody">
-              <tr><td colspan="5" style="text-align: center; color: #6C757D;">No activity yet</td></tr>
+              <tr><td colspan="5" style="text-align: center; color: #6C757D;">Loading...</td></tr>
             </tbody>
           </table>
         </div>
       </div>
     </div>
 
-    <!-- BUS DISTRIBUTION -->
+    <!-- BUS DISTRIBUTION SUMMARY -->
     <div class="activity-panel">
-      <div class="panel-title">🚌 Bus Distribution</div>
+      <div class="panel-title">🚌 Bus Distribution Summary</div>
       <div style="overflow-x: auto;">
         <table class="activity-table">
           <thead>
             <tr>
               <th>Bus #</th>
-              <th>Capacity</th>
+              <th>Total</th>
               <th>On Bus</th>
+              <th>Waiting</th>
               <th>Left</th>
               <th>Withdrawn</th>
-              <th>Occupancy</th>
-              <th>Available</th>
+              <th>Progress</th>
             </tr>
           </thead>
           <tbody id="busBody">
@@ -678,75 +748,78 @@ body {
         </table>
       </div>
     </div>
+
+    <!-- BUS GROUPS - full student roster per bus -->
+    <div class="bus-groups-panel" id="buses">
+      <div class="panel-title">👫 Students by Bus</div>
+      <input type="text" class="bus-search" id="busSearch" placeholder="🔍 Filter by student name or ID...">
+      <div id="busGroupsList"></div>
+    </div>
   </div>
 </div>
 
 <script>
-const SHEET_ID = '1N1ZZtUyxAKfyc9UbqI0qfzhB8BLbk4abo60jCkEmHPE';
-const BUS_CAPACITY = { 1: 60, 2: 60, 3: 60, 4: 60, 5: 60 };
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby-zWXmIfZgCftyGwey4CDXDT3IzW8MhqPqoRuyHmFuyrOkGyhralUaV423y-UyEJLO4A/exec';
+
 let allStudents = [];
+let allRecords = [];
+let studentStatus = {}; // studentId -> { status, checkInTime, checkOutTime }
+let openBuses = new Set(JSON.parse(sessionStorage.getItem('openBuses') || '[]'));
 
-function handleCheckInData(response) {
-  if (!response || !response.table || !response.table.rows) {
-    console.error('No data found');
-    return;
-  }
-
-  allStudents = [];
-  const rows = response.table.rows;
-
-  for (let i = 1; i < rows.length; i++) {
-    const cells = rows[i].c;
-    if (!cells || !cells[0]) continue;
-
-    const id = String(cells[0].v || '').trim();
-    if (!id) continue;
-
-    allStudents.push({
-      id: id,
-      name: String(cells[1]?.v || '').trim(),
-      team: String(cells[2]?.v || '').trim(),
-      bus: String(cells[3]?.v || '').trim(),
-      contact: String(cells[4]?.v || '').trim(),
-      className: String(cells[5]?.v || '').trim(),
-      photoUrl: String(cells[6]?.v || '').trim(),
-      checkInTime: cells[7]?.v ? String(cells[7].v).trim() : '',
-      checkOutTime: cells[8]?.v ? String(cells[8].v).trim() : '',
-      status: String(cells[9]?.v || 'Waiting').trim()
+function loadData() {
+  fetch(`${APPS_SCRIPT_URL}?action=getDashboardData`)
+    .then(res => res.json())
+    .then(data => {
+      allStudents = data.students || [];
+      allRecords = data.records || [];
+      computeStatus();
+      updateDashboard();
+      document.getElementById('lastUpdated').textContent = 'Live — updated ' + new Date().toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit', second: '2-digit'});
+    })
+    .catch(err => {
+      document.getElementById('lastUpdated').textContent = 'Connection error — retrying...';
     });
-  }
+}
 
-  updateDashboard();
+// Compute each student's current status from their check-in history (last action wins)
+function computeStatus() {
+  studentStatus = {};
+  allRecords.forEach(rec => {
+    const id = rec.studentId;
+    if (!studentStatus[id]) studentStatus[id] = { status: 'Waiting', checkInTime: '', checkOutTime: '' };
+    if (rec.action === 'Check-In') {
+      studentStatus[id].status = 'In Bus';
+      studentStatus[id].checkInTime = rec.timestamp;
+    } else if (rec.action === 'Check-Out') {
+      studentStatus[id].status = 'Left';
+      studentStatus[id].checkOutTime = rec.timestamp;
+    } else if (rec.action === 'Withdrawn') {
+      studentStatus[id].status = 'Withdrawn';
+    }
+  });
+}
+
+function getStatus(studentId) {
+  return (studentStatus[studentId] && studentStatus[studentId].status) || 'Waiting';
 }
 
 function updateDashboard() {
   if (allStudents.length === 0) return;
 
-  // Calculate statistics
-  const onBus = allStudents.filter(s => s.status === 'In Bus').length;
-  const waiting = allStudents.filter(s => s.status === 'Waiting').length;
-  const left = allStudents.filter(s => s.status === 'Left').length;
-  const withdrawn = allStudents.filter(s => s.status === 'Withdrawn').length;
+  const onBus = allStudents.filter(s => getStatus(s.id) === 'In Bus').length;
+  const waiting = allStudents.filter(s => getStatus(s.id) === 'Waiting').length;
+  const left = allStudents.filter(s => getStatus(s.id) === 'Left').length;
+  const withdrawn = allStudents.filter(s => getStatus(s.id) === 'Withdrawn').length;
   const total = allStudents.length;
 
-  // Count duplicates from CheckInLog
-  let duplicates = 0;
-  fetch('https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/gviz/tq?tqx=responseHandler:handleCheckInLog&sheet=CheckInLog')
-    .then(() => {})
-    .catch(() => {});
-
-  // Update tiles
   document.getElementById('totalCount').textContent = total;
   document.getElementById('onBusCount').textContent = onBus;
   document.getElementById('waitingCount').textContent = waiting;
   document.getElementById('leftCount').textContent = left;
   document.getElementById('withdrawnCount').textContent = withdrawn;
-  document.getElementById('duplicatesCount').textContent = duplicates;
 
-  // Update pie chart
   const onBusPercent = total > 0 ? (onBus / total * 100).toFixed(1) : 0;
   const waitingPercent = total > 0 ? (waiting / total * 100).toFixed(1) : 0;
-  const leftPercent = total > 0 ? (left / total * 100).toFixed(1) : 0;
 
   const circumference = 2 * Math.PI * 40;
   const onBusDash = (onBusPercent / 100) * circumference;
@@ -761,101 +834,168 @@ function updateDashboard() {
   document.getElementById('legendWaiting').textContent = waiting;
   document.getElementById('legendLeft').textContent = left;
 
-  // Update activity table
   updateActivityTable();
   updateBusDistribution();
-  updateTime();
+  updateBusGroups();
 }
 
 function updateActivityTable() {
-  const logUrl = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/gviz/tq?tqx=responseHandler:handleActivityLog&sheet=CheckInLog';
-  const script = document.createElement('script');
-  script.src = logUrl;
-  document.body.appendChild(script);
-}
+  const recent = allRecords.slice(-12).reverse();
+  const tbody = document.getElementById('activityBody');
 
-function handleActivityLog(response) {
-  if (!response || !response.table || !response.table.rows) return;
-
-  const rows = response.table.rows;
-  const activities = [];
-
-  for (let i = Math.max(0, rows.length - 10); i < rows.length; i++) {
-    const cells = rows[i].c;
-    if (!cells) continue;
-
-    const time = cells[0]?.v ? String(cells[0].v).trim() : '';
-    const studentId = cells[1]?.v ? String(cells[1].v).trim() : '';
-    const action = cells[4]?.v ? String(cells[4].v).trim() : '';
-
-    const student = allStudents.find(s => s.id === studentId);
-    if (student) {
-      activities.push({
-        time: time,
-        name: student.name,
-        contact: student.contact,
-        team: student.team,
-        action: action
-      });
-    }
+  if (recent.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #6C757D;">No activity yet</td></tr>';
+    return;
   }
 
-  const tbody = document.getElementById('activityBody');
-  tbody.innerHTML = activities.reverse().map(act => `
-    <tr>
-      <td>${act.time}</td>
-      <td><strong>${act.name}</strong></td>
-      <td>${act.contact}</td>
-      <td>${act.team}</td>
-      <td>
-        <span class="badge ${
-          act.action.includes('check-in') ? 'badge-checkin' :
-          act.action.includes('check-out') ? 'badge-checkout' :
-          'badge-withdrawn'
-        }">${act.action}</span>
-      </td>
-    </tr>
-  `).join('');
-}
-
-function updateBusDistribution() {
-  const busList = { '1': {}, '2': {}, '3': {}, '4': {}, '5': {} };
-
-  allStudents.forEach(s => {
-    if (!busList[s.bus]) busList[s.bus] = {};
-    busList[s.bus].total = (busList[s.bus].total || 0) + 1;
-    if (s.status === 'In Bus') busList[s.bus].onBus = (busList[s.bus].onBus || 0) + 1;
-    if (s.status === 'Left') busList[s.bus].left = (busList[s.bus].left || 0) + 1;
-    if (s.status === 'Withdrawn') busList[s.bus].withdrawn = (busList[s.bus].withdrawn || 0) + 1;
-  });
-
-  const tbody = document.getElementById('busBody');
-  tbody.innerHTML = Object.entries(busList).map(([busNum, data]) => {
-    const capacity = BUS_CAPACITY[busNum] || 60;
-    const onBus = data.onBus || 0;
-    const left = data.left || 0;
-    const withdrawn = data.withdrawn || 0;
-    const occupancy = ((onBus / capacity) * 100).toFixed(1);
-    const available = capacity - onBus;
-
+  tbody.innerHTML = recent.map(rec => {
+    const student = allStudents.find(s => s.id === rec.studentId);
+    const name = student ? student.name : rec.studentId;
+    const badgeClass = rec.action === 'Check-In' ? 'badge-checkin' : rec.action === 'Check-Out' ? 'badge-checkout' : 'badge-withdrawn';
     return `
       <tr>
-        <td><strong>Bus ${busNum}</strong></td>
-        <td>${capacity}</td>
-        <td><span class="status-dot green"></span>${onBus}</td>
-        <td><span class="status-dot orange"></span>${left}</td>
-        <td><span class="status-dot red"></span>${withdrawn}</td>
-        <td>
-          <div style="background: #E0E0E0; height: 6px; border-radius: 3px; overflow: hidden;">
-            <div style="background: #107E3E; height: 100%; width: ${occupancy}%;"></div>
-          </div>
-          ${occupancy}%
-        </td>
-        <td>${available}</td>
+        <td>${rec.timestamp}</td>
+        <td><strong>${name}</strong></td>
+        <td>Bus ${rec.bus || (student ? student.bus : '-')}</td>
+        <td>${rec.supervisor || '-'}</td>
+        <td><span class="badge ${badgeClass}">${rec.action}</span></td>
       </tr>
     `;
   }).join('');
 }
+
+function updateBusDistribution() {
+  const buses = {};
+  allStudents.forEach(s => {
+    const bus = s.bus || 'N/A';
+    if (!buses[bus]) buses[bus] = { total: 0, onBus: 0, waiting: 0, left: 0, withdrawn: 0 };
+    buses[bus].total++;
+    const status = getStatus(s.id);
+    if (status === 'In Bus') buses[bus].onBus++;
+    else if (status === 'Left') buses[bus].left++;
+    else if (status === 'Withdrawn') buses[bus].withdrawn++;
+    else buses[bus].waiting++;
+  });
+
+  const sortedBuses = Object.keys(buses).sort((a, b) => a.localeCompare(b, undefined, {numeric: true}));
+  const tbody = document.getElementById('busBody');
+
+  if (sortedBuses.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #6C757D;">No bus data</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = sortedBuses.map(busNum => {
+    const d = buses[busNum];
+    const progress = d.total > 0 ? ((d.onBus + d.left) / d.total * 100).toFixed(0) : 0;
+    return `
+      <tr>
+        <td><strong>Bus ${busNum}</strong></td>
+        <td>${d.total}</td>
+        <td><span class="status-dot green"></span>${d.onBus}</td>
+        <td><span class="status-dot gray"></span>${d.waiting}</td>
+        <td><span class="status-dot orange"></span>${d.left}</td>
+        <td><span class="status-dot red"></span>${d.withdrawn}</td>
+        <td>
+          <div style="background: #E0E0E0; height: 6px; border-radius: 3px; overflow: hidden; margin-bottom: 4px;">
+            <div style="background: #107E3E; height: 100%; width: ${progress}%;"></div>
+          </div>
+          ${progress}%
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function updateBusGroups() {
+  const filter = (document.getElementById('busSearch').value || '').trim().toLowerCase();
+
+  const buses = {};
+  allStudents.forEach(s => {
+    const bus = s.bus || 'N/A';
+    if (!buses[bus]) buses[bus] = [];
+    buses[bus].push(s);
+  });
+
+  const sortedBuses = Object.keys(buses).sort((a, b) => a.localeCompare(b, undefined, {numeric: true}));
+  const container = document.getElementById('busGroupsList');
+
+  const statusMeta = {
+    'In Bus': { label: '✅ On Bus', badge: 'badge-checkin' },
+    'Left': { label: '🚪 Left', badge: 'badge-checkout' },
+    'Withdrawn': { label: '⛔ Withdrawn', badge: 'badge-withdrawn' },
+    'Waiting': { label: '⏳ Waiting', badge: 'badge-waiting' }
+  };
+
+  container.innerHTML = sortedBuses.map(busNum => {
+    let students = buses[busNum].slice().sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+
+    if (filter) {
+      students = students.filter(s => s.name.toLowerCase().includes(filter) || s.id.includes(filter));
+      if (students.length === 0) return '';
+    }
+
+    const counts = { onbus: 0, waiting: 0, left: 0, withdrawn: 0 };
+    buses[busNum].forEach(s => {
+      const st = getStatus(s.id);
+      if (st === 'In Bus') counts.onbus++;
+      else if (st === 'Left') counts.left++;
+      else if (st === 'Withdrawn') counts.withdrawn++;
+      else counts.waiting++;
+    });
+
+    const isOpen = openBuses.has(busNum) || !!filter;
+
+    const rows = students.map(s => {
+      const st = getStatus(s.id);
+      const meta = statusMeta[st];
+      const info = studentStatus[s.id] || {};
+      const timeLabel = st === 'In Bus' ? info.checkInTime : st === 'Left' ? info.checkOutTime : '';
+      return `
+        <div class="student-row">
+          <div>
+            <span class="student-row-name">${s.name}</span>
+            <span class="student-row-id">#${s.id} · Class ${s.class}</span>
+            ${timeLabel ? `<div class="student-row-time">${timeLabel}</div>` : ''}
+          </div>
+          <span class="badge ${meta.badge}">${meta.label}</span>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="bus-group ${isOpen ? 'open' : ''}" data-bus="${busNum}">
+        <div class="bus-group-header" onclick="toggleBusGroup('${busNum}')">
+          <div class="bus-group-title">🚌 Bus ${busNum}
+            <span style="font-weight: 400; color: var(--sap-gray); font-size: 12px;">(${buses[busNum].length} students)</span>
+          </div>
+          <div class="bus-group-counts">
+            <span class="count-chip onbus">${counts.onbus} on bus</span>
+            <span class="count-chip waiting">${counts.waiting} waiting</span>
+            <span class="count-chip left">${counts.left} left</span>
+            ${counts.withdrawn > 0 ? `<span class="count-chip withdrawn">${counts.withdrawn} withdrawn</span>` : ''}
+          </div>
+          <span class="bus-group-toggle">▼</span>
+        </div>
+        <div class="bus-group-body">${rows}</div>
+      </div>
+    `;
+  }).join('') || '<div style="text-align:center; color: var(--sap-gray); padding: 20px;">No students match your search.</div>';
+}
+
+function toggleBusGroup(busNum) {
+  const el = document.querySelector(`.bus-group[data-bus="${busNum}"]`);
+  if (!el) return;
+  el.classList.toggle('open');
+  if (el.classList.contains('open')) {
+    openBuses.add(busNum);
+  } else {
+    openBuses.delete(busNum);
+  }
+  sessionStorage.setItem('openBuses', JSON.stringify([...openBuses]));
+}
+
+document.getElementById('busSearch').addEventListener('input', updateBusGroups);
 
 function updateTime() {
   const now = new Date();
@@ -875,7 +1015,6 @@ function exportPDF() {
     jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
   };
 
-  // Load html2pdf library if not already loaded
   if (!window.html2pdf) {
     const script = document.createElement('script');
     script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
@@ -888,16 +1027,9 @@ function exportPDF() {
   }
 }
 
-// Load data
-function loadData() {
-  const script = document.createElement('script');
-  script.src = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/gviz/tq?tqx=responseHandler:handleCheckInData&sheet=Bus';
-  document.body.appendChild(script);
-}
-
-// Update every 5 seconds (faster than before)
+// Fast refresh: every 3 seconds
 loadData();
-setInterval(loadData, 5000);
+setInterval(loadData, 3000);
 setInterval(updateTime, 1000);
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
