@@ -480,6 +480,7 @@ fieldset:disabled {
     <div>
       <h1>🏕️ Teaching Activity Camp - مخيم نشاط التدريس</h1>
       <p>Supervisor Station | Real-Time Check-In System | محطة المشرفين</p>
+      <p style="font-size: 10px; opacity: 0.7; margin-top: 4px;" id="versionMarker">Build v3.0</p>
     </div>
     <button onclick="window.print()" style="position: absolute; top: 20px; right: 20px; padding: 8px 16px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; border-radius: 4px; cursor: pointer; font-weight: 600;">🖨️ Print</button>
   </div>
@@ -624,6 +625,11 @@ fieldset:disabled {
 
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby-zWXmIfZgCftyGwey4CDXDT3IzW8MhqPqoRuyHmFuyrOkGyhralUaV423y-UyEJLO4A/exec';
+
+// Global error catcher - surfaces any hidden JS error immediately
+window.addEventListener('error', function(e) {
+  alert('PAGE ERROR: ' + e.message + ' (line ' + e.lineno + ')');
+});
 
 let html5QrcodeScanner = null;
 let currentStudent = null;
@@ -915,33 +921,46 @@ function checkForDuplicate(student) {
 
 // Check-In
 document.getElementById('checkInBtn').addEventListener('click', function(e) {
-  e.preventDefault();
-  if (identityVerified && currentStudent) {
-    saveCheckInOut('check-in');
-  } else {
-    showAlert('⚠️ Please verify identity first', 'warning');
+  try {
+    e.preventDefault();
+    alert('DEBUG: Check-In button clicked. identityVerified=' + identityVerified + ', currentStudent=' + (currentStudent ? currentStudent.studentId : 'null'));
+    if (identityVerified && currentStudent) {
+      saveCheckInOut('check-in');
+    } else {
+      showAlert('⚠️ Please verify identity first', 'warning');
+    }
+  } catch (err) {
+    alert('ERROR in Check-In: ' + err.message);
   }
 });
 
 // Check-Out
 document.getElementById('checkOutBtn').addEventListener('click', function(e) {
-  e.preventDefault();
-  if (identityVerified && currentStudent) {
-    saveCheckInOut('check-out');
-  } else {
-    showAlert('⚠️ Please verify identity first', 'warning');
+  try {
+    e.preventDefault();
+    if (identityVerified && currentStudent) {
+      saveCheckInOut('check-out');
+    } else {
+      showAlert('⚠️ Please verify identity first', 'warning');
+    }
+  } catch (err) {
+    alert('ERROR in Check-Out: ' + err.message);
   }
 });
 
 // Withdrawn
 document.getElementById('withdrawnBtn').addEventListener('click', function(e) {
-  e.preventDefault();
-  if (identityVerified && currentStudent) {
-    if (confirm('Are you sure you want to mark this student as withdrawn?')) {
-      saveCheckInOut('withdrawn');
+  try {
+    e.preventDefault();
+    if (identityVerified && currentStudent) {
+      if (confirm('Are you sure you want to mark this student as withdrawn?')) {
+        saveCheckInOut('withdrawn');
+      }
+    } else {
+      showAlert('⚠️ Please verify identity first', 'warning');
     }
-  } else {
-    showAlert('⚠️ Please verify identity first', 'warning');
+  } catch (err) {
+    alert('ERROR in Withdrawn: ' + err.message);
   }
 });
 
