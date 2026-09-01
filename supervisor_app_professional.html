@@ -645,7 +645,6 @@ document.getElementById('verifyIdentityBtn').addEventListener('click', function(
   this.disabled = true;
   this.style.background = 'var(--sap-green)';
   showAlert('Identity Verified', 'success', '✅ Photo verified. You can now proceed with Check-In/Out.');
-  setActionButtonsDisabled(false);
   setTimeout(() => {
     document.getElementById('actionButtons').scrollIntoView({ behavior: 'smooth' });
   }, 300);
@@ -893,9 +892,8 @@ function displayStudent(student) {
   void infoBox.offsetWidth; // restart animation
   infoBox.classList.add('scan-flash');
 
-  // Show action buttons but keep them disabled until identity is verified
+  // Show action buttons
   document.getElementById('actionButtons').style.display = 'block';
-  setActionButtonsDisabled(true);
 }
 
 // Check for Duplicate
@@ -916,19 +914,34 @@ function checkForDuplicate(student) {
 }
 
 // Check-In
-document.getElementById('checkInBtn').addEventListener('click', function() {
-  saveCheckInOut('check-in');
+document.getElementById('checkInBtn').addEventListener('click', function(e) {
+  e.preventDefault();
+  if (identityVerified && currentStudent) {
+    saveCheckInOut('check-in');
+  } else {
+    showAlert('⚠️ Please verify identity first', 'warning');
+  }
 });
 
 // Check-Out
-document.getElementById('checkOutBtn').addEventListener('click', function() {
-  saveCheckInOut('check-out');
+document.getElementById('checkOutBtn').addEventListener('click', function(e) {
+  e.preventDefault();
+  if (identityVerified && currentStudent) {
+    saveCheckInOut('check-out');
+  } else {
+    showAlert('⚠️ Please verify identity first', 'warning');
+  }
 });
 
 // Withdrawn
-document.getElementById('withdrawnBtn').addEventListener('click', function() {
-  if (confirm('Are you sure you want to mark this student as withdrawn?')) {
-    saveCheckInOut('withdrawn');
+document.getElementById('withdrawnBtn').addEventListener('click', function(e) {
+  e.preventDefault();
+  if (identityVerified && currentStudent) {
+    if (confirm('Are you sure you want to mark this student as withdrawn?')) {
+      saveCheckInOut('withdrawn');
+    }
+  } else {
+    showAlert('⚠️ Please verify identity first', 'warning');
   }
 });
 
@@ -936,12 +949,6 @@ document.getElementById('withdrawnBtn').addEventListener('click', function() {
 function saveCheckInOut(action) {
   if (!currentStudent) return;
 
-  if (!identityVerified) {
-    showAlert('Identity Not Verified', 'warning', '⚠️ Please verify the student\'s identity first by clicking "Verify Identity & Proceed"');
-    return;
-  }
-
-  setActionButtonsDisabled(true);
   showLoading(true);
 
   const data = {
@@ -970,21 +977,13 @@ function saveCheckInOut(action) {
           resetStudent();
         }, 2000);
       } else {
-        setActionButtonsDisabled(false);
         showAlert('Error saving data', 'error', data.error);
       }
     })
     .catch(err => {
       showLoading(false);
-      setActionButtonsDisabled(false);
       showAlert('Error: ' + err.message, 'error');
     });
-}
-
-function setActionButtonsDisabled(disabled) {
-  ['checkInBtn', 'checkOutBtn', 'withdrawnBtn'].forEach(id => {
-    document.getElementById(id).disabled = disabled;
-  });
 }
 
 // Reset
@@ -998,8 +997,8 @@ function resetStudent() {
   document.getElementById('studentInfo').classList.remove('show');
   document.getElementById('actionButtons').style.display = 'none';
   document.getElementById('studentIdInput').value = '';
+  document.getElementById('studentNameInput').value = '';
   document.getElementById('notesInput').value = '';
-  setActionButtonsDisabled(false);
   clearAlerts();
 }
 
