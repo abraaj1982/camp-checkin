@@ -311,17 +311,6 @@ tbody tr:hover { background: #F5FAFD; }
     </div>
   </div>
 
-  <!-- SHIRTS -->
-  <div class="panel">
-    <div class="panel-header">
-      <span class="panel-header-icon">👕</span>
-      <span class="panel-header-title">Shirt Distribution — Remaining Stock</span>
-    </div>
-    <div class="panel-body" id="shirtPanelBody">
-      <p style="text-align:center;color:var(--sap-gray)">Loading data...</p>
-    </div>
-  </div>
-
   <!-- DUPLICATES -->
   <div class="panel">
     <div class="panel-header">
@@ -375,8 +364,6 @@ setInterval(updateTime, 1000);
 updateTime();
 
 var SHEET_ID = '1N1ZZtUyxAKfyc9UbqI0qfzhB8BLbk4abo60jCkEmHPE';
-var SHIRT_SIZES = ['S', 'M', 'L', 'XL'];
-var shirtBusRows = null, shirtSupervisorRows = null, shirtInventoryRows = null;
 
 // ===== JSONP CALLBACK for the "Bus" sheet - هذا يتجاوز CORS تماماً =====
 function handleSheetData(response) {
@@ -387,9 +374,6 @@ function handleSheetData(response) {
   }
 
   var rows = response.table.rows;
-  shirtBusRows = rows;
-  renderShirtPanel();
-
   var total = 0, onBus = 0, waiting = 0, left = 0, withdrawn = 0;
   var busMap = {};
 
@@ -398,7 +382,6 @@ function handleSheetData(response) {
     var cells = row.c;
 
     // A=StudentID, B=Name, C=Team, D=Bus, E=Contact, F=Class, G=Photo, H=CheckIn, I=CheckOut, J=Status
-    // K=Shirt Size, L=Shirt Given At, M=Shirt Given By
     var id = cells[0] ? String(cells[0].v) : '';
     var bus = cells[3] ? String(cells[3].v) : '';
     var checkInTime = cells[7] ? String(cells[7].v) : '';
@@ -555,90 +538,6 @@ function handleLogData(response) {
   }
 }
 
-// ===== SHIRT DISTRIBUTION PANEL =====
-// Reads directly from the "Bus" (K/L size+given), "Supervisors" and
-// "ShirtInventory" sheets — same JSONP technique, no Apps Script involved.
-function handleShirtSupervisorsData(response) {
-  shirtSupervisorRows = (response && response.table && response.table.rows) ? response.table.rows : [];
-  renderShirtPanel();
-}
-
-function handleShirtInventoryData(response) {
-  shirtInventoryRows = (response && response.table && response.table.rows) ? response.table.rows : [];
-  renderShirtPanel();
-}
-
-function renderShirtPanel() {
-  var body = document.getElementById('shirtPanelBody');
-  if (!body) return;
-  if (!shirtBusRows || !shirtSupervisorRows || !shirtInventoryRows) return;
-
-  var distributed = { S: 0, M: 0, L: 0, XL: 0 };
-  var totalGiven = 0, totalPeople = 0;
-
-  for (var i = 0; i < shirtBusRows.length; i++) {
-    var c = shirtBusRows[i].c;
-    var id = c[0] ? String(c[0].v) : '';
-    if (!id) continue;
-    totalPeople++;
-    var size = c[10] ? String(c[10].v).trim().toUpperCase() : '';
-    var givenAt = c[11] ? c[11].v : '';
-    if (givenAt) {
-      totalGiven++;
-      if (distributed.hasOwnProperty(size)) distributed[size]++;
-    }
-  }
-
-  for (var j = 0; j < shirtSupervisorRows.length; j++) {
-    var sc = shirtSupervisorRows[j].c;
-    var name = sc[0] ? String(sc[0].v) : '';
-    if (!name) continue;
-    totalPeople++;
-    var sSize = sc[1] ? String(sc[1].v).trim().toUpperCase() : '';
-    var sGivenAt = sc[2] ? sc[2].v : '';
-    if (sGivenAt) {
-      totalGiven++;
-      if (distributed.hasOwnProperty(sSize)) distributed[sSize]++;
-    }
-  }
-
-  var inventory = {};
-  for (var k = 0; k < shirtInventoryRows.length; k++) {
-    var ic = shirtInventoryRows[k].c;
-    var invSize = ic[0] ? String(ic[0].v).trim().toUpperCase() : '';
-    if (!invSize) continue;
-    inventory[invSize] = {
-      initial: ic[1] ? Number(ic[1].v) || 0 : 0,
-      threshold: ic[2] ? Number(ic[2].v) || 0 : 0
-    };
-  }
-
-  var pct = totalPeople > 0 ? Math.round((totalGiven / totalPeople) * 100) : 0;
-
-  var html = '<div class="tiles-grid" style="margin-bottom:16px">';
-  html += '<div class="tile"><div class="tile-icon">👥</div><div class="tile-title">Given / Total</div>' +
-    '<div class="tile-value" style="color:var(--sap-green)">' + totalGiven + ' / ' + totalPeople + '</div>' +
-    '<div class="tile-subtitle">' + pct + '% distributed</div></div>';
-
-  for (var s = 0; s < SHIRT_SIZES.length; s++) {
-    var size = SHIRT_SIZES[s];
-    var inv = inventory[size] || { initial: 0, threshold: 0 };
-    var remaining = inv.initial - distributed[size];
-    var color = 'var(--sap-blue)';
-    var subtitle = 'in stock';
-    if (remaining <= 0) { color = 'var(--sap-red)'; subtitle = 'out of stock'; }
-    else if (remaining <= inv.threshold) { color = 'var(--sap-orange)'; subtitle = 'low stock'; }
-
-    html += '<div class="tile"><div class="tile-icon">👕</div><div class="tile-title">Size ' + size + '</div>' +
-      '<div class="tile-value" style="color:' + color + '">' + remaining + '</div>' +
-      '<div class="tile-subtitle">of ' + inv.initial + ' — ' + subtitle + '</div></div>';
-  }
-  html += '</div>';
-  html += '<p style="text-align:center;font-size:12px;color:var(--sap-gray)">Full distribution tool: <strong>shirt_distribution.html</strong></p>';
-
-  body.innerHTML = html;
-}
-
 // ===== LOAD DATA VIA JSONP (NO CORS!) =====
 function loadJsonp(sheetName, callbackName, onError) {
   var oldScript = document.querySelector('script[data-jsonp="' + sheetName + '"]');
@@ -662,13 +561,6 @@ function loadData() {
   loadJsonp('CheckInLog', 'handleLogData', function() {
     document.getElementById('activityTable').innerHTML =
       '<tr><td colspan="5" style="text-align:center;color:red">Failed to load activity log.</td></tr>';
-  });
-  loadJsonp('Supervisors', 'handleShirtSupervisorsData', function() {
-    shirtSupervisorRows = [];
-  });
-  loadJsonp('ShirtInventory', 'handleShirtInventoryData', function() {
-    document.getElementById('shirtPanelBody').innerHTML =
-      '<p style="text-align:center;color:red">Add a "ShirtInventory" sheet to enable this panel.</p>';
   });
 }
 

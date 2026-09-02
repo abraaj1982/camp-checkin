@@ -243,11 +243,22 @@ tbody tr:hover { background: #F5FAFD; cursor: pointer; }
   .topbar { flex-direction: column; align-items: flex-start; }
   .topbar h1 { font-size: 18px; }
 }
+
+.setup-banner { background: #FADAD4; border: 2px solid var(--sap-red); color: var(--sap-red); border-radius: 4px; padding: 16px 20px; margin-bottom: 20px; font-size: 13px; line-height: 1.6; }
+.setup-banner strong { display: block; margin-bottom: 6px; font-size: 15px; }
+.setup-banner code { background: rgba(0,0,0,.06); padding: 1px 5px; border-radius: 3px; }
 </style>
 </head>
 <body>
 
 <div class="container">
+
+  <div id="setupBanner" class="setup-banner" style="display:none;">
+    <strong>⚠️ Setup needed before this page will work</strong>
+    Open <code>shirt_distribution.html</code> and replace <code>SHEET_ID</code> and <code>APPS_SCRIPT_URL</code> near the top of the
+    <code>&lt;script&gt;</code> section with your new dedicated Sheet's ID and its deployed Apps Script Web App URL
+    (see <code>AppsScript_Shirts.gs</code> for setup steps).
+  </div>
 
   <div class="topbar">
     <div>
@@ -329,7 +340,6 @@ tbody tr:hover { background: #F5FAFD; cursor: pointer; }
 
         <!-- PERSON CARD -->
         <div id="personCard" class="person-card">
-          <img id="personAvatar" class="person-avatar" src="" alt="" style="display:none;">
           <div class="person-name" id="personName"></div>
           <div class="person-meta" id="personMeta"></div>
 
@@ -390,12 +400,18 @@ tbody tr:hover { background: #F5FAFD; cursor: pointer; }
 </div>
 
 <script>
-const SHEET_ID = '1N1ZZtUyxAKfyc9UbqI0qfzhB8BLbk4abo60jCkEmHPE';
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzZYgQ_IUjIueJeZgVb4gPmIRGXaPCII5MqtSidEe2TdF5_EFqpsA4MHLxcB7pOX1RGAg/exec';
+// TODO: replace these two with your NEW dedicated shirts Sheet's ID (from
+// its URL: docs.google.com/spreadsheets/d/<THIS PART>/edit) and the /exec
+// URL you get after deploying AppsScript_Shirts.gs as a Web App on it.
+const SHEET_ID = 'PUT_YOUR_NEW_SHEET_ID_HERE';
+const APPS_SCRIPT_URL = 'PUT_YOUR_NEW_APPS_SCRIPT_WEB_APP_URL_HERE';
+
+const SETUP_NOT_DONE = SHEET_ID.indexOf('PUT_YOUR') === 0 || APPS_SCRIPT_URL.indexOf('PUT_YOUR') === 0;
+
 const SIZES = ['S', 'M', 'L', 'XL'];
 const KNOWN_SUPERVISORS = ['Yasser Mustafa', 'Mohammed Ismail', 'Abbas Abdul Rab', 'Hussain Mustafa', 'Hamza'];
 
-let students = [];       // { id, name, class, bus, photo, size, givenAt, givenBy }
+let students = [];       // { id, name, group, size, givenAt, givenBy }
 let supervisors = [];    // { name, size, givenAt, givenBy }
 let inventory = {};      // { S: {initial, threshold}, ... }
 let busReady = false, supReady = false, invReady = false;
@@ -419,8 +435,8 @@ function loadJsonp(sheetName, callbackName, onError) {
 
 function cellStr(cell) { return cell ? String(cell.v) : ''; }
 
-// ===== Bus sheet: A id, B name, D bus, F class, G photo, K size, L givenAt, M givenBy =====
-function handleBusData(response) {
+// ===== Students sheet: A id, B name, C group (optional), D size, E givenAt, F givenBy =====
+function handleStudentsData(response) {
   students = [];
   if (response && response.table && response.table.rows) {
     response.table.rows.forEach(row => {
@@ -430,12 +446,10 @@ function handleBusData(response) {
       students.push({
         id: id,
         name: c[1] ? cellStr(c[1]) : '',
-        bus: c[3] ? cellStr(c[3]) : '',
-        class: c[5] ? cellStr(c[5]) : '',
-        photo: c[6] ? cellStr(c[6]) : '',
-        size: c[10] ? cellStr(c[10]).trim().toUpperCase() : '',
-        givenAt: c[11] ? cellStr(c[11]) : '',
-        givenBy: c[12] ? cellStr(c[12]) : ''
+        group: c[2] ? cellStr(c[2]) : '',
+        size: c[3] ? cellStr(c[3]).trim().toUpperCase() : '',
+        givenAt: c[4] ? cellStr(c[4]) : '',
+        givenBy: c[5] ? cellStr(c[5]) : ''
       });
     });
   }
@@ -464,7 +478,7 @@ function handleSupervisorsData(response) {
   onDataChanged();
 }
 
-// ===== ShirtInventory sheet: A size, B initial stock, C low stock threshold =====
+// ===== Inventory sheet: A size, B initial stock, C low stock threshold =====
 function handleInventoryData(response) {
   inventory = {};
   if (response && response.table && response.table.rows) {
@@ -535,10 +549,11 @@ function showDataStatus(text, loading) {
 }
 
 function loadAllData() {
+  if (SETUP_NOT_DONE) return;
   showDataStatus('⏳ Loading camp data...', true);
-  loadJsonp('Bus', 'handleBusData', () => { showDataStatus('⚠️ Failed to load students. Retrying...', true); setTimeout(loadAllData, 4000); });
+  loadJsonp('Students', 'handleStudentsData', () => { showDataStatus('⚠️ Failed to load students. Retrying...', true); setTimeout(loadAllData, 4000); });
   loadJsonp('Supervisors', 'handleSupervisorsData', () => {});
-  loadJsonp('ShirtInventory', 'handleInventoryData', () => {});
+  loadJsonp('Inventory', 'handleInventoryData', () => {});
 }
 
 // ===== Supervisor login (shared with the check-in app) =====
@@ -549,6 +564,11 @@ function updateLock() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+  if (SETUP_NOT_DONE) {
+    document.getElementById('setupBanner').style.display = 'block';
+    showDataStatus('⏳ Waiting for setup — see the banner above', true);
+  }
+
   const saved = localStorage.getItem('supervisorName');
   if (saved) {
     document.getElementById('supervisorName').value = saved;
@@ -629,7 +649,7 @@ function selectStudent(id) {
   if (!student) { showAlertGlobal('Student not found'); resetPerson(); return; }
 
   currentPerson = { type: 'student', id: student.id, name: student.name, registeredSize: student.size, givenAt: student.givenAt, givenBy: student.givenBy };
-  showPerson({ name: student.name, meta: `ID: ${student.id} | Class ${student.class} | Bus ${student.bus}`, photo: student.photo });
+  showPerson({ name: student.name, meta: `ID: ${student.id}${student.group ? ' | ' + student.group : ''}` });
 }
 
 // ===== Supervisor chips =====
@@ -658,7 +678,7 @@ function selectSupervisor(name) {
   const givenBy = rec ? rec.givenBy : '';
 
   currentPerson = { type: 'supervisor', id: name, name: name, registeredSize: registeredSize, givenAt: givenAt, givenBy: givenBy };
-  showPerson({ name: name, meta: 'Supervisor', photo: '' });
+  showPerson({ name: name, meta: 'Supervisor' });
 }
 
 // ===== Size picker =====
@@ -689,15 +709,6 @@ function refreshDistributeState() {
 function showPerson(info) {
   document.getElementById('personName').textContent = info.name;
   document.getElementById('personMeta').textContent = info.meta;
-
-  const avatar = document.getElementById('personAvatar');
-  if (info.photo) {
-    avatar.src = info.photo;
-    avatar.style.display = 'block';
-    avatar.onerror = function() { this.style.display = 'none'; };
-  } else {
-    avatar.style.display = 'none';
-  }
 
   selectedSize = currentPerson.registeredSize || '';
   refreshSizePicker();
@@ -799,7 +810,7 @@ function setupRosterControls() {
 function renderRoster() {
   const rows = [];
   students.forEach(s => rows.push({
-    name: s.name, id: s.id, type: 'Student', details: `Class ${s.class} | Bus ${s.bus}`,
+    name: s.name, id: s.id, type: 'Student', details: s.group || '—',
     size: s.size, givenAt: s.givenAt, givenBy: s.givenBy
   }));
   supervisors.forEach(s => rows.push({
