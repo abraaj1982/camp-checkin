@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Camp Shirt Distribution</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --sap-blue: #0A6ED4;
+  --sap-green: #107E3E;
+  --sap-orange: #E87722;
+  --sap-red: #C30C13;
+  --sap-gray: #6C757D;
+  --sap-text: #32363A;
+  --sap-bg: #F8F9FA;
+  --sap-border: #D3D3D3;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Roboto', 'Segoe UI', Helvetica, Arial, sans-serif;
+  background: linear-gradient(135deg, #E8F4FD 0%, #F8F9FA 100%);
+  color: var(--sap-text);
+  min-height: 100vh;
+}
+
+.container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+/* ===== TOPBAR ===== */
+.topbar {
+  background: linear-gradient(135deg, var(--sap-blue) 0%, #0052A3 100%);
+  color: white;
+  padding: 22px 24px;
+  border-radius: 4px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.topbar h1 { font-size: 24px; font-weight: 400; margin-bottom: 4px; }
+.topbar p { font-size: 13px; opacity: 0.9; }
+
+.supervisor-box { display: flex; align-items: center; gap: 8px; }
+.supervisor-box select {
+  padding: 10px 12px;
+  border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.4);
+  background: rgba(255,255,255,0.15);
+  color: white;
+  font-size: 13px;
+  min-width: 180px;
+}
+.supervisor-box select option { color: var(--sap-text); }
+.supervisor-box select:disabled { opacity: 0.9; }
+
+.btn-ghost {
+  padding: 9px 14px;
+  border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.4);
+  background: rgba(255,255,255,0.15);
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ===== STATS ROW ===== */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.stat-tile {
+  background: white;
+  border-radius: 4px;
+  padding: 16px 18px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  border: 1px solid var(--sap-border);
+  border-left: 4px solid var(--sap-blue);
+}
+.stat-tile.green { border-left-color: var(--sap-green); }
+.stat-tile.orange { border-left-color: var(--sap-orange); }
+.stat-tile.gray { border-left-color: var(--sap-gray); }
+
+.stat-label { font-size: 11px; color: var(--sap-gray); text-transform: uppercase; font-weight: 600; margin-bottom: 6px; }
+.stat-value { font-family: 'Roboto Mono', monospace; font-size: 24px; font-weight: 700; }
+
+/* ===== CARD / PANEL ===== */
+.card {
+  background: white;
+  border-radius: 4px;
+  padding: 22px;
+  margin-bottom: 22px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--sap-border);
+}
+
+.panel { background: white; border-radius: 4px; margin-bottom: 22px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid var(--sap-border); overflow: hidden; }
+.panel-header { background: linear-gradient(135deg, #F5FAFD 0%, var(--sap-bg) 100%); border-bottom: 1px solid var(--sap-border); padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.panel-body { padding: 20px; }
+
+.card-title { font-size: 15px; font-weight: 500; display: flex; align-items: center; gap: 10px; }
+.card-title-icon { font-size: 19px; }
+
+/* ===== INVENTORY ===== */
+.inventory-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px; }
+
+.inventory-tile { border: 2px solid var(--sap-border); border-radius: 8px; padding: 16px; text-align: center; }
+.inventory-tile.status-ok { border-color: var(--sap-green); }
+.inventory-tile.status-low { border-color: var(--sap-orange); }
+.inventory-tile.status-out { border-color: var(--sap-red); }
+
+.inventory-size { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+.inventory-remaining { font-family: 'Roboto Mono', monospace; font-size: 26px; font-weight: 700; }
+.status-ok .inventory-remaining { color: var(--sap-green); }
+.status-low .inventory-remaining { color: var(--sap-orange); }
+.status-out .inventory-remaining { color: var(--sap-red); }
+.inventory-of { font-size: 11px; color: var(--sap-gray); margin-bottom: 8px; }
+.inventory-bar { height: 6px; background: #EEEFF0; border-radius: 3px; overflow: hidden; margin-bottom: 8px; }
+.inventory-bar-fill { height: 100%; }
+.status-ok .inventory-bar-fill { background: var(--sap-green); }
+.status-low .inventory-bar-fill { background: var(--sap-orange); }
+.status-out .inventory-bar-fill { background: var(--sap-red); }
+.inventory-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; }
+.status-ok .inventory-label { color: var(--sap-green); }
+.status-low .inventory-label { color: var(--sap-orange); }
+.status-out .inventory-label { color: var(--sap-red); }
+.inventory-given { font-size: 11px; color: var(--sap-gray); margin-top: 4px; }
+
+/* ===== FORM ===== */
+.form-group { margin-bottom: 16px; }
+.form-group:last-child { margin-bottom: 0; }
+label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 8px; }
+
+select, input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--sap-border);
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--sap-text);
+}
+select:focus, input:focus { outline: none; border-color: var(--sap-blue); box-shadow: 0 0 0 3px rgba(10,110,212,.1); }
+
+.btn { padding: 12px 22px; border: none; border-radius: 4px; font-size: 14px; font-weight: 500; cursor: pointer; }
+.btn-block { width: 100%; }
+.btn-primary { background: var(--sap-blue); color: white; }
+.btn-primary:hover { background: #0052A3; }
+.btn-success { background: var(--sap-green); color: white; }
+.btn-success:hover { background: #0A5129; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+fieldset { border: none; padding: 0; margin: 0; }
+fieldset:disabled { opacity: .55; }
+
+.hint { font-size: 12px; color: var(--sap-gray); margin-top: 8px; }
+.hint-warning { color: var(--sap-orange); font-weight: 500; }
+
+/* ===== 2-col layout ===== */
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+@media (max-width: 800px) { .split { grid-template-columns: 1fr; } }
+
+/* ===== AUTOCOMPLETE ===== */
+.autocomplete-container { position: relative; }
+.autocomplete-dropdown {
+  position: absolute; top: 100%; left: 0; right: 0; background: white;
+  border: 1px solid var(--sap-border); border-top: none; border-radius: 0 0 4px 4px;
+  max-height: 280px; overflow-y: auto; display: none; z-index: 10; box-shadow: 0 4px 8px rgba(0,0,0,.1);
+}
+.autocomplete-dropdown.show { display: block; }
+.autocomplete-item { padding: 12px; border-bottom: 1px solid var(--sap-border); cursor: pointer; font-size: 13px; }
+.autocomplete-item:hover { background: var(--sap-bg); }
+
+/* ===== SUPERVISOR CHIPS ===== */
+.chip-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.chip { border: 1px solid var(--sap-border); border-radius: 6px; padding: 10px; cursor: pointer; text-align: center; transition: all .2s; background: white; }
+.chip:hover { border-color: var(--sap-blue); transform: translateY(-2px); }
+.chip.given { background: #E1F5EB; border-color: var(--sap-green); }
+.chip-name { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+.chip-status { font-size: 10px; color: var(--sap-gray); }
+.chip.given .chip-status { color: var(--sap-green); }
+
+/* ===== PERSON CARD ===== */
+.person-card { display: none; background: linear-gradient(135deg, #E8F4FD 0%, #F5FAFD 100%); border: 2px solid var(--sap-blue); border-radius: 8px; padding: 22px; text-align: center; margin-top: 18px; }
+.person-card.show { display: block; }
+.person-avatar { width: 110px; height: 110px; border-radius: 10px; margin: 0 auto 12px; object-fit: cover; border: 3px solid var(--sap-blue); background: var(--sap-bg); }
+.person-name { font-size: 18px; font-weight: 600; color: var(--sap-blue); margin-bottom: 2px; }
+.person-meta { font-size: 12px; color: var(--sap-gray); margin-bottom: 16px; }
+
+.size-picker { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 6px; }
+.size-option {
+  min-width: 52px; height: 52px; padding: 0 8px; border-radius: 8px; border: 2px solid var(--sap-border);
+  background: white; font-size: 15px; font-weight: 700; cursor: pointer; color: var(--sap-text);
+}
+.size-option.selected { border-color: var(--sap-blue); background: var(--sap-blue); color: white; }
+.size-registered-hint { font-size: 11px; color: var(--sap-gray); margin-bottom: 16px; }
+
+/* ===== ALERT ===== */
+.alert { padding: 14px 16px; border-radius: 4px; margin: 14px 0; display: none; border-left: 4px solid; text-align: left; }
+.alert.show { display: block; }
+.alert-success { background: #E1F5EB; border-left-color: var(--sap-green); color: var(--sap-green); }
+.alert-warning { background: #FEF0E8; border-left-color: var(--sap-orange); color: var(--sap-orange); }
+.alert-error { background: #FADAD4; border-left-color: var(--sap-red); color: var(--sap-red); }
+.alert-title { font-weight: 600; margin-bottom: 2px; }
+
+/* ===== ROSTER TABLE ===== */
+.roster-controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.roster-search { min-width: 220px; padding: 9px 12px; border: 1px solid var(--sap-border); border-radius: 4px; font-size: 13px; }
+.tabs { display: flex; gap: 4px; }
+.tab-btn { padding: 8px 14px; border-radius: 4px; border: 1px solid var(--sap-border); background: white; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--sap-gray); }
+.tab-btn.active { background: var(--sap-blue); color: white; border-color: var(--sap-blue); }
+
+.table-wrap { max-height: 480px; overflow-y: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead { background: var(--sap-bg); position: sticky; top: 0; }
+th { padding: 10px 14px; text-align: left; font-weight: 600; font-size: 11px; text-transform: uppercase; border-bottom: 1px solid var(--sap-border); color: var(--sap-gray); }
+td { padding: 10px 14px; border-bottom: 1px solid #EEEFF0; }
+tbody tr:hover { background: #F5FAFD; cursor: pointer; }
+
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+.badge-given { background: #E1F5EB; color: var(--sap-green); }
+.badge-pending { background: #FEF0E8; color: var(--sap-orange); }
+.badge-size { background: #E8F4FD; color: var(--sap-blue); }
+.type-tag { font-size: 11px; color: var(--sap-gray); }
+
+.loading { display: none; text-align: center; padding: 16px; }
+.loading.show { display: block; }
+.spinner { border: 3px solid var(--sap-bg); border-top: 3px solid var(--sap-blue); border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto 10px; }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+.footer-note { text-align: center; color: var(--sap-gray); font-size: 12px; padding: 10px 0 20px; }
+
+@media (max-width: 600px) {
+  .topbar { flex-direction: column; align-items: flex-start; }
+  .topbar h1 { font-size: 18px; }
+}
+
+.setup-banner { background: #FADAD4; border: 2px solid var(--sap-red); color: var(--sap-red); border-radius: 4px; padding: 16px 20px; margin-bottom: 20px; font-size: 13px; line-height: 1.6; }
+.setup-banner strong { display: block; margin-bottom: 6px; font-size: 15px; }
+.setup-banner code { background: rgba(0,0,0,.06); padding: 1px 5px; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <div id="setupBanner" class="setup-banner" style="display:none;">
+    <strong>⚠️ Setup needed before this page will work</strong>
+    Open <code>shirt_distribution.html</code> and replace <code>SHEET_ID</code> and <code>APPS_SCRIPT_URL</code> near the top of the
+    <code>&lt;script&gt;</code> section with your new dedicated Sheet's ID and its deployed Apps Script Web App URL
+    (see <code>AppsScript_Shirts.gs</code> for setup steps).
+  </div>
+
+  <div class="topbar">
+    <div>
+      <h1>👕 Camp Shirt Distribution — توزيع الأقمصة</h1>
+      <p>Sizes: S · M · L · XL · XXL | Students &amp; Supervisors</p>
+    </div>
+    <div class="supervisor-box">
+      <select id="supervisorName">
+        <option value="">-- Your Name --</option>
+        <option value="Yasser Mustafa">Yasser Mustafa</option>
+        <option value="Mohammed Ismail">Mohammed Ismail</option>
+        <option value="Abbas Abdul Rab">Abbas Abdul Rab</option>
+        <option value="Hussain Mustafa">Hussain Mustafa</option>
+        <option value="Hamza">Hamza</option>
+      </select>
+      <button class="btn-ghost" id="changeSupervisorBtn" style="display:none;">Change</button>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-row">
+    <div class="stat-tile">
+      <div class="stat-label">Total People</div>
+      <div class="stat-value" id="statTotal">—</div>
+    </div>
+    <div class="stat-tile green">
+      <div class="stat-label">Shirts Given</div>
+      <div class="stat-value" id="statGiven" style="color:var(--sap-green)">—</div>
+    </div>
+    <div class="stat-tile orange">
+      <div class="stat-label">Still Waiting</div>
+      <div class="stat-value" id="statPending" style="color:var(--sap-orange)">—</div>
+    </div>
+    <div class="stat-tile gray">
+      <div class="stat-label">Progress</div>
+      <div class="stat-value" id="statProgress" style="color:var(--sap-text)">—</div>
+    </div>
+  </div>
+
+  <!-- INVENTORY -->
+  <div class="card">
+    <div class="card-title" style="margin-bottom:18px;"><span class="card-title-icon">📦</span><span>Remaining Stock by Size</span></div>
+    <div class="inventory-grid" id="inventoryGrid">
+      <p style="grid-column: 1/-1; text-align:center; color: var(--sap-gray);">Loading inventory...</p>
+    </div>
+    <div class="hint" id="dataStatus" style="margin-top: 16px;"></div>
+  </div>
+
+  <div class="split">
+    <!-- DISTRIBUTION -->
+    <div>
+      <fieldset id="mainFieldset" disabled>
+        <div class="hint hint-warning" id="lockHint" style="margin-bottom: 14px;">⚠️ Select your name above to unlock distribution</div>
+
+        <div class="card">
+          <div class="card-title"><span class="card-title-icon">🎓</span><span>Find a Student</span></div>
+          <div class="form-group" style="margin-top:16px;">
+            <label>Search by Name</label>
+            <div class="autocomplete-container">
+              <input type="text" id="studentNameInput" placeholder="Type a student name" autocomplete="off">
+              <div class="autocomplete-dropdown" id="autocompleteDropdown"></div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Or Enter Student ID</label>
+            <div style="display:flex; gap:8px;">
+              <input type="text" id="studentIdInput" placeholder="e.g. 1205" inputmode="numeric" style="flex:1;">
+              <button class="btn btn-primary" id="searchBtn" style="width:auto;">🔍 Search</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title"><span class="card-title-icon">🧑‍🏫</span><span>Or Pick a Supervisor</span></div>
+          <div class="chip-grid" id="supervisorChips" style="margin-top:16px;">
+            <p style="grid-column: 1/-1; text-align:center; color: var(--sap-gray);">Loading...</p>
+          </div>
+        </div>
+
+        <!-- PERSON CARD -->
+        <div id="personCard" class="person-card">
+          <div class="person-name" id="personName"></div>
+          <div class="person-meta" id="personMeta"></div>
+
+          <div class="size-picker" id="sizePicker"></div>
+          <div class="size-registered-hint" id="sizeRegisteredHint"></div>
+
+          <div id="alertContainer"></div>
+          <button class="btn btn-success btn-block" id="distributeBtn">✅ Distribute Shirt</button>
+        </div>
+
+        <div id="loading" class="loading"><div class="spinner"></div><p>Saving...</p></div>
+      </fieldset>
+    </div>
+
+    <!-- ACTIVITY LOG -->
+    <div>
+      <div class="card">
+        <div class="card-title"><span class="card-title-icon">📋</span><span>Recent Distributions (This Session)</span></div>
+        <div id="activityLogList" style="margin-top:16px;"><div class="hint">No shirts distributed yet in this session.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROSTER -->
+  <div class="panel">
+    <div class="panel-header">
+      <div class="card-title"><span class="card-title-icon">📊</span><span>Roster — Who Has &amp; Who's Waiting</span></div>
+      <div class="roster-controls">
+        <div class="tabs">
+          <button class="tab-btn active" data-filter="all">All</button>
+          <button class="tab-btn" data-filter="given">✅ Given</button>
+          <button class="tab-btn" data-filter="pending">⏳ Pending</button>
+        </div>
+        <input type="text" class="roster-search" id="rosterSearch" placeholder="🔍 Search name or ID...">
+      </div>
+    </div>
+    <div class="panel-body" style="padding:0;">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Name</th><th>Type</th><th>Details</th><th>Size</th><th>Status</th><th>Given At</th><th>By</th></tr>
+          </thead>
+          <tbody id="rosterTable">
+            <tr><td colspan="7" style="text-align:center;color:var(--sap-gray);padding:20px;">Loading roster...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-note">🔄 Data refreshes automatically every 30 seconds</div>
+
+</div>
+
+<script>
+// TODO: replace these two with your NEW dedicated shirts Sheet's ID (from
+// its URL: docs.google.com/spreadsheets/d/<THIS PART>/edit) and the /exec
+// URL you get after deploying AppsScript_Shirts.gs as a Web App on it.
+const SHEET_ID = '1zkqlD2eFNBbooTOJ1_IUIsSgb_PRLW7DfUt9K4W81u0';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx-dLqDPnep7xYw5YLq5CyU57H57ETOXVOergJx6ncrDcavUDW94FzI79senB8BnaDR/exec';
+
+const SETUP_NOT_DONE = SHEET_ID.indexOf('PUT_YOUR') === 0 || APPS_SCRIPT_URL.indexOf('PUT_YOUR') === 0;
+
+// Sizes are NOT hardcoded — this is just the fallback shown before the
+// Inventory sheet has loaded. Once it loads, SIZES is replaced with
+// whatever size rows actually exist there, in that order.
+let SIZES = ['S', 'M', 'L', 'XL'];
+const KNOWN_SUPERVISORS = ['Yasser Mustafa', 'Mohammed Ismail', 'Abbas Abdul Rab', 'Hussain Mustafa', 'Hamza'];
+
+let students = [];       // { id, name, group, size, givenAt, givenBy }
+let supervisors = [];    // { name, size, givenAt, givenBy }
+let inventory = {};      // { S: {initial, threshold}, ... }
+let busReady = false, supReady = false, invReady = false;
+let currentPerson = null;   // { type, id, name, registeredSize }
+let selectedSize = '';
+let rosterFilter = 'all';
+let rosterQuery = '';
+let activityLog = JSON.parse(sessionStorage.getItem('shirtActivityLog') || '[]');
+
+function loadJsonp(sheetName, callbackName, onError) {
+  const old = document.querySelector('script[data-jsonp="' + sheetName + '"]');
+  if (old) old.remove();
+  const url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID +
+    '/gviz/tq?tqx=responseHandler:' + callbackName + '&sheet=' + encodeURIComponent(sheetName);
+  const script = document.createElement('script');
+  script.setAttribute('data-jsonp', sheetName);
+  script.src = url;
+  script.onerror = onError;
+  document.body.appendChild(script);
+}
+
+function cellStr(cell) { return cell ? String(cell.v) : ''; }
+
+// ===== "Names" sheet: A id, B name, C group (optional), D size, E givenAt, F givenBy =====
+function handleStudentsData(response) {
+  students = [];
+  if (response && response.table && response.table.rows) {
+    response.table.rows.forEach(row => {
+      const c = row.c;
+      const id = c[0] ? cellStr(c[0]) : '';
+      if (!id) return;
+      students.push({
+        id: id,
+        name: c[1] ? cellStr(c[1]) : '',
+        group: c[2] ? cellStr(c[2]) : '',
+        size: c[3] ? cellStr(c[3]).trim().toUpperCase() : '',
+        givenAt: c[4] ? cellStr(c[4]) : '',
+        givenBy: c[5] ? cellStr(c[5]) : ''
+      });
+    });
+  }
+  busReady = true;
+  showDataStatus(`✅ ${students.length} students loaded — auto-refreshing every 30s`, false);
+  onDataChanged();
+}
+
+// ===== Supervisors sheet: A name, B size, C givenAt, D givenBy =====
+function handleSupervisorsData(response) {
+  supervisors = [];
+  if (response && response.table && response.table.rows) {
+    response.table.rows.forEach(row => {
+      const c = row.c;
+      const name = c[0] ? cellStr(c[0]) : '';
+      if (!name) return;
+      supervisors.push({
+        name: name,
+        size: c[1] ? cellStr(c[1]).trim().toUpperCase() : '',
+        givenAt: c[2] ? cellStr(c[2]) : '',
+        givenBy: c[3] ? cellStr(c[3]) : ''
+      });
+    });
+  }
+  supReady = true;
+  onDataChanged();
+}
+
+// ===== Inventory sheet: A size, B initial stock, C low stock threshold =====
+// This sheet is the source of truth for which sizes exist — SIZES is
+// rebuilt from its rows (in the order they appear) every time it loads.
+function handleInventoryData(response) {
+  inventory = {};
+  const order = [];
+  if (response && response.table && response.table.rows) {
+    response.table.rows.forEach(row => {
+      const c = row.c;
+      const size = c[0] ? cellStr(c[0]).trim().toUpperCase() : '';
+      if (!size) return;
+      order.push(size);
+      inventory[size] = {
+        initial: c[1] ? Number(c[1].v) || 0 : 0,
+        threshold: c[2] ? Number(c[2].v) || 0 : 0
+      };
+    });
+  }
+  if (order.length > 0) SIZES = order;
+  invReady = true;
+  onDataChanged();
+}
+
+function onDataChanged() {
+  if (!busReady || !supReady || !invReady) return;
+  renderInventory();
+  renderStats();
+  renderSupervisorChips();
+  renderSizePicker();
+  renderRoster();
+}
+
+function renderInventory() {
+  const distributed = {};
+  SIZES.forEach(sz => { distributed[sz] = 0; });
+  students.forEach(s => { if (s.givenAt && distributed.hasOwnProperty(s.size)) distributed[s.size]++; });
+  supervisors.forEach(s => { if (s.givenAt && distributed.hasOwnProperty(s.size)) distributed[s.size]++; });
+
+  const grid = document.getElementById('inventoryGrid');
+  grid.innerHTML = SIZES.map(size => {
+    const inv = inventory[size] || { initial: 0, threshold: 0 };
+    const remaining = inv.initial - distributed[size];
+    const pct = inv.initial > 0 ? Math.max(0, Math.min(100, Math.round((remaining / inv.initial) * 100))) : 0;
+    let status = 'status-ok', label = '✅ In Stock';
+    if (remaining <= 0) { status = 'status-out'; label = '🔴 Out of Stock'; }
+    else if (remaining <= inv.threshold) { status = 'status-low'; label = '⚠️ Low Stock'; }
+
+    return `
+      <div class="inventory-tile ${status}">
+        <div class="inventory-size">${size}</div>
+        <div class="inventory-remaining">${remaining}</div>
+        <div class="inventory-of">of ${inv.initial}</div>
+        <div class="inventory-bar"><div class="inventory-bar-fill" style="width:${pct}%"></div></div>
+        <div class="inventory-label">${label}</div>
+        <div class="inventory-given">${distributed[size]} given</div>
+      </div>`;
+  }).join('');
+}
+
+function renderStats() {
+  const total = students.length + supervisors.length;
+  const given = students.filter(s => s.givenAt).length + supervisors.filter(s => s.givenAt).length;
+  const pending = total - given;
+  const pct = total > 0 ? Math.round((given / total) * 100) : 0;
+
+  document.getElementById('statTotal').textContent = total;
+  document.getElementById('statGiven').textContent = given;
+  document.getElementById('statPending').textContent = pending;
+  document.getElementById('statProgress').textContent = pct + '%';
+}
+
+function showDataStatus(text, loading) {
+  const el = document.getElementById('dataStatus');
+  el.textContent = text;
+  el.style.color = loading ? 'var(--sap-orange)' : 'var(--sap-green)';
+}
+
+function loadAllData() {
+  if (SETUP_NOT_DONE) return;
+  showDataStatus('⏳ Loading camp data...', true);
+  loadJsonp('Names', 'handleStudentsData', () => { showDataStatus('⚠️ Failed to load students. Retrying...', true); setTimeout(loadAllData, 4000); });
+  loadJsonp('Supervisors', 'handleSupervisorsData', () => {});
+  loadJsonp('Inventory', 'handleInventoryData', () => {});
+}
+
+// ===== Supervisor login (shared with the check-in app) =====
+function updateLock() {
+  const has = !!document.getElementById('supervisorName').value;
+  document.getElementById('mainFieldset').disabled = !has;
+  document.getElementById('lockHint').style.display = has ? 'none' : 'block';
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  if (SETUP_NOT_DONE) {
+    document.getElementById('setupBanner').style.display = 'block';
+    showDataStatus('⏳ Waiting for setup — see the banner above', true);
+  }
+
+  const saved = localStorage.getItem('supervisorName');
+  if (saved) {
+    document.getElementById('supervisorName').value = saved;
+    document.getElementById('supervisorName').disabled = true;
+    document.getElementById('changeSupervisorBtn').style.display = 'inline-block';
+  }
+  updateLock();
+  loadAllData();
+  setupNameSearch();
+  setupSizePicker();
+  setupRosterControls();
+  renderActivityLog();
+  setInterval(() => { if (busReady && supReady && invReady) loadAllData(); }, 30000);
+});
+
+document.getElementById('supervisorName').addEventListener('change', function() {
+  if (this.value) {
+    localStorage.setItem('supervisorName', this.value);
+    this.disabled = true;
+    document.getElementById('changeSupervisorBtn').style.display = 'inline-block';
+  }
+  updateLock();
+});
+
+document.getElementById('changeSupervisorBtn').addEventListener('click', function() {
+  localStorage.removeItem('supervisorName');
+  document.getElementById('supervisorName').value = '';
+  document.getElementById('supervisorName').disabled = false;
+  document.getElementById('changeSupervisorBtn').style.display = 'none';
+  resetPerson();
+  updateLock();
+});
+
+// ===== Student search =====
+function setupNameSearch() {
+  const input = document.getElementById('studentNameInput');
+  const dropdown = document.getElementById('autocompleteDropdown');
+
+  input.addEventListener('input', function() {
+    const q = this.value.trim().toLowerCase();
+    if (q.length < 2) { dropdown.classList.remove('show'); return; }
+
+    const matches = students.filter(s => s.name.toLowerCase().includes(q) || s.id.includes(q)).slice(0, 10);
+    if (matches.length === 0) { dropdown.classList.remove('show'); return; }
+
+    dropdown.innerHTML = matches.map(s => `
+      <div class="autocomplete-item" data-id="${s.id}">
+        <strong>${s.name}</strong> (ID: ${s.id}) — ${s.size ? 'Size ' + s.size : 'no size'} ${s.givenAt ? '✅' : ''}
+      </div>`).join('');
+    dropdown.classList.add('show');
+
+    dropdown.querySelectorAll('.autocomplete-item').forEach(item => {
+      item.addEventListener('click', function() {
+        dropdown.classList.remove('show');
+        input.value = '';
+        selectStudent(this.getAttribute('data-id'));
+      });
+    });
+  });
+
+  document.addEventListener('click', function(e) {
+    if (e.target !== input && !dropdown.contains(e.target)) dropdown.classList.remove('show');
+  });
+}
+
+document.getElementById('searchBtn').addEventListener('click', function() {
+  const id = document.getElementById('studentIdInput').value.trim();
+  if (!id) { showAlertGlobal('Please enter a Student ID'); return; }
+  selectStudent(id);
+});
+
+document.getElementById('studentIdInput').addEventListener('keypress', function(e) {
+  if (e.key === 'Enter') { e.preventDefault(); document.getElementById('searchBtn').click(); }
+});
+
+function selectStudent(id) {
+  const student = students.find(s => s.id === id);
+  if (!student) { showAlertGlobal('Student not found'); resetPerson(); return; }
+
+  currentPerson = { type: 'student', id: student.id, name: student.name, registeredSize: student.size, givenAt: student.givenAt, givenBy: student.givenBy };
+  showPerson({ name: student.name, meta: `ID: ${student.id}${student.group ? ' | ' + student.group : ''}` });
+}
+
+// ===== Supervisor chips =====
+function renderSupervisorChips() {
+  const grid = document.getElementById('supervisorChips');
+  grid.innerHTML = KNOWN_SUPERVISORS.map(name => {
+    const rec = supervisors.find(s => s.name === name);
+    const size = rec ? rec.size : '';
+    const given = rec && rec.givenAt;
+    return `
+      <div class="chip ${given ? 'given' : ''}" data-name="${name}">
+        <div class="chip-name">${name}</div>
+        <div class="chip-status">${size ? 'Size ' + size : 'No size set'}${given ? ' ✅' : ''}</div>
+      </div>`;
+  }).join('');
+
+  grid.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', function() { selectSupervisor(this.getAttribute('data-name')); });
+  });
+}
+
+function selectSupervisor(name) {
+  const rec = supervisors.find(s => s.name === name);
+  const registeredSize = rec ? rec.size : '';
+  const givenAt = rec ? rec.givenAt : '';
+  const givenBy = rec ? rec.givenBy : '';
+
+  currentPerson = { type: 'supervisor', id: name, name: name, registeredSize: registeredSize, givenAt: givenAt, givenBy: givenBy };
+  showPerson({ name: name, meta: 'Supervisor' });
+}
+
+// ===== Size picker (buttons are generated from SIZES, not hardcoded) =====
+function setupSizePicker() {
+  document.getElementById('sizePicker').addEventListener('click', function(e) {
+    const btn = e.target.closest('.size-option');
+    if (!btn) return;
+    selectedSize = btn.getAttribute('data-size');
+    renderSizePicker();
+    refreshDistributeState();
+  });
+}
+
+function renderSizePicker() {
+  const el = document.getElementById('sizePicker');
+  el.innerHTML = SIZES.map(sz => `
+    <button type="button" class="size-option${sz === selectedSize ? ' selected' : ''}" data-size="${sz}">${sz}</button>
+  `).join('');
+}
+
+function refreshDistributeState() {
+  const btn = document.getElementById('distributeBtn');
+  if (!currentPerson) { btn.disabled = true; return; }
+  if (currentPerson.givenAt) { btn.disabled = true; return; }
+  btn.disabled = !selectedSize;
+}
+
+// ===== Person card =====
+function showPerson(info) {
+  document.getElementById('personName').textContent = info.name;
+  document.getElementById('personMeta').textContent = info.meta;
+
+  selectedSize = currentPerson.registeredSize || '';
+  renderSizePicker();
+
+  const hint = document.getElementById('sizeRegisteredHint');
+  hint.textContent = currentPerson.registeredSize
+    ? `Registered size: ${currentPerson.registeredSize} (tap a different size above to change it)`
+    : 'No size registered yet — pick one above';
+
+  document.getElementById('personCard').classList.add('show');
+  clearAlerts();
+
+  if (currentPerson.givenAt) {
+    showAlert('Already Distributed', 'warning', `Given at ${currentPerson.givenAt}${currentPerson.givenBy ? ' by ' + currentPerson.givenBy : ''}.`);
+  }
+
+  refreshDistributeState();
+  document.getElementById('personCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function resetPerson() {
+  currentPerson = null;
+  selectedSize = '';
+  renderSizePicker();
+  document.getElementById('personCard').classList.remove('show');
+  document.getElementById('studentIdInput').value = '';
+  document.getElementById('studentNameInput').value = '';
+  clearAlerts();
+}
+
+document.getElementById('distributeBtn').addEventListener('click', function() {
+  if (!currentPerson || !selectedSize) return;
+  const supervisor = document.getElementById('supervisorName').value;
+  if (!supervisor) { showAlertGlobal('Please select your name first'); return; }
+
+  showLoading(true);
+  document.getElementById('distributeBtn').disabled = true;
+
+  fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    body: JSON.stringify({
+      requestType: 'shirt',
+      personType: currentPerson.type,
+      personId: currentPerson.id,
+      size: selectedSize,
+      supervisor: supervisor
+    })
+  })
+    .then(res => res.json())
+    .then(data => {
+      showLoading(false);
+      if (data.success) {
+        showAlert('✅ Shirt Distributed', 'success', `${currentPerson.name} — Size ${data.size} — ${data.timestamp}`);
+        addToActivityLog(currentPerson.name, currentPerson.type, data.size, data.timestamp);
+
+        if (currentPerson.type === 'student') {
+          const s = students.find(x => x.id === currentPerson.id);
+          if (s) { s.size = data.size; s.givenAt = data.timestamp; s.givenBy = supervisor; }
+        } else {
+          const s = supervisors.find(x => x.name === currentPerson.id);
+          if (s) { s.size = data.size; s.givenAt = data.timestamp; s.givenBy = supervisor; }
+        }
+        renderInventory();
+        renderStats();
+        renderSupervisorChips();
+        renderRoster();
+
+        setTimeout(resetPerson, 2000);
+      } else if (data.alreadyGiven) {
+        showAlert('Already Distributed', 'warning', `Given at ${data.givenAt}.`);
+      } else {
+        showAlert('Error', 'error', data.error || 'Could not save.');
+        document.getElementById('distributeBtn').disabled = false;
+      }
+    })
+    .catch(err => {
+      showLoading(false);
+      showAlert('Error', 'error', err.message);
+      document.getElementById('distributeBtn').disabled = false;
+    });
+});
+
+// ===== Roster =====
+function setupRosterControls() {
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      rosterFilter = this.getAttribute('data-filter');
+      renderRoster();
+    });
+  });
+  document.getElementById('rosterSearch').addEventListener('input', function() {
+    rosterQuery = this.value.trim().toLowerCase();
+    renderRoster();
+  });
+}
+
+function renderRoster() {
+  const rows = [];
+  students.forEach(s => rows.push({
+    name: s.name, id: s.id, type: 'Student', details: s.group || '—',
+    size: s.size, givenAt: s.givenAt, givenBy: s.givenBy
+  }));
+  supervisors.forEach(s => rows.push({
+    name: s.name, id: s.name, type: 'Supervisor', details: 'Supervisor',
+    size: s.size, givenAt: s.givenAt, givenBy: s.givenBy
+  }));
+
+  let filtered = rows;
+  if (rosterFilter === 'given') filtered = filtered.filter(r => r.givenAt);
+  if (rosterFilter === 'pending') filtered = filtered.filter(r => !r.givenAt);
+  if (rosterQuery) filtered = filtered.filter(r => r.name.toLowerCase().includes(rosterQuery) || r.id.toLowerCase().includes(rosterQuery));
+
+  const tbody = document.getElementById('rosterTable');
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--sap-gray);padding:20px;">No matches</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.slice(0, 400).map(r => `
+    <tr data-type="${r.type.toLowerCase()}" data-id="${r.id}">
+      <td><strong>${r.name}</strong></td>
+      <td><span class="type-tag">${r.type}</span></td>
+      <td>${r.details}</td>
+      <td>${r.size ? `<span class="badge badge-size">${r.size}</span>` : '—'}</td>
+      <td>${r.givenAt ? '<span class="badge badge-given">✅ Given</span>' : '<span class="badge badge-pending">⏳ Pending</span>'}</td>
+      <td>${r.givenAt || '—'}</td>
+      <td>${r.givenBy || '—'}</td>
+    </tr>`).join('');
+
+  tbody.querySelectorAll('tr').forEach(tr => {
+    tr.addEventListener('click', function() {
+      const type = this.getAttribute('data-type');
+      const id = this.getAttribute('data-id');
+      if (type === 'student') selectStudent(id); else selectSupervisor(id);
+    });
+  });
+}
+
+// ===== Activity log =====
+function addToActivityLog(name, type, size, timestamp) {
+  activityLog.unshift({ name, type, size, timestamp });
+  activityLog = activityLog.slice(0, 20);
+  sessionStorage.setItem('shirtActivityLog', JSON.stringify(activityLog));
+  renderActivityLog();
+}
+
+function renderActivityLog() {
+  const list = document.getElementById('activityLogList');
+  if (activityLog.length === 0) {
+    list.innerHTML = '<div class="hint">No shirts distributed yet in this session.</div>';
+    return;
+  }
+  list.innerHTML = activityLog.map(item => `
+    <div style="display:flex;justify-content:space-between;align-items:center;background:white;border:1px solid var(--sap-border);border-left:4px solid var(--sap-green);border-radius:4px;padding:10px 14px;margin-bottom:8px;">
+      <div>
+        <div style="font-weight:600;font-size:13px;">${item.name}</div>
+        <div style="font-size:11px;color:var(--sap-gray);margin-top:2px;">${item.type === 'student' ? 'Student' : 'Supervisor'} | ${item.timestamp}</div>
+      </div>
+      <span class="badge badge-size">${item.size}</span>
+    </div>`).join('');
+}
+
+// ===== Alerts / loading =====
+function showAlert(title, type, message = '') {
+  clearAlerts();
+  document.getElementById('alertContainer').innerHTML = `
+    <div class="alert alert-${type} show">
+      <div class="alert-title">${title}</div>
+      ${message ? `<div>${message}</div>` : ''}
+    </div>`;
+}
+function showAlertGlobal(message) { alert(message); }
+function clearAlerts() { document.getElementById('alertContainer').innerHTML = ''; }
+function showLoading(show) { document.getElementById('loading').classList.toggle('show', show); }
+</script>
+
+</body>
+</html>

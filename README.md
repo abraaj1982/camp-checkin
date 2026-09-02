@@ -50,6 +50,24 @@ https://abraaj1982.github.io/camp-checkin/dashboard_v3.html
 
 ---
 
+### 👕 **توزيع الأقمصة (Shirt Distribution)**
+لتوزيع الأقمصة على الطلبة والمشرفين وتتبع المخزون لحظياً (S / M / L / XL / XXL):
+```
+https://abraaj1982.github.io/camp-checkin/shirt_distribution.html
+```
+
+**المميزات:**
+- 📦 مخزون حي لكل مقاس (S/M/L/XL/XXL) مع تنبيه Low Stock / Out of Stock
+- 🔍 بحث عن الطالب بالاسم أو الرقم، واختيار سريع للمشرفين الخمسة
+- 👕 اختيار المقاس وقت التسليم (يظهر المقاس المسجل مسبقاً ويمكن تغييره)
+- 📊 جدول Roster يعرض كل الأسماء مع حالتها (✅ استلم / ⏳ بالانتظار) وفلترة وبحث
+- 🔒 قفل يمنع تسليم قميصين لنفس الشخص (باستخدام LockService لمنع التعارض بين مشرفين في نفس اللحظة)
+- 🔄 تحديث تلقائي كل 30 ثانية، ونفس تسجيل دخول المشرف المستخدم في تطبيق الـ Check-In
+
+**ملاحظة مهمة:** هذه الأداة **مستقلة تماماً** عن نظام الحافلات — تعمل على Google Sheet خاص بها وحده، وليس على شيت "Bus" الأصلي. راجع قسم "إعداد شيت توزيع الأقمصة" بالأسفل.
+
+---
+
 ## 🛠️ البيانات الفنية
 
 ### Google Sheet:
@@ -71,6 +89,65 @@ https://docs.google.com/spreadsheets/d/1N1ZZtUyxAKfyc9UbqI0qfzhB8BLbk4abo60jCkEm
 | H | Check-In Time | وقت الدخول |
 | I | Check-Out Time | وقت الخروج |
 | J | Status | الحالة |
+
+### 👕 إعداد شيت توزيع الأقمصة (شيت جديد ومستقل)
+
+أنشئ **Google Sheet جديد فارغ** (منفصل تماماً عن شيت الحافلات)، وأضف فيه 3 تبويبات (Sheets/Tabs):
+
+**1. تبويب باسم "Names":**
+| A: ID No | B: Name | C: Group (اختياري) | D: Size | E: Given At | F: Given By |
+|-------|---------|----------------------|---------|--------------|---------------|
+| 1205 | محمد علي | Class 6 / Bus 2 | M | | |
+| 1206 | أحمد سالم | Class 5 / Bus 1 | L | | |
+
+- عمود **C (Group)** اختياري — أي نص يساعدك تميّز الطالب (صف، فريق، رقم باص...).
+- **D (Size)** هو المقاس المسجل مسبقاً. أعمدة E و F لازم تكونا **عمودين منفصلين** ("Given At" و"Given By")، واتركهما فارغين — النظام يملؤهما تلقائياً وقت التسليم.
+- **مهم:** اسم التبويب لازم يكون بالضبط `Names` (هذا ما يقرأه الكود حالياً).
+
+**2. تبويب باسم "Supervisors":**
+| A: Name | B: Size | C: Given At | D: Given By |
+|---------|---------|-------------|---------------|
+| Yasser Mustafa | M | | |
+| Mohammed Ismail | L | | |
+| Abbas Abdul Rab | XL | | |
+| Hussain Mustafa | L | | |
+| Hamza | M | | |
+
+**3. تبويب باسم "Inventory" (المخزون الابتدائي لكل مقاس):**
+| A: Size | B: Initial Stock | C: Low Stock Threshold |
+|---------|-------------------|--------------------------|
+| S | 80 | 10 |
+| M | 90 | 15 |
+| L | 110 | 15 |
+| XL | 150 | 15 |
+| XXL | 30 | 8 |
+
+المقاسات **مرنة تماماً** — أضف أي صف مقاس هنا (S/M/L/XL/XXL أو غيرها) وسيظهر تلقائياً في صفحة التوزيع، طالما نفس اسم المقاس مكتوب بنفس الشكل في عمود Size بتبويب "Names".
+
+**4. تبويب "Log"**: لا تنشئه — يُنشأ تلقائياً عند أول عملية تسليم (سجل تدقيق كامل).
+
+**5. صلاحية المشاركة:** من زر Share اجعل الشيت **"Anyone with the link → Viewer"** (بدون هذا لن تُقرأ البيانات في الصفحة).
+
+**6. ربط Apps Script (مرة واحدة):**
+   1. من داخل الشيت الجديد: **Extensions → Apps Script**.
+   2. الصق كامل محتوى ملف `AppsScript_Shirts.gs` من هذا المستودع (يستبدل أي كود موجود، فهذا مشروع جديد مستقل).
+   3. **Deploy → New deployment → Web app** → Execute as: **Me** | Who has access: **Anyone**.
+   4. انسخ رابط `/exec` الناتج.
+
+**7. آخر خطوة:** افتح `shirt_distribution.html` وعدّل السطرين بالأعلى داخل `<script>`:
+```js
+const SHEET_ID = 'PUT_YOUR_NEW_SHEET_ID_HERE';         // من رابط الشيت الجديد
+const APPS_SCRIPT_URL = 'PUT_YOUR_NEW_APPS_SCRIPT_WEB_APP_URL_HERE'; // رابط /exec من الخطوة 6
+```
+`SHEET_ID` هو الجزء بين `/d/` و `/edit` في رابط الشيت، مثال:
+```
+https://docs.google.com/spreadsheets/d/1AbCdEfGhIjKlMnOpQrStUvWxYz/edit
+                                        └────────── هذا الجزء ──────────┘
+```
+
+بدون هذه الخطوة الأخيرة، الصفحة تعرض رسالة تنبيه حمراء بالأعلى تذكّرك بها.
+
+---
 
 ### الباصات:
 - 🚌 Bus 1
@@ -94,9 +171,11 @@ https://docs.google.com/spreadsheets/d/1N1ZZtUyxAKfyc9UbqI0qfzhB8BLbk4abo60jCkEm
 camp-checkin/
 ├── README.md                          # هذا الملف
 ├── supervisor_app_professional.html   # تطبيق المشرفين (مسح QR + Check-In/Out)
-├── dashboard_v3.html                  # لوحة التحكم
+├── dashboard_v3.html                  # لوحة التحكم (نظام الحافلات)
 ├── qr_codes_ready.html                # توليد QR Codes للطباعة (بيانات تجريبية)
-└── AppsScript_Final_v2.gs             # Google Apps Script (Backend)
+├── AppsScript_Final_v2.gs             # Google Apps Script لنظام الحافلات (Backend)
+├── shirt_distribution.html            # توزيع الأقمصة S/M/L/XL + مخزون حي + Roster (مستقل)
+└── AppsScript_Shirts.gs               # Google Apps Script الخاص بشيت الأقمصة (Backend مستقل)
 ```
 
 ---
