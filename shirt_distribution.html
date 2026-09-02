@@ -196,10 +196,10 @@ fieldset:disabled { opacity: .55; }
 .person-name { font-size: 18px; font-weight: 600; color: var(--sap-blue); margin-bottom: 2px; }
 .person-meta { font-size: 12px; color: var(--sap-gray); margin-bottom: 16px; }
 
-.size-picker { display: flex; justify-content: center; gap: 8px; margin-bottom: 6px; }
+.size-picker { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 6px; }
 .size-option {
-  width: 52px; height: 52px; border-radius: 8px; border: 2px solid var(--sap-border);
-  background: white; font-size: 16px; font-weight: 700; cursor: pointer; color: var(--sap-text);
+  min-width: 52px; height: 52px; padding: 0 8px; border-radius: 8px; border: 2px solid var(--sap-border);
+  background: white; font-size: 15px; font-weight: 700; cursor: pointer; color: var(--sap-text);
 }
 .size-option.selected { border-color: var(--sap-blue); background: var(--sap-blue); color: white; }
 .size-registered-hint { font-size: 11px; color: var(--sap-gray); margin-bottom: 16px; }
@@ -263,7 +263,7 @@ tbody tr:hover { background: #F5FAFD; cursor: pointer; }
   <div class="topbar">
     <div>
       <h1>👕 Camp Shirt Distribution — توزيع الأقمصة</h1>
-      <p>Sizes: S · M · L · XL | Students &amp; Supervisors</p>
+      <p>Sizes: S · M · L · XL · XXL | Students &amp; Supervisors</p>
     </div>
     <div class="supervisor-box">
       <select id="supervisorName">
@@ -343,12 +343,7 @@ tbody tr:hover { background: #F5FAFD; cursor: pointer; }
           <div class="person-name" id="personName"></div>
           <div class="person-meta" id="personMeta"></div>
 
-          <div class="size-picker" id="sizePicker">
-            <button type="button" class="size-option" data-size="S">S</button>
-            <button type="button" class="size-option" data-size="M">M</button>
-            <button type="button" class="size-option" data-size="L">L</button>
-            <button type="button" class="size-option" data-size="XL">XL</button>
-          </div>
+          <div class="size-picker" id="sizePicker"></div>
           <div class="size-registered-hint" id="sizeRegisteredHint"></div>
 
           <div id="alertContainer"></div>
@@ -408,7 +403,10 @@ const APPS_SCRIPT_URL = 'PUT_YOUR_NEW_APPS_SCRIPT_WEB_APP_URL_HERE';
 
 const SETUP_NOT_DONE = SHEET_ID.indexOf('PUT_YOUR') === 0 || APPS_SCRIPT_URL.indexOf('PUT_YOUR') === 0;
 
-const SIZES = ['S', 'M', 'L', 'XL'];
+// Sizes are NOT hardcoded — this is just the fallback shown before the
+// Inventory sheet has loaded. Once it loads, SIZES is replaced with
+// whatever size rows actually exist there, in that order.
+let SIZES = ['S', 'M', 'L', 'XL'];
 const KNOWN_SUPERVISORS = ['Yasser Mustafa', 'Mohammed Ismail', 'Abbas Abdul Rab', 'Hussain Mustafa', 'Hamza'];
 
 let students = [];       // { id, name, group, size, givenAt, givenBy }
@@ -435,7 +433,7 @@ function loadJsonp(sheetName, callbackName, onError) {
 
 function cellStr(cell) { return cell ? String(cell.v) : ''; }
 
-// ===== Students sheet: A id, B name, C group (optional), D size, E givenAt, F givenBy =====
+// ===== "Names" sheet: A id, B name, C group (optional), D size, E givenAt, F givenBy =====
 function handleStudentsData(response) {
   students = [];
   if (response && response.table && response.table.rows) {
@@ -479,19 +477,24 @@ function handleSupervisorsData(response) {
 }
 
 // ===== Inventory sheet: A size, B initial stock, C low stock threshold =====
+// This sheet is the source of truth for which sizes exist — SIZES is
+// rebuilt from its rows (in the order they appear) every time it loads.
 function handleInventoryData(response) {
   inventory = {};
+  const order = [];
   if (response && response.table && response.table.rows) {
     response.table.rows.forEach(row => {
       const c = row.c;
       const size = c[0] ? cellStr(c[0]).trim().toUpperCase() : '';
       if (!size) return;
+      order.push(size);
       inventory[size] = {
         initial: c[1] ? Number(c[1].v) || 0 : 0,
         threshold: c[2] ? Number(c[2].v) || 0 : 0
       };
     });
   }
+  if (order.length > 0) SIZES = order;
   invReady = true;
   onDataChanged();
 }
@@ -501,11 +504,13 @@ function onDataChanged() {
   renderInventory();
   renderStats();
   renderSupervisorChips();
+  renderSizePicker();
   renderRoster();
 }
 
 function renderInventory() {
-  const distributed = { S: 0, M: 0, L: 0, XL: 0 };
+  const distributed = {};
+  SIZES.forEach(sz => { distributed[sz] = 0; });
   students.forEach(s => { if (s.givenAt && distributed.hasOwnProperty(s.size)) distributed[s.size]++; });
   supervisors.forEach(s => { if (s.givenAt && distributed.hasOwnProperty(s.size)) distributed[s.size]++; });
 
@@ -551,7 +556,7 @@ function showDataStatus(text, loading) {
 function loadAllData() {
   if (SETUP_NOT_DONE) return;
   showDataStatus('⏳ Loading camp data...', true);
-  loadJsonp('Students', 'handleStudentsData', () => { showDataStatus('⚠️ Failed to load students. Retrying...', true); setTimeout(loadAllData, 4000); });
+  loadJsonp('Names', 'handleStudentsData', () => { showDataStatus('⚠️ Failed to load students. Retrying...', true); setTimeout(loadAllData, 4000); });
   loadJsonp('Supervisors', 'handleSupervisorsData', () => {});
   loadJsonp('Inventory', 'handleInventoryData', () => {});
 }
@@ -681,21 +686,22 @@ function selectSupervisor(name) {
   showPerson({ name: name, meta: 'Supervisor' });
 }
 
-// ===== Size picker =====
+// ===== Size picker (buttons are generated from SIZES, not hardcoded) =====
 function setupSizePicker() {
-  document.querySelectorAll('.size-option').forEach(btn => {
-    btn.addEventListener('click', function() {
-      selectedSize = this.getAttribute('data-size');
-      refreshSizePicker();
-      refreshDistributeState();
-    });
+  document.getElementById('sizePicker').addEventListener('click', function(e) {
+    const btn = e.target.closest('.size-option');
+    if (!btn) return;
+    selectedSize = btn.getAttribute('data-size');
+    renderSizePicker();
+    refreshDistributeState();
   });
 }
 
-function refreshSizePicker() {
-  document.querySelectorAll('.size-option').forEach(btn => {
-    btn.classList.toggle('selected', btn.getAttribute('data-size') === selectedSize);
-  });
+function renderSizePicker() {
+  const el = document.getElementById('sizePicker');
+  el.innerHTML = SIZES.map(sz => `
+    <button type="button" class="size-option${sz === selectedSize ? ' selected' : ''}" data-size="${sz}">${sz}</button>
+  `).join('');
 }
 
 function refreshDistributeState() {
@@ -711,7 +717,7 @@ function showPerson(info) {
   document.getElementById('personMeta').textContent = info.meta;
 
   selectedSize = currentPerson.registeredSize || '';
-  refreshSizePicker();
+  renderSizePicker();
 
   const hint = document.getElementById('sizeRegisteredHint');
   hint.textContent = currentPerson.registeredSize
@@ -732,7 +738,7 @@ function showPerson(info) {
 function resetPerson() {
   currentPerson = null;
   selectedSize = '';
-  refreshSizePicker();
+  renderSizePicker();
   document.getElementById('personCard').classList.remove('show');
   document.getElementById('studentIdInput').value = '';
   document.getElementById('studentNameInput').value = '';

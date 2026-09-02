@@ -4,11 +4,14 @@
 //
 // Expected tabs in that Sheet:
 //
-//   "Students"    -> A: ID | B: Name | C: Group (optional, e.g. class/bus)
+//   "Names"       -> A: ID | B: Name | C: Group (optional, e.g. class/bus)
 //                     | D: Size | E: Given At | F: Given By
 //   "Supervisors" -> A: Name | B: Size | C: Given At | D: Given By
 //   "Inventory"   -> A: Size | B: Initial Stock | C: Low Stock Threshold
 //   "Log"         -> created automatically on the first distribution
+//
+// Sizes are open-ended (S/M/L/XL/XXL/...) — the sheet's own Size column
+// and Inventory rows are the source of truth, nothing here hardcodes them.
 //
 // All reads (search, inventory levels, roster) are done client-side via
 // the public gviz/tq JSON feed — this script only needs to handle the
@@ -24,7 +27,7 @@
 //      shirt_distribution.html.
 // ========================================================================
 
-const STUDENTS_SHEET_NAME = 'Students';
+const STUDENTS_SHEET_NAME = 'Names';
 const SUPERVISORS_SHEET_NAME = 'Supervisors';
 const LOG_SHEET_NAME = 'Log';
 
@@ -76,7 +79,7 @@ function distributeShirt(data) {
 
 function giveStudentShirt(ss, studentId, givenBy, chosenSize) {
   const sheet = ss.getSheetByName(STUDENTS_SHEET_NAME);
-  if (!sheet) return { success: false, error: 'Students sheet not found' };
+  if (!sheet) return { success: false, error: 'Names sheet not found' };
 
   const values = sheet.getDataRange().getValues();
   for (let i = 1; i < values.length; i++) {
