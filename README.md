@@ -50,6 +50,22 @@ https://abraaj1982.github.io/camp-checkin/dashboard_v3.html
 
 ---
 
+### 👕 **توزيع الأقمصة (Shirt Distribution)**
+لتوزيع الأقمصة على الطلبة والمشرفين وتتبع المخزون لحظياً (S / M / L / XL):
+```
+https://abraaj1982.github.io/camp-checkin/shirt_distribution.html
+```
+
+**المميزات:**
+- 📦 مخزون حي لكل مقاس (S/M/L/XL) مع تنبيه Low Stock / Out of Stock
+- 🔍 بحث عن الطالب بالاسم أو الرقم، واختيار سريع للمشرفين الخمسة
+- 👕 اختيار المقاس وقت التسليم (يظهر المقاس المسجل مسبقاً ويمكن تغييره)
+- 📊 جدول Roster يعرض كل الأسماء مع حالتها (✅ استلم / ⏳ بالانتظار) وفلترة وبحث
+- 🔒 قفل يمنع تسليم قميصين لنفس الشخص (باستخدام LockService لمنع التعارض بين مشرفين في نفس اللحظة)
+- 🔄 تحديث تلقائي كل 30 ثانية، ونفس تسجيل دخول المشرف المستخدم في تطبيق الـ Check-In
+
+---
+
 ## 🛠️ البيانات الفنية
 
 ### Google Sheet:
@@ -71,6 +87,42 @@ https://docs.google.com/spreadsheets/d/1N1ZZtUyxAKfyc9UbqI0qfzhB8BLbk4abo60jCkEm
 | H | Check-In Time | وقت الدخول |
 | I | Check-Out Time | وقت الخروج |
 | J | Status | الحالة |
+
+### 👕 إعداد شيت توزيع الأقمصة (مطلوب مرة واحدة فقط)
+
+أضف الأعمدة والشيتات التالية في نفس Google Sheet:
+
+**1. أعمدة إضافية في شيت "Bus" (بعد العمود J):**
+| العمود | الاسم | البيانات |
+|--------|-------|---------|
+| K | Shirt Size | مقاس القميص المسجل للطالب (S/M/L/XL) |
+| L | Shirt Given At | وقت التسليم (فارغ = لم يُسلَّم بعد) |
+| M | Shirt Given By | اسم المشرف الذي سلّم القميص |
+
+**2. شيت جديد باسم "Supervisors":**
+| A: Name | B: Shirt Size | C: Shirt Given At | D: Shirt Given By |
+|---------|----------------|--------------------|---------------------|
+| Yasser Mustafa | M | | |
+| Mohammed Ismail | L | | |
+| ... | | | |
+
+**3. شيت جديد باسم "ShirtInventory" (المخزون الابتدائي لكل مقاس):**
+| A: Size | B: Initial Stock | C: Low Stock Threshold |
+|---------|-------------------|--------------------------|
+| S | 60 | 10 |
+| M | 100 | 15 |
+| L | 100 | 15 |
+| XL | 40 | 10 |
+
+**4. شيت "ShirtLog"**: يُنشأ تلقائياً عند أول عملية تسليم (سجل تدقيق كامل).
+
+**5. تحديث Google Apps Script:** افتح محرر Apps Script المرتبط بهذا الـ Sheet، وأضف التعديلين التاليين من ملف `AppsScript_Final_v2.gs` في هذا المستودع:
+   - داخل `doPost`: السطر الذي يتحقق من `data.requestType === 'shirt'` قبل استدعاء `saveCheckInOut` — هذا لا يغيّر سلوك تسجيل الحافلات القديم إطلاقاً.
+   - كل الدوال الجديدة في نهاية الملف (`distributeShirt`, `giveStudentShirt`, `giveSupervisorShirt`, `logShirt`).
+
+   ثم من **Deploy → Manage deployments → ✏️ Edit → Version: New version → Deploy** حتى يبقى نفس رابط الـ Web App المستخدم في كل الصفحات ساري المفعول مع الكود الجديد.
+
+---
 
 ### الباصات:
 - 🚌 Bus 1
@@ -94,7 +146,8 @@ https://docs.google.com/spreadsheets/d/1N1ZZtUyxAKfyc9UbqI0qfzhB8BLbk4abo60jCkEm
 camp-checkin/
 ├── README.md                          # هذا الملف
 ├── supervisor_app_professional.html   # تطبيق المشرفين (مسح QR + Check-In/Out)
-├── dashboard_v3.html                  # لوحة التحكم
+├── dashboard_v3.html                  # لوحة التحكم (تشمل مخزون الأقمصة)
+├── shirt_distribution.html            # توزيع الأقمصة S/M/L/XL + مخزون حي + Roster
 ├── qr_codes_ready.html                # توليد QR Codes للطباعة (بيانات تجريبية)
 └── AppsScript_Final_v2.gs             # Google Apps Script (Backend)
 ```

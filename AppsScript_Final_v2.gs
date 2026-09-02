@@ -31,13 +31,20 @@ function doGet(e) {
 function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
+
+    if (data.requestType === 'shirt') {
+      const shirtResult = distributeShirt(data);
+      return ContentService.createTextOutput(JSON.stringify(shirtResult))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     const result = saveCheckInOut(data);
     return ContentService.createTextOutput(JSON.stringify(result))
       .setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
-    return ContentService.createTextOutput(JSON.stringify({ 
-      success: false, 
-      error: error.toString() 
+    return ContentService.createTextOutput(JSON.stringify({
+      success: false,
+      error: error.toString()
     })).setMimeType(ContentService.MimeType.JSON);
   }
 }
@@ -222,4 +229,145 @@ function saveCheckInOut(data) {
     studentId: studentId,
     timestamp: timeString
   };
+}
+
+// ========================================================================
+// SHIRT DISTRIBUTION (S / M / L / XL) — for shirt_distribution.html
+//
+// Requires 3 extra columns on the "Bus" sheet:
+//   K = Shirt Size, L = Shirt Given At, M = Shirt Given By
+// and 2 new sheets:
+//   "Supervisors"    -> A: Name | B: Shirt Size | C: Shirt Given At | D: Shirt Given By
+//   "ShirtInventory" -> A: Size | B: Initial Stock | C: Low Stock Threshold
+//   "ShirtLog"       -> append-only audit trail (created automatically on first write)
+//
+// All reads (search, inventory levels) are done client-side via the public
+// gviz/tq JSON feed, same as dashboard_v3.html. This is the only endpoint
+// this feature needs on the backend — it just marks a shirt as handed out.
+// ========================================================================
+
+const STUDENTS_SHEET_NAME = 'Bus';
+const SUPERVISORS_SHEET_NAME = 'Supervisors';
+const SHIRT_LOG_SHEET_NAME = 'ShirtLog';
+
+// entry point called from doPost when data.requestType === 'shirt'
+function distributeShirt(data) {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+  } catch (e) {
+    return { success: false, error: 'System is busy, please try again in a moment.' };
+  }
+
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const personType = data.personType;
+    const personId = (data.personId || '').toString().trim();
+    const supervisor = data.supervisor || '';
+    const chosenSize = (data.size || '').toString().trim().toUpperCase();
+
+    if (!personId) return { success: false, error: 'Missing person ID' };
+
+    if (personType === 'student') {
+      return giveStudentShirt(ss, personId, supervisor, chosenSize);
+    } else if (personType === 'supervisor') {
+      return giveSupervisorShirt(ss, personId, supervisor, chosenSize);
+    }
+    return { success: false, error: 'Invalid personType' };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// chosenSize is picked by the supervisor at hand-out time (the UI pre-fills it
+// with the registered size, but it can be overridden). It always wins over the
+// sheet's registered size, and the sheet is updated to reflect what was
+// actually handed out.
+function giveStudentShirt(ss, studentId, givenBy, chosenSize) {
+  const sheet = ss.getSheetByName(STUDENTS_SHEET_NAME);
+  if (!sheet) return { success: false, error: 'Bus sheet not found' };
+
+  const values = sheet.getDataRange().getValues();
+  for (let i = 1; i < values.length; i++) {
+    if (values[i][0].toString().trim() === studentId) {
+      const registeredSize = (values[i][10] || '').toString().trim().toUpperCase(); // column K
+      const givenAt = values[i][11];                                                 // column L
+
+      if (givenAt) {
+        return {
+          success: false,
+          error: 'Shirt already given',
+          alreadyGiven: true,
+          givenAt: givenAt,
+          size: registeredSize
+        };
+      }
+
+      const size = chosenSize || registeredSize;
+      if (!size) {
+        return { success: false, error: 'No shirt size selected' };
+      }
+
+      const now = new Date();
+      const timeString = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
+      sheet.getRange(i + 1, 11).setValue(size);       // K - size actually handed out
+      sheet.getRange(i + 1, 12).setValue(timeString); // L
+      sheet.getRange(i + 1, 13).setValue(givenBy);    // M
+
+      const note = (registeredSize && registeredSize !== size) ? ('Changed from ' + registeredSize) : '';
+      logShirt(ss, studentId, values[i][1], 'Student', size, givenBy, note);
+
+      return { success: true, size: size, timestamp: timeString, name: values[i][1] };
+    }
+  }
+  return { success: false, error: 'Student not found' };
+}
+
+function giveSupervisorShirt(ss, name, givenBy, chosenSize) {
+  const sheet = ss.getSheetByName(SUPERVISORS_SHEET_NAME);
+  if (!sheet) return { success: false, error: 'Supervisors sheet not found' };
+
+  const values = sheet.getDataRange().getValues();
+  for (let i = 1; i < values.length; i++) {
+    if (values[i][0].toString().trim() === name.trim()) {
+      const registeredSize = (values[i][1] || '').toString().trim().toUpperCase(); // column B
+      const givenAt = values[i][2];                                                // column C
+
+      if (givenAt) {
+        return {
+          success: false,
+          error: 'Shirt already given',
+          alreadyGiven: true,
+          givenAt: givenAt,
+          size: registeredSize
+        };
+      }
+
+      const size = chosenSize || registeredSize;
+      if (!size) {
+        return { success: false, error: 'No shirt size selected' };
+      }
+
+      const now = new Date();
+      const timeString = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
+      sheet.getRange(i + 1, 2).setValue(size);        // B - size actually handed out
+      sheet.getRange(i + 1, 3).setValue(timeString);  // C
+      sheet.getRange(i + 1, 4).setValue(givenBy);     // D
+
+      const note = (registeredSize && registeredSize !== size) ? ('Changed from ' + registeredSize) : '';
+      logShirt(ss, name, name, 'Supervisor', size, givenBy, note);
+
+      return { success: true, size: size, timestamp: timeString, name: name };
+    }
+  }
+  return { success: false, error: 'Supervisor not found' };
+}
+
+function logShirt(ss, id, name, type, size, givenBy, note) {
+  let logSheet = ss.getSheetByName(SHIRT_LOG_SHEET_NAME);
+  if (!logSheet) {
+    logSheet = ss.insertSheet(SHIRT_LOG_SHEET_NAME);
+    logSheet.appendRow(['Timestamp', 'ID', 'Name', 'Type', 'Size', 'Given By', 'Note']);
+  }
+  logSheet.appendRow([new Date(), id, name, type, size, givenBy, note || '']);
 }
