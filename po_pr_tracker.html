@@ -2681,6 +2681,25 @@ function readFileAsDataURL(file) {
   });
 }
 
+// Opening a data: URI link is inert in the Artifacts viewer sandbox — it
+// requires the declared "downloads" capability instead. Falls back to a
+// plain new-tab open for a local HTML file / GitHub Pages, where there is
+// no window.claude runtime and the plain link works fine.
+async function openAttachment(attachment) {
+  try {
+    if (window.claude && typeof window.claude.use === "function") {
+      const downloads = await window.claude.use("downloads");
+      if (downloads) {
+        await downloads.save({ filename: attachment.name, data: attachment.dataUrl });
+        return;
+      }
+    }
+  } catch (err) {
+    // fall through to the plain-browser path below
+  }
+  window.open(attachment.dataUrl, "_blank");
+}
+
 function AttachmentPicker({ attachments, onChange }) {
   const [busy, setBusy] = useState(false);
 
@@ -2710,9 +2729,9 @@ function AttachmentPicker({ attachments, onChange }) {
         <ul className="mt-2 space-y-1">
           {attachments.map((a, i) => (
             <li key={i} className="flex items-center justify-between text-xs sap-card px-2 py-1">
-              <a href={a.dataUrl} target="_blank" rel="noopener noreferrer" className="sap-link">
+              <button type="button" onClick={() => openAttachment(a)} className="sap-link" style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}>
                 📎 {a.name} {a.size ? `(${Math.round(a.size / 1024)} KB)` : ""}
-              </a>
+              </button>
               <button type="button" onClick={() => removeAt(i)} className="sap-link-danger">Remove</button>
             </li>
           ))}
