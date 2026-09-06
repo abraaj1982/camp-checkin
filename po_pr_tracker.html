@@ -5123,11 +5123,22 @@ async function openAttachment(attachment) {
 // any text extracted from a PDF stay on the request so search can reach them.
 async function ingestAttachment(file, textOverride) {
   const base = await readFileAsDataURL(file);
-  const text = textOverride !== undefined && textOverride !== null && textOverride !== ""
-    ? String(textOverride).slice(0, MAX_EXTRACTED_TEXT)
-    : (/\.pdf$/i.test(file.name) || file.type === "application/pdf"
-        ? await extractPdfText(file)
-        : "");
+  let text = "";
+  if (textOverride !== undefined && textOverride !== null && textOverride !== "") {
+    text = String(textOverride).slice(0, MAX_EXTRACTED_TEXT);
+  } else if (/\.pdf$/i.test(file.name) || file.type === "application/pdf") {
+    text = await extractPdfText(file);
+  } else if (/\.(msg|eml)$/i.test(file.name)) {
+    // A .msg/.eml can land here too — dropped into the general Attachments
+    // picker instead of "Load the email file directly" above it. Either way
+    // it's an email, so read it the same way, or "View text" would never
+    // appear and the file would look unopenable for no visible reason.
+    try {
+      text = await readEmailFile(file);
+    } catch (err) {
+      text = "";
+    }
+  }
 
   const blobId = uid();
   try {
