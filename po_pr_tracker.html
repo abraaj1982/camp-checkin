@@ -4099,7 +4099,7 @@ exports.decompressRTF = decompressRTF;
 <div id="root"></div>
 
 <script type="text/babel">
-const { useState, useEffect, useMemo } = React;
+const { useState, useEffect, useMemo, useRef } = React;
 
 const STORAGE_KEY = "po_pr_tracker_requests_v1";
 
@@ -4949,7 +4949,7 @@ function makeTypeEntry(type, vendor, customActions) {
   return { vendor: vendor || "", prNumber: "", actionSteps: getActionsForType(type, customActions), newStep: "" };
 }
 
-function EmailParserForm({ requests, onSave, onCancel }) {
+function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
   const [emailText, setEmailText] = useState("");
   const [extracted, setExtracted] = useState(null); // shared fields: owner, requiredDate, budget
   const [selectedTypes, setSelectedTypes] = useState([]);
@@ -5004,29 +5004,67 @@ function EmailParserForm({ requests, onSave, onCancel }) {
       return;
     }
     extractAndSetForm(emailText);
+    if (onContentReplaced) onContentReplaced();
+  };
+
+  // Clears everything belonging to the email currently under review, so a
+  // newly loaded email never inherits the previous one's attachment, vendor
+  // or service selection.
+  const resetForNewEmail = () => {
+    setEmailText("");
+    setExtracted(null);
+    setSelectedTypes([]);
+    setTypeEntries({});
+    setAttachments([]);
   };
 
   const handleEmailFile = async (e) => {
     const file = e.target.files[0];
+    // Reset the input right away: it lets the same file be picked again after
+    // a mistake, and avoids touching the event after the awaits below.
+    e.target.value = "";
     if (!file) return;
+
+    // Loading a second email replaces the one being reviewed — say so instead
+    // of silently swapping the content out from under the user.
+    if (extracted) {
+      const proceed = await appConfirm(
+        `You're still reviewing an email that hasn't been saved yet. Loading "${file.name}" will replace it — save the current one first if you need it. Continue?`
+      );
+      if (!proceed) return;
+    }
+
     setLoadingFile(true);
     try {
       const text = await readEmailFile(file);
-      setEmailText(text);
       const fileAttachment = await readFileAsDataURL(file);
-      setAttachments((prev) => [...prev, fileAttachment]);
+
+      setEmailText(text);
+      setAttachments([fileAttachment]);
       if (text.trim()) {
         extractAndSetForm(text);
-        appToast(`Loaded and read "${file.name}" — review the extracted fields below`);
+        if (onContentReplaced) onContentReplaced();
+        appToast(`Loaded "${file.name}" — review the extracted fields below`);
       } else {
-        appToast(`Loaded "${file.name}" but found no readable text — check the pasted content`);
+        setExtracted(null);
+        setSelectedTypes([]);
+        setTypeEntries({});
+        appToast(`Loaded "${file.name}" but found no readable text in it — paste the content manually instead`);
       }
     } catch (err) {
       appToast("Could not read this email file: " + err.message);
     } finally {
       setLoadingFile(false);
-      e.target.value = "";
     }
+  };
+
+  const handleStartOver = async () => {
+    if (extracted) {
+      const proceed = await appConfirm("Discard the email you're reviewing and start over?");
+      if (!proceed) return;
+    }
+    resetForNewEmail();
+    if (onContentReplaced) onContentReplaced();
   };
 
   const toggleType = (type) => {
@@ -5097,9 +5135,19 @@ function EmailParserForm({ requests, onSave, onCancel }) {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <label className="sap-label">Load the email file directly (.msg from Outlook, or .eml)</label>
-        <input type="file" accept=".msg,.eml" onChange={handleEmailFile} className="sap-input" />
-        {loadingFile && <p className="text-xs mt-1" style={{ color: "var(--sap-gray)" }}>Reading and extracting the email...</p>}
+        <div className="flex items-center justify-between mb-1">
+          <label className="sap-label" style={{ marginBottom: 0 }}>Load the email file directly (.msg from Outlook, or .eml)</label>
+          {extracted && (
+            <button type="button" onClick={handleStartOver} className="sap-link">Start over</button>
+          )}
+        </div>
+        <input type="file" accept=".msg,.eml" onChange={handleEmailFile} className="sap-input" disabled={loadingFile} />
+        {loadingFile && <p className="text-xs mt-1" style={{ color: "var(--sap-blue)" }}>Reading and extracting the email…</p>}
+        {extracted && !loadingFile && (
+          <p className="text-xs mt-1" style={{ color: "var(--sap-gray)" }}>
+            One email is under review below. Save it first, or load another file to replace it.
+          </p>
+        )}
       </div>
 
       <div>
@@ -5464,13 +5512,34 @@ function StatusUpdateForm({ req, onSave, onCancel }) {
   );
 }
 
-function Modal({ title, onClose, children }) {
+// A dialog holding a multi-step form must not be dismissible by a stray click
+// on the backdrop: the content's height changes as you work through it (an
+// email with three services is far taller than an empty form), so a click
+// aimed at a control that just moved lands on the backdrop instead and would
+// throw away everything entered so far. Closing is therefore explicit only —
+// the × button or Escape.
+function Modal({ title, onClose, children, scrollResetKey }) {
+  const cardRef = useRef(null);
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  // When the dialog's content is replaced (e.g. a different email is loaded),
+  // bring the reader back to the top instead of leaving them staring at
+  // whitespace where the previous, longer content used to be.
+  useEffect(() => {
+    if (scrollResetKey !== undefined && cardRef.current) cardRef.current.scrollTop = 0;
+  }, [scrollResetKey]);
+
   return (
-    <div className="sap-modal-overlay fixed inset-0 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="sap-modal w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="sap-modal-header flex items-center justify-between px-6 py-4">
+    <div className="sap-modal-overlay fixed inset-0 flex items-center justify-center z-50 p-4">
+      <div ref={cardRef} className="sap-modal w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="sap-modal-header flex items-center justify-between px-6 py-4 sticky top-0" style={{ zIndex: 1 }}>
           <h2 className="text-base font-bold" style={{ color: "var(--sap-text)" }}>{title}</h2>
-          <button onClick={onClose} className="text-xl leading-none" style={{ color: "var(--sap-gray)" }}>×</button>
+          <button onClick={onClose} className="text-xl leading-none" style={{ color: "var(--sap-gray)" }} title="Close (Esc)">×</button>
         </div>
         <div className="p-6">{children}</div>
       </div>
@@ -5567,6 +5636,7 @@ function App() {
   const [showDaily, setShowDaily] = useState(false);
   const [showSuppliers, setShowSuppliers] = useState(false);
   const [viewBatchId, setViewBatchId] = useState(null);
+  const [parserContentVersion, setParserContentVersion] = useState(0);
 
   useEffect(() => {
     saveRequests(requests);
@@ -5860,11 +5930,16 @@ function App() {
       )}
 
       {showParser && (
-        <Modal title="Parse Request From Email" onClose={() => setShowParser(false)}>
+        <Modal
+          title="Parse Request From Email"
+          onClose={() => setShowParser(false)}
+          scrollResetKey={parserContentVersion}
+        >
           <EmailParserForm
             requests={requests}
             onSave={handleSaveMultiple}
             onCancel={() => setShowParser(false)}
+            onContentReplaced={() => setParserContentVersion((v) => v + 1)}
           />
         </Modal>
       )}
