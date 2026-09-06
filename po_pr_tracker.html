@@ -254,12 +254,28 @@ function getKnownVendors(requests, serviceType) {
     .map(([vendor]) => vendor);
 }
 
-function matchKnownVendorInText(text, knownVendors) {
-  const t = text.toLowerCase();
-  return knownVendors.find((v) => t.includes(v.toLowerCase())) || "";
+// Same idea for the request owner: the regex guess on free-form email text is
+// unreliable (it can grab a signature line like "Content Safety" instead of
+// the actual requester), so a name you've used before always wins over it.
+function getKnownOwners(requests) {
+  const counts = {};
+  requests
+    .filter((r) => r.owner && r.owner.trim())
+    .forEach((r) => {
+      const o = r.owner.trim();
+      counts[o] = (counts[o] || 0) + 1;
+    });
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([owner]) => owner);
 }
 
-function extractFromEmail(text, knownVendors) {
+function matchKnownInText(text, knownValues) {
+  const t = text.toLowerCase();
+  return knownValues.find((v) => t.includes(v.toLowerCase())) || "";
+}
+
+function extractFromEmail(text, knownVendors, knownOwners) {
   const prMatch = text.match(/PR[\s#:.-]*([0-9]{4,})/i);
   const budgetMatch = text.match(/(?:ميزانية|budget|المبلغ|amount)[^\d]{0,10}([\d,]+(?:\.\d+)?)/i);
   const dateMatch = text.match(/(\d{4}-\d{2}-\d{2})/);
@@ -267,13 +283,20 @@ function extractFromEmail(text, knownVendors) {
   const vendorMatch = text.match(/(?:الموردة?|المورد|Vendor|Supplier)[\s:]+([؀-ۿa-zA-Z0-9\s]{2,40}?)(?:\n|,|،|$)/i);
 
   const serviceType = guessServiceType(text);
-  const learnedVendor = matchKnownVendorInText(text, knownVendors || []);
+  const learnedVendor = matchKnownInText(text, knownVendors || []);
+  const learnedOwner = matchKnownInText(text, knownOwners || []);
+  const guessedOwner = ownerMatch ? ownerMatch[1].trim() : "";
 
   return {
     prNumber: prMatch ? prMatch[1] : "",
     budget: budgetMatch ? budgetMatch[1].replace(/,/g, "") : "",
     requiredDate: dateMatch ? dateMatch[1] : "",
-    owner: ownerMatch ? ownerMatch[1].trim() : "",
+    // Never trust the free-text guess blindly — only auto-fill when it matches
+    // someone you've actually logged as an owner before; otherwise leave it
+    // blank and require you to pick/type the real owner yourself.
+    owner: learnedOwner,
+    ownerNeedsConfirmation: !learnedOwner && !!guessedOwner,
+    ownerGuess: guessedOwner,
     vendor: learnedVendor || (vendorMatch ? vendorMatch[1].trim() : ""),
     serviceType,
   };
@@ -566,6 +589,7 @@ function EmailParserForm({ requests, onSave, onCancel }) {
   const [newStep, setNewStep] = useState("");
 
   const knownVendorsAll = useMemo(() => getKnownVendors(requests), [requests]);
+  const knownOwners = useMemo(() => getKnownOwners(requests), [requests]);
 
   const handleExtract = () => {
     if (!emailText.trim()) {
@@ -573,7 +597,7 @@ function EmailParserForm({ requests, onSave, onCancel }) {
       return;
     }
     const knownForGuess = getKnownVendors(requests, guessServiceType(emailText));
-    const data = extractFromEmail(emailText, knownForGuess.length ? knownForGuess : knownVendorsAll);
+    const data = extractFromEmail(emailText, knownForGuess.length ? knownForGuess : knownVendorsAll, knownOwners);
     setForm({
       ...emptyForm(),
       ...data,
@@ -677,8 +701,36 @@ function EmailParserForm({ requests, onSave, onCancel }) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="sap-label">Owner *</label>
-              <input value={form.owner} onChange={set("owner")} className="sap-input" required />
+              <label className="sap-label">Owner (requester) *</label>
+              <input
+                value={form.owner}
+                onChange={(e) => setForm({ ...form, owner: e.target.value, ownerNeedsConfirmation: false })}
+                className="sap-input"
+                style={!form.owner ? { borderColor: "var(--sap-red)" } : undefined}
+                placeholder="Select or type the requester's name"
+                required
+              />
+              {form.ownerNeedsConfirmation && (
+                <p className="text-xs mt-1 font-semibold" style={{ color: "var(--sap-red)" }}>
+                  ⚠️ Could not confirm the owner from this email (found "{form.ownerGuess}" — might just be a signature/footer line). Please pick or type the real requester below.
+                </p>
+              )}
+              {knownOwners.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1.5 items-center">
+                  <span className="text-xs" style={{ color: "var(--sap-gray)" }}>Previous requesters:</span>
+                  {knownOwners.slice(0, 8).map((o) => (
+                    <button
+                      type="button"
+                      key={o}
+                      onClick={() => setForm({ ...form, owner: o, ownerNeedsConfirmation: false })}
+                      className="text-xs px-2 py-0.5"
+                      style={{ background: "#F5F6F7", border: "1px solid var(--sap-border)", borderRadius: "10px", color: "var(--sap-text)" }}
+                    >
+                      {o}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <div>
               <label className="sap-label">Service Type</label>
