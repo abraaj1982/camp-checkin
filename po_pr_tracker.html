@@ -92,6 +92,141 @@ const ALERT_STYLES = {
   yellow: { row: "bg-yellow-50", dot: "bg-yellow-500", text: "text-yellow-700", label: "متأخر عن الموعد" },
 };
 
+const ACTION_SUGGESTIONS = {
+  "فندق": ["اتصل بالموردة", "تأكد التوفر", "احصل على تأكيد الحجز", "أرجع PO"],
+  "سيارة": ["تواصل مع شركة التأجير", "تأكد من توفر السيارة والسائق", "أكّد موعد الاستلام", "أرجع PO"],
+  "تذاكر": ["تواصل مع وكالة السفر", "تأكد من توفر المقاعد والأسعار", "أصدر التذكرة بعد الموافقة", "أرجع PO"],
+  "أخرى": ["راجع تفاصيل الطلب مع المسؤول", "حدد المورد المناسب", "أرجع PO بعد الموافقة"],
+};
+
+function guessServiceType(text) {
+  const t = text.toLowerCase();
+  if (/فندق|hotel|إقامة|غرفة/.test(t)) return "فندق";
+  if (/سيارة|car|تأجير|ليموزين/.test(t)) return "سيارة";
+  if (/تذكرة|تذاكر|ticket|طيران|رحلة/.test(t)) return "تذاكر";
+  return "أخرى";
+}
+
+function extractFromEmail(text) {
+  const prMatch = text.match(/PR[\s#:.-]*([0-9]{4,})/i);
+  const budgetMatch = text.match(/(?:ميزانية|budget|المبلغ)[^\d]{0,10}([\d,]+(?:\.\d+)?)/i);
+  const dateMatch = text.match(/(\d{4}-\d{2}-\d{2})/);
+  const ownerMatch = text.match(/(?:من|المسؤول|السيد|الأخ|الأخت)[\s:]+([؀-ۿa-zA-Z\s]{2,30}?)(?:\n|,|،|$)/);
+  const vendorMatch = text.match(/(?:الموردة?|المورد|Vendor|Supplier)[\s:]+([؀-ۿa-zA-Z0-9\s]{2,40}?)(?:\n|,|،|$)/i);
+
+  return {
+    prNumber: prMatch ? prMatch[1] : "",
+    budget: budgetMatch ? budgetMatch[1].replace(/,/g, "") : "",
+    requiredDate: dateMatch ? dateMatch[1] : "",
+    owner: ownerMatch ? ownerMatch[1].trim() : "",
+    vendor: vendorMatch ? vendorMatch[1].trim() : "",
+    serviceType: guessServiceType(text),
+  };
+}
+
+function EmailParserForm({ onSave, onCancel }) {
+  const [emailText, setEmailText] = useState("");
+  const [extracted, setExtracted] = useState(null);
+  const [form, setForm] = useState(null);
+
+  const handleExtract = () => {
+    if (!emailText.trim()) {
+      alert("الرجاء لصق محتوى الايميل أولاً");
+      return;
+    }
+    const data = extractFromEmail(emailText);
+    setExtracted(data);
+    setForm({
+      ...emptyForm(),
+      ...data,
+      notes: emailText.slice(0, 500),
+    });
+  };
+
+  const set = (key) => (e) => setForm({ ...form, [key]: e.target.value });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!form.owner) {
+      alert("الرجاء إدخال اسم المسؤول");
+      return;
+    }
+    onSave(form);
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div>
+        <label className="block text-sm font-medium text-slate-600 mb-1">نسخ محتوى الايميل هنا</label>
+        <textarea
+          value={emailText}
+          onChange={(e) => setEmailText(e.target.value)}
+          rows="6"
+          placeholder="الصق نص الايميل من القسم أو SAP هنا..."
+          className="w-full border rounded-lg px-3 py-2"
+        ></textarea>
+        <div className="flex justify-end mt-2">
+          <button type="button" onClick={handleExtract} className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm font-semibold">
+            🔍 استخلص البيانات
+          </button>
+        </div>
+      </div>
+
+      {form && (
+        <form onSubmit={handleSubmit} className="border-t pt-4 flex flex-col gap-4">
+          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 text-sm text-indigo-800">
+            <p className="font-semibold mb-1">💡 الإجراءات المقترحة ({form.serviceType}):</p>
+            <ol className="list-decimal list-inside space-y-0.5">
+              {(ACTION_SUGGESTIONS[form.serviceType] || ACTION_SUGGESTIONS["أخرى"]).map((a, i) => (
+                <li key={i}>{a}</li>
+              ))}
+            </ol>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-600 mb-1">اسم المسؤول *</label>
+              <input value={form.owner} onChange={set("owner")} className="w-full border rounded-lg px-3 py-2" required />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-600 mb-1">نوع الخدمة</label>
+              <select value={form.serviceType} onChange={set("serviceType")} className="w-full border rounded-lg px-3 py-2">
+                {SERVICE_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-600 mb-1">التاريخ المطلوب</label>
+              <input type="date" value={form.requiredDate} onChange={set("requiredDate")} className="w-full border rounded-lg px-3 py-2" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-600 mb-1">الميزانية</label>
+              <input type="number" value={form.budget} onChange={set("budget")} className="w-full border rounded-lg px-3 py-2" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-600 mb-1">رقم PR (إن وجد)</label>
+              <input value={form.prNumber} onChange={set("prNumber")} className="w-full border rounded-lg px-3 py-2" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-600 mb-1">الموردة</label>
+              <input value={form.vendor} onChange={set("vendor")} className="w-full border rounded-lg px-3 py-2" />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-600 mb-1">ملاحظات إضافية</label>
+            <textarea value={form.notes} onChange={set("notes")} rows="3" className="w-full border rounded-lg px-3 py-2"></textarea>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={onCancel} className="px-4 py-2 rounded-lg border text-slate-600 hover:bg-slate-50">إلغاء</button>
+            <button type="submit" className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">حفظ الطلب</button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
+
 function emptyForm() {
   return {
     id: null,
@@ -280,6 +415,7 @@ function App() {
   const [showForm, setShowForm] = useState(false);
   const [editingReq, setEditingReq] = useState(null);
   const [statusReq, setStatusReq] = useState(null);
+  const [showParser, setShowParser] = useState(false);
 
   useEffect(() => {
     saveRequests(requests);
@@ -356,12 +492,20 @@ function App() {
             <h1 className="text-2xl font-extrabold">نظام تتبع PR / PO</h1>
             <p className="text-sm opacity-90">إدارة طلبات الشراء ومتابعة الموافقات — Phase 1</p>
           </div>
-          <button
-            onClick={() => { setEditingReq(null); setShowForm(true); }}
-            className="bg-white text-blue-700 font-bold px-4 py-2 rounded-lg shadow hover:bg-blue-50"
-          >
-            + طلب جديد
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowParser(true)}
+              className="bg-indigo-800 text-white font-bold px-4 py-2 rounded-lg shadow hover:bg-indigo-900"
+            >
+              📧 استخلاص من ايميل
+            </button>
+            <button
+              onClick={() => { setEditingReq(null); setShowForm(true); }}
+              className="bg-white text-blue-700 font-bold px-4 py-2 rounded-lg shadow hover:bg-blue-50"
+            >
+              + طلب جديد
+            </button>
+          </div>
         </div>
       </header>
 
@@ -490,6 +634,15 @@ function App() {
       {statusReq && (
         <Modal title={`تحديث حالة الطلب — ${statusReq.owner}`} onClose={() => setStatusReq(null)}>
           <StatusUpdateForm req={statusReq} onSave={handleStatusSave} onCancel={() => setStatusReq(null)} />
+        </Modal>
+      )}
+
+      {showParser && (
+        <Modal title="استخلاص طلب من ايميل" onClose={() => setShowParser(false)}>
+          <EmailParserForm
+            onSave={(form) => { handleSaveNew(form); setShowParser(false); }}
+            onCancel={() => setShowParser(false)}
+          />
         </Modal>
       )}
     </div>
