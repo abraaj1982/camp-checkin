@@ -4521,6 +4521,20 @@ function summarizeEmail({ owner, beneficiary, selectedTypes, budget, requiredDat
   return parts.join(" ");
 }
 
+// Requests split out of one email get a colour of their own, drawn as a stripe
+// down the left edge of every row in the group. Colour alone never carries the
+// meaning — each row also says "1 of 3 · same email" — but the stripe is what
+// makes the grouping visible at a glance in a long list. These tones are kept
+// clear of the status palette so they can't be mistaken for a state.
+const BATCH_COLORS = ["#5B7F95", "#8A6A9E", "#3F7D6E", "#9A6B4F", "#4A6FA5", "#8B6D3F"];
+
+function batchColorFor(batchId) {
+  if (!batchId) return null;
+  let hash = 0;
+  for (let i = 0; i < batchId.length; i++) hash = (hash * 31 + batchId.charCodeAt(i)) >>> 0;
+  return BATCH_COLORS[hash % BATCH_COLORS.length];
+}
+
 // Tells the user exactly what to do next for this request, based on its
 // current status and what's already filled in — the workflow guidance.
 function getNextAction(req) {
@@ -4688,6 +4702,33 @@ function matchesSearch(req, query) {
 }
 
 // ---------------------------------------------------------------------------
+// Fingerprinting the source email
+//
+// Field-level duplicate checks can't see the simplest mistake of all: the same
+// email being imported twice. A request often has no dates or traveller filled
+// in yet, so there's nothing to compare — but the email text itself is an exact
+// key. Hashing it lets the second import be caught before any work is redone.
+// ---------------------------------------------------------------------------
+function fingerprintEmail(text) {
+  const normalized = String(text || "").toLowerCase().replace(/\s+/g, " ").trim();
+  if (normalized.length < 20) return "";
+  let h1 = 0x811c9dc5;
+  let h2 = 0x01000193;
+  for (let i = 0; i < normalized.length; i++) {
+    const c = normalized.charCodeAt(i);
+    h1 = (h1 ^ c) >>> 0;
+    h1 = (h1 * 0x01000193) >>> 0;
+    h2 = (h2 + c * (i + 1)) >>> 0;
+  }
+  return h1.toString(36) + "-" + h2.toString(36) + "-" + normalized.length.toString(36);
+}
+
+function findRequestsFromSameEmail(sourceHash, requests) {
+  if (!sourceHash) return [];
+  return requests.filter((r) => r.sourceHash === sourceHash);
+}
+
+// ---------------------------------------------------------------------------
 // Duplicate detection: the same person, same service, overlapping dates.
 // ---------------------------------------------------------------------------
 function datesOverlap(aFrom, aTo, bFrom, bTo) {
@@ -4708,10 +4749,21 @@ function findPossibleDuplicates(candidate, requests) {
     const otherPerson = (r.beneficiary || r.owner || "").trim().toLowerCase();
     if (otherPerson !== person) return false;
     if (r.serviceType !== candidate.serviceType) return false;
-    return datesOverlap(
-      candidate.serviceDateFrom, candidate.serviceDateTo,
-      r.serviceDateFrom, r.serviceDateTo
-    );
+
+    const bothHaveDates =
+      (candidate.serviceDateFrom || candidate.serviceDateTo) &&
+      (r.serviceDateFrom || r.serviceDateTo);
+    if (bothHaveDates) {
+      return datesOverlap(
+        candidate.serviceDateFrom, candidate.serviceDateTo,
+        r.serviceDateFrom, r.serviceDateTo
+      );
+    }
+    // With no dates to compare there is nothing to rule the match out, and a
+    // second open request of the same service for the same person is exactly
+    // the mistake worth questioning. Completed ones are left alone: repeat
+    // bookings for a frequent traveller are normal.
+    return r.status !== "Completed";
   });
 }
 
@@ -5365,6 +5417,7 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
   const [customActions, setCustomActions] = useState(loadCustomActions);
   const [attachments, setAttachments] = useState([]);
   const [loadingFile, setLoadingFile] = useState(false);
+  const [sourceHash, setSourceHash] = useState("");
   const [suppliers, setSuppliers] = useState(loadSuppliers);
 
   const knownVendorsAll = useMemo(() => getKnownVendors(requests), [requests]);
@@ -5382,6 +5435,7 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
   };
 
   const extractAndSetForm = (text) => {
+    setSourceHash(fingerprintEmail(text));
     const detectedTypes = detectServiceTypes(text);
     const primaryType = guessServiceType(text);
     const knownForGuess = getKnownVendors(requests, primaryType);
@@ -5410,10 +5464,20 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
     setTypeEntries(entries);
   };
 
-  const handleExtract = () => {
+  const handleExtract = async () => {
     if (!emailText.trim()) {
       appToast("Please paste the email content first");
       return;
+    }
+    const seen = findRequestsFromSameEmail(fingerprintEmail(emailText), requests);
+    if (seen.length) {
+      const when = seen[0].createdAt ? String(seen[0].createdAt).slice(0, 10) : "earlier";
+      const proceed = await appConfirm(
+        `You already logged this exact email on ${when}. It created ${seen.length} request(s): ` +
+        `${seen.map((r) => r.serviceType + (r.poNumber ? ` (PO ${r.poNumber})` : "")).join(", ")}. ` +
+        `Log it again anyway?`
+      );
+      if (!proceed) return;
     }
     extractAndSetForm(emailText);
     if (onContentReplaced) onContentReplaced();
@@ -5428,6 +5492,7 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
     setSelectedTypes([]);
     setTypeEntries({});
     setAttachments([]);
+    setSourceHash("");
   };
 
   const handleEmailFile = async (e) => {
@@ -5454,6 +5519,16 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
       setEmailText(text);
       setAttachments([fileAttachment]);
       if (text.trim()) {
+        const seen = findRequestsFromSameEmail(fingerprintEmail(text), requests);
+        if (seen.length) {
+          const when = seen[0].createdAt ? String(seen[0].createdAt).slice(0, 10) : "earlier";
+          const proceed = await appConfirm(
+            `You already logged this exact email on ${when}. It created ${seen.length} request(s): ` +
+            `${seen.map((r) => r.serviceType + (r.poNumber ? ` (PO ${r.poNumber})` : "")).join(", ")}. ` +
+            `Log it again anyway?`
+          );
+          if (!proceed) { setLoadingFile(false); return; }
+        }
         extractAndSetForm(text);
         if (onContentReplaced) onContentReplaced();
         appToast(`Loaded "${file.name}" — review the extracted fields below`);
@@ -5547,6 +5622,7 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
       batchId,
       batchSize: selectedTypes.length,
       emailSummary,
+      sourceHash,
     }));
 
     // Catch the same trip being logged twice — the usual cause of a duplicate
@@ -5605,6 +5681,17 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
 
       {extracted && (
         <form onSubmit={handleSubmit} className="flex flex-col gap-4" style={{ borderTop: "1px solid var(--sap-border)", paddingTop: "1rem" }}>
+          {findRequestsFromSameEmail(sourceHash, requests).length > 0 && (
+            <div className="p-3 text-sm" style={{ background: "var(--sap-red-bg)", border: "1px solid #F5C2C2", borderRadius: "2px", color: "var(--sap-red)" }}>
+              <p className="font-semibold">⚠️ This exact email is already logged</p>
+              <p className="mt-1">
+                It created {findRequestsFromSameEmail(sourceHash, requests).length} request(s):{" "}
+                {findRequestsFromSameEmail(sourceHash, requests).map((r) => r.serviceType).join(", ")}.
+                Saving again will duplicate them.
+              </p>
+            </div>
+          )}
+
           <div className="p-3 text-sm" style={{ background: "var(--sap-purple-bg)", border: "1px solid #D9CCEA", borderRadius: "2px", color: "var(--sap-purple)" }}>
             <p className="font-semibold mb-1">🧠 Summary — what this email is asking for:</p>
             <p>{summarizeEmail({ owner: extracted.owner, beneficiary: extracted.beneficiary, selectedTypes, budget: extracted.budget, requiredDate: extracted.requiredDate, serviceDateFrom: extracted.serviceDateFrom, serviceDateTo: extracted.serviceDateTo, prNumber: extracted.prNumber })}</p>
@@ -6114,6 +6201,39 @@ function BarRow({ label, value, max, formatted, color, note }) {
   );
 }
 
+function AttachmentsView({ req }) {
+  const files = req.attachments || [];
+  if (!files.length) {
+    return <p className="text-center py-8" style={{ color: "var(--sap-gray)" }}>No files attached to this request.</p>;
+  }
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-sm" style={{ color: "var(--sap-gray)" }}>
+        {req.serviceType} · {req.owner}{req.beneficiary ? ` · for ${req.beneficiary}` : ""}
+      </p>
+      {files.map((a, i) => (
+        <div key={i} className="sap-card p-3 flex items-center justify-between gap-3">
+          <div style={{ minWidth: 0 }}>
+            <button
+              type="button"
+              onClick={() => openAttachment(a)}
+              className="sap-link"
+              style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}
+            >
+              📎 {a.name}
+            </button>
+            <p className="text-xs mt-0.5" style={{ color: "var(--sap-gray)" }}>
+              {a.size ? `${Math.round(a.size / 1024)} KB` : "size unknown"}
+              {a.text ? " · text inside this file is searchable" : ""}
+            </p>
+          </div>
+          <button type="button" onClick={() => openAttachment(a)} className="sap-btn sap-btn-outline">Open</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ReportsView({ requests, sla }) {
   const open = requests.filter((r) => r.status !== "Completed" && r.status !== "Cancelled");
   const waitingOnMe = open.filter((r) => r.waitingOn === "Me").length;
@@ -6374,6 +6494,7 @@ function App() {
   const [viewBatchId, setViewBatchId] = useState(null);
   const [parserContentVersion, setParserContentVersion] = useState(0);
   const [waitingFilter, setWaitingFilter] = useState("all");
+  const [viewFilesReq, setViewFilesReq] = useState(null);
   const [showReports, setShowReports] = useState(false);
   const [sla, setSla] = useState(loadSla);
 
@@ -6605,6 +6726,7 @@ function App() {
                   <th>PR</th>
                   <th>PO</th>
                   <th>Requester / For</th>
+                  <th>Files</th>
                   <th>Service</th>
                   <th>Vendor</th>
                   <th>Status</th>
@@ -6618,7 +6740,7 @@ function App() {
               <tbody>
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan="11" className="text-center py-10" style={{ color: "var(--sap-gray)" }}>No matching requests</td>
+                    <td colSpan="12" className="text-center py-10" style={{ color: "var(--sap-gray)" }}>No matching requests</td>
                   </tr>
                 )}
                 {filtered.map((r) => {
@@ -6626,8 +6748,18 @@ function App() {
                   const style = alert ? ALERT_STYLES[alert] : null;
                   const breach = slaBreach(r, sla);
                   const stageDays = daysInStage(r);
+                  const group = r.batchId ? batchSiblings[r.batchId] : null;
+                  const grouped = group && group.length > 1;
+                  const groupColor = grouped ? batchColorFor(r.batchId) : null;
+                  const groupIndex = grouped ? group.findIndex((x) => x.id === r.id) + 1 : 0;
                   return (
-                    <tr key={r.id} style={style ? style.rowStyle : undefined}>
+                    <tr
+                      key={r.id}
+                      style={{
+                        ...(style ? style.rowStyle : {}),
+                        ...(groupColor ? { boxShadow: `inset 4px 0 0 0 ${groupColor}` } : {}),
+                      }}
+                    >
                       <td>{r.prNumber || "—"}</td>
                       <td>{r.poNumber || "—"}</td>
                       <td style={{ minWidth: 130 }}>
@@ -6637,19 +6769,31 @@ function App() {
                             for <strong>{r.beneficiary}</strong>
                           </div>
                         )}
-                        {r.attachments && r.attachments.length > 0 && (
-                          <span className="ml-1" title={`${r.attachments.length} attachment(s)`}>📎{r.attachments.length}</span>
-                        )}
-                        {r.batchId && batchSiblings[r.batchId] && batchSiblings[r.batchId].length > 1 && (
+                        {grouped && (
                           <button
                             type="button"
                             onClick={() => setViewBatchId(r.batchId)}
-                            className="ml-1 text-xs font-semibold"
-                            style={{ color: "var(--sap-purple)" }}
-                            title="These requests came from the same email"
+                            className="text-xs font-semibold mt-1"
+                            style={{ color: groupColor, display: "block", textAlign: "left", background: "none", border: "none", padding: 0, cursor: "pointer" }}
+                            title="All the requests that came out of this one email"
                           >
-                            🔗{batchSiblings[r.batchId].length}
+                            ▌{groupIndex} of {group.length} · same email
                           </button>
+                        )}
+                      </td>
+                      <td>
+                        {r.attachments && r.attachments.length > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => setViewFilesReq(r)}
+                            className="sap-link whitespace-nowrap"
+                            style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}
+                            title={r.attachments.map((a) => a.name).join(", ")}
+                          >
+                            📎 {r.attachments.length}
+                          </button>
+                        ) : (
+                          <span style={{ color: "var(--sap-gray)" }}>—</span>
                         )}
                       </td>
                       <td>{r.serviceType}</td>
@@ -6775,6 +6919,12 @@ function App() {
       )}
 
       {printReq && <PrintablePO req={printReq} />}
+
+      {viewFilesReq && (
+        <Modal title="📎 Attachments" onClose={() => setViewFilesReq(null)}>
+          <AttachmentsView req={viewFilesReq} />
+        </Modal>
+      )}
 
       {showReports && (
         <Modal title="📊 Reports" onClose={() => setShowReports(false)}>
