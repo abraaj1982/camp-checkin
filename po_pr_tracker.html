@@ -2556,6 +2556,51 @@ function getActionsForType(serviceType, customActions) {
   return (customActions && customActions[serviceType]) || ACTION_SUGGESTIONS[serviceType] || ACTION_SUGGESTIONS["Other"];
 }
 
+// A curated, per-service-type list of registered/approved suppliers you
+// maintain yourself — separate from the vendors auto-learned from past
+// requests, so the app can tell "recommend from your approved list" apart
+// from "this is a supplier we haven't used/registered before".
+const SUPPLIERS_STORAGE_KEY = "po_pr_tracker_suppliers_v1";
+
+function loadSuppliers() {
+  try {
+    const raw = localStorage.getItem(SUPPLIERS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveSuppliers(suppliers) {
+  try {
+    localStorage.setItem(SUPPLIERS_STORAGE_KEY, JSON.stringify(suppliers));
+  } catch (e) {
+    console.error("Failed to save suppliers", e);
+  }
+}
+
+function getRegisteredSuppliers(suppliers, serviceType) {
+  return (suppliers && suppliers[serviceType]) || [];
+}
+
+// Plain-language brief of what an email is actually asking for — built from
+// what was actually extracted, not a guess dressed up as one.
+function summarizeEmail({ owner, selectedTypes, budget, requiredDate, prNumber }) {
+  const who = owner || "an unconfirmed requester";
+  const services = selectedTypes.length ? selectedTypes.join(", ") : "no recognizable service";
+  const parts = [
+    `This email is from/about ${who}, requesting ${selectedTypes.length} service${selectedTypes.length === 1 ? "" : "s"}: ${services}.`,
+  ];
+  if (requiredDate) parts.push(`Needed by ${requiredDate}.`);
+  if (budget) parts.push(`Mentioned budget: ${Number(budget).toLocaleString()}.`);
+  parts.push(
+    prNumber
+      ? `A PR number was already mentioned (${prNumber}) — verify which of the ${selectedTypes.length > 1 ? "requests below it belongs to" : "request below it belongs to"}.`
+      : `No PR number yet — you'll need to create ${selectedTypes.length > 1 ? "one PR per service" : "a PR"} in SAP and enter ${selectedTypes.length > 1 ? "each" : "its"} number once issued.`
+  );
+  return parts.join(" ");
+}
+
 // Tells the user exactly what to do next for this request, based on its
 // current status and what's already filled in — the workflow guidance.
 function getNextAction(req) {
@@ -3040,9 +3085,20 @@ function EmailParserForm({ requests, onSave, onCancel }) {
   const [customActions, setCustomActions] = useState(loadCustomActions);
   const [attachments, setAttachments] = useState([]);
   const [loadingFile, setLoadingFile] = useState(false);
+  const [suppliers, setSuppliers] = useState(loadSuppliers);
 
   const knownVendorsAll = useMemo(() => getKnownVendors(requests), [requests]);
   const knownOwners = useMemo(() => getKnownOwners(requests), [requests]);
+
+  const registerSupplier = (type, vendor) => {
+    if (!vendor || !vendor.trim()) return;
+    const list = getRegisteredSuppliers(suppliers, type);
+    if (list.some((v) => v.toLowerCase() === vendor.trim().toLowerCase())) return;
+    const updated = { ...suppliers, [type]: [...list, vendor.trim()] };
+    setSuppliers(updated);
+    saveSuppliers(updated);
+    appToast(`Registered "${vendor.trim()}" as an approved ${type} supplier`);
+  };
 
   const extractAndSetForm = (text) => {
     const detectedTypes = detectServiceTypes(text);
@@ -3141,6 +3197,14 @@ function EmailParserForm({ requests, onSave, onCancel }) {
       appToast("Select at least one service this email is requesting");
       return;
     }
+    const batchId = selectedTypes.length > 1 ? uid() : null;
+    const emailSummary = summarizeEmail({
+      owner: extracted.owner,
+      selectedTypes,
+      budget: extracted.budget,
+      requiredDate: extracted.requiredDate,
+      prNumber: extracted.prNumber,
+    });
     const forms = selectedTypes.map((type) => ({
       ...emptyForm(),
       owner: extracted.owner,
@@ -3151,6 +3215,9 @@ function EmailParserForm({ requests, onSave, onCancel }) {
       serviceType: type,
       vendor: typeEntries[type].vendor,
       prNumber: typeEntries[type].prNumber,
+      batchId,
+      batchSize: selectedTypes.length,
+      emailSummary,
     }));
     onSave(forms);
   };
@@ -3183,9 +3250,14 @@ function EmailParserForm({ requests, onSave, onCancel }) {
 
       {extracted && (
         <form onSubmit={handleSubmit} className="flex flex-col gap-4" style={{ borderTop: "1px solid var(--sap-border)", paddingTop: "1rem" }}>
+          <div className="p-3 text-sm" style={{ background: "var(--sap-purple-bg)", border: "1px solid #D9CCEA", borderRadius: "2px", color: "var(--sap-purple)" }}>
+            <p className="font-semibold mb-1">🧠 Summary — what this email is asking for:</p>
+            <p>{summarizeEmail({ owner: extracted.owner, selectedTypes, budget: extracted.budget, requiredDate: extracted.requiredDate, prNumber: extracted.prNumber })}</p>
+          </div>
+
           <div className="sap-panel-info p-3 text-sm" style={{ color: "var(--sap-blue-dark)" }}>
             <p className="font-semibold mb-2">
-              🤖 This email seems to request {selectedTypes.length > 1 ? `${selectedTypes.length} separate services` : "one service"} — confirm or adjust which apply. Each checked service becomes its own tracked request (its own supplier, PR, and PO), since they don't share the same approval.
+              🤖 Confirm or adjust which services apply. Each checked service becomes its own tracked request (its own supplier, PR, and PO), since they don't share the same approval.
             </p>
             <div className="flex flex-wrap gap-3">
               {SERVICE_TYPES.filter((s) => s !== "Other").concat("Other").map((type) => (
@@ -3243,7 +3315,11 @@ function EmailParserForm({ requests, onSave, onCancel }) {
           {selectedTypes.map((type) => {
             const entry = typeEntries[type];
             if (!entry) return null;
-            const vendorsForType = getKnownVendors(requests, type);
+            const registered = getRegisteredSuppliers(suppliers, type);
+            const learned = getKnownVendors(requests, type);
+            const registeredLower = registered.map((v) => v.toLowerCase());
+            const extraLearned = learned.filter((v) => !registeredLower.includes(v.toLowerCase()));
+            const isUnregistered = entry.vendor.trim() && registered.length > 0 && !registeredLower.includes(entry.vendor.trim().toLowerCase());
             return (
               <div key={type} className="sap-card p-3" style={{ borderTop: "3px solid var(--sap-blue)" }}>
                 <p className="font-semibold mb-2" style={{ color: "var(--sap-text)" }}>🧾 {type} request</p>
@@ -3251,10 +3327,23 @@ function EmailParserForm({ requests, onSave, onCancel }) {
                   <div>
                     <label className="sap-label">Vendor / Supplier</label>
                     <input value={entry.vendor} onChange={(e) => updateEntry(type, { vendor: e.target.value })} className="sap-input" />
-                    {vendorsForType.length > 0 && (
+                    {(registered.length > 0 || extraLearned.length > 0) && (
                       <div className="flex flex-wrap gap-1 mt-1.5 items-center">
-                        <span className="text-xs" style={{ color: "var(--sap-gray)" }}>Usual vendors:</span>
-                        {vendorsForType.slice(0, 6).map((v) => (
+                        <span className="text-xs" style={{ color: "var(--sap-gray)" }}>
+                          {registered.length > 0 ? "Recommended (registered):" : "Usual vendors:"}
+                        </span>
+                        {registered.slice(0, 6).map((v) => (
+                          <button
+                            type="button"
+                            key={v}
+                            onClick={() => updateEntry(type, { vendor: v })}
+                            className="text-xs px-2 py-0.5"
+                            style={{ background: "var(--sap-green-bg)", border: "1px solid #BFE3CB", borderRadius: "10px", color: "var(--sap-green)" }}
+                          >
+                            ⭐ {v}
+                          </button>
+                        ))}
+                        {extraLearned.slice(0, 4).map((v) => (
                           <button
                             type="button"
                             key={v}
@@ -3265,6 +3354,12 @@ function EmailParserForm({ requests, onSave, onCancel }) {
                             {v}
                           </button>
                         ))}
+                      </div>
+                    )}
+                    {isUnregistered && (
+                      <div className="mt-1.5 text-xs font-semibold flex items-center gap-2" style={{ color: "var(--sap-orange)" }}>
+                        <span>⚠️ "{entry.vendor}" isn't on your registered {type} supplier list.</span>
+                        <button type="button" onClick={() => registerSupplier(type, entry.vendor)} className="sap-link">+ Register it</button>
                       </div>
                     )}
                   </div>
@@ -3511,6 +3606,79 @@ function Modal({ title, onClose, children }) {
   );
 }
 
+function SupplierManagerModal({ onClose }) {
+  const [suppliers, setSuppliers] = useState(loadSuppliers);
+  const [activeType, setActiveType] = useState(SERVICE_TYPES[0]);
+  const [newSupplier, setNewSupplier] = useState("");
+
+  const persist = (updated) => {
+    setSuppliers(updated);
+    saveSuppliers(updated);
+  };
+
+  const addSupplier = () => {
+    const name = newSupplier.trim();
+    if (!name) return;
+    const list = suppliers[activeType] || [];
+    if (list.some((v) => v.toLowerCase() === name.toLowerCase())) {
+      appToast(`"${name}" is already registered for ${activeType}`);
+      return;
+    }
+    persist({ ...suppliers, [activeType]: [...list, name] });
+    setNewSupplier("");
+  };
+
+  const removeSupplier = (type, name) => {
+    persist({ ...suppliers, [type]: (suppliers[type] || []).filter((v) => v !== name) });
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="text-sm" style={{ color: "var(--sap-gray)" }}>
+        Register the suppliers you actually work with, per service type. When parsing an email, these show up as ⭐ recommended choices — anything else typed in gets flagged as an unregistered/new supplier.
+      </p>
+      <div className="flex gap-2">
+        <select value={activeType} onChange={(e) => setActiveType(e.target.value)} className="sap-select" style={{ maxWidth: 160 }}>
+          {SERVICE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
+        <input
+          value={newSupplier}
+          onChange={(e) => setNewSupplier(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSupplier(); } }}
+          placeholder={`Add a ${activeType} supplier...`}
+          className="sap-input"
+          style={{ flex: 1 }}
+        />
+        <button type="button" onClick={addSupplier} className="sap-btn sap-btn-blue">+ Add</button>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        {SERVICE_TYPES.map((type) => (
+          <div key={type} className="sap-card p-3">
+            <p className="font-semibold text-sm mb-2" style={{ color: "var(--sap-text)" }}>{type}</p>
+            {(suppliers[type] || []).length === 0 ? (
+              <p className="text-xs" style={{ color: "var(--sap-gray)" }}>No registered suppliers yet.</p>
+            ) : (
+              <ul className="flex flex-wrap gap-2">
+                {(suppliers[type] || []).map((v) => (
+                  <li key={v} className="flex items-center gap-1 text-xs px-2 py-1" style={{ background: "var(--sap-green-bg)", border: "1px solid #BFE3CB", borderRadius: "10px", color: "var(--sap-green)" }}>
+                    ⭐ {v}
+                    <button type="button" onClick={() => removeSupplier(type, v)} className="font-bold" style={{ color: "var(--sap-red)" }}>×</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="flex justify-end pt-2">
+        <button type="button" onClick={onClose} className="sap-btn sap-btn-blue">Done</button>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [requests, setRequests] = useState(loadRequests);
   const [search, setSearch] = useState("");
@@ -3525,6 +3693,8 @@ function App() {
   const [showImport, setShowImport] = useState(false);
   const [printReq, setPrintReq] = useState(null);
   const [showDaily, setShowDaily] = useState(false);
+  const [showSuppliers, setShowSuppliers] = useState(false);
+  const [viewBatchId, setViewBatchId] = useState(null);
 
   useEffect(() => {
     saveRequests(requests);
@@ -3628,6 +3798,16 @@ function App() {
       });
   }, [requests]);
 
+  const batchSiblings = useMemo(() => {
+    const map = {};
+    requests.forEach((r) => {
+      if (!r.batchId) return;
+      if (!map[r.batchId]) map[r.batchId] = [];
+      map[r.batchId].push(r);
+    });
+    return map;
+  }, [requests]);
+
   return (
     <div className="sap-shell">
       <header className="sap-header sticky top-0 z-10">
@@ -3648,6 +3828,9 @@ function App() {
             </button>
             <button onClick={() => setShowParser(true)} className="sap-btn sap-btn-ghost">
               📧 Parse Email
+            </button>
+            <button onClick={() => setShowSuppliers(true)} className="sap-btn sap-btn-ghost">
+              ⭐ Suppliers
             </button>
             <button onClick={() => { setEditingReq(null); setShowForm(true); }} className="sap-btn sap-btn-primary">
               + New Request
@@ -3746,6 +3929,17 @@ function App() {
                         {r.owner}
                         {r.attachments && r.attachments.length > 0 && (
                           <span className="ml-1" title={`${r.attachments.length} attachment(s)`}>📎{r.attachments.length}</span>
+                        )}
+                        {r.batchId && batchSiblings[r.batchId] && batchSiblings[r.batchId].length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setViewBatchId(r.batchId)}
+                            className="ml-1 text-xs font-semibold"
+                            style={{ color: "var(--sap-purple)" }}
+                            title="These requests came from the same email"
+                          >
+                            🔗{batchSiblings[r.batchId].length}
+                          </button>
                         )}
                       </td>
                       <td>{r.serviceType}</td>
@@ -3846,6 +4040,31 @@ function App() {
       )}
 
       {printReq && <PrintablePO req={printReq} />}
+
+      {showSuppliers && (
+        <Modal title="⭐ Registered Suppliers" onClose={() => setShowSuppliers(false)}>
+          <SupplierManagerModal onClose={() => setShowSuppliers(false)} />
+        </Modal>
+      )}
+
+      {viewBatchId && batchSiblings[viewBatchId] && (
+        <Modal title="🔗 Linked requests from the same email" onClose={() => setViewBatchId(null)}>
+          <div className="flex flex-col gap-3">
+            <p className="text-sm" style={{ color: "var(--sap-gray)" }}>
+              {batchSiblings[viewBatchId][0].emailSummary || "These requests were split from one email into separate services."}
+            </p>
+            {batchSiblings[viewBatchId].map((r) => (
+              <div key={r.id} className="sap-card p-3 flex items-center justify-between">
+                <div>
+                  <p className="font-semibold" style={{ color: "var(--sap-text)" }}>{r.serviceType} {r.vendor ? `— ${r.vendor}` : ""}</p>
+                  <p className="text-xs" style={{ color: "var(--sap-gray)" }}>PR: {r.prNumber || "—"} · PO: {r.poNumber || "—"}</p>
+                </div>
+                <span className="sap-badge" style={STATUS_INLINE_STYLE[r.status]}>{STATUS_LABELS[r.status]}</span>
+              </div>
+            ))}
+          </div>
+        </Modal>
+      )}
       <ConfirmHost />
       <ToastHost />
     </div>
