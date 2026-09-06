@@ -1,15 +1,15 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>نظام تتبع PR / PO</title>
+<title>PR / PO Tracker</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.25.6/babel.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
   :root {
     --sap-blue: #0A6ED4;
@@ -31,7 +31,7 @@
   }
 
   * { box-sizing: border-box; }
-  body { font-family: 'Cairo', 'Segoe UI', sans-serif; background: var(--sap-bg); color: var(--sap-text); }
+  body { font-family: 'Roboto', 'Segoe UI', sans-serif; background: var(--sap-bg); color: var(--sap-text); }
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-thumb { background: #b9bdc2; border-radius: 2px; }
 
@@ -81,7 +81,7 @@
     border-radius: 2px;
     padding: 14px 16px;
   }
-  .sap-tile-value { font-size: 26px; font-weight: 700; line-height: 1.1; }
+  .sap-tile-value { font-size: 26px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
   .sap-tile-label { font-size: 12px; color: var(--sap-gray); margin-top: 4px; }
 
   .sap-input, .sap-select, .sap-textarea {
@@ -110,7 +110,7 @@
     letter-spacing: 0.02em;
     padding: 10px 14px;
     border-bottom: 2px solid var(--sap-border);
-    text-align: right;
+    text-align: left;
   }
   .sap-table tbody td { padding: 10px 14px; border-bottom: 1px solid #ECECEC; }
   .sap-table tbody tr:hover { background: #F5FAFF; }
@@ -156,23 +156,15 @@ const { useState, useEffect, useMemo } = React;
 
 const STORAGE_KEY = "po_pr_tracker_requests_v1";
 
-const SERVICE_TYPES = ["فندق", "سيارة", "تذاكر", "أخرى"];
+const SERVICE_TYPES = ["Hotel", "Car", "Tickets", "Other"];
 const STATUSES = ["Pending", "Processing", "Approved", "PO Issued", "Completed"];
 
 const STATUS_LABELS = {
-  "Pending": "معلق",
-  "Processing": "قيد المعالجة",
-  "Approved": "تمت الموافقة",
-  "PO Issued": "تم إصدار PO",
-  "Completed": "مكتمل",
-};
-
-const STATUS_COLORS = {
-  "Pending": "sap-badge",
-  "Processing": "sap-badge",
-  "Approved": "sap-badge",
-  "PO Issued": "sap-badge",
-  "Completed": "sap-badge",
+  "Pending": "Pending",
+  "Processing": "Processing",
+  "Approved": "Approved",
+  "PO Issued": "PO Issued",
+  "Completed": "Completed",
 };
 
 const STATUS_INLINE_STYLE = {
@@ -200,7 +192,7 @@ function saveRequests(requests) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(requests));
   } catch (e) {
-    console.error("فشل الحفظ في localStorage", e);
+    console.error("Failed to save to localStorage", e);
   }
 }
 
@@ -228,27 +220,27 @@ function getAlertLevel(req) {
 }
 
 const ALERT_STYLES = {
-  red: { row: "", rowStyle: { background: "var(--sap-red-bg)" }, dot: "var(--sap-red)", text: "var(--sap-red)", label: "معلق أكثر من 3 أسابيع" },
-  orange: { row: "", rowStyle: { background: "var(--sap-orange-bg)" }, dot: "var(--sap-orange)", text: "var(--sap-orange)", label: "معلق منذ أسبوع" },
-  yellow: { row: "", rowStyle: { background: "var(--sap-amber-bg)" }, dot: "var(--sap-amber)", text: "var(--sap-amber)", label: "متأخر عن الموعد" },
+  red: { rowStyle: { background: "var(--sap-red-bg)" }, dot: "var(--sap-red)", text: "var(--sap-red)", label: "Pending over 3 weeks" },
+  orange: { rowStyle: { background: "var(--sap-orange-bg)" }, dot: "var(--sap-orange)", text: "var(--sap-orange)", label: "Pending over a week" },
+  yellow: { rowStyle: { background: "var(--sap-amber-bg)" }, dot: "var(--sap-amber)", text: "var(--sap-amber)", label: "Overdue" },
 };
 
 const ACTION_SUGGESTIONS = {
-  "فندق": ["اتصل بالموردة", "تأكد التوفر", "احصل على تأكيد الحجز", "أرجع PO"],
-  "سيارة": ["تواصل مع شركة التأجير", "تأكد من توفر السيارة والسائق", "أكّد موعد الاستلام", "أرجع PO"],
-  "تذاكر": ["تواصل مع وكالة السفر", "تأكد من توفر المقاعد والأسعار", "أصدر التذكرة بعد الموافقة", "أرجع PO"],
-  "أخرى": ["راجع تفاصيل الطلب مع المسؤول", "حدد المورد المناسب", "أرجع PO بعد الموافقة"],
+  "Hotel": ["Contact the vendor", "Confirm availability", "Get the booking confirmation", "Issue the PO"],
+  "Car": ["Contact the rental company", "Confirm car and driver availability", "Confirm pickup time", "Issue the PO"],
+  "Tickets": ["Contact the travel agency", "Confirm seat availability and fares", "Issue the ticket after approval", "Issue the PO"],
+  "Other": ["Review request details with the requester", "Identify the right vendor", "Issue the PO after approval"],
 };
 
 function guessServiceType(text) {
   const t = text.toLowerCase();
-  if (/فندق|hotel|إقامة|غرفة/.test(t)) return "فندق";
-  if (/سيارة|car|تأجير|ليموزين/.test(t)) return "سيارة";
-  if (/تذكرة|تذاكر|ticket|طيران|رحلة/.test(t)) return "تذاكر";
-  return "أخرى";
+  if (/فندق|hotel|إقامة|غرفة|room|stay/.test(t)) return "Hotel";
+  if (/سيارة|car|تأجير|ليموزين|rental|limo/.test(t)) return "Car";
+  if (/تذكرة|تذاكر|ticket|طيران|رحلة|flight/.test(t)) return "Tickets";
+  return "Other";
 }
 
-// "تتعلم" الموردين المعتادين من الطلبات المحفوظة سابقاً — بدون أي API خارجي
+// Learns the vendors you've actually used before, per service type — no external API
 function getKnownVendors(requests, serviceType) {
   const counts = {};
   requests
@@ -269,9 +261,9 @@ function matchKnownVendorInText(text, knownVendors) {
 
 function extractFromEmail(text, knownVendors) {
   const prMatch = text.match(/PR[\s#:.-]*([0-9]{4,})/i);
-  const budgetMatch = text.match(/(?:ميزانية|budget|المبلغ)[^\d]{0,10}([\d,]+(?:\.\d+)?)/i);
+  const budgetMatch = text.match(/(?:ميزانية|budget|المبلغ|amount)[^\d]{0,10}([\d,]+(?:\.\d+)?)/i);
   const dateMatch = text.match(/(\d{4}-\d{2}-\d{2})/);
-  const ownerMatch = text.match(/(?:من|المسؤول|السيد|الأخ|الأخت)[\s:]+([؀-ۿa-zA-Z\s]{2,30}?)(?:\n|,|،|$)/);
+  const ownerMatch = text.match(/(?:من|المسؤول|السيد|الأخ|الأخت|from|requester|attn)[\s:]+([؀-ۿa-zA-Z\s]{2,30}?)(?:\n|,|،|$)/i);
   const vendorMatch = text.match(/(?:الموردة?|المورد|Vendor|Supplier)[\s:]+([؀-ۿa-zA-Z0-9\s]{2,40}?)(?:\n|,|،|$)/i);
 
   const serviceType = guessServiceType(text);
@@ -302,12 +294,12 @@ function saveCustomActions(actions) {
   try {
     localStorage.setItem(ACTIONS_STORAGE_KEY, JSON.stringify(actions));
   } catch (e) {
-    console.error("فشل حفظ الإجراءات", e);
+    console.error("Failed to save actions", e);
   }
 }
 
 function getActionsForType(serviceType, customActions) {
-  return (customActions && customActions[serviceType]) || ACTION_SUGGESTIONS[serviceType] || ACTION_SUGGESTIONS["أخرى"];
+  return (customActions && customActions[serviceType]) || ACTION_SUGGESTIONS[serviceType] || ACTION_SUGGESTIONS["Other"];
 }
 
 const EXCEL_STATUS_MAP = {
@@ -351,18 +343,18 @@ function parseExcelFile(file) {
         const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
         const parsed = rows.map((row) => ({
           id: uid(),
-          prNumber: String(findCol(row, ["PR", "PR رقم", "رقم PR"]) || ""),
-          poNumber: String(findCol(row, ["PO", "PO رقم", "رقم PO"]) || ""),
-          owner: String(findCol(row, ["المسؤول", "Owner", "Requester"]) || ""),
-          department: String(findCol(row, ["القسم", "Department"]) || ""),
-          serviceType: String(findCol(row, ["نوع الخدمة", "Service", "Service Type"]) || "أخرى"),
-          vendor: String(findCol(row, ["الموردة", "المورد", "Vendor", "Supplier"]) || ""),
-          budget: String(findCol(row, ["الميزانية", "Budget"]) || ""),
-          finalAmount: String(findCol(row, ["المبلغ النهائي", "Amount", "Final Amount"]) || ""),
-          requiredDate: String(findCol(row, ["التاريخ المطلوب", "Required Date", "Date"]) || ""),
-          completedDate: String(findCol(row, ["تاريخ الانتهاء", "Completed Date"]) || ""),
-          status: mapExcelStatus(findCol(row, ["الحالة", "Status"])),
-          notes: String(findCol(row, ["الوصف", "الملاحظات", "Description", "Notes"]) || ""),
+          prNumber: String(findCol(row, ["PR", "PR Number", "PR رقم", "رقم PR"]) || ""),
+          poNumber: String(findCol(row, ["PO", "PO Number", "PO رقم", "رقم PO"]) || ""),
+          owner: String(findCol(row, ["Owner", "Requester", "المسؤول"]) || ""),
+          department: String(findCol(row, ["Department", "القسم"]) || ""),
+          serviceType: String(findCol(row, ["Service", "Service Type", "نوع الخدمة"]) || "Other"),
+          vendor: String(findCol(row, ["Vendor", "Supplier", "الموردة", "المورد"]) || ""),
+          budget: String(findCol(row, ["Budget", "الميزانية"]) || ""),
+          finalAmount: String(findCol(row, ["Amount", "Final Amount", "المبلغ النهائي"]) || ""),
+          requiredDate: String(findCol(row, ["Required Date", "Date", "التاريخ المطلوب"]) || ""),
+          completedDate: String(findCol(row, ["Completed Date", "تاريخ الانتهاء"]) || ""),
+          status: mapExcelStatus(findCol(row, ["Status", "الحالة"])),
+          notes: String(findCol(row, ["Description", "Notes", "الوصف", "الملاحظات"]) || ""),
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         }));
@@ -378,23 +370,23 @@ function parseExcelFile(file) {
 
 function exportToExcel(requests) {
   const rows = requests.map((r) => ({
-    "PR رقم": r.prNumber,
-    "PO رقم": r.poNumber,
-    "المسؤول": r.owner,
-    "القسم": r.department,
-    "نوع الخدمة": r.serviceType,
-    "الموردة": r.vendor,
-    "الحالة": STATUS_LABELS[r.status] || r.status,
-    "الميزانية": r.budget,
-    "المبلغ النهائي": r.finalAmount,
-    "التاريخ المطلوب": r.requiredDate,
-    "تاريخ الانتهاء الفعلي": r.completedDate,
-    "الملاحظات": r.notes,
-    "تاريخ الإنشاء": r.createdAt ? r.createdAt.slice(0, 10) : "",
+    "PR Number": r.prNumber,
+    "PO Number": r.poNumber,
+    "Owner": r.owner,
+    "Department": r.department,
+    "Service Type": r.serviceType,
+    "Vendor": r.vendor,
+    "Status": STATUS_LABELS[r.status] || r.status,
+    "Budget": r.budget,
+    "Final Amount": r.finalAmount,
+    "Required Date": r.requiredDate,
+    "Completed Date": r.completedDate,
+    "Notes": r.notes,
+    "Created": r.createdAt ? r.createdAt.slice(0, 10) : "",
   }));
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "الطلبات");
+  XLSX.utils.book_append_sheet(wb, ws, "Requests");
   const stamp = new Date().toISOString().slice(0, 10);
   XLSX.writeFile(wb, `PR_PO_Tracker_${stamp}.xlsx`);
 }
@@ -411,21 +403,21 @@ function ImportExcelModal({ onImport, onCancel }) {
       const parsed = await parseExcelFile(file);
       setPending(parsed);
     } catch (err) {
-      alert("تعذّرت قراءة الملف: " + err.message);
+      alert("Could not read the file: " + err.message);
     }
   };
 
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <label className="sap-label">اختر ملف Excel</label>
+        <label className="sap-label">Choose an Excel file</label>
         <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} className="sap-input" />
       </div>
 
       {pending && (
         <div>
           <p className="text-sm mb-2" style={{ color: "var(--sap-gray)" }}>
-            تم العثور على <span className="font-bold" style={{ color: "var(--sap-text)" }}>{pending.length}</span> صف في ملف "{fileName}". راجع النتيجة قبل التأكيد:
+            Found <span className="font-bold" style={{ color: "var(--sap-text)" }}>{pending.length}</span> row(s) in "{fileName}". Review before confirming:
           </p>
           <div className="sap-card overflow-auto" style={{ maxHeight: "16rem" }}>
             <table className="sap-table">
@@ -433,9 +425,9 @@ function ImportExcelModal({ onImport, onCancel }) {
                 <tr>
                   <th>PR</th>
                   <th>PO</th>
-                  <th>المسؤول</th>
-                  <th>الحالة</th>
-                  <th>الموردة</th>
+                  <th>Owner</th>
+                  <th>Status</th>
+                  <th>Vendor</th>
                 </tr>
               </thead>
               <tbody>
@@ -455,14 +447,14 @@ function ImportExcelModal({ onImport, onCancel }) {
       )}
 
       <div className="flex justify-end gap-2 pt-2">
-        <button type="button" onClick={onCancel} className="sap-btn sap-btn-outline">إلغاء</button>
+        <button type="button" onClick={onCancel} className="sap-btn sap-btn-outline">Cancel</button>
         <button
           type="button"
           disabled={!pending}
           onClick={() => onImport(pending)}
           className="sap-btn sap-btn-blue"
         >
-          تأكيد الاستيراد ({pending ? pending.length : 0})
+          Confirm Import ({pending ? pending.length : 0})
         </button>
       </div>
     </div>
@@ -472,24 +464,24 @@ function ImportExcelModal({ onImport, onCancel }) {
 function PrintablePO({ req }) {
   return (
     <div id="print-area" className="fixed inset-0 bg-white z-[100] p-8 overflow-auto">
-      <h1 className="text-xl font-bold mb-4">نموذج طلب شراء (PO)</h1>
+      <h1 className="text-xl font-bold mb-4">Purchase Order Form (PO)</h1>
       <table className="w-full text-sm border-collapse">
         <tbody>
-          <tr><td className="border p-2 font-semibold w-1/3">رقم PR</td><td className="border p-2">{req.prNumber || "—"}</td></tr>
-          <tr><td className="border p-2 font-semibold">رقم PO</td><td className="border p-2">{req.poNumber || "—"}</td></tr>
-          <tr><td className="border p-2 font-semibold">المسؤول</td><td className="border p-2">{req.owner}</td></tr>
-          <tr><td className="border p-2 font-semibold">القسم</td><td className="border p-2">{req.department || "—"}</td></tr>
-          <tr><td className="border p-2 font-semibold">نوع الخدمة</td><td className="border p-2">{req.serviceType}</td></tr>
-          <tr><td className="border p-2 font-semibold">الموردة</td><td className="border p-2">{req.vendor || "—"}</td></tr>
-          <tr><td className="border p-2 font-semibold">الميزانية</td><td className="border p-2">{req.budget || "—"}</td></tr>
-          <tr><td className="border p-2 font-semibold">المبلغ النهائي</td><td className="border p-2">{req.finalAmount || "—"}</td></tr>
-          <tr><td className="border p-2 font-semibold">التاريخ المطلوب</td><td className="border p-2">{req.requiredDate || "—"}</td></tr>
-          <tr><td className="border p-2 font-semibold">تاريخ الانتهاء الفعلي</td><td className="border p-2">{req.completedDate || "—"}</td></tr>
-          <tr><td className="border p-2 font-semibold">الحالة</td><td className="border p-2">{STATUS_LABELS[req.status]}</td></tr>
-          <tr><td className="border p-2 font-semibold">الملاحظات</td><td className="border p-2">{req.notes || "—"}</td></tr>
+          <tr><td className="border p-2 font-semibold w-1/3">PR Number</td><td className="border p-2">{req.prNumber || "—"}</td></tr>
+          <tr><td className="border p-2 font-semibold">PO Number</td><td className="border p-2">{req.poNumber || "—"}</td></tr>
+          <tr><td className="border p-2 font-semibold">Owner</td><td className="border p-2">{req.owner}</td></tr>
+          <tr><td className="border p-2 font-semibold">Department</td><td className="border p-2">{req.department || "—"}</td></tr>
+          <tr><td className="border p-2 font-semibold">Service Type</td><td className="border p-2">{req.serviceType}</td></tr>
+          <tr><td className="border p-2 font-semibold">Vendor</td><td className="border p-2">{req.vendor || "—"}</td></tr>
+          <tr><td className="border p-2 font-semibold">Budget</td><td className="border p-2">{req.budget || "—"}</td></tr>
+          <tr><td className="border p-2 font-semibold">Final Amount</td><td className="border p-2">{req.finalAmount || "—"}</td></tr>
+          <tr><td className="border p-2 font-semibold">Required Date</td><td className="border p-2">{req.requiredDate || "—"}</td></tr>
+          <tr><td className="border p-2 font-semibold">Completed Date</td><td className="border p-2">{req.completedDate || "—"}</td></tr>
+          <tr><td className="border p-2 font-semibold">Status</td><td className="border p-2">{STATUS_LABELS[req.status]}</td></tr>
+          <tr><td className="border p-2 font-semibold">Notes</td><td className="border p-2">{req.notes || "—"}</td></tr>
         </tbody>
       </table>
-      <p className="text-xs mt-6" style={{ color: "var(--sap-gray)" }}>تمت الطباعة بتاريخ {new Date().toLocaleDateString("ar")}</p>
+      <p className="text-xs mt-6" style={{ color: "var(--sap-gray)" }}>Printed on {new Date().toLocaleDateString("en-US")}</p>
     </div>
   );
 }
@@ -505,7 +497,7 @@ function EmailParserForm({ requests, onSave, onCancel }) {
 
   const handleExtract = () => {
     if (!emailText.trim()) {
-      alert("الرجاء لصق محتوى الايميل أولاً");
+      alert("Please paste the email content first");
       return;
     }
     const knownForGuess = getKnownVendors(requests, guessServiceType(emailText));
@@ -543,13 +535,13 @@ function EmailParserForm({ requests, onSave, onCancel }) {
     const updated = { ...customActions, [form.serviceType]: actionSteps };
     setCustomActions(updated);
     saveCustomActions(updated);
-    alert(`تم حفظ هذه الإجراءات كافتراضي لطلبات "${form.serviceType}" القادمة`);
+    alert(`Saved this checklist as the default for future "${form.serviceType}" requests`);
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!form.owner) {
-      alert("الرجاء إدخال اسم المسؤول");
+      alert("Please enter the requester's name");
       return;
     }
     onSave(form);
@@ -558,17 +550,17 @@ function EmailParserForm({ requests, onSave, onCancel }) {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <label className="sap-label">نسخ محتوى الايميل هنا</label>
+        <label className="sap-label">Paste the email content here</label>
         <textarea
           value={emailText}
           onChange={(e) => setEmailText(e.target.value)}
           rows="6"
-          placeholder="الصق نص الايميل من القسم أو SAP هنا..."
+          placeholder="Paste the email text from the department or SAP here..."
           className="sap-textarea"
         ></textarea>
         <div className="flex justify-end mt-2">
           <button type="button" onClick={handleExtract} className="sap-btn sap-btn-blue">
-            🔍 استخلص البيانات
+            🔍 Extract Data
           </button>
         </div>
       </div>
@@ -576,7 +568,7 @@ function EmailParserForm({ requests, onSave, onCancel }) {
       {form && (
         <form onSubmit={handleSubmit} className="flex flex-col gap-4" style={{ borderTop: "1px solid var(--sap-border)", paddingTop: "1rem" }}>
           <div className="sap-panel-info p-3 text-sm" style={{ color: "var(--sap-blue-dark)" }}>
-            <p className="font-semibold mb-2">💡 الإجراءات المقترحة ({form.serviceType}):</p>
+            <p className="font-semibold mb-2">💡 Suggested actions ({form.serviceType}):</p>
             <ul className="space-y-1">
               {actionSteps.map((a, i) => (
                 <li key={i} className="flex items-center gap-2">
@@ -587,7 +579,7 @@ function EmailParserForm({ requests, onSave, onCancel }) {
                     className="sap-input"
                     style={{ flex: 1, background: "#fff" }}
                   />
-                  <button type="button" onClick={() => removeStep(i)} className="sap-link-danger">حذف</button>
+                  <button type="button" onClick={() => removeStep(i)} className="sap-link-danger">Remove</button>
                 </li>
               ))}
             </ul>
@@ -595,11 +587,11 @@ function EmailParserForm({ requests, onSave, onCancel }) {
               <input
                 value={newStep}
                 onChange={(e) => setNewStep(e.target.value)}
-                placeholder="إضافة إجراء جديد..."
+                placeholder="Add a new action..."
                 className="sap-input"
                 style={{ flex: 1, background: "#fff" }}
               />
-              <button type="button" onClick={addStep} className="sap-btn sap-btn-outline">+ إضافة</button>
+              <button type="button" onClick={addStep} className="sap-btn sap-btn-outline">+ Add</button>
             </div>
             <button
               type="button"
@@ -607,39 +599,39 @@ function EmailParserForm({ requests, onSave, onCancel }) {
               className="mt-2 sap-link"
               style={{ display: "block" }}
             >
-              💾 احفظ هذه القائمة كافتراضي لطلبات "{form.serviceType}" القادمة
+              💾 Save this checklist as the default for "{form.serviceType}" requests
             </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="sap-label">اسم المسؤول *</label>
+              <label className="sap-label">Owner *</label>
               <input value={form.owner} onChange={set("owner")} className="sap-input" required />
             </div>
             <div>
-              <label className="sap-label">نوع الخدمة</label>
+              <label className="sap-label">Service Type</label>
               <select value={form.serviceType} onChange={handleServiceChange} className="sap-select">
                 {SERVICE_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
             <div>
-              <label className="sap-label">التاريخ المطلوب</label>
+              <label className="sap-label">Required Date</label>
               <input type="date" value={form.requiredDate} onChange={set("requiredDate")} className="sap-input" />
             </div>
             <div>
-              <label className="sap-label">الميزانية</label>
+              <label className="sap-label">Budget</label>
               <input type="number" value={form.budget} onChange={set("budget")} className="sap-input" />
             </div>
             <div>
-              <label className="sap-label">رقم PR (إن وجد)</label>
+              <label className="sap-label">PR Number (if any)</label>
               <input value={form.prNumber} onChange={set("prNumber")} className="sap-input" />
             </div>
             <div>
-              <label className="sap-label">الموردة</label>
+              <label className="sap-label">Vendor</label>
               <input value={form.vendor} onChange={set("vendor")} className="sap-input" />
               {vendorsForCurrentType.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-1.5 items-center">
-                  <span className="text-xs" style={{ color: "var(--sap-gray)" }}>موردون معتادون:</span>
+                  <span className="text-xs" style={{ color: "var(--sap-gray)" }}>Usual vendors:</span>
                   {vendorsForCurrentType.slice(0, 6).map((v) => (
                     <button
                       type="button"
@@ -657,13 +649,13 @@ function EmailParserForm({ requests, onSave, onCancel }) {
           </div>
 
           <div>
-            <label className="sap-label">ملاحظات إضافية</label>
+            <label className="sap-label">Additional Notes</label>
             <textarea value={form.notes} onChange={set("notes")} rows="3" className="sap-textarea"></textarea>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={onCancel} className="sap-btn sap-btn-outline">إلغاء</button>
-            <button type="submit" className="sap-btn sap-btn-blue">حفظ الطلب</button>
+            <button type="button" onClick={onCancel} className="sap-btn sap-btn-outline">Cancel</button>
+            <button type="submit" className="sap-btn sap-btn-blue">Save Request</button>
           </div>
         </form>
       )}
@@ -706,7 +698,7 @@ function RequestForm({ initial, onSave, onCancel }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!form.owner || !form.serviceType) {
-      alert("الرجاء إدخال المسؤول ونوع الخدمة على الأقل");
+      alert("Please enter at least the owner and service type");
       return;
     }
     onSave(form);
@@ -715,60 +707,60 @@ function RequestForm({ initial, onSave, onCancel }) {
   return (
     <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div>
-        <label className="sap-label">اسم المسؤول *</label>
+        <label className="sap-label">Owner *</label>
         <input value={form.owner} onChange={set("owner")} className="sap-input" required />
       </div>
       <div>
-        <label className="sap-label">القسم</label>
+        <label className="sap-label">Department</label>
         <input value={form.department} onChange={set("department")} className="sap-input" />
       </div>
       <div>
-        <label className="sap-label">نوع الخدمة *</label>
+        <label className="sap-label">Service Type *</label>
         <select value={form.serviceType} onChange={set("serviceType")} className="sap-select">
           {SERVICE_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
       </div>
       <div>
-        <label className="sap-label">الموردة</label>
+        <label className="sap-label">Vendor</label>
         <input value={form.vendor} onChange={set("vendor")} className="sap-input" />
       </div>
       <div>
-        <label className="sap-label">الميزانية</label>
+        <label className="sap-label">Budget</label>
         <input type="number" value={form.budget} onChange={set("budget")} className="sap-input" />
       </div>
       <div>
-        <label className="sap-label">المبلغ النهائي</label>
+        <label className="sap-label">Final Amount</label>
         <input type="number" value={form.finalAmount} onChange={set("finalAmount")} className="sap-input" />
       </div>
       <div>
-        <label className="sap-label">التاريخ المطلوب</label>
+        <label className="sap-label">Required Date</label>
         <input type="date" value={form.requiredDate} onChange={set("requiredDate")} className="sap-input" />
       </div>
       <div>
-        <label className="sap-label">تاريخ الانتهاء الفعلي</label>
+        <label className="sap-label">Completed Date</label>
         <input type="date" value={form.completedDate} onChange={set("completedDate")} className="sap-input" />
       </div>
       <div>
-        <label className="sap-label">رقم PR</label>
+        <label className="sap-label">PR Number</label>
         <input value={form.prNumber} onChange={set("prNumber")} className="sap-input" />
       </div>
       <div>
-        <label className="sap-label">رقم PO</label>
+        <label className="sap-label">PO Number</label>
         <input value={form.poNumber} onChange={set("poNumber")} className="sap-input" />
       </div>
       <div>
-        <label className="sap-label">الحالة</label>
+        <label className="sap-label">Status</label>
         <select value={form.status} onChange={set("status")} className="sap-select">
           {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
         </select>
       </div>
       <div className="md:col-span-2">
-        <label className="sap-label">ملاحظات</label>
+        <label className="sap-label">Notes</label>
         <textarea value={form.notes} onChange={set("notes")} rows="3" className="sap-textarea"></textarea>
       </div>
       <div className="md:col-span-2 flex justify-end gap-2 pt-2">
-        <button type="button" onClick={onCancel} className="sap-btn sap-btn-outline">إلغاء</button>
-        <button type="submit" className="sap-btn sap-btn-blue">حفظ الطلب</button>
+        <button type="button" onClick={onCancel} className="sap-btn sap-btn-outline">Cancel</button>
+        <button type="submit" className="sap-btn sap-btn-blue">Save Request</button>
       </div>
     </form>
   );
@@ -784,10 +776,10 @@ function StatusUpdateForm({ req, onSave, onCancel }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (status === "Approved" && !prNumber) {
-      if (!confirm("تأكد من إدخال رقم PR قبل الموافقة. هل تريد المتابعة بدون رقم PR؟")) return;
+      if (!confirm("Make sure to enter the PR number before approving. Continue without a PR number?")) return;
     }
     if (status === "PO Issued" && !poNumber) {
-      if (!confirm("تأكد من إدخال رقم PO قبل تعليم الحالة كـ 'تم إصدار PO'. متابعة؟")) return;
+      if (!confirm("Make sure to enter the PO number before marking as 'PO Issued'. Continue?")) return;
     }
     onSave({
       ...req,
@@ -804,32 +796,32 @@ function StatusUpdateForm({ req, onSave, onCancel }) {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div>
-        <label className="sap-label">الحالة الجديدة</label>
+        <label className="sap-label">New Status</label>
         <select value={status} onChange={(e) => setStatus(e.target.value)} className="sap-select">
           {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
         </select>
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="sap-label">رقم PR</label>
+          <label className="sap-label">PR Number</label>
           <input value={prNumber} onChange={(e) => setPrNumber(e.target.value)} className="sap-input" />
         </div>
         <div>
-          <label className="sap-label">رقم PO</label>
+          <label className="sap-label">PO Number</label>
           <input value={poNumber} onChange={(e) => setPoNumber(e.target.value)} className="sap-input" />
         </div>
       </div>
       <div>
-        <label className="sap-label">تاريخ الانتهاء الفعلي</label>
+        <label className="sap-label">Completed Date</label>
         <input type="date" value={completedDate} onChange={(e) => setCompletedDate(e.target.value)} className="sap-input" />
       </div>
       <div>
-        <label className="sap-label">ملاحظات</label>
+        <label className="sap-label">Notes</label>
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows="3" className="sap-textarea"></textarea>
       </div>
       <div className="flex justify-end gap-2 pt-2">
-        <button type="button" onClick={onCancel} className="sap-btn sap-btn-outline">إلغاء</button>
-        <button type="submit" className="sap-btn sap-btn-blue">تحديث الحالة</button>
+        <button type="button" onClick={onCancel} className="sap-btn sap-btn-outline">Cancel</button>
+        <button type="submit" className="sap-btn sap-btn-blue">Update Status</button>
       </div>
     </form>
   );
@@ -927,14 +919,14 @@ function App() {
   };
 
   const handleDelete = (id) => {
-    if (!confirm("هل أنت متأكد من حذف هذا الطلب؟")) return;
+    if (!confirm("Are you sure you want to delete this request?")) return;
     setRequests(requests.filter((r) => r.id !== id));
   };
 
   const handleImport = (parsedRows) => {
     setRequests([...parsedRows, ...requests]);
     setShowImport(false);
-    alert(`تم استيراد ${parsedRows.length} طلب بنجاح`);
+    alert(`Successfully imported ${parsedRows.length} request(s)`);
   };
 
   const handlePrint = (req) => {
@@ -961,24 +953,24 @@ function App() {
       <header className="sap-header sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-xl font-extrabold">نظام تتبع PR / PO</h1>
-            <p className="text-xs opacity-90 mt-0.5">إدارة طلبات الشراء ومتابعة الموافقات</p>
+            <h1 className="text-xl font-extrabold">PR / PO Tracker</h1>
+            <p className="text-xs opacity-90 mt-0.5">Purchase request &amp; approval tracking</p>
           </div>
           <div className="flex gap-2 flex-wrap justify-end">
             <button onClick={() => setShowDaily(true)} className="sap-btn sap-btn-ghost">
-              ⏰ متابعة اليوم {dailyItems.length > 0 && `(${dailyItems.length})`}
+              ⏰ Today's Follow-up {dailyItems.length > 0 && `(${dailyItems.length})`}
             </button>
             <button onClick={() => setShowImport(true)} className="sap-btn sap-btn-ghost">
-              📥 استيراد Excel
+              📥 Import Excel
             </button>
             <button onClick={() => exportToExcel(requests)} className="sap-btn sap-btn-ghost">
-              📤 تصدير Excel
+              📤 Export Excel
             </button>
             <button onClick={() => setShowParser(true)} className="sap-btn sap-btn-ghost">
-              📧 استخلاص من ايميل
+              📧 Parse Email
             </button>
             <button onClick={() => { setEditingReq(null); setShowForm(true); }} className="sap-btn sap-btn-primary">
-              + طلب جديد
+              + New Request
             </button>
           </div>
         </div>
@@ -986,46 +978,46 @@ function App() {
 
       <main className="max-w-7xl mx-auto px-6 py-6">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-          <StatCard label="الإجمالي" value={stats.total} borderColor="var(--sap-gray)" />
-          <StatCard label="معلقة" value={stats.pending} borderColor="var(--sap-amber)" />
-          <StatCard label="قيد المعالجة" value={stats.processing} borderColor="var(--sap-blue)" />
-          <StatCard label="مكتملة" value={stats.completed} borderColor="var(--sap-green)" />
-          <StatCard label="متأخرة" value={stats.overdue} borderColor="var(--sap-red)" />
+          <StatCard label="Total" value={stats.total} borderColor="var(--sap-gray)" />
+          <StatCard label="Pending" value={stats.pending} borderColor="var(--sap-amber)" />
+          <StatCard label="Processing" value={stats.processing} borderColor="var(--sap-blue)" />
+          <StatCard label="Completed" value={stats.completed} borderColor="var(--sap-green)" />
+          <StatCard label="Overdue" value={stats.overdue} borderColor="var(--sap-red)" />
         </div>
 
         <div className="sap-card p-4 mb-6 flex flex-wrap gap-3 items-end">
           <div className="flex-1 min-w-[200px]">
-            <label className="sap-label">بحث</label>
+            <label className="sap-label">Search</label>
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="ابحث بالمسؤول، رقم PR/PO، الموردة..."
+              placeholder="Search by owner, PR/PO number, vendor..."
               className="sap-input"
             />
           </div>
           <div>
-            <label className="sap-label">الحالة</label>
+            <label className="sap-label">Status</label>
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="sap-select">
-              <option value="all">الكل</option>
+              <option value="all">All</option>
               {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
             </select>
           </div>
           <div>
-            <label className="sap-label">المسؤول</label>
+            <label className="sap-label">Owner</label>
             <select value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value)} className="sap-select">
-              <option value="all">الكل</option>
+              <option value="all">All</option>
               {owners.map((o) => <option key={o} value={o}>{o}</option>)}
             </select>
           </div>
           <div>
-            <label className="sap-label">نوع الخدمة</label>
+            <label className="sap-label">Service Type</label>
             <select value={serviceFilter} onChange={(e) => setServiceFilter(e.target.value)} className="sap-select">
-              <option value="all">الكل</option>
+              <option value="all">All</option>
               {SERVICE_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
           <div>
-            <label className="sap-label">التاريخ المطلوب</label>
+            <label className="sap-label">Required Date</label>
             <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="sap-input" />
           </div>
           {(search || statusFilter !== "all" || ownerFilter !== "all" || serviceFilter !== "all" || dateFilter) && (
@@ -1034,7 +1026,7 @@ function App() {
               className="sap-link"
               style={{ padding: "8px 4px" }}
             >
-              مسح الفلاتر
+              Clear filters
             </button>
           )}
         </div>
@@ -1046,20 +1038,20 @@ function App() {
                 <tr>
                   <th>PR</th>
                   <th>PO</th>
-                  <th>المسؤول</th>
-                  <th>الخدمة</th>
-                  <th>الموردة</th>
-                  <th>الحالة</th>
-                  <th>التاريخ المطلوب</th>
-                  <th>الميزانية</th>
-                  <th>تنبيه</th>
-                  <th>إجراءات</th>
+                  <th>Owner</th>
+                  <th>Service</th>
+                  <th>Vendor</th>
+                  <th>Status</th>
+                  <th>Required Date</th>
+                  <th>Budget</th>
+                  <th>Alert</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan="10" className="text-center py-10" style={{ color: "var(--sap-gray)" }}>لا توجد طلبات مطابقة</td>
+                    <td colSpan="10" className="text-center py-10" style={{ color: "var(--sap-gray)" }}>No matching requests</td>
                   </tr>
                 )}
                 {filtered.map((r) => {
@@ -1088,10 +1080,10 @@ function App() {
                         ) : "—"}
                       </td>
                       <td className="whitespace-nowrap">
-                        <button onClick={() => setStatusReq(r)} className="sap-link ml-3">تحديث الحالة</button>
-                        <button onClick={() => { setEditingReq(r); setShowForm(true); }} className="sap-link ml-3" style={{ color: "var(--sap-gray)" }}>تعديل</button>
-                        <button onClick={() => handlePrint(r)} className="sap-link-green ml-3">طباعة PO</button>
-                        <button onClick={() => handleDelete(r.id)} className="sap-link-danger">حذف</button>
+                        <button onClick={() => setStatusReq(r)} className="sap-link mr-3">Update Status</button>
+                        <button onClick={() => { setEditingReq(r); setShowForm(true); }} className="sap-link mr-3" style={{ color: "var(--sap-gray)" }}>Edit</button>
+                        <button onClick={() => handlePrint(r)} className="sap-link-green mr-3">Print PO</button>
+                        <button onClick={() => handleDelete(r.id)} className="sap-link-danger">Delete</button>
                       </td>
                     </tr>
                   );
@@ -1103,19 +1095,19 @@ function App() {
       </main>
 
       {showForm && (
-        <Modal title={editingReq ? "تعديل الطلب" : "طلب جديد"} onClose={() => { setShowForm(false); setEditingReq(null); }}>
+        <Modal title={editingReq ? "Edit Request" : "New Request"} onClose={() => { setShowForm(false); setEditingReq(null); }}>
           <RequestForm initial={editingReq} onSave={handleSaveNew} onCancel={() => { setShowForm(false); setEditingReq(null); }} />
         </Modal>
       )}
 
       {statusReq && (
-        <Modal title={`تحديث حالة الطلب — ${statusReq.owner}`} onClose={() => setStatusReq(null)}>
+        <Modal title={`Update Status — ${statusReq.owner}`} onClose={() => setStatusReq(null)}>
           <StatusUpdateForm req={statusReq} onSave={handleStatusSave} onCancel={() => setStatusReq(null)} />
         </Modal>
       )}
 
       {showParser && (
-        <Modal title="استخلاص طلب من ايميل" onClose={() => setShowParser(false)}>
+        <Modal title="Parse Request From Email" onClose={() => setShowParser(false)}>
           <EmailParserForm
             requests={requests}
             onSave={(form) => { handleSaveNew(form); setShowParser(false); }}
@@ -1125,15 +1117,15 @@ function App() {
       )}
 
       {showImport && (
-        <Modal title="استيراد من Excel" onClose={() => setShowImport(false)}>
+        <Modal title="Import From Excel" onClose={() => setShowImport(false)}>
           <ImportExcelModal onImport={handleImport} onCancel={() => setShowImport(false)} />
         </Modal>
       )}
 
       {showDaily && (
-        <Modal title="⏰ متابعة اليوم" onClose={() => setShowDaily(false)}>
+        <Modal title="⏰ Today's Follow-up" onClose={() => setShowDaily(false)}>
           {dailyItems.length === 0 ? (
-            <p className="text-center py-8" style={{ color: "var(--sap-gray)" }}>لا توجد طلبات تحتاج إجراء اليوم 🎉</p>
+            <p className="text-center py-8" style={{ color: "var(--sap-gray)" }}>No requests need attention today 🎉</p>
           ) : (
             <div className="flex flex-col gap-3">
               {dailyItems.map(({ req, alert }) => {
@@ -1148,14 +1140,14 @@ function App() {
                     </div>
                     <div className="text-sm mt-1 space-y-0.5">
                       {style && <p className="font-semibold" style={{ color: style.text }}>⚠️ {style.label}</p>}
-                      {missingPr && <p className="font-semibold" style={{ color: "var(--sap-red)" }}>💾 تذكير: لم تُدخل رقم PR لهذا الطلب</p>}
-                      {missingPo && <p className="font-semibold" style={{ color: "var(--sap-red)" }}>💾 تذكير: لم تُدخل رقم PO لهذا الطلب</p>}
+                      {missingPr && <p className="font-semibold" style={{ color: "var(--sap-red)" }}>💾 Reminder: PR number not entered for this request</p>}
+                      {missingPo && <p className="font-semibold" style={{ color: "var(--sap-red)" }}>💾 Reminder: PO number not entered for this request</p>}
                     </div>
                     <button
                       onClick={() => { setShowDaily(false); setStatusReq(req); }}
                       className="mt-2 sap-link"
                     >
-                      تحديث الحالة الآن
+                      Update status now
                     </button>
                   </div>
                 );
