@@ -11,9 +11,135 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-  body { font-family: 'Cairo', sans-serif; }
+  :root {
+    --sap-blue: #0A6ED4;
+    --sap-blue-dark: #05386B;
+    --sap-green: #107E3E;
+    --sap-green-bg: #E6F4EA;
+    --sap-orange: #E9730C;
+    --sap-orange-bg: #FEF3E6;
+    --sap-red: #BB0000;
+    --sap-red-bg: #FDEDED;
+    --sap-purple: #6B4A96;
+    --sap-purple-bg: #F0EBF7;
+    --sap-amber: #DF9000;
+    --sap-amber-bg: #FEF6E6;
+    --sap-gray: #6A6D70;
+    --sap-text: #32363A;
+    --sap-bg: #F5F6F7;
+    --sap-border: #D9D9D9;
+  }
+
+  * { box-sizing: border-box; }
+  body { font-family: 'Cairo', 'Segoe UI', sans-serif; background: var(--sap-bg); color: var(--sap-text); }
   ::-webkit-scrollbar { width: 8px; height: 8px; }
-  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+  ::-webkit-scrollbar-thumb { background: #b9bdc2; border-radius: 2px; }
+
+  .sap-shell { min-height: 100vh; }
+
+  .sap-header {
+    background: linear-gradient(180deg, var(--sap-blue) 0%, #08508f 100%);
+    color: #fff;
+    border-bottom: 3px solid var(--sap-blue-dark);
+  }
+
+  .sap-btn {
+    border-radius: 2px;
+    font-weight: 600;
+    font-size: 13px;
+    padding: 8px 14px;
+    border: 1px solid transparent;
+    transition: background .15s ease;
+    white-space: nowrap;
+  }
+  .sap-btn-primary { background: #fff; color: var(--sap-blue); border-color: #fff; }
+  .sap-btn-primary:hover { background: #EAF2FC; }
+  .sap-btn-ghost { background: rgba(255,255,255,0.12); color: #fff; border-color: rgba(255,255,255,0.4); }
+  .sap-btn-ghost:hover { background: rgba(255,255,255,0.22); }
+  .sap-btn-outline { background: #fff; color: var(--sap-text); border-color: var(--sap-border); }
+  .sap-btn-outline:hover { background: #F5F6F7; }
+  .sap-btn-blue { background: var(--sap-blue); color: #fff; }
+  .sap-btn-blue:hover { background: #085caf; }
+  .sap-btn-blue:disabled { background: #a9c8ea; cursor: not-allowed; }
+  .sap-link { color: var(--sap-blue); font-size: 12.5px; font-weight: 600; }
+  .sap-link:hover { text-decoration: underline; }
+  .sap-link-danger { color: var(--sap-red); font-size: 12.5px; font-weight: 600; }
+  .sap-link-danger:hover { text-decoration: underline; }
+  .sap-link-green { color: var(--sap-green); font-size: 12.5px; font-weight: 600; }
+  .sap-link-green:hover { text-decoration: underline; }
+
+  .sap-card {
+    background: #fff;
+    border: 1px solid var(--sap-border);
+    border-radius: 2px;
+  }
+
+  .sap-tile {
+    background: #fff;
+    border: 1px solid var(--sap-border);
+    border-top: 3px solid var(--sap-gray);
+    border-radius: 2px;
+    padding: 14px 16px;
+  }
+  .sap-tile-value { font-size: 26px; font-weight: 700; line-height: 1.1; }
+  .sap-tile-label { font-size: 12px; color: var(--sap-gray); margin-top: 4px; }
+
+  .sap-input, .sap-select, .sap-textarea {
+    border: 1px solid var(--sap-border);
+    border-radius: 2px;
+    padding: 7px 10px;
+    font-size: 13.5px;
+    background: #fff;
+    color: var(--sap-text);
+    width: 100%;
+  }
+  .sap-input:focus, .sap-select:focus, .sap-textarea:focus {
+    outline: none;
+    border-color: var(--sap-blue);
+    box-shadow: 0 0 0 2px rgba(10,110,212,0.15);
+  }
+  .sap-label { display: block; font-size: 12px; font-weight: 600; color: var(--sap-gray); margin-bottom: 4px; }
+
+  .sap-table { width: 100%; font-size: 13px; border-collapse: collapse; }
+  .sap-table thead th {
+    background: #F5F6F7;
+    color: var(--sap-gray);
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    padding: 10px 14px;
+    border-bottom: 2px solid var(--sap-border);
+    text-align: right;
+  }
+  .sap-table tbody td { padding: 10px 14px; border-bottom: 1px solid #ECECEC; }
+  .sap-table tbody tr:hover { background: #F5FAFF; }
+
+  .sap-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    font-size: 11.5px;
+    font-weight: 700;
+    border-radius: 10px;
+    border: 1px solid transparent;
+  }
+
+  .sap-modal-overlay { background: rgba(50,54,58,0.55); }
+  .sap-modal {
+    background: #fff;
+    border-radius: 2px;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.25);
+  }
+  .sap-modal-header {
+    background: var(--sap-bg);
+    border-bottom: 1px solid var(--sap-border);
+  }
+
+  .sap-panel-info {
+    background: #EAF2FC;
+    border: 1px solid #BEDAF7;
+    border-radius: 2px;
+  }
 
   @media print {
     body * { visibility: hidden; }
@@ -22,7 +148,7 @@
   }
 </style>
 </head>
-<body class="bg-slate-100 min-h-screen">
+<body>
 <div id="root"></div>
 
 <script type="text/babel">
@@ -42,11 +168,19 @@ const STATUS_LABELS = {
 };
 
 const STATUS_COLORS = {
-  "Pending": "bg-amber-100 text-amber-800 border-amber-300",
-  "Processing": "bg-blue-100 text-blue-800 border-blue-300",
-  "Approved": "bg-indigo-100 text-indigo-800 border-indigo-300",
-  "PO Issued": "bg-purple-100 text-purple-800 border-purple-300",
-  "Completed": "bg-green-100 text-green-800 border-green-300",
+  "Pending": "sap-badge",
+  "Processing": "sap-badge",
+  "Approved": "sap-badge",
+  "PO Issued": "sap-badge",
+  "Completed": "sap-badge",
+};
+
+const STATUS_INLINE_STYLE = {
+  "Pending": { background: "var(--sap-amber-bg)", color: "var(--sap-amber)", borderColor: "#F5DFA6" },
+  "Processing": { background: "#EAF2FC", color: "var(--sap-blue)", borderColor: "#BEDAF7" },
+  "Approved": { background: "var(--sap-purple-bg)", color: "var(--sap-purple)", borderColor: "#D9CCEA" },
+  "PO Issued": { background: "#EAF2FC", color: "var(--sap-blue-dark)", borderColor: "#BEDAF7" },
+  "Completed": { background: "var(--sap-green-bg)", color: "var(--sap-green)", borderColor: "#BFE3CB" },
 };
 
 function uid() {
@@ -94,9 +228,9 @@ function getAlertLevel(req) {
 }
 
 const ALERT_STYLES = {
-  red: { row: "bg-red-50", dot: "bg-red-500", text: "text-red-700", label: "معلق أكثر من 3 أسابيع" },
-  orange: { row: "bg-orange-50", dot: "bg-orange-500", text: "text-orange-700", label: "معلق منذ أسبوع" },
-  yellow: { row: "bg-yellow-50", dot: "bg-yellow-500", text: "text-yellow-700", label: "متأخر عن الموعد" },
+  red: { row: "", rowStyle: { background: "var(--sap-red-bg)" }, dot: "var(--sap-red)", text: "var(--sap-red)", label: "معلق أكثر من 3 أسابيع" },
+  orange: { row: "", rowStyle: { background: "var(--sap-orange-bg)" }, dot: "var(--sap-orange)", text: "var(--sap-orange)", label: "معلق منذ أسبوع" },
+  yellow: { row: "", rowStyle: { background: "var(--sap-amber-bg)" }, dot: "var(--sap-amber)", text: "var(--sap-amber)", label: "متأخر عن الموعد" },
 };
 
 const ACTION_SUGGESTIONS = {
@@ -284,34 +418,34 @@ function ImportExcelModal({ onImport, onCancel }) {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <label className="block text-sm font-medium text-slate-600 mb-1">اختر ملف Excel</label>
-        <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} className="w-full border rounded-lg px-3 py-2" />
+        <label className="sap-label">اختر ملف Excel</label>
+        <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} className="sap-input" />
       </div>
 
       {pending && (
         <div>
-          <p className="text-sm text-slate-600 mb-2">
-            تم العثور على <span className="font-bold">{pending.length}</span> صف في ملف "{fileName}". راجع النتيجة قبل التأكيد:
+          <p className="text-sm mb-2" style={{ color: "var(--sap-gray)" }}>
+            تم العثور على <span className="font-bold" style={{ color: "var(--sap-text)" }}>{pending.length}</span> صف في ملف "{fileName}". راجع النتيجة قبل التأكيد:
           </p>
-          <div className="border rounded-lg overflow-auto max-h-64">
-            <table className="w-full text-xs text-right">
-              <thead className="bg-slate-50 sticky top-0">
+          <div className="sap-card overflow-auto" style={{ maxHeight: "16rem" }}>
+            <table className="sap-table">
+              <thead>
                 <tr>
-                  <th className="px-2 py-2">PR</th>
-                  <th className="px-2 py-2">PO</th>
-                  <th className="px-2 py-2">المسؤول</th>
-                  <th className="px-2 py-2">الحالة</th>
-                  <th className="px-2 py-2">الموردة</th>
+                  <th>PR</th>
+                  <th>PO</th>
+                  <th>المسؤول</th>
+                  <th>الحالة</th>
+                  <th>الموردة</th>
                 </tr>
               </thead>
               <tbody>
                 {pending.map((r) => (
-                  <tr key={r.id} className="border-t">
-                    <td className="px-2 py-1">{r.prNumber || "—"}</td>
-                    <td className="px-2 py-1">{r.poNumber || "—"}</td>
-                    <td className="px-2 py-1">{r.owner || "—"}</td>
-                    <td className="px-2 py-1">{STATUS_LABELS[r.status]}</td>
-                    <td className="px-2 py-1">{r.vendor || "—"}</td>
+                  <tr key={r.id}>
+                    <td>{r.prNumber || "—"}</td>
+                    <td>{r.poNumber || "—"}</td>
+                    <td>{r.owner || "—"}</td>
+                    <td>{STATUS_LABELS[r.status]}</td>
+                    <td>{r.vendor || "—"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -321,12 +455,12 @@ function ImportExcelModal({ onImport, onCancel }) {
       )}
 
       <div className="flex justify-end gap-2 pt-2">
-        <button type="button" onClick={onCancel} className="px-4 py-2 rounded-lg border text-slate-600 hover:bg-slate-50">إلغاء</button>
+        <button type="button" onClick={onCancel} className="sap-btn sap-btn-outline">إلغاء</button>
         <button
           type="button"
           disabled={!pending}
           onClick={() => onImport(pending)}
-          className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="sap-btn sap-btn-blue"
         >
           تأكيد الاستيراد ({pending ? pending.length : 0})
         </button>
@@ -355,7 +489,7 @@ function PrintablePO({ req }) {
           <tr><td className="border p-2 font-semibold">الملاحظات</td><td className="border p-2">{req.notes || "—"}</td></tr>
         </tbody>
       </table>
-      <p className="text-xs text-slate-400 mt-6">تمت الطباعة بتاريخ {new Date().toLocaleDateString("ar")}</p>
+      <p className="text-xs mt-6" style={{ color: "var(--sap-gray)" }}>تمت الطباعة بتاريخ {new Date().toLocaleDateString("ar")}</p>
     </div>
   );
 }
@@ -424,35 +558,36 @@ function EmailParserForm({ requests, onSave, onCancel }) {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <label className="block text-sm font-medium text-slate-600 mb-1">نسخ محتوى الايميل هنا</label>
+        <label className="sap-label">نسخ محتوى الايميل هنا</label>
         <textarea
           value={emailText}
           onChange={(e) => setEmailText(e.target.value)}
           rows="6"
           placeholder="الصق نص الايميل من القسم أو SAP هنا..."
-          className="w-full border rounded-lg px-3 py-2"
+          className="sap-textarea"
         ></textarea>
         <div className="flex justify-end mt-2">
-          <button type="button" onClick={handleExtract} className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm font-semibold">
+          <button type="button" onClick={handleExtract} className="sap-btn sap-btn-blue">
             🔍 استخلص البيانات
           </button>
         </div>
       </div>
 
       {form && (
-        <form onSubmit={handleSubmit} className="border-t pt-4 flex flex-col gap-4">
-          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 text-sm text-indigo-800">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4" style={{ borderTop: "1px solid var(--sap-border)", paddingTop: "1rem" }}>
+          <div className="sap-panel-info p-3 text-sm" style={{ color: "var(--sap-blue-dark)" }}>
             <p className="font-semibold mb-2">💡 الإجراءات المقترحة ({form.serviceType}):</p>
             <ul className="space-y-1">
               {actionSteps.map((a, i) => (
                 <li key={i} className="flex items-center gap-2">
-                  <span className="text-indigo-400">{i + 1}.</span>
+                  <span style={{ color: "var(--sap-blue)" }}>{i + 1}.</span>
                   <input
                     value={a}
                     onChange={(e) => updateStep(i, e.target.value)}
-                    className="flex-1 bg-white border border-indigo-200 rounded px-2 py-1 text-sm"
+                    className="sap-input"
+                    style={{ flex: 1, background: "#fff" }}
                   />
-                  <button type="button" onClick={() => removeStep(i)} className="text-red-500 text-xs px-1">حذف</button>
+                  <button type="button" onClick={() => removeStep(i)} className="sap-link-danger">حذف</button>
                 </li>
               ))}
             </ul>
@@ -461,14 +596,16 @@ function EmailParserForm({ requests, onSave, onCancel }) {
                 value={newStep}
                 onChange={(e) => setNewStep(e.target.value)}
                 placeholder="إضافة إجراء جديد..."
-                className="flex-1 bg-white border border-indigo-200 rounded px-2 py-1 text-sm"
+                className="sap-input"
+                style={{ flex: 1, background: "#fff" }}
               />
-              <button type="button" onClick={addStep} className="text-xs font-semibold px-2 py-1 rounded bg-indigo-200 hover:bg-indigo-300">+ إضافة</button>
+              <button type="button" onClick={addStep} className="sap-btn sap-btn-outline">+ إضافة</button>
             </div>
             <button
               type="button"
               onClick={handleSaveActionsAsDefault}
-              className="mt-2 text-xs font-semibold text-indigo-700 underline"
+              className="mt-2 sap-link"
+              style={{ display: "block" }}
             >
               💾 احفظ هذه القائمة كافتراضي لطلبات "{form.serviceType}" القادمة
             </button>
@@ -476,39 +613,40 @@ function EmailParserForm({ requests, onSave, onCancel }) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">اسم المسؤول *</label>
-              <input value={form.owner} onChange={set("owner")} className="w-full border rounded-lg px-3 py-2" required />
+              <label className="sap-label">اسم المسؤول *</label>
+              <input value={form.owner} onChange={set("owner")} className="sap-input" required />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">نوع الخدمة</label>
-              <select value={form.serviceType} onChange={handleServiceChange} className="w-full border rounded-lg px-3 py-2">
+              <label className="sap-label">نوع الخدمة</label>
+              <select value={form.serviceType} onChange={handleServiceChange} className="sap-select">
                 {SERVICE_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">التاريخ المطلوب</label>
-              <input type="date" value={form.requiredDate} onChange={set("requiredDate")} className="w-full border rounded-lg px-3 py-2" />
+              <label className="sap-label">التاريخ المطلوب</label>
+              <input type="date" value={form.requiredDate} onChange={set("requiredDate")} className="sap-input" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">الميزانية</label>
-              <input type="number" value={form.budget} onChange={set("budget")} className="w-full border rounded-lg px-3 py-2" />
+              <label className="sap-label">الميزانية</label>
+              <input type="number" value={form.budget} onChange={set("budget")} className="sap-input" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">رقم PR (إن وجد)</label>
-              <input value={form.prNumber} onChange={set("prNumber")} className="w-full border rounded-lg px-3 py-2" />
+              <label className="sap-label">رقم PR (إن وجد)</label>
+              <input value={form.prNumber} onChange={set("prNumber")} className="sap-input" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">الموردة</label>
-              <input value={form.vendor} onChange={set("vendor")} className="w-full border rounded-lg px-3 py-2" />
+              <label className="sap-label">الموردة</label>
+              <input value={form.vendor} onChange={set("vendor")} className="sap-input" />
               {vendorsForCurrentType.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-1.5">
-                  <span className="text-xs text-slate-400 ml-1">موردون معتادون:</span>
+                <div className="flex flex-wrap gap-1 mt-1.5 items-center">
+                  <span className="text-xs" style={{ color: "var(--sap-gray)" }}>موردون معتادون:</span>
                   {vendorsForCurrentType.slice(0, 6).map((v) => (
                     <button
                       type="button"
                       key={v}
                       onClick={() => setForm({ ...form, vendor: v })}
-                      className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full"
+                      className="text-xs px-2 py-0.5"
+                      style={{ background: "#F5F6F7", border: "1px solid var(--sap-border)", borderRadius: "10px", color: "var(--sap-text)" }}
                     >
                       {v}
                     </button>
@@ -519,13 +657,13 @@ function EmailParserForm({ requests, onSave, onCancel }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">ملاحظات إضافية</label>
-            <textarea value={form.notes} onChange={set("notes")} rows="3" className="w-full border rounded-lg px-3 py-2"></textarea>
+            <label className="sap-label">ملاحظات إضافية</label>
+            <textarea value={form.notes} onChange={set("notes")} rows="3" className="sap-textarea"></textarea>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={onCancel} className="px-4 py-2 rounded-lg border text-slate-600 hover:bg-slate-50">إلغاء</button>
-            <button type="submit" className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">حفظ الطلب</button>
+            <button type="button" onClick={onCancel} className="sap-btn sap-btn-outline">إلغاء</button>
+            <button type="submit" className="sap-btn sap-btn-blue">حفظ الطلب</button>
           </div>
         </form>
       )}
@@ -551,11 +689,11 @@ function emptyForm() {
   };
 }
 
-function StatCard({ label, value, color }) {
+function StatCard({ label, value, borderColor }) {
   return (
-    <div className={`rounded-xl border p-4 bg-white shadow-sm flex flex-col gap-1 ${color}`}>
-      <span className="text-2xl font-bold">{value}</span>
-      <span className="text-xs text-slate-500">{label}</span>
+    <div className="sap-tile" style={{ borderTopColor: borderColor }}>
+      <div className="sap-tile-value">{value}</div>
+      <div className="sap-tile-label">{label}</div>
     </div>
   );
 }
@@ -577,60 +715,60 @@ function RequestForm({ initial, onSave, onCancel }) {
   return (
     <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div>
-        <label className="block text-sm font-medium text-slate-600 mb-1">اسم المسؤول *</label>
-        <input value={form.owner} onChange={set("owner")} className="w-full border rounded-lg px-3 py-2" required />
+        <label className="sap-label">اسم المسؤول *</label>
+        <input value={form.owner} onChange={set("owner")} className="sap-input" required />
       </div>
       <div>
-        <label className="block text-sm font-medium text-slate-600 mb-1">القسم</label>
-        <input value={form.department} onChange={set("department")} className="w-full border rounded-lg px-3 py-2" />
+        <label className="sap-label">القسم</label>
+        <input value={form.department} onChange={set("department")} className="sap-input" />
       </div>
       <div>
-        <label className="block text-sm font-medium text-slate-600 mb-1">نوع الخدمة *</label>
-        <select value={form.serviceType} onChange={set("serviceType")} className="w-full border rounded-lg px-3 py-2">
+        <label className="sap-label">نوع الخدمة *</label>
+        <select value={form.serviceType} onChange={set("serviceType")} className="sap-select">
           {SERVICE_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
       </div>
       <div>
-        <label className="block text-sm font-medium text-slate-600 mb-1">الموردة</label>
-        <input value={form.vendor} onChange={set("vendor")} className="w-full border rounded-lg px-3 py-2" />
+        <label className="sap-label">الموردة</label>
+        <input value={form.vendor} onChange={set("vendor")} className="sap-input" />
       </div>
       <div>
-        <label className="block text-sm font-medium text-slate-600 mb-1">الميزانية</label>
-        <input type="number" value={form.budget} onChange={set("budget")} className="w-full border rounded-lg px-3 py-2" />
+        <label className="sap-label">الميزانية</label>
+        <input type="number" value={form.budget} onChange={set("budget")} className="sap-input" />
       </div>
       <div>
-        <label className="block text-sm font-medium text-slate-600 mb-1">المبلغ النهائي</label>
-        <input type="number" value={form.finalAmount} onChange={set("finalAmount")} className="w-full border rounded-lg px-3 py-2" />
+        <label className="sap-label">المبلغ النهائي</label>
+        <input type="number" value={form.finalAmount} onChange={set("finalAmount")} className="sap-input" />
       </div>
       <div>
-        <label className="block text-sm font-medium text-slate-600 mb-1">التاريخ المطلوب</label>
-        <input type="date" value={form.requiredDate} onChange={set("requiredDate")} className="w-full border rounded-lg px-3 py-2" />
+        <label className="sap-label">التاريخ المطلوب</label>
+        <input type="date" value={form.requiredDate} onChange={set("requiredDate")} className="sap-input" />
       </div>
       <div>
-        <label className="block text-sm font-medium text-slate-600 mb-1">تاريخ الانتهاء الفعلي</label>
-        <input type="date" value={form.completedDate} onChange={set("completedDate")} className="w-full border rounded-lg px-3 py-2" />
+        <label className="sap-label">تاريخ الانتهاء الفعلي</label>
+        <input type="date" value={form.completedDate} onChange={set("completedDate")} className="sap-input" />
       </div>
       <div>
-        <label className="block text-sm font-medium text-slate-600 mb-1">رقم PR</label>
-        <input value={form.prNumber} onChange={set("prNumber")} className="w-full border rounded-lg px-3 py-2" />
+        <label className="sap-label">رقم PR</label>
+        <input value={form.prNumber} onChange={set("prNumber")} className="sap-input" />
       </div>
       <div>
-        <label className="block text-sm font-medium text-slate-600 mb-1">رقم PO</label>
-        <input value={form.poNumber} onChange={set("poNumber")} className="w-full border rounded-lg px-3 py-2" />
+        <label className="sap-label">رقم PO</label>
+        <input value={form.poNumber} onChange={set("poNumber")} className="sap-input" />
       </div>
       <div>
-        <label className="block text-sm font-medium text-slate-600 mb-1">الحالة</label>
-        <select value={form.status} onChange={set("status")} className="w-full border rounded-lg px-3 py-2">
+        <label className="sap-label">الحالة</label>
+        <select value={form.status} onChange={set("status")} className="sap-select">
           {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
         </select>
       </div>
       <div className="md:col-span-2">
-        <label className="block text-sm font-medium text-slate-600 mb-1">ملاحظات</label>
-        <textarea value={form.notes} onChange={set("notes")} rows="3" className="w-full border rounded-lg px-3 py-2"></textarea>
+        <label className="sap-label">ملاحظات</label>
+        <textarea value={form.notes} onChange={set("notes")} rows="3" className="sap-textarea"></textarea>
       </div>
       <div className="md:col-span-2 flex justify-end gap-2 pt-2">
-        <button type="button" onClick={onCancel} className="px-4 py-2 rounded-lg border text-slate-600 hover:bg-slate-50">إلغاء</button>
-        <button type="submit" className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">حفظ الطلب</button>
+        <button type="button" onClick={onCancel} className="sap-btn sap-btn-outline">إلغاء</button>
+        <button type="submit" className="sap-btn sap-btn-blue">حفظ الطلب</button>
       </div>
     </form>
   );
@@ -666,32 +804,32 @@ function StatusUpdateForm({ req, onSave, onCancel }) {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div>
-        <label className="block text-sm font-medium text-slate-600 mb-1">الحالة الجديدة</label>
-        <select value={status} onChange={(e) => setStatus(e.target.value)} className="w-full border rounded-lg px-3 py-2">
+        <label className="sap-label">الحالة الجديدة</label>
+        <select value={status} onChange={(e) => setStatus(e.target.value)} className="sap-select">
           {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
         </select>
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-slate-600 mb-1">رقم PR</label>
-          <input value={prNumber} onChange={(e) => setPrNumber(e.target.value)} className="w-full border rounded-lg px-3 py-2" />
+          <label className="sap-label">رقم PR</label>
+          <input value={prNumber} onChange={(e) => setPrNumber(e.target.value)} className="sap-input" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-600 mb-1">رقم PO</label>
-          <input value={poNumber} onChange={(e) => setPoNumber(e.target.value)} className="w-full border rounded-lg px-3 py-2" />
+          <label className="sap-label">رقم PO</label>
+          <input value={poNumber} onChange={(e) => setPoNumber(e.target.value)} className="sap-input" />
         </div>
       </div>
       <div>
-        <label className="block text-sm font-medium text-slate-600 mb-1">تاريخ الانتهاء الفعلي</label>
-        <input type="date" value={completedDate} onChange={(e) => setCompletedDate(e.target.value)} className="w-full border rounded-lg px-3 py-2" />
+        <label className="sap-label">تاريخ الانتهاء الفعلي</label>
+        <input type="date" value={completedDate} onChange={(e) => setCompletedDate(e.target.value)} className="sap-input" />
       </div>
       <div>
-        <label className="block text-sm font-medium text-slate-600 mb-1">ملاحظات</label>
-        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows="3" className="w-full border rounded-lg px-3 py-2"></textarea>
+        <label className="sap-label">ملاحظات</label>
+        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows="3" className="sap-textarea"></textarea>
       </div>
       <div className="flex justify-end gap-2 pt-2">
-        <button type="button" onClick={onCancel} className="px-4 py-2 rounded-lg border text-slate-600 hover:bg-slate-50">إلغاء</button>
-        <button type="submit" className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">تحديث الحالة</button>
+        <button type="button" onClick={onCancel} className="sap-btn sap-btn-outline">إلغاء</button>
+        <button type="submit" className="sap-btn sap-btn-blue">تحديث الحالة</button>
       </div>
     </form>
   );
@@ -699,11 +837,11 @@ function StatusUpdateForm({ req, onSave, onCancel }) {
 
 function Modal({ title, onClose, children }) {
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-4 border-b">
-          <h2 className="text-lg font-bold text-slate-800">{title}</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">×</button>
+    <div className="sap-modal-overlay fixed inset-0 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="sap-modal w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="sap-modal-header flex items-center justify-between px-6 py-4">
+          <h2 className="text-base font-bold" style={{ color: "var(--sap-text)" }}>{title}</h2>
+          <button onClick={onClose} className="text-xl leading-none" style={{ color: "var(--sap-gray)" }}>×</button>
         </div>
         <div className="p-6">{children}</div>
       </div>
@@ -819,42 +957,27 @@ function App() {
   }, [requests]);
 
   return (
-    <div className="min-h-screen">
-      <header className="bg-gradient-to-l from-blue-700 to-blue-500 text-white shadow-md sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
+    <div className="sap-shell">
+      <header className="sap-header sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-2xl font-extrabold">نظام تتبع PR / PO</h1>
-            <p className="text-sm opacity-90">إدارة طلبات الشراء ومتابعة الموافقات — Phase 1</p>
+            <h1 className="text-xl font-extrabold">نظام تتبع PR / PO</h1>
+            <p className="text-xs opacity-90 mt-0.5">إدارة طلبات الشراء ومتابعة الموافقات</p>
           </div>
           <div className="flex gap-2 flex-wrap justify-end">
-            <button
-              onClick={() => setShowDaily(true)}
-              className="bg-amber-500 text-white font-bold px-4 py-2 rounded-lg shadow hover:bg-amber-600"
-            >
+            <button onClick={() => setShowDaily(true)} className="sap-btn sap-btn-ghost">
               ⏰ متابعة اليوم {dailyItems.length > 0 && `(${dailyItems.length})`}
             </button>
-            <button
-              onClick={() => setShowImport(true)}
-              className="bg-emerald-700 text-white font-bold px-4 py-2 rounded-lg shadow hover:bg-emerald-800"
-            >
+            <button onClick={() => setShowImport(true)} className="sap-btn sap-btn-ghost">
               📥 استيراد Excel
             </button>
-            <button
-              onClick={() => exportToExcel(requests)}
-              className="bg-emerald-600 text-white font-bold px-4 py-2 rounded-lg shadow hover:bg-emerald-700"
-            >
+            <button onClick={() => exportToExcel(requests)} className="sap-btn sap-btn-ghost">
               📤 تصدير Excel
             </button>
-            <button
-              onClick={() => setShowParser(true)}
-              className="bg-indigo-800 text-white font-bold px-4 py-2 rounded-lg shadow hover:bg-indigo-900"
-            >
+            <button onClick={() => setShowParser(true)} className="sap-btn sap-btn-ghost">
               📧 استخلاص من ايميل
             </button>
-            <button
-              onClick={() => { setEditingReq(null); setShowForm(true); }}
-              className="bg-white text-blue-700 font-bold px-4 py-2 rounded-lg shadow hover:bg-blue-50"
-            >
+            <button onClick={() => { setEditingReq(null); setShowForm(true); }} className="sap-btn sap-btn-primary">
               + طلب جديد
             </button>
           </div>
@@ -863,111 +986,112 @@ function App() {
 
       <main className="max-w-7xl mx-auto px-6 py-6">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-          <StatCard label="الإجمالي" value={stats.total} color="border-slate-200" />
-          <StatCard label="معلقة" value={stats.pending} color="border-amber-300" />
-          <StatCard label="قيد المعالجة" value={stats.processing} color="border-blue-300" />
-          <StatCard label="مكتملة" value={stats.completed} color="border-green-300" />
-          <StatCard label="متأخرة" value={stats.overdue} color="border-red-300" />
+          <StatCard label="الإجمالي" value={stats.total} borderColor="var(--sap-gray)" />
+          <StatCard label="معلقة" value={stats.pending} borderColor="var(--sap-amber)" />
+          <StatCard label="قيد المعالجة" value={stats.processing} borderColor="var(--sap-blue)" />
+          <StatCard label="مكتملة" value={stats.completed} borderColor="var(--sap-green)" />
+          <StatCard label="متأخرة" value={stats.overdue} borderColor="var(--sap-red)" />
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border p-4 mb-6 flex flex-wrap gap-3 items-end">
+        <div className="sap-card p-4 mb-6 flex flex-wrap gap-3 items-end">
           <div className="flex-1 min-w-[200px]">
-            <label className="block text-xs font-medium text-slate-500 mb-1">بحث</label>
+            <label className="sap-label">بحث</label>
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="ابحث بالمسؤول، رقم PR/PO، الموردة..."
-              className="w-full border rounded-lg px-3 py-2"
+              className="sap-input"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">الحالة</label>
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="border rounded-lg px-3 py-2">
+            <label className="sap-label">الحالة</label>
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="sap-select">
               <option value="all">الكل</option>
               {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">المسؤول</label>
-            <select value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value)} className="border rounded-lg px-3 py-2">
+            <label className="sap-label">المسؤول</label>
+            <select value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value)} className="sap-select">
               <option value="all">الكل</option>
               {owners.map((o) => <option key={o} value={o}>{o}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">نوع الخدمة</label>
-            <select value={serviceFilter} onChange={(e) => setServiceFilter(e.target.value)} className="border rounded-lg px-3 py-2">
+            <label className="sap-label">نوع الخدمة</label>
+            <select value={serviceFilter} onChange={(e) => setServiceFilter(e.target.value)} className="sap-select">
               <option value="all">الكل</option>
               {SERVICE_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">التاريخ المطلوب</label>
-            <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="border rounded-lg px-3 py-2" />
+            <label className="sap-label">التاريخ المطلوب</label>
+            <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="sap-input" />
           </div>
           {(search || statusFilter !== "all" || ownerFilter !== "all" || serviceFilter !== "all" || dateFilter) && (
             <button
               onClick={() => { setSearch(""); setStatusFilter("all"); setOwnerFilter("all"); setServiceFilter("all"); setDateFilter(""); }}
-              className="text-sm text-slate-500 underline px-2 py-2"
+              className="sap-link"
+              style={{ padding: "8px 4px" }}
             >
               مسح الفلاتر
             </button>
           )}
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+        <div className="sap-card overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-right">
-              <thead className="bg-slate-50 text-slate-600 border-b">
+            <table className="sap-table">
+              <thead>
                 <tr>
-                  <th className="px-4 py-3 font-semibold">PR</th>
-                  <th className="px-4 py-3 font-semibold">PO</th>
-                  <th className="px-4 py-3 font-semibold">المسؤول</th>
-                  <th className="px-4 py-3 font-semibold">الخدمة</th>
-                  <th className="px-4 py-3 font-semibold">الموردة</th>
-                  <th className="px-4 py-3 font-semibold">الحالة</th>
-                  <th className="px-4 py-3 font-semibold">التاريخ المطلوب</th>
-                  <th className="px-4 py-3 font-semibold">الميزانية</th>
-                  <th className="px-4 py-3 font-semibold">تنبيه</th>
-                  <th className="px-4 py-3 font-semibold">إجراءات</th>
+                  <th>PR</th>
+                  <th>PO</th>
+                  <th>المسؤول</th>
+                  <th>الخدمة</th>
+                  <th>الموردة</th>
+                  <th>الحالة</th>
+                  <th>التاريخ المطلوب</th>
+                  <th>الميزانية</th>
+                  <th>تنبيه</th>
+                  <th>إجراءات</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan="10" className="text-center py-10 text-slate-400">لا توجد طلبات مطابقة</td>
+                    <td colSpan="10" className="text-center py-10" style={{ color: "var(--sap-gray)" }}>لا توجد طلبات مطابقة</td>
                   </tr>
                 )}
                 {filtered.map((r) => {
                   const alert = getAlertLevel(r);
                   const style = alert ? ALERT_STYLES[alert] : null;
                   return (
-                    <tr key={r.id} className={`border-b last:border-0 ${style ? style.row : ""}`}>
-                      <td className="px-4 py-3">{r.prNumber || "—"}</td>
-                      <td className="px-4 py-3">{r.poNumber || "—"}</td>
-                      <td className="px-4 py-3">{r.owner}</td>
-                      <td className="px-4 py-3">{r.serviceType}</td>
-                      <td className="px-4 py-3">{r.vendor || "—"}</td>
-                      <td className="px-4 py-3">
-                        <span className={`px-2 py-1 rounded-full text-xs font-semibold border ${STATUS_COLORS[r.status]}`}>
+                    <tr key={r.id} style={style ? style.rowStyle : undefined}>
+                      <td>{r.prNumber || "—"}</td>
+                      <td>{r.poNumber || "—"}</td>
+                      <td>{r.owner}</td>
+                      <td>{r.serviceType}</td>
+                      <td>{r.vendor || "—"}</td>
+                      <td>
+                        <span className="sap-badge" style={STATUS_INLINE_STYLE[r.status]}>
                           {STATUS_LABELS[r.status]}
                         </span>
                       </td>
-                      <td className="px-4 py-3">{r.requiredDate || "—"}</td>
-                      <td className="px-4 py-3">{r.budget ? Number(r.budget).toLocaleString() : "—"}</td>
-                      <td className="px-4 py-3">
+                      <td>{r.requiredDate || "—"}</td>
+                      <td>{r.budget ? Number(r.budget).toLocaleString() : "—"}</td>
+                      <td>
                         {style ? (
-                          <span className={`flex items-center gap-1 text-xs font-semibold ${style.text}`}>
-                            <span className={`w-2 h-2 rounded-full ${style.dot}`}></span>
+                          <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: style.text }}>
+                            <span className="inline-block rounded-full" style={{ width: 8, height: 8, background: style.dot }}></span>
                             {style.label}
                           </span>
                         ) : "—"}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <button onClick={() => setStatusReq(r)} className="text-blue-600 hover:underline text-xs font-semibold ml-3">تحديث الحالة</button>
-                        <button onClick={() => { setEditingReq(r); setShowForm(true); }} className="text-slate-600 hover:underline text-xs font-semibold ml-3">تعديل</button>
-                        <button onClick={() => handlePrint(r)} className="text-emerald-700 hover:underline text-xs font-semibold ml-3">طباعة PO</button>
-                        <button onClick={() => handleDelete(r.id)} className="text-red-600 hover:underline text-xs font-semibold">حذف</button>
+                      <td className="whitespace-nowrap">
+                        <button onClick={() => setStatusReq(r)} className="sap-link ml-3">تحديث الحالة</button>
+                        <button onClick={() => { setEditingReq(r); setShowForm(true); }} className="sap-link ml-3" style={{ color: "var(--sap-gray)" }}>تعديل</button>
+                        <button onClick={() => handlePrint(r)} className="sap-link-green ml-3">طباعة PO</button>
+                        <button onClick={() => handleDelete(r.id)} className="sap-link-danger">حذف</button>
                       </td>
                     </tr>
                   );
@@ -1009,7 +1133,7 @@ function App() {
       {showDaily && (
         <Modal title="⏰ متابعة اليوم" onClose={() => setShowDaily(false)}>
           {dailyItems.length === 0 ? (
-            <p className="text-center text-slate-400 py-8">لا توجد طلبات تحتاج إجراء اليوم 🎉</p>
+            <p className="text-center py-8" style={{ color: "var(--sap-gray)" }}>لا توجد طلبات تحتاج إجراء اليوم 🎉</p>
           ) : (
             <div className="flex flex-col gap-3">
               {dailyItems.map(({ req, alert }) => {
@@ -1017,19 +1141,19 @@ function App() {
                 const missingPr = req.status === "Approved" && !req.prNumber;
                 const missingPo = req.status === "PO Issued" && !req.poNumber;
                 return (
-                  <div key={req.id} className={`border rounded-lg p-3 ${style ? style.row : "bg-slate-50"}`}>
+                  <div key={req.id} className="sap-card p-3" style={style ? style.rowStyle : { background: "#F5F6F7" }}>
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-slate-800">{req.owner} — {req.serviceType} {req.vendor ? `(${req.vendor})` : ""}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${STATUS_COLORS[req.status]}`}>{STATUS_LABELS[req.status]}</span>
+                      <span className="font-semibold" style={{ color: "var(--sap-text)" }}>{req.owner} — {req.serviceType} {req.vendor ? `(${req.vendor})` : ""}</span>
+                      <span className="sap-badge" style={STATUS_INLINE_STYLE[req.status]}>{STATUS_LABELS[req.status]}</span>
                     </div>
                     <div className="text-sm mt-1 space-y-0.5">
-                      {style && <p className={`${style.text} font-semibold`}>⚠️ {style.label}</p>}
-                      {missingPr && <p className="text-red-600 font-semibold">💾 تذكير: لم تُدخل رقم PR لهذا الطلب</p>}
-                      {missingPo && <p className="text-red-600 font-semibold">💾 تذكير: لم تُدخل رقم PO لهذا الطلب</p>}
+                      {style && <p className="font-semibold" style={{ color: style.text }}>⚠️ {style.label}</p>}
+                      {missingPr && <p className="font-semibold" style={{ color: "var(--sap-red)" }}>💾 تذكير: لم تُدخل رقم PR لهذا الطلب</p>}
+                      {missingPo && <p className="font-semibold" style={{ color: "var(--sap-red)" }}>💾 تذكير: لم تُدخل رقم PO لهذا الطلب</p>}
                     </div>
                     <button
                       onClick={() => { setShowDaily(false); setStatusReq(req); }}
-                      className="mt-2 text-xs font-semibold text-blue-600 hover:underline"
+                      className="mt-2 sap-link"
                     >
                       تحديث الحالة الآن
                     </button>
