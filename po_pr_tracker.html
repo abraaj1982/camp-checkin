@@ -5943,7 +5943,41 @@ function App() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  componentDidCatch(error, info) {
+    console.error("Render error caught by boundary:", error, info);
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ maxWidth: 640, margin: "80px auto", padding: 24 }}>
+          <div className="sap-card p-4">
+            <h2 className="font-bold mb-2" style={{ color: "var(--sap-red)" }}>⚠️ Something went wrong displaying this page</h2>
+            <p className="text-sm mb-3" style={{ color: "var(--sap-text)" }}>
+              Your saved requests are safe (they live in this browser's storage, not in this screen). Reloading should recover the app.
+            </p>
+            <pre className="text-xs p-2 mb-3" style={{ background: "#F5F6F7", color: "var(--sap-gray)", overflow: "auto", whiteSpace: "pre-wrap" }}>
+              {String(this.state.error && (this.state.error.stack || this.state.error.message || this.state.error))}
+            </pre>
+            <button onClick={() => window.location.reload()} className="sap-btn sap-btn-blue">Reload</button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(
+  <ErrorBoundary><App /></ErrorBoundary>
+);
 </script>
 </body>
 </html>
