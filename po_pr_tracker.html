@@ -9,6 +9,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.25.6/babel.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- Used to read the text inside attached PDFs so deep search can reach it. Optional: if it fails to load, attachments still work, only their inner text isn't searchable. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <!-- Bundled from npm "@kenjiuno/msgreader" (MIT) + "@kenjiuno/decompressrtf" (MIT) — both dependency-free in practice for this app's usage (the one iconv-lite import is stubbed since it's only reached for a non-Unicode ANSI option this app never sets), so they're inlined directly rather than needing a bundler. Reads Outlook .msg files client-side, including HTML-composed and Rich-Text-composed (compressed RTF) bodies. -->
 <script>
 (function (global) {
@@ -3973,22 +3975,35 @@ exports.decompressRTF = decompressRTF;
     --sap-amber-bg: #FEF6E6;
     --sap-gray: #6A6D70;
     --sap-text: #32363A;
-    --sap-bg: #F5F6F7;
+    /* Fiori Launchpad: a soft blue canvas, not flat grey — tiles read as
+       raised white cards against it. */
+    --sap-bg: #dee7f0;
+    --sap-bg-2: #eef3f8;
+    --sap-shell: #eff4f9;
+    --sap-shell-border: #c8d6e5;
+    --sap-tile-border: #e5e9ee;
     --sap-border: #D9D9D9;
   }
 
   * { box-sizing: border-box; }
-  body { font-family: 'Roboto', 'Segoe UI', sans-serif; background: var(--sap-bg); color: var(--sap-text); }
+  body {
+    font-family: 'Roboto', 'Segoe UI', sans-serif;
+    background: linear-gradient(180deg, var(--sap-bg) 0%, var(--sap-bg-2) 60%, var(--sap-bg-2) 100%);
+    background-attachment: fixed;
+    color: var(--sap-text);
+  }
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-thumb { background: #b9bdc2; border-radius: 2px; }
 
   .sap-shell { min-height: 100vh; }
 
   .sap-header {
-    background: linear-gradient(180deg, var(--sap-blue) 0%, #08508f 100%);
-    color: #fff;
-    border-bottom: 3px solid var(--sap-blue-dark);
+    background: var(--sap-shell);
+    color: var(--sap-text);
+    border-bottom: 1px solid var(--sap-shell-border);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   }
+  .sap-header h1 { color: var(--sap-blue-dark); }
 
   .sap-btn {
     border-radius: 2px;
@@ -3999,10 +4014,10 @@ exports.decompressRTF = decompressRTF;
     transition: background .15s ease;
     white-space: nowrap;
   }
-  .sap-btn-primary { background: #fff; color: var(--sap-blue); border-color: #fff; }
-  .sap-btn-primary:hover { background: #EAF2FC; }
-  .sap-btn-ghost { background: rgba(255,255,255,0.12); color: #fff; border-color: rgba(255,255,255,0.4); }
-  .sap-btn-ghost:hover { background: rgba(255,255,255,0.22); }
+  .sap-btn-primary { background: var(--sap-blue); color: #fff; border-color: var(--sap-blue); }
+  .sap-btn-primary:hover { background: #085caf; }
+  .sap-btn-ghost { background: transparent; color: var(--sap-blue); border-color: transparent; }
+  .sap-btn-ghost:hover { background: rgba(10, 110, 212, 0.08); }
   .sap-btn-outline { background: #fff; color: var(--sap-text); border-color: var(--sap-border); }
   .sap-btn-outline:hover { background: #F5F6F7; }
   .sap-btn-blue { background: var(--sap-blue); color: #fff; }
@@ -4017,17 +4032,21 @@ exports.decompressRTF = decompressRTF;
 
   .sap-card {
     background: #fff;
-    border: 1px solid var(--sap-border);
-    border-radius: 2px;
+    border: 1px solid var(--sap-tile-border);
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(34, 54, 79, 0.06);
   }
 
   .sap-tile {
     background: #fff;
-    border: 1px solid var(--sap-border);
+    border: 1px solid var(--sap-tile-border);
     border-top: 3px solid var(--sap-gray);
-    border-radius: 2px;
+    border-radius: 4px;
     padding: 14px 16px;
+    box-shadow: 0 1px 3px rgba(34, 54, 79, 0.08);
+    transition: box-shadow .15s ease;
   }
+  .sap-tile:hover { box-shadow: 0 3px 8px rgba(34, 54, 79, 0.14); }
   .sap-tile-value { font-size: 26px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
   .sap-tile-label { font-size: 12px; color: var(--sap-gray); margin-top: 4px; }
 
@@ -4049,7 +4068,7 @@ exports.decompressRTF = decompressRTF;
 
   .sap-table { width: 100%; font-size: 13px; border-collapse: collapse; }
   .sap-table thead th {
-    background: #F5F6F7;
+    background: #f4f7fa;
     color: var(--sap-gray);
     font-weight: 700;
     font-size: 12px;
@@ -4078,8 +4097,8 @@ exports.decompressRTF = decompressRTF;
     box-shadow: 0 8px 28px rgba(0,0,0,0.25);
   }
   .sap-modal-header {
-    background: var(--sap-bg);
-    border-bottom: 1px solid var(--sap-border);
+    background: var(--sap-shell);
+    border-bottom: 1px solid var(--sap-shell-border);
   }
 
   .sap-panel-info {
@@ -4207,8 +4226,18 @@ function loadRequests() {
 function saveRequests(requests) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(requests));
+    return true;
   } catch (e) {
+    // Never fail quietly: a tracker that silently stops recording is worse
+    // than one that refuses loudly.
     console.error("Failed to save to localStorage", e);
+    const full = e && (e.name === "QuotaExceededError" || e.code === 22 || e.code === 1014);
+    appToast(
+      full
+        ? "This browser's storage is full, so the last change was NOT saved. Export to Excel, then delete some old requests or their attachments."
+        : "The last change could not be saved to this browser: " + (e && e.message ? e.message : e)
+    );
+    return false;
   }
 }
 
@@ -4302,33 +4331,115 @@ function getKnownOwners(requests) {
     .map(([owner]) => owner);
 }
 
+function getKnownBeneficiaries(requests) {
+  const counts = {};
+  requests
+    .filter((r) => r.beneficiary && r.beneficiary.trim())
+    .forEach((r) => {
+      const b = r.beneficiary.trim();
+      counts[b] = (counts[b] || 0) + 1;
+    });
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([name]) => name);
+}
+
 function matchKnownInText(text, knownValues) {
   const t = text.toLowerCase();
   return knownValues.find((v) => t.includes(v.toLowerCase())) || "";
 }
 
-function extractFromEmail(text, knownVendors, knownOwners) {
+const MONTH_WORD = "(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*";
+
+function monthNumberFromWord(word) {
+  const idx = MONTHS_EN_SHORT.indexOf(String(word).slice(0, 3).toLowerCase());
+  return idx === -1 ? null : idx + 1;
+}
+
+function toIsoDate(year, month, day) {
+  if (!year || !month || !day) return "";
+  const y = String(year).length === 2 ? "20" + year : String(year);
+  return `${y}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+// Travel emails write the stay as a range far more often than as one date:
+// "10-15 Jan 2026", "12/1/26 - 15/1/26", "2026-01-10 to 2026-01-15". Reading
+// both ends matters because an invoice months later quotes those dates.
+function extractServiceDates(text) {
+  const thisYear = new Date().getFullYear();
+
+  // "10 - 15 Jan 2026"  /  "10-15 January"
+  let m = text.match(new RegExp(`(\\d{1,2})\\s*[-–—/]\\s*(\\d{1,2})\\s+(${MONTH_WORD})\\.?\\s*(\\d{2,4})?`, "i"));
+  if (m) {
+    const month = monthNumberFromWord(m[3]);
+    const year = m[4] || thisYear;
+    if (month) return { from: toIsoDate(year, month, m[1]), to: toIsoDate(year, month, m[2]) };
+  }
+
+  // "10 Jan - 15 Feb 2026"
+  m = text.match(new RegExp(`(\\d{1,2})\\s+(${MONTH_WORD})\\.?\\s*(\\d{2,4})?\\s*[-–—]\\s*(\\d{1,2})\\s+(${MONTH_WORD})\\.?\\s*(\\d{2,4})?`, "i"));
+  if (m) {
+    const m1 = monthNumberFromWord(m[2]);
+    const m2 = monthNumberFromWord(m[5]);
+    const y2 = m[6] || m[3] || thisYear;
+    const y1 = m[3] || y2;
+    if (m1 && m2) return { from: toIsoDate(y1, m1, m[1]), to: toIsoDate(y2, m2, m[4]) };
+  }
+
+  // ISO range: "2026-01-10 to 2026-01-15"
+  m = text.match(/(\d{4}-\d{2}-\d{2})\s*(?:to|until|[-–—])\s*(\d{4}-\d{2}-\d{2})/i);
+  if (m) return { from: m[1], to: m[2] };
+
+  // Numeric range: "11/1/26 - 06/2/26" (day first, as written locally)
+  m = text.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})\s*[-–—]\s*(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (m) return { from: toIsoDate(m[3], m[2], m[1]), to: toIsoDate(m[6], m[5], m[4]) };
+
+  // A single ISO date is better than nothing.
+  m = text.match(/(\d{4}-\d{2}-\d{2})/);
+  if (m) return { from: m[1], to: "" };
+
+  // Single "15 Jan 2026"
+  m = text.match(new RegExp(`(\\d{1,2})\\s+(${MONTH_WORD})\\.?\\s*(\\d{2,4})`, "i"));
+  if (m) {
+    const month = monthNumberFromWord(m[2]);
+    if (month) return { from: toIsoDate(m[3], month, m[1]), to: "" };
+  }
+
+  return { from: "", to: "" };
+}
+
+function extractFromEmail(text, knownVendors, knownOwners, knownBeneficiaries) {
   const prMatch = text.match(/PR[\s#:.-]*([0-9]{4,})/i);
   const budgetMatch = text.match(/(?:ميزانية|budget|المبلغ|amount)[^\d]{0,10}([\d,]+(?:\.\d+)?)/i);
-  const dateMatch = text.match(/(\d{4}-\d{2}-\d{2})/);
   const ownerMatch = text.match(/(?:من|المسؤول|السيد|الأخ|الأخت|from|requester|attn)[\s:]+([؀-ۿa-zA-Z\s]{2,30}?)(?:\n|,|،|$)/i);
   const vendorMatch = text.match(/(?:الموردة?|المورد|Vendor|Supplier)[\s:]+([؀-ۿa-zA-Z0-9\s]{2,40}?)(?:\n|,|،|$)/i);
+  // The traveller is usually introduced explicitly ("guest name:", "for Mr X",
+  // "باسم ..."), which is a far more reliable signal than the sender line.
+  const beneficiaryMatch = text.match(
+    /(?:guest\s*name|traveller|traveler|passenger|for\s+(?:mr|mrs|ms|dr)\.?|المسافر|باسم|للسيد|للأخ|لصالح)[\s:.]+([؀-ۿa-zA-Z.\s]{2,40}?)(?:\n|,|،|-|\d|$)/i
+  );
 
   const serviceType = guessServiceType(text);
   const learnedVendor = matchKnownInText(text, knownVendors || []);
   const learnedOwner = matchKnownInText(text, knownOwners || []);
+  const learnedBeneficiary = matchKnownInText(text, knownBeneficiaries || []);
   const guessedOwner = ownerMatch ? ownerMatch[1].trim() : "";
+  const guessedBeneficiary = beneficiaryMatch ? beneficiaryMatch[1].trim() : "";
+  const serviceDates = extractServiceDates(text);
 
   return {
     prNumber: prMatch ? prMatch[1] : "",
     budget: budgetMatch ? budgetMatch[1].replace(/,/g, "") : "",
-    requiredDate: dateMatch ? dateMatch[1] : "",
+    requiredDate: "",
+    serviceDateFrom: serviceDates.from,
+    serviceDateTo: serviceDates.to,
     // Never trust the free-text guess blindly — only auto-fill when it matches
     // someone you've actually logged as an owner before; otherwise leave it
     // blank and require you to pick/type the real owner yourself.
     owner: learnedOwner,
     ownerNeedsConfirmation: !learnedOwner && !!guessedOwner,
     ownerGuess: guessedOwner,
+    beneficiary: learnedBeneficiary || guessedBeneficiary,
     vendor: learnedVendor || (vendorMatch ? vendorMatch[1].trim() : ""),
     serviceType,
   };
@@ -4386,12 +4497,20 @@ function getRegisteredSuppliers(suppliers, serviceType) {
 
 // Plain-language brief of what an email is actually asking for — built from
 // what was actually extracted, not a guess dressed up as one.
-function summarizeEmail({ owner, selectedTypes, budget, requiredDate, prNumber }) {
+function summarizeEmail({ owner, beneficiary, selectedTypes, budget, requiredDate, serviceDateFrom, serviceDateTo, prNumber }) {
   const who = owner || "an unconfirmed requester";
   const services = selectedTypes.length ? selectedTypes.join(", ") : "no recognizable service";
+  const forWhom = beneficiary && beneficiary.trim() && beneficiary.trim() !== (owner || "").trim()
+    ? ` on behalf of ${beneficiary.trim()}`
+    : "";
   const parts = [
-    `This email is from/about ${who}, requesting ${selectedTypes.length} service${selectedTypes.length === 1 ? "" : "s"}: ${services}.`,
+    `Requested by ${who}${forWhom}: ${selectedTypes.length} service${selectedTypes.length === 1 ? "" : "s"} — ${services}.`,
   ];
+  if (serviceDateFrom || serviceDateTo) {
+    parts.push(serviceDateTo && serviceDateFrom
+      ? `Service dates ${serviceDateFrom} → ${serviceDateTo}.`
+      : `Service date ${serviceDateFrom || serviceDateTo}.`);
+  }
   if (requiredDate) parts.push(`Needed by ${requiredDate}.`);
   if (budget) parts.push(`Mentioned budget: ${Number(budget).toLocaleString()}.`);
   parts.push(
@@ -4423,6 +4542,246 @@ function getNextAction(req) {
       return "Cancelled — no action needed";
     default:
       return "";
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Who is the request waiting on, and for how long
+//
+// "Pending" alone doesn't say whether the delay is mine, SAP's or the
+// supplier's — and those need completely different actions. Tracking this
+// separately is what turns the list into a work queue.
+// ---------------------------------------------------------------------------
+const WAITING_ON = ["Me", "SAP", "Supplier", "Requester"];
+
+const WAITING_ON_LABELS = {
+  "Me": "Me",
+  "SAP": "SAP",
+  "Supplier": "Supplier",
+  "Requester": "Requester",
+};
+
+// The party a stage normally sits with, used to pre-fill the field so it
+// stays accurate without extra typing.
+const DEFAULT_WAITING_ON = {
+  "Pending": "Me",
+  "Processing": "SAP",
+  "Approved": "Me",
+  "PO Issued": "Supplier",
+  "Completed": "",
+  "Cancelled": "",
+};
+
+const WAITING_ON_STYLE = {
+  "Me": { background: "var(--sap-red-bg)", color: "var(--sap-red)", borderColor: "#F5C2C2" },
+  "SAP": { background: "#EAF2FC", color: "var(--sap-blue)", borderColor: "#BEDAF7" },
+  "Supplier": { background: "var(--sap-orange-bg)", color: "var(--sap-orange)", borderColor: "#F7D6B0" },
+  "Requester": { background: "var(--sap-purple-bg)", color: "var(--sap-purple)", borderColor: "#D9CCEA" },
+};
+
+// ---------------------------------------------------------------------------
+// Per-stage service levels
+// ---------------------------------------------------------------------------
+const SLA_STORAGE_KEY = "po_pr_tracker_sla_v1";
+
+const DEFAULT_SLA_DAYS = {
+  "Pending": 2,
+  "Processing": 5,
+  "Approved": 3,
+  "PO Issued": 7,
+};
+
+function loadSla() {
+  try {
+    const raw = localStorage.getItem(SLA_STORAGE_KEY);
+    return raw ? { ...DEFAULT_SLA_DAYS, ...JSON.parse(raw) } : { ...DEFAULT_SLA_DAYS };
+  } catch (e) {
+    return { ...DEFAULT_SLA_DAYS };
+  }
+}
+
+function saveSla(sla) {
+  try {
+    localStorage.setItem(SLA_STORAGE_KEY, JSON.stringify(sla));
+  } catch (e) {
+    console.error("Failed to save SLA settings", e);
+  }
+}
+
+// Days the request has sat in its current stage, measured from the last time
+// the stage (or the party it waits on) actually changed.
+function daysInStage(req) {
+  return daysSince(req.stageSince || req.updatedAt || req.createdAt);
+}
+
+// How far past the stage's target this request is: >1 means breached.
+function slaBreach(req, sla) {
+  const target = (sla || DEFAULT_SLA_DAYS)[req.status];
+  if (!target || req.status === "Completed" || req.status === "Cancelled") return null;
+  const elapsed = daysInStage(req);
+  if (elapsed <= target) return null;
+  return { elapsed, target, over: elapsed - target };
+}
+
+// ---------------------------------------------------------------------------
+// Deep search
+//
+// An invoice arriving months later carries the traveller's name, the hotel,
+// the stay dates and an amount — rarely the same words that were typed when
+// the request was created. So everything a request knows (including the text
+// pulled out of its attached PDFs, and dates spelled out as month names in
+// both languages) is folded into one blob, and a query matches when every
+// word in it appears somewhere in that blob.
+// ---------------------------------------------------------------------------
+const MONTHS_EN = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+const MONTHS_EN_SHORT = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+const MONTHS_AR = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+
+// "2026-01-12" also becomes "january jan يناير 2026" so a search for the
+// month name finds it.
+function spellOutDate(dateStr) {
+  if (!dateStr) return "";
+  const m = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return String(dateStr);
+  const monthIdx = parseInt(m[2], 10) - 1;
+  if (monthIdx < 0 || monthIdx > 11) return String(dateStr);
+  return [dateStr, MONTHS_EN[monthIdx], MONTHS_EN_SHORT[monthIdx], MONTHS_AR[monthIdx], m[1]].join(" ");
+}
+
+function buildSearchBlob(req) {
+  const attachmentText = (req.attachments || [])
+    .map((a) => [a.name, a.text].filter(Boolean).join(" "))
+    .join(" ");
+  return [
+    req.prNumber,
+    req.poNumber,
+    req.owner,
+    req.beneficiary,
+    req.department,
+    req.serviceType,
+    req.vendor,
+    req.status,
+    req.waitingOn,
+    req.budget,
+    req.finalAmount,
+    spellOutDate(req.requiredDate),
+    spellOutDate(req.serviceDateFrom),
+    spellOutDate(req.serviceDateTo),
+    spellOutDate(req.completedDate),
+    spellOutDate(req.createdAt ? String(req.createdAt).slice(0, 10) : ""),
+    req.notes,
+    req.emailSummary,
+    attachmentText,
+  ]
+    .filter(Boolean)
+    .join(" \n ")
+    .toLowerCase();
+}
+
+// Every word must appear somewhere — so "radisson mohammed jan" narrows
+// instead of returning everything that mentions any one of them.
+function matchesSearch(req, query) {
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!terms.length) return true;
+  const blob = buildSearchBlob(req);
+  return terms.every((t) => blob.includes(t));
+}
+
+// ---------------------------------------------------------------------------
+// Duplicate detection: the same person, same service, overlapping dates.
+// ---------------------------------------------------------------------------
+function datesOverlap(aFrom, aTo, bFrom, bTo) {
+  const aStart = aFrom || aTo;
+  const bStart = bFrom || bTo;
+  if (!aStart || !bStart) return false;
+  const aEnd = aTo || aFrom;
+  const bEnd = bTo || bFrom;
+  return aStart <= bEnd && bStart <= aEnd;
+}
+
+function findPossibleDuplicates(candidate, requests) {
+  const person = (candidate.beneficiary || candidate.owner || "").trim().toLowerCase();
+  if (!person) return [];
+  return requests.filter((r) => {
+    if (r.id && r.id === candidate.id) return false;
+    if (r.status === "Cancelled") return false;
+    const otherPerson = (r.beneficiary || r.owner || "").trim().toLowerCase();
+    if (otherPerson !== person) return false;
+    if (r.serviceType !== candidate.serviceType) return false;
+    return datesOverlap(
+      candidate.serviceDateFrom, candidate.serviceDateTo,
+      r.serviceDateFrom, r.serviceDateTo
+    );
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Attachment blobs live in IndexedDB, not localStorage
+//
+// A couple of PDFs base64-encoded into localStorage exhausts its ~5 MB quota,
+// and the failure mode is silent: writes start throwing and the tracker stops
+// saving. Only the small stuff (name, size, extracted text) stays in
+// localStorage for search; the bytes go to IndexedDB, which is sized for it.
+// ---------------------------------------------------------------------------
+const ATTACHMENT_DB = "po_pr_tracker_files";
+const ATTACHMENT_STORE = "files";
+
+function openAttachmentDb() {
+  return new Promise((resolve, reject) => {
+    if (!window.indexedDB) { reject(new Error("IndexedDB unavailable")); return; }
+    const req = window.indexedDB.open(ATTACHMENT_DB, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(ATTACHMENT_STORE)) db.createObjectStore(ATTACHMENT_STORE);
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error || new Error("Could not open the file store"));
+  });
+}
+
+function putAttachmentBlob(id, dataUrl) {
+  return openAttachmentDb().then((db) => new Promise((resolve, reject) => {
+    const tx = db.transaction(ATTACHMENT_STORE, "readwrite");
+    tx.objectStore(ATTACHMENT_STORE).put(dataUrl, id);
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
+  }));
+}
+
+function getAttachmentBlob(id) {
+  return openAttachmentDb().then((db) => new Promise((resolve, reject) => {
+    const tx = db.transaction(ATTACHMENT_STORE, "readonly");
+    const get = tx.objectStore(ATTACHMENT_STORE).get(id);
+    get.onsuccess = () => resolve(get.result || null);
+    get.onerror = () => reject(get.error);
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// Reading the text inside an attached PDF so search can reach it
+// ---------------------------------------------------------------------------
+const MAX_EXTRACTED_TEXT = 20000;
+
+async function extractPdfText(file) {
+  if (!window.pdfjsLib) return "";
+  try {
+    if (window.pdfjsLib.GlobalWorkerOptions && !window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    }
+    const buffer = await file.arrayBuffer();
+    const pdf = await window.pdfjsLib.getDocument({ data: buffer }).promise;
+    const pages = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      pages.push(content.items.map((it) => it.str).join(" "));
+      if (pages.join(" ").length > MAX_EXTRACTED_TEXT) break;
+    }
+    return pages.join("\n").slice(0, MAX_EXTRACTED_TEXT);
+  } catch (err) {
+    console.warn("Could not read text out of this PDF:", err);
+    return "";
   }
 }
 
@@ -4618,19 +4977,59 @@ function readFileAsDataURL(file) {
 // requires the declared "downloads" capability instead. Falls back to a
 // plain new-tab open for a local HTML file / GitHub Pages, where there is
 // no window.claude runtime and the plain link works fine.
+// Attachments saved before the move to IndexedDB still carry their bytes
+// inline, so both shapes have to be readable.
+async function resolveAttachmentData(attachment) {
+  if (attachment.dataUrl) return attachment.dataUrl;
+  if (attachment.blobId) {
+    try {
+      return await getAttachmentBlob(attachment.blobId);
+    } catch (err) {
+      return null;
+    }
+  }
+  return null;
+}
+
 async function openAttachment(attachment) {
+  const data = await resolveAttachmentData(attachment);
+  if (!data) {
+    appToast(`"${attachment.name}" could not be found in this browser's file store`);
+    return;
+  }
   try {
     if (window.claude && typeof window.claude.use === "function") {
       const downloads = await window.claude.use("downloads");
       if (downloads) {
-        await downloads.save({ filename: attachment.name, data: attachment.dataUrl });
+        await downloads.save({ filename: attachment.name, data });
         return;
       }
     }
   } catch (err) {
     // fall through to the plain-browser path below
   }
-  window.open(attachment.dataUrl, "_blank");
+  window.open(data, "_blank");
+}
+
+// Reads a picked file into the shape stored on a request: the bytes go to
+// IndexedDB (localStorage's few MB can't hold PDFs), while the name, size and
+// any text extracted from a PDF stay on the request so search can reach them.
+async function ingestAttachment(file) {
+  const base = await readFileAsDataURL(file);
+  const text = /\.pdf$/i.test(file.name) || file.type === "application/pdf"
+    ? await extractPdfText(file)
+    : "";
+
+  const blobId = uid();
+  try {
+    await putAttachmentBlob(blobId, base.dataUrl);
+    return { name: base.name, type: base.type, size: base.size, blobId, text };
+  } catch (err) {
+    // No IndexedDB (private mode, old browser): keep the bytes inline so the
+    // attachment still works, accepting the storage cost.
+    console.warn("Falling back to inline attachment storage:", err);
+    return { ...base, text };
+  }
 }
 
 function AttachmentPicker({ attachments, onChange }) {
@@ -4638,16 +5037,19 @@ function AttachmentPicker({ attachments, onChange }) {
 
   const handleFiles = async (e) => {
     const files = Array.from(e.target.files || []);
+    e.target.value = "";
     if (!files.length) return;
     setBusy(true);
     try {
-      const read = await Promise.all(files.map(readFileAsDataURL));
+      const read = [];
+      for (const file of files) read.push(await ingestAttachment(file));
       onChange([...(attachments || []), ...read]);
+      const withText = read.filter((a) => a.text).length;
+      if (withText) appToast(`Read the text inside ${withText} PDF(s) — it's searchable now`);
     } catch (err) {
       appToast("Could not read one of the files: " + err.message);
     } finally {
       setBusy(false);
-      e.target.value = "";
     }
   };
 
@@ -4828,7 +5230,11 @@ function exportToExcel(requests) {
   const rows = requests.map((r) => ({
     "PR Number": r.prNumber,
     "PO Number": r.poNumber,
-    "Owner": r.owner,
+    "Requester": r.owner,
+    "Beneficiary": r.beneficiary,
+    "Waiting On": r.waitingOn,
+    "Service From": r.serviceDateFrom,
+    "Service To": r.serviceDateTo,
     "Department": r.department,
     "Service Type": r.serviceType,
     "Vendor": r.vendor,
@@ -4925,7 +5331,9 @@ function PrintablePO({ req }) {
         <tbody>
           <tr><td className="border p-2 font-semibold w-1/3">PR Number</td><td className="border p-2">{req.prNumber || "—"}</td></tr>
           <tr><td className="border p-2 font-semibold">PO Number</td><td className="border p-2">{req.poNumber || "—"}</td></tr>
-          <tr><td className="border p-2 font-semibold">Owner</td><td className="border p-2">{req.owner}</td></tr>
+          <tr><td className="border p-2 font-semibold">Requester</td><td className="border p-2">{req.owner}</td></tr>
+          <tr><td className="border p-2 font-semibold">Beneficiary / traveller</td><td className="border p-2">{req.beneficiary || req.owner}</td></tr>
+          <tr><td className="border p-2 font-semibold">Service dates</td><td className="border p-2">{req.serviceDateFrom ? (req.serviceDateTo ? `${req.serviceDateFrom} → ${req.serviceDateTo}` : req.serviceDateFrom) : "—"}</td></tr>
           <tr><td className="border p-2 font-semibold">Department</td><td className="border p-2">{req.department || "—"}</td></tr>
           <tr><td className="border p-2 font-semibold">Service Type</td><td className="border p-2">{req.serviceType}</td></tr>
           <tr><td className="border p-2 font-semibold">Vendor</td><td className="border p-2">{req.vendor || "—"}</td></tr>
@@ -4961,6 +5369,7 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
 
   const knownVendorsAll = useMemo(() => getKnownVendors(requests), [requests]);
   const knownOwners = useMemo(() => getKnownOwners(requests), [requests]);
+  const knownBeneficiaries = useMemo(() => getKnownBeneficiaries(requests), [requests]);
 
   const registerSupplier = (type, vendor) => {
     if (!vendor || !vendor.trim()) return;
@@ -4976,13 +5385,16 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
     const detectedTypes = detectServiceTypes(text);
     const primaryType = guessServiceType(text);
     const knownForGuess = getKnownVendors(requests, primaryType);
-    const data = extractFromEmail(text, knownForGuess.length ? knownForGuess : knownVendorsAll, knownOwners);
+    const data = extractFromEmail(text, knownForGuess.length ? knownForGuess : knownVendorsAll, knownOwners, knownBeneficiaries);
 
     setExtracted({
       owner: data.owner,
       ownerNeedsConfirmation: data.ownerNeedsConfirmation,
       ownerGuess: data.ownerGuess,
+      beneficiary: data.beneficiary,
       requiredDate: data.requiredDate,
+      serviceDateFrom: data.serviceDateFrom,
+      serviceDateTo: data.serviceDateTo,
       budget: data.budget,
       prNumber: data.prNumber,
       notes: text.slice(0, 500),
@@ -5037,7 +5449,7 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
     setLoadingFile(true);
     try {
       const text = await readEmailFile(file);
-      const fileAttachment = await readFileAsDataURL(file);
+      const fileAttachment = await ingestAttachment(file);
 
       setEmailText(text);
       setAttachments([fileAttachment]);
@@ -5097,7 +5509,7 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
     appToast(`Saved this checklist as the default for future "${type}" requests`);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!extracted.owner) {
       appToast("Please enter the requester's name");
@@ -5110,25 +5522,48 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
     const batchId = selectedTypes.length > 1 ? uid() : null;
     const emailSummary = summarizeEmail({
       owner: extracted.owner,
+      beneficiary: extracted.beneficiary,
       selectedTypes,
       budget: extracted.budget,
       requiredDate: extracted.requiredDate,
+      serviceDateFrom: extracted.serviceDateFrom,
+      serviceDateTo: extracted.serviceDateTo,
       prNumber: extracted.prNumber,
     });
     const forms = selectedTypes.map((type) => ({
       ...emptyForm(),
       owner: extracted.owner,
+      beneficiary: extracted.beneficiary || "",
       requiredDate: extracted.requiredDate,
+      serviceDateFrom: extracted.serviceDateFrom || "",
+      serviceDateTo: extracted.serviceDateTo || "",
       budget: extracted.budget,
       notes: extracted.notes,
       attachments,
       serviceType: type,
       vendor: typeEntries[type].vendor,
       prNumber: typeEntries[type].prNumber,
+      waitingOn: DEFAULT_WAITING_ON["Pending"],
       batchId,
       batchSize: selectedTypes.length,
       emailSummary,
     }));
+
+    // Catch the same trip being logged twice — the usual cause of a duplicate
+    // PO going out to the same supplier.
+    const clashes = forms
+      .map((f) => ({ form: f, dup: findPossibleDuplicates(f, requests)[0] }))
+      .filter((x) => x.dup);
+    if (clashes.length) {
+      const { form, dup } = clashes[0];
+      const proceed = await appConfirm(
+        `A ${form.serviceType} request for ${dup.beneficiary || dup.owner} already covers overlapping dates ` +
+        `(${dup.serviceDateFrom || "?"} → ${dup.serviceDateTo || "?"}, status ${STATUS_LABELS[dup.status]}` +
+        `${dup.poNumber ? `, PO ${dup.poNumber}` : ""}). Save anyway?`
+      );
+      if (!proceed) return;
+    }
+
     onSave(forms);
   };
 
@@ -5172,7 +5607,7 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
         <form onSubmit={handleSubmit} className="flex flex-col gap-4" style={{ borderTop: "1px solid var(--sap-border)", paddingTop: "1rem" }}>
           <div className="p-3 text-sm" style={{ background: "var(--sap-purple-bg)", border: "1px solid #D9CCEA", borderRadius: "2px", color: "var(--sap-purple)" }}>
             <p className="font-semibold mb-1">🧠 Summary — what this email is asking for:</p>
-            <p>{summarizeEmail({ owner: extracted.owner, selectedTypes, budget: extracted.budget, requiredDate: extracted.requiredDate, prNumber: extracted.prNumber })}</p>
+            <p>{summarizeEmail({ owner: extracted.owner, beneficiary: extracted.beneficiary, selectedTypes, budget: extracted.budget, requiredDate: extracted.requiredDate, serviceDateFrom: extracted.serviceDateFrom, serviceDateTo: extracted.serviceDateTo, prNumber: extracted.prNumber })}</p>
           </div>
 
           <div className="sap-panel-info p-3 text-sm" style={{ color: "var(--sap-blue-dark)" }}>
@@ -5223,7 +5658,43 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
               )}
             </div>
             <div>
-              <label className="sap-label">Required Date (shared across these requests)</label>
+              <label className="sap-label">Beneficiary / traveller (who the service is for)</label>
+              <input
+                value={extracted.beneficiary || ""}
+                onChange={(e) => setExtracted({ ...extracted, beneficiary: e.target.value })}
+                className="sap-input"
+                placeholder="Leave blank if the requester is also the traveller"
+              />
+              <p className="text-xs mt-1" style={{ color: "var(--sap-gray)" }}>
+                Invoices arrive under this name months later — filling it in is what makes them findable.
+              </p>
+              {knownBeneficiaries.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1.5 items-center">
+                  <span className="text-xs" style={{ color: "var(--sap-gray)" }}>Previous travellers:</span>
+                  {knownBeneficiaries.slice(0, 8).map((b) => (
+                    <button
+                      type="button"
+                      key={b}
+                      onClick={() => setExtracted({ ...extracted, beneficiary: b })}
+                      className="text-xs px-2 py-0.5"
+                      style={{ background: "#F5F6F7", border: "1px solid var(--sap-border)", borderRadius: "10px", color: "var(--sap-text)" }}
+                    >
+                      {b}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div>
+              <label className="sap-label">Service start (check-in / departure)</label>
+              <input type="date" value={extracted.serviceDateFrom || ""} onChange={(e) => setExtracted({ ...extracted, serviceDateFrom: e.target.value })} className="sap-input" />
+            </div>
+            <div>
+              <label className="sap-label">Service end (check-out / return)</label>
+              <input type="date" value={extracted.serviceDateTo || ""} onChange={(e) => setExtracted({ ...extracted, serviceDateTo: e.target.value })} className="sap-input" />
+            </div>
+            <div>
+              <label className="sap-label">Required by (when you need it done)</label>
               <input type="date" value={extracted.requiredDate} onChange={(e) => setExtracted({ ...extracted, requiredDate: e.target.value })} className="sap-input" />
             </div>
             <div>
@@ -5344,14 +5815,24 @@ function emptyForm() {
     prNumber: "",
     poNumber: "",
     owner: "",
+    // Who the service is actually for — often not the person who asked.
+    // Invoices arrive months later under this name, so it is the key that
+    // makes them findable.
+    beneficiary: "",
     department: "",
     serviceType: SERVICE_TYPES[0],
     vendor: "",
     budget: "",
     finalAmount: "",
     requiredDate: "",
+    // The dates of the service itself (check-in/check-out, travel), as
+    // distinct from the date the work has to be finished by.
+    serviceDateFrom: "",
+    serviceDateTo: "",
     completedDate: "",
     status: "Pending",
+    waitingOn: "Me",
+    stageSince: "",
     notes: "",
     attachments: [],
   };
@@ -5366,16 +5847,26 @@ function StatCard({ label, value, borderColor }) {
   );
 }
 
-function RequestForm({ initial, onSave, onCancel }) {
+function RequestForm({ initial, onSave, onCancel, requests }) {
   const [form, setForm] = useState(initial || emptyForm());
 
   const set = (key) => (e) => setForm({ ...form, [key]: e.target.value });
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.owner || !form.serviceType) {
-      appToast("Please enter at least the owner and service type");
+      appToast("Please enter at least the requester and service type");
       return;
+    }
+    const duplicates = findPossibleDuplicates(form, requests || []);
+    if (duplicates.length) {
+      const d = duplicates[0];
+      const proceed = await appConfirm(
+        `A ${d.serviceType} request for ${d.beneficiary || d.owner} already covers overlapping dates ` +
+        `(${d.serviceDateFrom || "?"} → ${d.serviceDateTo || "?"}, status ${STATUS_LABELS[d.status]}` +
+        `${d.poNumber ? `, PO ${d.poNumber}` : ""}). Save this one anyway?`
+      );
+      if (!proceed) return;
     }
     onSave(form);
   };
@@ -5383,12 +5874,36 @@ function RequestForm({ initial, onSave, onCancel }) {
   return (
     <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div>
-        <label className="sap-label">Owner *</label>
+        <label className="sap-label">Requester (who asked) *</label>
         <input value={form.owner} onChange={set("owner")} className="sap-input" required />
+      </div>
+      <div>
+        <label className="sap-label">Beneficiary / traveller (who it's for)</label>
+        <input
+          value={form.beneficiary || ""}
+          onChange={set("beneficiary")}
+          className="sap-input"
+          placeholder="Leave blank if same as the requester"
+        />
+      </div>
+      <div>
+        <label className="sap-label">Service start (check-in / departure)</label>
+        <input type="date" value={form.serviceDateFrom || ""} onChange={set("serviceDateFrom")} className="sap-input" />
+      </div>
+      <div>
+        <label className="sap-label">Service end (check-out / return)</label>
+        <input type="date" value={form.serviceDateTo || ""} onChange={set("serviceDateTo")} className="sap-input" />
       </div>
       <div>
         <label className="sap-label">Department</label>
         <input value={form.department} onChange={set("department")} className="sap-input" />
+      </div>
+      <div>
+        <label className="sap-label">Waiting on</label>
+        <select value={form.waitingOn || ""} onChange={set("waitingOn")} className="sap-select">
+          <option value="">—</option>
+          {WAITING_ON.map((w) => <option key={w} value={w}>{WAITING_ON_LABELS[w]}</option>)}
+        </select>
       </div>
       <div>
         <label className="sap-label">Service Type *</label>
@@ -5452,6 +5967,17 @@ function StatusUpdateForm({ req, onSave, onCancel }) {
   const [notes, setNotes] = useState(req.notes || "");
   const [completedDate, setCompletedDate] = useState(req.completedDate || "");
   const [attachments, setAttachments] = useState(req.attachments || []);
+  const [waitingOn, setWaitingOn] = useState(req.waitingOn || DEFAULT_WAITING_ON[req.status] || "");
+
+  // Moving to a new stage normally hands the request to a different party;
+  // follow that automatically so the queue stays truthful without extra work.
+  const handleStatusChange = (e) => {
+    const next = e.target.value;
+    setStatus(next);
+    if ((req.waitingOn || "") === (DEFAULT_WAITING_ON[req.status] || "")) {
+      setWaitingOn(DEFAULT_WAITING_ON[next] || "");
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -5461,6 +5987,7 @@ function StatusUpdateForm({ req, onSave, onCancel }) {
     if (status === "PO Issued" && !poNumber) {
       if (!(await appConfirm("Make sure to enter the PO number before marking as 'PO Issued'. Continue?"))) return;
     }
+    const stageChanged = status !== req.status || waitingOn !== (req.waitingOn || "");
     onSave({
       ...req,
       status,
@@ -5468,22 +5995,42 @@ function StatusUpdateForm({ req, onSave, onCancel }) {
       poNumber,
       notes,
       attachments,
+      waitingOn,
+      // Restart the clock only when the request actually moved on, so "5 days
+      // with SAP" means exactly that, not "5 days since I last edited a note".
+      stageSince: stageChanged ? new Date().toISOString() : (req.stageSince || req.createdAt),
       completedDate: status === "Completed" && !completedDate
         ? new Date().toISOString().slice(0, 10)
         : completedDate,
     });
   };
 
+  const breach = slaBreach(req, loadSla());
+
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="sap-panel-info p-3 text-sm" style={{ color: "var(--sap-blue-dark)" }}>
         <span className="font-semibold">Next step: </span>{getNextAction(req)}
+        <div className="mt-1 text-xs">
+          In this stage for <strong>{daysInStage(req)}</strong> day(s)
+          {req.waitingOn ? <> · waiting on <strong>{WAITING_ON_LABELS[req.waitingOn] || req.waitingOn}</strong></> : null}
+          {breach ? <span style={{ color: "var(--sap-red)" }}> · {breach.over} day(s) past the {breach.target}-day target</span> : null}
+        </div>
       </div>
-      <div>
-        <label className="sap-label">New Status</label>
-        <select value={status} onChange={(e) => setStatus(e.target.value)} className="sap-select">
-          {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
-        </select>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="sap-label">New Status</label>
+          <select value={status} onChange={handleStatusChange} className="sap-select">
+            {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="sap-label">Waiting on</label>
+          <select value={waitingOn} onChange={(e) => setWaitingOn(e.target.value)} className="sap-select">
+            <option value="">—</option>
+            {WAITING_ON.map((w) => <option key={w} value={w}>{WAITING_ON_LABELS[w]}</option>)}
+          </select>
+        </div>
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
@@ -5547,10 +6094,178 @@ function Modal({ title, onClose, children, scrollResetKey }) {
   );
 }
 
-function SupplierManagerModal({ onClose }) {
+// A ranked bar: the row label carries identity, the value is direct-labeled,
+// and the track stays recessive so the filled length is what the eye reads.
+function BarRow({ label, value, max, formatted, color, note }) {
+  const pct = max > 0 ? Math.max((value / max) * 100, value > 0 ? 2 : 0) : 0;
+  return (
+    <div className="mb-2" title={`${label}: ${formatted !== undefined ? formatted : value}`}>
+      <div className="flex items-baseline justify-between gap-3 mb-1">
+        <span className="text-xs" style={{ color: "var(--sap-text)" }}>{label}</span>
+        <span className="text-xs font-semibold" style={{ color: "var(--sap-text)", fontVariantNumeric: "tabular-nums" }}>
+          {formatted !== undefined ? formatted : value}
+          {note ? <span className="font-normal" style={{ color: "var(--sap-gray)" }}> {note}</span> : null}
+        </span>
+      </div>
+      <div style={{ background: "#EDEFF1", height: 8, borderRadius: 2 }}>
+        <div style={{ width: `${pct}%`, height: 8, background: color || "var(--sap-blue)", borderRadius: 4 }}></div>
+      </div>
+    </div>
+  );
+}
+
+function ReportsView({ requests, sla }) {
+  const open = requests.filter((r) => r.status !== "Completed" && r.status !== "Cancelled");
+  const waitingOnMe = open.filter((r) => r.waitingOn === "Me").length;
+  const pastTarget = open.filter((r) => slaBreach(r, sla)).length;
+
+  const countBy = (list, keyFn) => {
+    const out = {};
+    list.forEach((r) => {
+      const k = keyFn(r);
+      if (!k) return;
+      out[k] = (out[k] || 0) + 1;
+    });
+    return out;
+  };
+
+  const byStatus = countBy(requests, (r) => r.status);
+  const byWaiting = countBy(open, (r) => r.waitingOn);
+  const byService = countBy(requests, (r) => r.serviceType);
+
+  const spendByVendor = {};
+  requests.forEach((r) => {
+    const vendor = (r.vendor || "").trim();
+    if (!vendor) return;
+    const amount = Number(r.finalAmount || r.budget || 0);
+    if (!amount || isNaN(amount)) return;
+    spendByVendor[vendor] = (spendByVendor[vendor] || 0) + amount;
+  });
+  const topVendors = Object.entries(spendByVendor).sort((a, b) => b[1] - a[1]).slice(0, 8);
+
+  // Only completed requests can tell you how long the round trip really takes.
+  const completed = requests.filter((r) => r.status === "Completed" && r.completedDate && r.createdAt);
+  const cycleTimes = completed.map((r) =>
+    Math.max(0, Math.round((new Date(r.completedDate) - new Date(r.createdAt)) / 86400000))
+  );
+  const avgCycle = cycleTimes.length
+    ? Math.round(cycleTimes.reduce((a, b) => a + b, 0) / cycleTimes.length)
+    : null;
+
+  // Average days currently parked with each party — the closest honest answer
+  // to "who holds things up", without a full change history.
+  const ageByParty = {};
+  open.forEach((r) => {
+    if (!r.waitingOn) return;
+    if (!ageByParty[r.waitingOn]) ageByParty[r.waitingOn] = [];
+    ageByParty[r.waitingOn].push(daysInStage(r));
+  });
+  const avgAge = Object.entries(ageByParty).map(([party, days]) => [
+    party,
+    Math.round(days.reduce((a, b) => a + b, 0) / days.length),
+  ]).sort((a, b) => b[1] - a[1]);
+
+  const maxOf = (entries) => entries.reduce((m, [, v]) => Math.max(m, v), 0);
+
+  if (requests.length === 0) {
+    return <p className="text-center py-8" style={{ color: "var(--sap-gray)" }}>Nothing to report yet — add a few requests first.</p>;
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="grid grid-cols-3 gap-3">
+        <div className="sap-tile" style={{ borderTopColor: "var(--sap-blue)" }}>
+          <div className="sap-tile-value">{open.length}</div>
+          <div className="sap-tile-label">Open requests</div>
+        </div>
+        <div className="sap-tile" style={{ borderTopColor: "var(--sap-red)" }}>
+          <div className="sap-tile-value">{waitingOnMe}</div>
+          <div className="sap-tile-label">Waiting on me</div>
+        </div>
+        <div className="sap-tile" style={{ borderTopColor: "var(--sap-orange)" }}>
+          <div className="sap-tile-value">{pastTarget}</div>
+          <div className="sap-tile-label">Past stage target</div>
+        </div>
+      </div>
+
+      <section>
+        <h3 className="font-semibold text-sm mb-2" style={{ color: "var(--sap-text)" }}>Where the open work is sitting</h3>
+        {avgAge.length === 0 ? (
+          <p className="text-xs" style={{ color: "var(--sap-gray)" }}>No open requests with a party assigned.</p>
+        ) : (
+          avgAge.map(([party, days]) => (
+            <BarRow
+              key={party}
+              label={`${WAITING_ON_LABELS[party] || party} · ${ageByParty[party].length} request(s)`}
+              value={days}
+              max={maxOf(avgAge)}
+              formatted={`${days}d`}
+              note="avg wait"
+              color={(WAITING_ON_STYLE[party] || {}).color}
+            />
+          ))
+        )}
+      </section>
+
+      <section>
+        <h3 className="font-semibold text-sm mb-2" style={{ color: "var(--sap-text)" }}>Requests by stage</h3>
+        {Object.entries(byStatus).map(([status, count]) => (
+          <BarRow
+            key={status}
+            label={STATUS_LABELS[status] || status}
+            value={count}
+            max={maxOf(Object.entries(byStatus))}
+            color={(STATUS_INLINE_STYLE[status] || {}).color}
+          />
+        ))}
+      </section>
+
+      <section>
+        <h3 className="font-semibold text-sm mb-2" style={{ color: "var(--sap-text)" }}>Spend by supplier (top 8)</h3>
+        {topVendors.length === 0 ? (
+          <p className="text-xs" style={{ color: "var(--sap-gray)" }}>No amounts recorded yet.</p>
+        ) : (
+          topVendors.map(([vendor, amount]) => (
+            <BarRow
+              key={vendor}
+              label={vendor}
+              value={amount}
+              max={maxOf(topVendors)}
+              formatted={Math.round(amount).toLocaleString()}
+            />
+          ))
+        )}
+      </section>
+
+      <section>
+        <h3 className="font-semibold text-sm mb-2" style={{ color: "var(--sap-text)" }}>Volume by service type</h3>
+        {Object.entries(byService).map(([type, count]) => (
+          <BarRow key={type} label={type} value={count} max={maxOf(Object.entries(byService))} />
+        ))}
+      </section>
+
+      <section className="sap-card p-3">
+        <p className="text-sm" style={{ color: "var(--sap-text)" }}>
+          {avgCycle === null
+            ? "No completed requests yet, so there's no cycle time to measure."
+            : <>Completed requests took <strong>{avgCycle} day(s)</strong> on average from first logged to done, across {cycleTimes.length} request(s).</>}
+        </p>
+      </section>
+    </div>
+  );
+}
+
+function SupplierManagerModal({ onClose, sla, onSlaChange }) {
   const [suppliers, setSuppliers] = useState(loadSuppliers);
   const [activeType, setActiveType] = useState(SERVICE_TYPES[0]);
   const [newSupplier, setNewSupplier] = useState("");
+
+  const updateSla = (status, value) => {
+    const days = parseInt(value, 10);
+    const updated = { ...sla, [status]: isNaN(days) ? 0 : days };
+    saveSla(updated);
+    onSlaChange(updated);
+  };
 
   const persist = (updated) => {
     setSuppliers(updated);
@@ -5613,6 +6328,27 @@ function SupplierManagerModal({ onClose }) {
         ))}
       </div>
 
+      <div style={{ borderTop: "1px solid var(--sap-border)", paddingTop: "1rem" }}>
+        <p className="font-semibold text-sm mb-1" style={{ color: "var(--sap-text)" }}>⏱ Stage targets (SLA)</p>
+        <p className="text-xs mb-3" style={{ color: "var(--sap-gray)" }}>
+          How many days a request may sit in each stage before it's flagged as late. This is what turns "it's been a while" into a number you can act on.
+        </p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {Object.keys(DEFAULT_SLA_DAYS).map((status) => (
+            <div key={status}>
+              <label className="sap-label">{STATUS_LABELS[status]}</label>
+              <input
+                type="number"
+                min="0"
+                value={sla[status]}
+                onChange={(e) => updateSla(status, e.target.value)}
+                className="sap-input"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div className="flex justify-end pt-2">
         <button type="button" onClick={onClose} className="sap-btn sap-btn-blue">Done</button>
       </div>
@@ -5637,6 +6373,9 @@ function App() {
   const [showSuppliers, setShowSuppliers] = useState(false);
   const [viewBatchId, setViewBatchId] = useState(null);
   const [parserContentVersion, setParserContentVersion] = useState(0);
+  const [waitingFilter, setWaitingFilter] = useState("all");
+  const [showReports, setShowReports] = useState(false);
+  const [sla, setSla] = useState(loadSla);
 
   useEffect(() => {
     saveRequests(requests);
@@ -5657,18 +6396,21 @@ function App() {
 
   const filtered = useMemo(() => {
     let list = [...requests];
-    if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      list = list.filter((r) =>
-        [r.owner, r.prNumber, r.poNumber, r.vendor, r.serviceType, r.notes]
-          .filter(Boolean)
-          .some((v) => v.toLowerCase().includes(q))
-      );
-    }
+    // Deep search: every word must land somewhere in the request — including
+    // the traveller's name, the stay dates spelled out as month names, and the
+    // text pulled out of attached PDFs.
+    if (search.trim()) list = list.filter((r) => matchesSearch(r, search.trim()));
     if (statusFilter !== "all") list = list.filter((r) => r.status === statusFilter);
     if (ownerFilter !== "all") list = list.filter((r) => r.owner === ownerFilter);
     if (serviceFilter !== "all") list = list.filter((r) => r.serviceType === serviceFilter);
-    if (dateFilter) list = list.filter((r) => r.requiredDate === dateFilter);
+    if (waitingFilter !== "all") list = list.filter((r) => (r.waitingOn || "") === waitingFilter);
+    if (dateFilter) {
+      list = list.filter((r) =>
+        r.requiredDate === dateFilter ||
+        (r.serviceDateFrom && r.serviceDateTo && r.serviceDateFrom <= dateFilter && dateFilter <= r.serviceDateTo) ||
+        r.serviceDateFrom === dateFilter
+      );
+    }
 
     const statusOrder = { Pending: 0, Processing: 1, Approved: 2, "PO Issued": 3, Completed: 4 };
     list.sort((a, b) => {
@@ -5677,7 +6419,7 @@ function App() {
       return new Date(b.createdAt) - new Date(a.createdAt);
     });
     return list;
-  }, [requests, search, statusFilter, ownerFilter, serviceFilter, dateFilter]);
+  }, [requests, search, statusFilter, ownerFilter, serviceFilter, waitingFilter, dateFilter]);
 
   const handleSaveNew = (form) => {
     if (form.id) {
@@ -5731,14 +6473,23 @@ function App() {
 
   const dailyItems = useMemo(() => {
     return requests
-      .filter((r) => r.status !== "Completed")
-      .map((r) => ({ req: r, alert: getAlertLevel(r) }))
-      .filter(({ req, alert }) => alert || (req.status === "Approved" && !req.prNumber) || (req.status === "PO Issued" && !req.poNumber))
+      .filter((r) => r.status !== "Completed" && r.status !== "Cancelled")
+      .map((r) => ({ req: r, alert: getAlertLevel(r), breach: slaBreach(r, sla) }))
+      .filter(({ req, alert, breach }) =>
+        alert || breach ||
+        (req.status === "Approved" && !req.prNumber) ||
+        (req.status === "PO Issued" && !req.poNumber))
+      // What's sitting with me comes first — that's the part I can actually
+      // move today; the rest is chasing other people.
       .sort((a, b) => {
+        const mine = (x) => (x.req.waitingOn === "Me" ? 0 : 1);
+        if (mine(a) !== mine(b)) return mine(a) - mine(b);
+        const overdue = (x) => (x.breach ? x.breach.over : 0);
+        if (overdue(a) !== overdue(b)) return overdue(b) - overdue(a);
         const order = { red: 0, yellow: 1, orange: 2 };
         return (order[a.alert] ?? 3) - (order[b.alert] ?? 3);
       });
-  }, [requests]);
+  }, [requests, sla]);
 
   const batchSiblings = useMemo(() => {
     const map = {};
@@ -5756,7 +6507,7 @@ function App() {
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-xl font-extrabold">PR / PO Tracker</h1>
-            <p className="text-xs opacity-90 mt-0.5">Purchase request &amp; approval tracking</p>
+            <p className="text-xs mt-0.5" style={{ color: "var(--sap-gray)" }}>Purchase request &amp; approval tracking</p>
           </div>
           <div className="flex gap-2 flex-wrap justify-end">
             <button onClick={() => setShowDaily(true)} className="sap-btn sap-btn-ghost">
@@ -5771,8 +6522,11 @@ function App() {
             <button onClick={() => setShowParser(true)} className="sap-btn sap-btn-ghost">
               📧 Parse Email
             </button>
+            <button onClick={() => setShowReports(true)} className="sap-btn sap-btn-ghost">
+              📊 Reports
+            </button>
             <button onClick={() => setShowSuppliers(true)} className="sap-btn sap-btn-ghost">
-              ⭐ Suppliers
+              ⚙️ Setup
             </button>
             <button onClick={() => { setEditingReq(null); setShowForm(true); }} className="sap-btn sap-btn-primary">
               + New Request
@@ -5796,7 +6550,7 @@ function App() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by owner, PR/PO number, vendor..."
+              placeholder="Deep search: traveller, hotel, month, PR/PO, amount, text inside attached PDFs…"
               className="sap-input"
             />
           </div>
@@ -5822,12 +6576,19 @@ function App() {
             </select>
           </div>
           <div>
-            <label className="sap-label">Required Date</label>
+            <label className="sap-label">Waiting On</label>
+            <select value={waitingFilter} onChange={(e) => setWaitingFilter(e.target.value)} className="sap-select">
+              <option value="all">All</option>
+              {WAITING_ON.map((w) => <option key={w} value={w}>{WAITING_ON_LABELS[w]}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="sap-label">Date (service or required)</label>
             <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="sap-input" />
           </div>
-          {(search || statusFilter !== "all" || ownerFilter !== "all" || serviceFilter !== "all" || dateFilter) && (
+          {(search || statusFilter !== "all" || ownerFilter !== "all" || serviceFilter !== "all" || waitingFilter !== "all" || dateFilter) && (
             <button
-              onClick={() => { setSearch(""); setStatusFilter("all"); setOwnerFilter("all"); setServiceFilter("all"); setDateFilter(""); }}
+              onClick={() => { setSearch(""); setStatusFilter("all"); setOwnerFilter("all"); setServiceFilter("all"); setWaitingFilter("all"); setDateFilter(""); }}
               className="sap-link"
               style={{ padding: "8px 4px" }}
             >
@@ -5843,13 +6604,13 @@ function App() {
                 <tr>
                   <th>PR</th>
                   <th>PO</th>
-                  <th>Owner</th>
+                  <th>Requester / For</th>
                   <th>Service</th>
                   <th>Vendor</th>
                   <th>Status</th>
-                  <th>Required Date</th>
+                  <th>Waiting On</th>
+                  <th>Service Dates</th>
                   <th>Budget</th>
-                  <th>Alert</th>
                   <th>Next Step</th>
                   <th>Actions</th>
                 </tr>
@@ -5863,12 +6624,19 @@ function App() {
                 {filtered.map((r) => {
                   const alert = getAlertLevel(r);
                   const style = alert ? ALERT_STYLES[alert] : null;
+                  const breach = slaBreach(r, sla);
+                  const stageDays = daysInStage(r);
                   return (
                     <tr key={r.id} style={style ? style.rowStyle : undefined}>
                       <td>{r.prNumber || "—"}</td>
                       <td>{r.poNumber || "—"}</td>
-                      <td>
+                      <td style={{ minWidth: 130 }}>
                         {r.owner}
+                        {r.beneficiary && r.beneficiary.trim() && r.beneficiary.trim() !== (r.owner || "").trim() && (
+                          <div className="text-xs" style={{ color: "var(--sap-blue-dark)" }}>
+                            for <strong>{r.beneficiary}</strong>
+                          </div>
+                        )}
                         {r.attachments && r.attachments.length > 0 && (
                           <span className="ml-1" title={`${r.attachments.length} attachment(s)`}>📎{r.attachments.length}</span>
                         )}
@@ -5891,17 +6659,27 @@ function App() {
                           {STATUS_LABELS[r.status]}
                         </span>
                       </td>
-                      <td>{r.requiredDate || "—"}</td>
-                      <td>{r.budget ? Number(r.budget).toLocaleString() : "—"}</td>
-                      <td>
-                        {style ? (
-                          <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: style.text }}>
-                            <span className="inline-block rounded-full" style={{ width: 8, height: 8, background: style.dot }}></span>
-                            {style.label}
+                      <td className="whitespace-nowrap">
+                        {r.waitingOn ? (
+                          <span className="sap-badge" style={WAITING_ON_STYLE[r.waitingOn]} title={`In this stage for ${stageDays} day(s)`}>
+                            {WAITING_ON_LABELS[r.waitingOn]} · {stageDays}d
                           </span>
                         ) : "—"}
+                        {breach ? (
+                          <div className="text-xs font-semibold mt-1" style={{ color: "var(--sap-red)" }}>
+                            {breach.over}d past target
+                          </div>
+                        ) : style ? (
+                          <div className="text-xs font-semibold mt-1" style={{ color: style.text }}>{style.label}</div>
+                        ) : null}
                       </td>
-                      <td className="text-xs" style={{ color: "var(--sap-blue-dark)", maxWidth: 220 }}>{getNextAction(r)}</td>
+                      <td className="whitespace-nowrap">
+                        {r.serviceDateFrom
+                          ? (r.serviceDateTo ? `${r.serviceDateFrom} → ${r.serviceDateTo}` : r.serviceDateFrom)
+                          : (r.requiredDate || "—")}
+                      </td>
+                      <td>{r.budget ? Number(r.budget).toLocaleString() : "—"}</td>
+                      <td className="text-xs" style={{ color: "var(--sap-blue-dark)", minWidth: 130, maxWidth: 170 }} title={getNextAction(r)}>{getNextAction(r)}</td>
                       <td className="whitespace-nowrap">
                         <button onClick={() => setStatusReq(r)} className="sap-link mr-3">Update Status</button>
                         <button onClick={() => { setEditingReq(r); setShowForm(true); }} className="sap-link mr-3" style={{ color: "var(--sap-gray)" }}>Edit</button>
@@ -5919,7 +6697,7 @@ function App() {
 
       {showForm && (
         <Modal title={editingReq ? "Edit Request" : "New Request"} onClose={() => { setShowForm(false); setEditingReq(null); }}>
-          <RequestForm initial={editingReq} onSave={handleSaveNew} onCancel={() => { setShowForm(false); setEditingReq(null); }} />
+          <RequestForm initial={editingReq} requests={requests} onSave={handleSaveNew} onCancel={() => { setShowForm(false); setEditingReq(null); }} />
         </Modal>
       )}
 
@@ -5956,7 +6734,7 @@ function App() {
             <p className="text-center py-8" style={{ color: "var(--sap-gray)" }}>No requests need attention today 🎉</p>
           ) : (
             <div className="flex flex-col gap-3">
-              {dailyItems.map(({ req, alert }) => {
+              {dailyItems.map(({ req, alert, breach }) => {
                 const style = alert ? ALERT_STYLES[alert] : null;
                 const missingPr = req.status === "Approved" && !req.prNumber;
                 const missingPo = req.status === "PO Issued" && !req.poNumber;
@@ -5968,6 +6746,16 @@ function App() {
                     </div>
                     <div className="text-sm mt-1 space-y-0.5">
                       {style && <p className="font-semibold" style={{ color: style.text }}>⚠️ {style.label}</p>}
+                      {breach && (
+                        <p className="font-semibold" style={{ color: "var(--sap-red)" }}>
+                          ⏱ {breach.elapsed} day(s) in “{STATUS_LABELS[req.status]}” — {breach.over} past the {breach.target}-day target
+                        </p>
+                      )}
+                      {req.waitingOn && (
+                        <p style={{ color: "var(--sap-gray)" }}>
+                          Waiting on <strong>{WAITING_ON_LABELS[req.waitingOn]}</strong> for {daysInStage(req)} day(s)
+                        </p>
+                      )}
                       {missingPr && <p className="font-semibold" style={{ color: "var(--sap-red)" }}>💾 Reminder: PR number not entered for this request</p>}
                       {missingPo && <p className="font-semibold" style={{ color: "var(--sap-red)" }}>💾 Reminder: PO number not entered for this request</p>}
                       <p style={{ color: "var(--sap-blue-dark)" }}><span className="font-semibold">Next step:</span> {getNextAction(req)}</p>
@@ -5988,9 +6776,15 @@ function App() {
 
       {printReq && <PrintablePO req={printReq} />}
 
+      {showReports && (
+        <Modal title="📊 Reports" onClose={() => setShowReports(false)}>
+          <ReportsView requests={requests} sla={sla} />
+        </Modal>
+      )}
+
       {showSuppliers && (
-        <Modal title="⭐ Registered Suppliers" onClose={() => setShowSuppliers(false)}>
-          <SupplierManagerModal onClose={() => setShowSuppliers(false)} />
+        <Modal title="⚙️ Setup — suppliers & stage targets" onClose={() => setShowSuppliers(false)}>
+          <SupplierManagerModal onClose={() => setShowSuppliers(false)} sla={sla} onSlaChange={setSla} />
         </Modal>
       )}
 
