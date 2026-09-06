@@ -181,6 +181,73 @@ function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
+// Native window.confirm()/alert() are blocked (or silently return falsy
+// instantly) inside a sandboxed iframe such as the Artifacts viewer, which
+// made destructive actions like Delete silently no-op. These in-app
+// replacements work the same everywhere — the artifact link and a plain
+// local HTML file alike.
+let _confirmSetter = null;
+let _confirmResolve = null;
+function registerConfirmSetter(setter) { _confirmSetter = setter; }
+function appConfirm(message) {
+  return new Promise((resolve) => {
+    _confirmResolve = resolve;
+    _confirmSetter({ open: true, message });
+  });
+}
+
+let _toastSetter = null;
+function registerToastSetter(setter) { _toastSetter = setter; }
+function appToast(message) {
+  _toastSetter({ id: uid(), message });
+}
+
+function ConfirmHost() {
+  const [state, setState] = useState({ open: false, message: "" });
+  useEffect(() => { registerConfirmSetter(setState); }, []);
+
+  const respond = (result) => {
+    setState({ open: false, message: "" });
+    if (_confirmResolve) { _confirmResolve(result); _confirmResolve = null; }
+  };
+
+  if (!state.open) return null;
+  return (
+    <div className="sap-modal-overlay fixed inset-0 flex items-center justify-center z-[200] p-4" onClick={() => respond(false)}>
+      <div className="sap-modal w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+        <div className="p-5">
+          <p className="text-sm" style={{ color: "var(--sap-text)" }}>{state.message}</p>
+          <div className="flex justify-end gap-2 pt-4">
+            <button onClick={() => respond(false)} className="sap-btn sap-btn-outline">Cancel</button>
+            <button onClick={() => respond(true)} className="sap-btn sap-btn-blue">Confirm</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ToastHost() {
+  const [toasts, setToasts] = useState([]);
+  useEffect(() => {
+    registerToastSetter((toast) => {
+      setToasts((prev) => [...prev, toast]);
+      setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== toast.id)), 4000);
+    });
+  }, []);
+
+  if (toasts.length === 0) return null;
+  return (
+    <div className="fixed bottom-4 z-[200] flex flex-col gap-2" style={{ insetInlineEnd: 16 }}>
+      {toasts.map((t) => (
+        <div key={t.id} className="sap-card px-4 py-3 text-sm shadow-lg" style={{ background: "#fff", color: "var(--sap-text)", maxWidth: 320 }}>
+          {t.message}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function loadRequests() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -371,7 +438,7 @@ function AttachmentPicker({ attachments, onChange }) {
       const read = await Promise.all(files.map(readFileAsDataURL));
       onChange([...(attachments || []), ...read]);
     } catch (err) {
-      alert("Could not read one of the files: " + err.message);
+      appToast("Could not read one of the files: " + err.message);
     } finally {
       setBusy(false);
       e.target.value = "";
@@ -586,7 +653,7 @@ function ImportExcelModal({ onImport, onCancel }) {
       const parsed = await parseExcelFile(file);
       setPending(parsed);
     } catch (err) {
-      alert("Could not read the file: " + err.message);
+      appToast("Could not read the file: " + err.message);
     }
   };
 
@@ -675,13 +742,14 @@ function EmailParserForm({ requests, onSave, onCancel }) {
   const [customActions, setCustomActions] = useState(loadCustomActions);
   const [actionSteps, setActionSteps] = useState([]);
   const [newStep, setNewStep] = useState("");
+  const [attachments, setAttachments] = useState([]);
 
   const knownVendorsAll = useMemo(() => getKnownVendors(requests), [requests]);
   const knownOwners = useMemo(() => getKnownOwners(requests), [requests]);
 
   const handleExtract = () => {
     if (!emailText.trim()) {
-      alert("Please paste the email content first");
+      appToast("Please paste the email content first");
       return;
     }
     const knownForGuess = getKnownVendors(requests, guessServiceType(emailText));
@@ -719,16 +787,16 @@ function EmailParserForm({ requests, onSave, onCancel }) {
     const updated = { ...customActions, [form.serviceType]: actionSteps };
     setCustomActions(updated);
     saveCustomActions(updated);
-    alert(`Saved this checklist as the default for future "${form.serviceType}" requests`);
+    appToast(`Saved this checklist as the default for future "${form.serviceType}" requests`);
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!form.owner) {
-      alert("Please enter the requester's name");
+      appToast("Please enter the requester's name");
       return;
     }
-    onSave(form);
+    onSave({ ...form, attachments });
   };
 
   return (
@@ -748,6 +816,8 @@ function EmailParserForm({ requests, onSave, onCancel }) {
           </button>
         </div>
       </div>
+
+      <AttachmentPicker attachments={attachments} onChange={setAttachments} />
 
       {form && (
         <form onSubmit={handleSubmit} className="flex flex-col gap-4" style={{ borderTop: "1px solid var(--sap-border)", paddingTop: "1rem" }}>
@@ -865,8 +935,6 @@ function EmailParserForm({ requests, onSave, onCancel }) {
             <textarea value={form.notes} onChange={set("notes")} rows="3" className="sap-textarea"></textarea>
           </div>
 
-          <AttachmentPicker attachments={form.attachments} onChange={(attachments) => setForm({ ...form, attachments })} />
-
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={onCancel} className="sap-btn sap-btn-outline">Cancel</button>
             <button type="submit" className="sap-btn sap-btn-blue">Save Request</button>
@@ -913,7 +981,7 @@ function RequestForm({ initial, onSave, onCancel }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!form.owner || !form.serviceType) {
-      alert("Please enter at least the owner and service type");
+      appToast("Please enter at least the owner and service type");
       return;
     }
     onSave(form);
@@ -992,13 +1060,13 @@ function StatusUpdateForm({ req, onSave, onCancel }) {
   const [completedDate, setCompletedDate] = useState(req.completedDate || "");
   const [attachments, setAttachments] = useState(req.attachments || []);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (status === "Approved" && !prNumber) {
-      if (!confirm("Make sure to enter the PR number before approving. Continue without a PR number?")) return;
+      if (!(await appConfirm("Make sure to enter the PR number before approving. Continue without a PR number?"))) return;
     }
     if (status === "PO Issued" && !poNumber) {
-      if (!confirm("Make sure to enter the PO number before marking as 'PO Issued'. Continue?")) return;
+      if (!(await appConfirm("Make sure to enter the PO number before marking as 'PO Issued'. Continue?"))) return;
     }
     onSave({
       ...req,
@@ -1142,15 +1210,15 @@ function App() {
     setStatusReq(null);
   };
 
-  const handleDelete = (id) => {
-    if (!confirm("Are you sure you want to delete this request?")) return;
-    setRequests(requests.filter((r) => r.id !== id));
+  const handleDelete = async (id) => {
+    if (!(await appConfirm("Are you sure you want to delete this request?"))) return;
+    setRequests((prev) => prev.filter((r) => r.id !== id));
   };
 
   const handleImport = (parsedRows) => {
-    setRequests([...parsedRows, ...requests]);
+    setRequests((prev) => [...parsedRows, ...prev]);
     setShowImport(false);
-    alert(`Successfully imported ${parsedRows.length} request(s)`);
+    appToast(`Successfully imported ${parsedRows.length} request(s)`);
   };
 
   const handlePrint = (req) => {
@@ -1390,6 +1458,8 @@ function App() {
       )}
 
       {printReq && <PrintablePO req={printReq} />}
+      <ConfirmHost />
+      <ToastHost />
     </div>
   );
 }
