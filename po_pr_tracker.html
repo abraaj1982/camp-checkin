@@ -8,11 +8,18 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.25.6/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   body { font-family: 'Cairo', sans-serif; }
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
+  @media print {
+    body * { visibility: hidden; }
+    #print-area, #print-area * { visibility: visible; }
+    #print-area { position: absolute; top: 0; left: 0; width: 100%; padding: 24px; }
+  }
 </style>
 </head>
 <body class="bg-slate-100 min-h-screen">
@@ -107,43 +114,303 @@ function guessServiceType(text) {
   return "أخرى";
 }
 
-function extractFromEmail(text) {
+// "تتعلم" الموردين المعتادين من الطلبات المحفوظة سابقاً — بدون أي API خارجي
+function getKnownVendors(requests, serviceType) {
+  const counts = {};
+  requests
+    .filter((r) => r.vendor && r.vendor.trim() && (!serviceType || r.serviceType === serviceType))
+    .forEach((r) => {
+      const v = r.vendor.trim();
+      counts[v] = (counts[v] || 0) + 1;
+    });
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([vendor]) => vendor);
+}
+
+function matchKnownVendorInText(text, knownVendors) {
+  const t = text.toLowerCase();
+  return knownVendors.find((v) => t.includes(v.toLowerCase())) || "";
+}
+
+function extractFromEmail(text, knownVendors) {
   const prMatch = text.match(/PR[\s#:.-]*([0-9]{4,})/i);
   const budgetMatch = text.match(/(?:ميزانية|budget|المبلغ)[^\d]{0,10}([\d,]+(?:\.\d+)?)/i);
   const dateMatch = text.match(/(\d{4}-\d{2}-\d{2})/);
   const ownerMatch = text.match(/(?:من|المسؤول|السيد|الأخ|الأخت)[\s:]+([؀-ۿa-zA-Z\s]{2,30}?)(?:\n|,|،|$)/);
   const vendorMatch = text.match(/(?:الموردة?|المورد|Vendor|Supplier)[\s:]+([؀-ۿa-zA-Z0-9\s]{2,40}?)(?:\n|,|،|$)/i);
 
+  const serviceType = guessServiceType(text);
+  const learnedVendor = matchKnownVendorInText(text, knownVendors || []);
+
   return {
     prNumber: prMatch ? prMatch[1] : "",
     budget: budgetMatch ? budgetMatch[1].replace(/,/g, "") : "",
     requiredDate: dateMatch ? dateMatch[1] : "",
     owner: ownerMatch ? ownerMatch[1].trim() : "",
-    vendor: vendorMatch ? vendorMatch[1].trim() : "",
-    serviceType: guessServiceType(text),
+    vendor: learnedVendor || (vendorMatch ? vendorMatch[1].trim() : ""),
+    serviceType,
   };
 }
 
-function EmailParserForm({ onSave, onCancel }) {
+const ACTIONS_STORAGE_KEY = "po_pr_tracker_actions_v1";
+
+function loadCustomActions() {
+  try {
+    const raw = localStorage.getItem(ACTIONS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveCustomActions(actions) {
+  try {
+    localStorage.setItem(ACTIONS_STORAGE_KEY, JSON.stringify(actions));
+  } catch (e) {
+    console.error("فشل حفظ الإجراءات", e);
+  }
+}
+
+function getActionsForType(serviceType, customActions) {
+  return (customActions && customActions[serviceType]) || ACTION_SUGGESTIONS[serviceType] || ACTION_SUGGESTIONS["أخرى"];
+}
+
+const EXCEL_STATUS_MAP = {
+  "done": "Completed",
+  "completed": "Completed",
+  "مكتمل": "Completed",
+  "منتهي": "Completed",
+  "pending": "Pending",
+  "معلق": "Pending",
+  "processing": "Processing",
+  "قيد المعالجة": "Processing",
+  "approved": "Approved",
+  "تمت الموافقة": "Approved",
+  "po issued": "PO Issued",
+  "تم إصدار po": "PO Issued",
+};
+
+function mapExcelStatus(raw) {
+  if (!raw) return "Pending";
+  const key = String(raw).trim().toLowerCase();
+  return EXCEL_STATUS_MAP[key] || "Pending";
+}
+
+function findCol(row, candidates) {
+  const keys = Object.keys(row);
+  for (const c of candidates) {
+    const found = keys.find((k) => k.trim().toLowerCase() === c.toLowerCase());
+    if (found) return row[found];
+  }
+  return "";
+}
+
+function parseExcelFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, { type: "array" });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+        const parsed = rows.map((row) => ({
+          id: uid(),
+          prNumber: String(findCol(row, ["PR", "PR رقم", "رقم PR"]) || ""),
+          poNumber: String(findCol(row, ["PO", "PO رقم", "رقم PO"]) || ""),
+          owner: String(findCol(row, ["المسؤول", "Owner", "Requester"]) || ""),
+          department: String(findCol(row, ["القسم", "Department"]) || ""),
+          serviceType: String(findCol(row, ["نوع الخدمة", "Service", "Service Type"]) || "أخرى"),
+          vendor: String(findCol(row, ["الموردة", "المورد", "Vendor", "Supplier"]) || ""),
+          budget: String(findCol(row, ["الميزانية", "Budget"]) || ""),
+          finalAmount: String(findCol(row, ["المبلغ النهائي", "Amount", "Final Amount"]) || ""),
+          requiredDate: String(findCol(row, ["التاريخ المطلوب", "Required Date", "Date"]) || ""),
+          completedDate: String(findCol(row, ["تاريخ الانتهاء", "Completed Date"]) || ""),
+          status: mapExcelStatus(findCol(row, ["الحالة", "Status"])),
+          notes: String(findCol(row, ["الوصف", "الملاحظات", "Description", "Notes"]) || ""),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }));
+        resolve(parsed);
+      } catch (err) {
+        reject(err);
+      }
+    };
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function exportToExcel(requests) {
+  const rows = requests.map((r) => ({
+    "PR رقم": r.prNumber,
+    "PO رقم": r.poNumber,
+    "المسؤول": r.owner,
+    "القسم": r.department,
+    "نوع الخدمة": r.serviceType,
+    "الموردة": r.vendor,
+    "الحالة": STATUS_LABELS[r.status] || r.status,
+    "الميزانية": r.budget,
+    "المبلغ النهائي": r.finalAmount,
+    "التاريخ المطلوب": r.requiredDate,
+    "تاريخ الانتهاء الفعلي": r.completedDate,
+    "الملاحظات": r.notes,
+    "تاريخ الإنشاء": r.createdAt ? r.createdAt.slice(0, 10) : "",
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "الطلبات");
+  const stamp = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `PR_PO_Tracker_${stamp}.xlsx`);
+}
+
+function ImportExcelModal({ onImport, onCancel }) {
+  const [pending, setPending] = useState(null);
+  const [fileName, setFileName] = useState("");
+
+  const handleFile = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setFileName(file.name);
+    try {
+      const parsed = await parseExcelFile(file);
+      setPending(parsed);
+    } catch (err) {
+      alert("تعذّرت قراءة الملف: " + err.message);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div>
+        <label className="block text-sm font-medium text-slate-600 mb-1">اختر ملف Excel</label>
+        <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} className="w-full border rounded-lg px-3 py-2" />
+      </div>
+
+      {pending && (
+        <div>
+          <p className="text-sm text-slate-600 mb-2">
+            تم العثور على <span className="font-bold">{pending.length}</span> صف في ملف "{fileName}". راجع النتيجة قبل التأكيد:
+          </p>
+          <div className="border rounded-lg overflow-auto max-h-64">
+            <table className="w-full text-xs text-right">
+              <thead className="bg-slate-50 sticky top-0">
+                <tr>
+                  <th className="px-2 py-2">PR</th>
+                  <th className="px-2 py-2">PO</th>
+                  <th className="px-2 py-2">المسؤول</th>
+                  <th className="px-2 py-2">الحالة</th>
+                  <th className="px-2 py-2">الموردة</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pending.map((r) => (
+                  <tr key={r.id} className="border-t">
+                    <td className="px-2 py-1">{r.prNumber || "—"}</td>
+                    <td className="px-2 py-1">{r.poNumber || "—"}</td>
+                    <td className="px-2 py-1">{r.owner || "—"}</td>
+                    <td className="px-2 py-1">{STATUS_LABELS[r.status]}</td>
+                    <td className="px-2 py-1">{r.vendor || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <div className="flex justify-end gap-2 pt-2">
+        <button type="button" onClick={onCancel} className="px-4 py-2 rounded-lg border text-slate-600 hover:bg-slate-50">إلغاء</button>
+        <button
+          type="button"
+          disabled={!pending}
+          onClick={() => onImport(pending)}
+          className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          تأكيد الاستيراد ({pending ? pending.length : 0})
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function PrintablePO({ req }) {
+  return (
+    <div id="print-area" className="fixed inset-0 bg-white z-[100] p-8 overflow-auto">
+      <h1 className="text-xl font-bold mb-4">نموذج طلب شراء (PO)</h1>
+      <table className="w-full text-sm border-collapse">
+        <tbody>
+          <tr><td className="border p-2 font-semibold w-1/3">رقم PR</td><td className="border p-2">{req.prNumber || "—"}</td></tr>
+          <tr><td className="border p-2 font-semibold">رقم PO</td><td className="border p-2">{req.poNumber || "—"}</td></tr>
+          <tr><td className="border p-2 font-semibold">المسؤول</td><td className="border p-2">{req.owner}</td></tr>
+          <tr><td className="border p-2 font-semibold">القسم</td><td className="border p-2">{req.department || "—"}</td></tr>
+          <tr><td className="border p-2 font-semibold">نوع الخدمة</td><td className="border p-2">{req.serviceType}</td></tr>
+          <tr><td className="border p-2 font-semibold">الموردة</td><td className="border p-2">{req.vendor || "—"}</td></tr>
+          <tr><td className="border p-2 font-semibold">الميزانية</td><td className="border p-2">{req.budget || "—"}</td></tr>
+          <tr><td className="border p-2 font-semibold">المبلغ النهائي</td><td className="border p-2">{req.finalAmount || "—"}</td></tr>
+          <tr><td className="border p-2 font-semibold">التاريخ المطلوب</td><td className="border p-2">{req.requiredDate || "—"}</td></tr>
+          <tr><td className="border p-2 font-semibold">تاريخ الانتهاء الفعلي</td><td className="border p-2">{req.completedDate || "—"}</td></tr>
+          <tr><td className="border p-2 font-semibold">الحالة</td><td className="border p-2">{STATUS_LABELS[req.status]}</td></tr>
+          <tr><td className="border p-2 font-semibold">الملاحظات</td><td className="border p-2">{req.notes || "—"}</td></tr>
+        </tbody>
+      </table>
+      <p className="text-xs text-slate-400 mt-6">تمت الطباعة بتاريخ {new Date().toLocaleDateString("ar")}</p>
+    </div>
+  );
+}
+
+function EmailParserForm({ requests, onSave, onCancel }) {
   const [emailText, setEmailText] = useState("");
-  const [extracted, setExtracted] = useState(null);
   const [form, setForm] = useState(null);
+  const [customActions, setCustomActions] = useState(loadCustomActions);
+  const [actionSteps, setActionSteps] = useState([]);
+  const [newStep, setNewStep] = useState("");
+
+  const knownVendorsAll = useMemo(() => getKnownVendors(requests), [requests]);
 
   const handleExtract = () => {
     if (!emailText.trim()) {
       alert("الرجاء لصق محتوى الايميل أولاً");
       return;
     }
-    const data = extractFromEmail(emailText);
-    setExtracted(data);
+    const knownForGuess = getKnownVendors(requests, guessServiceType(emailText));
+    const data = extractFromEmail(emailText, knownForGuess.length ? knownForGuess : knownVendorsAll);
     setForm({
       ...emptyForm(),
       ...data,
       notes: emailText.slice(0, 500),
     });
+    setActionSteps(getActionsForType(data.serviceType, customActions));
   };
 
   const set = (key) => (e) => setForm({ ...form, [key]: e.target.value });
+
+  const handleServiceChange = (e) => {
+    const serviceType = e.target.value;
+    setForm({ ...form, serviceType });
+    setActionSteps(getActionsForType(serviceType, customActions));
+  };
+
+  const vendorsForCurrentType = useMemo(
+    () => (form ? getKnownVendors(requests, form.serviceType) : []),
+    [requests, form && form.serviceType]
+  );
+
+  const updateStep = (i, value) => setActionSteps(actionSteps.map((s, idx) => (idx === i ? value : s)));
+  const removeStep = (i) => setActionSteps(actionSteps.filter((_, idx) => idx !== i));
+  const addStep = () => {
+    if (!newStep.trim()) return;
+    setActionSteps([...actionSteps, newStep.trim()]);
+    setNewStep("");
+  };
+
+  const handleSaveActionsAsDefault = () => {
+    const updated = { ...customActions, [form.serviceType]: actionSteps };
+    setCustomActions(updated);
+    saveCustomActions(updated);
+    alert(`تم حفظ هذه الإجراءات كافتراضي لطلبات "${form.serviceType}" القادمة`);
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -175,12 +442,36 @@ function EmailParserForm({ onSave, onCancel }) {
       {form && (
         <form onSubmit={handleSubmit} className="border-t pt-4 flex flex-col gap-4">
           <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 text-sm text-indigo-800">
-            <p className="font-semibold mb-1">💡 الإجراءات المقترحة ({form.serviceType}):</p>
-            <ol className="list-decimal list-inside space-y-0.5">
-              {(ACTION_SUGGESTIONS[form.serviceType] || ACTION_SUGGESTIONS["أخرى"]).map((a, i) => (
-                <li key={i}>{a}</li>
+            <p className="font-semibold mb-2">💡 الإجراءات المقترحة ({form.serviceType}):</p>
+            <ul className="space-y-1">
+              {actionSteps.map((a, i) => (
+                <li key={i} className="flex items-center gap-2">
+                  <span className="text-indigo-400">{i + 1}.</span>
+                  <input
+                    value={a}
+                    onChange={(e) => updateStep(i, e.target.value)}
+                    className="flex-1 bg-white border border-indigo-200 rounded px-2 py-1 text-sm"
+                  />
+                  <button type="button" onClick={() => removeStep(i)} className="text-red-500 text-xs px-1">حذف</button>
+                </li>
               ))}
-            </ol>
+            </ul>
+            <div className="flex gap-2 mt-2">
+              <input
+                value={newStep}
+                onChange={(e) => setNewStep(e.target.value)}
+                placeholder="إضافة إجراء جديد..."
+                className="flex-1 bg-white border border-indigo-200 rounded px-2 py-1 text-sm"
+              />
+              <button type="button" onClick={addStep} className="text-xs font-semibold px-2 py-1 rounded bg-indigo-200 hover:bg-indigo-300">+ إضافة</button>
+            </div>
+            <button
+              type="button"
+              onClick={handleSaveActionsAsDefault}
+              className="mt-2 text-xs font-semibold text-indigo-700 underline"
+            >
+              💾 احفظ هذه القائمة كافتراضي لطلبات "{form.serviceType}" القادمة
+            </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -190,7 +481,7 @@ function EmailParserForm({ onSave, onCancel }) {
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-600 mb-1">نوع الخدمة</label>
-              <select value={form.serviceType} onChange={set("serviceType")} className="w-full border rounded-lg px-3 py-2">
+              <select value={form.serviceType} onChange={handleServiceChange} className="w-full border rounded-lg px-3 py-2">
                 {SERVICE_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
@@ -209,6 +500,21 @@ function EmailParserForm({ onSave, onCancel }) {
             <div>
               <label className="block text-sm font-medium text-slate-600 mb-1">الموردة</label>
               <input value={form.vendor} onChange={set("vendor")} className="w-full border rounded-lg px-3 py-2" />
+              {vendorsForCurrentType.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  <span className="text-xs text-slate-400 ml-1">موردون معتادون:</span>
+                  {vendorsForCurrentType.slice(0, 6).map((v) => (
+                    <button
+                      type="button"
+                      key={v}
+                      onClick={() => setForm({ ...form, vendor: v })}
+                      className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full"
+                    >
+                      {v}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -416,6 +722,9 @@ function App() {
   const [editingReq, setEditingReq] = useState(null);
   const [statusReq, setStatusReq] = useState(null);
   const [showParser, setShowParser] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [printReq, setPrintReq] = useState(null);
+  const [showDaily, setShowDaily] = useState(false);
 
   useEffect(() => {
     saveRequests(requests);
@@ -484,6 +793,31 @@ function App() {
     setRequests(requests.filter((r) => r.id !== id));
   };
 
+  const handleImport = (parsedRows) => {
+    setRequests([...parsedRows, ...requests]);
+    setShowImport(false);
+    alert(`تم استيراد ${parsedRows.length} طلب بنجاح`);
+  };
+
+  const handlePrint = (req) => {
+    setPrintReq(req);
+    setTimeout(() => {
+      window.print();
+      setPrintReq(null);
+    }, 100);
+  };
+
+  const dailyItems = useMemo(() => {
+    return requests
+      .filter((r) => r.status !== "Completed")
+      .map((r) => ({ req: r, alert: getAlertLevel(r) }))
+      .filter(({ req, alert }) => alert || (req.status === "Approved" && !req.prNumber) || (req.status === "PO Issued" && !req.poNumber))
+      .sort((a, b) => {
+        const order = { red: 0, yellow: 1, orange: 2 };
+        return (order[a.alert] ?? 3) - (order[b.alert] ?? 3);
+      });
+  }, [requests]);
+
   return (
     <div className="min-h-screen">
       <header className="bg-gradient-to-l from-blue-700 to-blue-500 text-white shadow-md sticky top-0 z-10">
@@ -492,7 +826,25 @@ function App() {
             <h1 className="text-2xl font-extrabold">نظام تتبع PR / PO</h1>
             <p className="text-sm opacity-90">إدارة طلبات الشراء ومتابعة الموافقات — Phase 1</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap justify-end">
+            <button
+              onClick={() => setShowDaily(true)}
+              className="bg-amber-500 text-white font-bold px-4 py-2 rounded-lg shadow hover:bg-amber-600"
+            >
+              ⏰ متابعة اليوم {dailyItems.length > 0 && `(${dailyItems.length})`}
+            </button>
+            <button
+              onClick={() => setShowImport(true)}
+              className="bg-emerald-700 text-white font-bold px-4 py-2 rounded-lg shadow hover:bg-emerald-800"
+            >
+              📥 استيراد Excel
+            </button>
+            <button
+              onClick={() => exportToExcel(requests)}
+              className="bg-emerald-600 text-white font-bold px-4 py-2 rounded-lg shadow hover:bg-emerald-700"
+            >
+              📤 تصدير Excel
+            </button>
             <button
               onClick={() => setShowParser(true)}
               className="bg-indigo-800 text-white font-bold px-4 py-2 rounded-lg shadow hover:bg-indigo-900"
@@ -614,6 +966,7 @@ function App() {
                       <td className="px-4 py-3 whitespace-nowrap">
                         <button onClick={() => setStatusReq(r)} className="text-blue-600 hover:underline text-xs font-semibold ml-3">تحديث الحالة</button>
                         <button onClick={() => { setEditingReq(r); setShowForm(true); }} className="text-slate-600 hover:underline text-xs font-semibold ml-3">تعديل</button>
+                        <button onClick={() => handlePrint(r)} className="text-emerald-700 hover:underline text-xs font-semibold ml-3">طباعة PO</button>
                         <button onClick={() => handleDelete(r.id)} className="text-red-600 hover:underline text-xs font-semibold">حذف</button>
                       </td>
                     </tr>
@@ -640,11 +993,55 @@ function App() {
       {showParser && (
         <Modal title="استخلاص طلب من ايميل" onClose={() => setShowParser(false)}>
           <EmailParserForm
+            requests={requests}
             onSave={(form) => { handleSaveNew(form); setShowParser(false); }}
             onCancel={() => setShowParser(false)}
           />
         </Modal>
       )}
+
+      {showImport && (
+        <Modal title="استيراد من Excel" onClose={() => setShowImport(false)}>
+          <ImportExcelModal onImport={handleImport} onCancel={() => setShowImport(false)} />
+        </Modal>
+      )}
+
+      {showDaily && (
+        <Modal title="⏰ متابعة اليوم" onClose={() => setShowDaily(false)}>
+          {dailyItems.length === 0 ? (
+            <p className="text-center text-slate-400 py-8">لا توجد طلبات تحتاج إجراء اليوم 🎉</p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {dailyItems.map(({ req, alert }) => {
+                const style = alert ? ALERT_STYLES[alert] : null;
+                const missingPr = req.status === "Approved" && !req.prNumber;
+                const missingPo = req.status === "PO Issued" && !req.poNumber;
+                return (
+                  <div key={req.id} className={`border rounded-lg p-3 ${style ? style.row : "bg-slate-50"}`}>
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-slate-800">{req.owner} — {req.serviceType} {req.vendor ? `(${req.vendor})` : ""}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${STATUS_COLORS[req.status]}`}>{STATUS_LABELS[req.status]}</span>
+                    </div>
+                    <div className="text-sm mt-1 space-y-0.5">
+                      {style && <p className={`${style.text} font-semibold`}>⚠️ {style.label}</p>}
+                      {missingPr && <p className="text-red-600 font-semibold">💾 تذكير: لم تُدخل رقم PR لهذا الطلب</p>}
+                      {missingPo && <p className="text-red-600 font-semibold">💾 تذكير: لم تُدخل رقم PO لهذا الطلب</p>}
+                    </div>
+                    <button
+                      onClick={() => { setShowDaily(false); setStatusReq(req); }}
+                      className="mt-2 text-xs font-semibold text-blue-600 hover:underline"
+                    >
+                      تحديث الحالة الآن
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Modal>
+      )}
+
+      {printReq && <PrintablePO req={printReq} />}
     </div>
   );
 }
