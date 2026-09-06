@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>نظام تتبع PR / PO</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.25.6/babel.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'Cairo', sans-serif; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+</style>
+</head>
+<body class="bg-slate-100 min-h-screen">
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useMemo } = React;
+
+const STORAGE_KEY = "po_pr_tracker_requests_v1";
+
+const SERVICE_TYPES = ["فندق", "سيارة", "تذاكر", "أخرى"];
+const STATUSES = ["Pending", "Processing", "Approved", "PO Issued", "Completed"];
+
+const STATUS_LABELS = {
+  "Pending": "معلق",
+  "Processing": "قيد المعالجة",
+  "Approved": "تمت الموافقة",
+  "PO Issued": "تم إصدار PO",
+  "Completed": "مكتمل",
+};
+
+const STATUS_COLORS = {
+  "Pending": "bg-amber-100 text-amber-800 border-amber-300",
+  "Processing": "bg-blue-100 text-blue-800 border-blue-300",
+  "Approved": "bg-indigo-100 text-indigo-800 border-indigo-300",
+  "PO Issued": "bg-purple-100 text-purple-800 border-purple-300",
+  "Completed": "bg-green-100 text-green-800 border-green-300",
+};
+
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+function loadRequests() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveRequests(requests) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(requests));
+  } catch (e) {
+    console.error("فشل الحفظ في localStorage", e);
+  }
+}
+
+function daysSince(dateStr) {
+  if (!dateStr) return 0;
+  const d = new Date(dateStr);
+  const now = new Date();
+  return Math.floor((now - d) / (1000 * 60 * 60 * 24));
+}
+
+function isOverdue(req) {
+  if (!req.requiredDate || req.status === "Completed") return false;
+  const req_d = new Date(req.requiredDate);
+  const now = new Date();
+  return req_d < now;
+}
+
+function getAlertLevel(req) {
+  if (req.status === "Completed") return null;
+  if (isOverdue(req)) return "yellow";
+  const pendingDays = daysSince(req.createdAt);
+  if (req.status === "Pending" && pendingDays > 21) return "red";
+  if (req.status === "Pending" && pendingDays > 7) return "orange";
+  return null;
+}
+
+const ALERT_STYLES = {
+  red: { row: "bg-red-50", dot: "bg-red-500", text: "text-red-700", label: "معلق أكثر من 3 أسابيع" },
+  orange: { row: "bg-orange-50", dot: "bg-orange-500", text: "text-orange-700", label: "معلق منذ أسبوع" },
+  yellow: { row: "bg-yellow-50", dot: "bg-yellow-500", text: "text-yellow-700", label: "متأخر عن الموعد" },
+};
+
+function emptyForm() {
+  return {
+    id: null,
+    prNumber: "",
+    poNumber: "",
+    owner: "",
+    department: "",
+    serviceType: SERVICE_TYPES[0],
+    vendor: "",
+    budget: "",
+    finalAmount: "",
+    requiredDate: "",
+    completedDate: "",
+    status: "Pending",
+    notes: "",
+  };
+}
+
+function StatCard({ label, value, color }) {
+  return (
+    <div className={`rounded-xl border p-4 bg-white shadow-sm flex flex-col gap-1 ${color}`}>
+      <span className="text-2xl font-bold">{value}</span>
+      <span className="text-xs text-slate-500">{label}</span>
+    </div>
+  );
+}
+
+function RequestForm({ initial, onSave, onCancel }) {
+  const [form, setForm] = useState(initial || emptyForm());
+
+  const set = (key) => (e) => setForm({ ...form, [key]: e.target.value });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!form.owner || !form.serviceType) {
+      alert("الرجاء إدخال المسؤول ونوع الخدمة على الأقل");
+      return;
+    }
+    onSave(form);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label className="block text-sm font-medium text-slate-600 mb-1">اسم المسؤول *</label>
+        <input value={form.owner} onChange={set("owner")} className="w-full border rounded-lg px-3 py-2" required />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-slate-600 mb-1">القسم</label>
+        <input value={form.department} onChange={set("department")} className="w-full border rounded-lg px-3 py-2" />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-slate-600 mb-1">نوع الخدمة *</label>
+        <select value={form.serviceType} onChange={set("serviceType")} className="w-full border rounded-lg px-3 py-2">
+          {SERVICE_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-slate-600 mb-1">الموردة</label>
+        <input value={form.vendor} onChange={set("vendor")} className="w-full border rounded-lg px-3 py-2" />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-slate-600 mb-1">الميزانية</label>
+        <input type="number" value={form.budget} onChange={set("budget")} className="w-full border rounded-lg px-3 py-2" />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-slate-600 mb-1">المبلغ النهائي</label>
+        <input type="number" value={form.finalAmount} onChange={set("finalAmount")} className="w-full border rounded-lg px-3 py-2" />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-slate-600 mb-1">التاريخ المطلوب</label>
+        <input type="date" value={form.requiredDate} onChange={set("requiredDate")} className="w-full border rounded-lg px-3 py-2" />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-slate-600 mb-1">تاريخ الانتهاء الفعلي</label>
+        <input type="date" value={form.completedDate} onChange={set("completedDate")} className="w-full border rounded-lg px-3 py-2" />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-slate-600 mb-1">رقم PR</label>
+        <input value={form.prNumber} onChange={set("prNumber")} className="w-full border rounded-lg px-3 py-2" />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-slate-600 mb-1">رقم PO</label>
+        <input value={form.poNumber} onChange={set("poNumber")} className="w-full border rounded-lg px-3 py-2" />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-slate-600 mb-1">الحالة</label>
+        <select value={form.status} onChange={set("status")} className="w-full border rounded-lg px-3 py-2">
+          {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
+        </select>
+      </div>
+      <div className="md:col-span-2">
+        <label className="block text-sm font-medium text-slate-600 mb-1">ملاحظات</label>
+        <textarea value={form.notes} onChange={set("notes")} rows="3" className="w-full border rounded-lg px-3 py-2"></textarea>
+      </div>
+      <div className="md:col-span-2 flex justify-end gap-2 pt-2">
+        <button type="button" onClick={onCancel} className="px-4 py-2 rounded-lg border text-slate-600 hover:bg-slate-50">إلغاء</button>
+        <button type="submit" className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">حفظ الطلب</button>
+      </div>
+    </form>
+  );
+}
+
+function StatusUpdateForm({ req, onSave, onCancel }) {
+  const [status, setStatus] = useState(req.status);
+  const [prNumber, setPrNumber] = useState(req.prNumber);
+  const [poNumber, setPoNumber] = useState(req.poNumber);
+  const [notes, setNotes] = useState(req.notes || "");
+  const [completedDate, setCompletedDate] = useState(req.completedDate || "");
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (status === "Approved" && !prNumber) {
+      if (!confirm("تأكد من إدخال رقم PR قبل الموافقة. هل تريد المتابعة بدون رقم PR؟")) return;
+    }
+    if (status === "PO Issued" && !poNumber) {
+      if (!confirm("تأكد من إدخال رقم PO قبل تعليم الحالة كـ 'تم إصدار PO'. متابعة؟")) return;
+    }
+    onSave({
+      ...req,
+      status,
+      prNumber,
+      poNumber,
+      notes,
+      completedDate: status === "Completed" && !completedDate
+        ? new Date().toISOString().slice(0, 10)
+        : completedDate,
+    });
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <div>
+        <label className="block text-sm font-medium text-slate-600 mb-1">الحالة الجديدة</label>
+        <select value={status} onChange={(e) => setStatus(e.target.value)} className="w-full border rounded-lg px-3 py-2">
+          {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
+        </select>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-slate-600 mb-1">رقم PR</label>
+          <input value={prNumber} onChange={(e) => setPrNumber(e.target.value)} className="w-full border rounded-lg px-3 py-2" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-600 mb-1">رقم PO</label>
+          <input value={poNumber} onChange={(e) => setPoNumber(e.target.value)} className="w-full border rounded-lg px-3 py-2" />
+        </div>
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-slate-600 mb-1">تاريخ الانتهاء الفعلي</label>
+        <input type="date" value={completedDate} onChange={(e) => setCompletedDate(e.target.value)} className="w-full border rounded-lg px-3 py-2" />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-slate-600 mb-1">ملاحظات</label>
+        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows="3" className="w-full border rounded-lg px-3 py-2"></textarea>
+      </div>
+      <div className="flex justify-end gap-2 pt-2">
+        <button type="button" onClick={onCancel} className="px-4 py-2 rounded-lg border text-slate-600 hover:bg-slate-50">إلغاء</button>
+        <button type="submit" className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">تحديث الحالة</button>
+      </div>
+    </form>
+  );
+}
+
+function Modal({ title, onClose, children }) {
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b">
+          <h2 className="text-lg font-bold text-slate-800">{title}</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">×</button>
+        </div>
+        <div className="p-6">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [requests, setRequests] = useState(loadRequests);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [ownerFilter, setOwnerFilter] = useState("all");
+  const [serviceFilter, setServiceFilter] = useState("all");
+  const [dateFilter, setDateFilter] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [editingReq, setEditingReq] = useState(null);
+  const [statusReq, setStatusReq] = useState(null);
+
+  useEffect(() => {
+    saveRequests(requests);
+  }, [requests]);
+
+  const owners = useMemo(() => {
+    const set = new Set(requests.map((r) => r.owner).filter(Boolean));
+    return Array.from(set);
+  }, [requests]);
+
+  const stats = useMemo(() => {
+    const pending = requests.filter((r) => r.status === "Pending").length;
+    const processing = requests.filter((r) => r.status === "Processing").length;
+    const completed = requests.filter((r) => r.status === "Completed").length;
+    const overdue = requests.filter((r) => isOverdue(r)).length;
+    return { pending, processing, completed, overdue, total: requests.length };
+  }, [requests]);
+
+  const filtered = useMemo(() => {
+    let list = [...requests];
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      list = list.filter((r) =>
+        [r.owner, r.prNumber, r.poNumber, r.vendor, r.serviceType, r.notes]
+          .filter(Boolean)
+          .some((v) => v.toLowerCase().includes(q))
+      );
+    }
+    if (statusFilter !== "all") list = list.filter((r) => r.status === statusFilter);
+    if (ownerFilter !== "all") list = list.filter((r) => r.owner === ownerFilter);
+    if (serviceFilter !== "all") list = list.filter((r) => r.serviceType === serviceFilter);
+    if (dateFilter) list = list.filter((r) => r.requiredDate === dateFilter);
+
+    const statusOrder = { Pending: 0, Processing: 1, Approved: 2, "PO Issued": 3, Completed: 4 };
+    list.sort((a, b) => {
+      const diff = statusOrder[a.status] - statusOrder[b.status];
+      if (diff !== 0) return diff;
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+    return list;
+  }, [requests, search, statusFilter, ownerFilter, serviceFilter, dateFilter]);
+
+  const handleSaveNew = (form) => {
+    if (form.id) {
+      setRequests(requests.map((r) => (r.id === form.id ? { ...r, ...form, updatedAt: new Date().toISOString() } : r)));
+    } else {
+      const newReq = {
+        ...form,
+        id: uid(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      setRequests([newReq, ...requests]);
+    }
+    setShowForm(false);
+    setEditingReq(null);
+  };
+
+  const handleStatusSave = (updated) => {
+    setRequests(requests.map((r) => (r.id === updated.id ? { ...updated, updatedAt: new Date().toISOString() } : r)));
+    setStatusReq(null);
+  };
+
+  const handleDelete = (id) => {
+    if (!confirm("هل أنت متأكد من حذف هذا الطلب؟")) return;
+    setRequests(requests.filter((r) => r.id !== id));
+  };
+
+  return (
+    <div className="min-h-screen">
+      <header className="bg-gradient-to-l from-blue-700 to-blue-500 text-white shadow-md sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-extrabold">نظام تتبع PR / PO</h1>
+            <p className="text-sm opacity-90">إدارة طلبات الشراء ومتابعة الموافقات — Phase 1</p>
+          </div>
+          <button
+            onClick={() => { setEditingReq(null); setShowForm(true); }}
+            className="bg-white text-blue-700 font-bold px-4 py-2 rounded-lg shadow hover:bg-blue-50"
+          >
+            + طلب جديد
+          </button>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-6 py-6">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+          <StatCard label="الإجمالي" value={stats.total} color="border-slate-200" />
+          <StatCard label="معلقة" value={stats.pending} color="border-amber-300" />
+          <StatCard label="قيد المعالجة" value={stats.processing} color="border-blue-300" />
+          <StatCard label="مكتملة" value={stats.completed} color="border-green-300" />
+          <StatCard label="متأخرة" value={stats.overdue} color="border-red-300" />
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border p-4 mb-6 flex flex-wrap gap-3 items-end">
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-xs font-medium text-slate-500 mb-1">بحث</label>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="ابحث بالمسؤول، رقم PR/PO، الموردة..."
+              className="w-full border rounded-lg px-3 py-2"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">الحالة</label>
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="border rounded-lg px-3 py-2">
+              <option value="all">الكل</option>
+              {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">المسؤول</label>
+            <select value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value)} className="border rounded-lg px-3 py-2">
+              <option value="all">الكل</option>
+              {owners.map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">نوع الخدمة</label>
+            <select value={serviceFilter} onChange={(e) => setServiceFilter(e.target.value)} className="border rounded-lg px-3 py-2">
+              <option value="all">الكل</option>
+              {SERVICE_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">التاريخ المطلوب</label>
+            <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="border rounded-lg px-3 py-2" />
+          </div>
+          {(search || statusFilter !== "all" || ownerFilter !== "all" || serviceFilter !== "all" || dateFilter) && (
+            <button
+              onClick={() => { setSearch(""); setStatusFilter("all"); setOwnerFilter("all"); setServiceFilter("all"); setDateFilter(""); }}
+              className="text-sm text-slate-500 underline px-2 py-2"
+            >
+              مسح الفلاتر
+            </button>
+          )}
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-right">
+              <thead className="bg-slate-50 text-slate-600 border-b">
+                <tr>
+                  <th className="px-4 py-3 font-semibold">PR</th>
+                  <th className="px-4 py-3 font-semibold">PO</th>
+                  <th className="px-4 py-3 font-semibold">المسؤول</th>
+                  <th className="px-4 py-3 font-semibold">الخدمة</th>
+                  <th className="px-4 py-3 font-semibold">الموردة</th>
+                  <th className="px-4 py-3 font-semibold">الحالة</th>
+                  <th className="px-4 py-3 font-semibold">التاريخ المطلوب</th>
+                  <th className="px-4 py-3 font-semibold">الميزانية</th>
+                  <th className="px-4 py-3 font-semibold">تنبيه</th>
+                  <th className="px-4 py-3 font-semibold">إجراءات</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan="10" className="text-center py-10 text-slate-400">لا توجد طلبات مطابقة</td>
+                  </tr>
+                )}
+                {filtered.map((r) => {
+                  const alert = getAlertLevel(r);
+                  const style = alert ? ALERT_STYLES[alert] : null;
+                  return (
+                    <tr key={r.id} className={`border-b last:border-0 ${style ? style.row : ""}`}>
+                      <td className="px-4 py-3">{r.prNumber || "—"}</td>
+                      <td className="px-4 py-3">{r.poNumber || "—"}</td>
+                      <td className="px-4 py-3">{r.owner}</td>
+                      <td className="px-4 py-3">{r.serviceType}</td>
+                      <td className="px-4 py-3">{r.vendor || "—"}</td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 rounded-full text-xs font-semibold border ${STATUS_COLORS[r.status]}`}>
+                          {STATUS_LABELS[r.status]}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">{r.requiredDate || "—"}</td>
+                      <td className="px-4 py-3">{r.budget ? Number(r.budget).toLocaleString() : "—"}</td>
+                      <td className="px-4 py-3">
+                        {style ? (
+                          <span className={`flex items-center gap-1 text-xs font-semibold ${style.text}`}>
+                            <span className={`w-2 h-2 rounded-full ${style.dot}`}></span>
+                            {style.label}
+                          </span>
+                        ) : "—"}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <button onClick={() => setStatusReq(r)} className="text-blue-600 hover:underline text-xs font-semibold ml-3">تحديث الحالة</button>
+                        <button onClick={() => { setEditingReq(r); setShowForm(true); }} className="text-slate-600 hover:underline text-xs font-semibold ml-3">تعديل</button>
+                        <button onClick={() => handleDelete(r.id)} className="text-red-600 hover:underline text-xs font-semibold">حذف</button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+
+      {showForm && (
+        <Modal title={editingReq ? "تعديل الطلب" : "طلب جديد"} onClose={() => { setShowForm(false); setEditingReq(null); }}>
+          <RequestForm initial={editingReq} onSave={handleSaveNew} onCancel={() => { setShowForm(false); setEditingReq(null); }} />
+        </Modal>
+      )}
+
+      {statusReq && (
+        <Modal title={`تحديث حالة الطلب — ${statusReq.owner}`} onClose={() => setStatusReq(null)}>
+          <StatusUpdateForm req={statusReq} onSave={handleStatusSave} onCancel={() => setStatusReq(null)} />
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
