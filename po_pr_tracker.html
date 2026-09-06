@@ -2447,12 +2447,28 @@ const ACTION_SUGGESTIONS = {
   "Other": ["Review request details with the requester", "Identify the right supplier", "Create the PR in SAP and enter the PR number", "Issue the PO after approval"],
 };
 
+const SERVICE_TYPE_PATTERNS = {
+  "Hotel": /فندق|hotel|إقامة|غرفة|room|stay/,
+  "Car": /سيارة|car|تأجير|ليموزين|rental|limo/,
+  "Tickets": /تذكرة|تذاكر|ticket|طيران|رحلة|flight/,
+};
+
+// Single best guess — used where only one type is expected (e.g. Excel import).
 function guessServiceType(text) {
   const t = text.toLowerCase();
-  if (/فندق|hotel|إقامة|غرفة|room|stay/.test(t)) return "Hotel";
-  if (/سيارة|car|تأجير|ليموزين|rental|limo/.test(t)) return "Car";
-  if (/تذكرة|تذاكر|ticket|طيران|رحلة|flight/.test(t)) return "Tickets";
+  for (const type of ["Hotel", "Car", "Tickets"]) {
+    if (SERVICE_TYPE_PATTERNS[type].test(t)) return type;
+  }
   return "Other";
+}
+
+// One email can bundle several services at once (hotel + car + tickets for
+// the same trip) — this returns every type mentioned, not just the first,
+// so the parser can offer them as a multi-select instead of picking one.
+function detectServiceTypes(text) {
+  const t = text.toLowerCase();
+  const found = ["Hotel", "Car", "Tickets"].filter((type) => SERVICE_TYPE_PATTERNS[type].test(t));
+  return found.length ? found : ["Other"];
 }
 
 // Learns the vendors you've actually used before, per service type — no external API
@@ -3009,28 +3025,49 @@ function PrintablePO({ req }) {
   );
 }
 
+// One entry per selected service type: its own vendor, its own PR number
+// (each service is its own SAP request tied to its own supplier), and its
+// own editable suggested-action checklist.
+function makeTypeEntry(type, vendor, customActions) {
+  return { vendor: vendor || "", prNumber: "", actionSteps: getActionsForType(type, customActions), newStep: "" };
+}
+
 function EmailParserForm({ requests, onSave, onCancel }) {
   const [emailText, setEmailText] = useState("");
-  const [form, setForm] = useState(null);
+  const [extracted, setExtracted] = useState(null); // shared fields: owner, requiredDate, budget
+  const [selectedTypes, setSelectedTypes] = useState([]);
+  const [typeEntries, setTypeEntries] = useState({}); // { Hotel: {vendor, prNumber, actionSteps, newStep}, ... }
   const [customActions, setCustomActions] = useState(loadCustomActions);
-  const [actionSteps, setActionSteps] = useState([]);
-  const [newStep, setNewStep] = useState("");
   const [attachments, setAttachments] = useState([]);
-
   const [loadingFile, setLoadingFile] = useState(false);
 
   const knownVendorsAll = useMemo(() => getKnownVendors(requests), [requests]);
   const knownOwners = useMemo(() => getKnownOwners(requests), [requests]);
 
   const extractAndSetForm = (text) => {
-    const knownForGuess = getKnownVendors(requests, guessServiceType(text));
+    const detectedTypes = detectServiceTypes(text);
+    const primaryType = guessServiceType(text);
+    const knownForGuess = getKnownVendors(requests, primaryType);
     const data = extractFromEmail(text, knownForGuess.length ? knownForGuess : knownVendorsAll, knownOwners);
-    setForm({
-      ...emptyForm(),
-      ...data,
+
+    setExtracted({
+      owner: data.owner,
+      ownerNeedsConfirmation: data.ownerNeedsConfirmation,
+      ownerGuess: data.ownerGuess,
+      requiredDate: data.requiredDate,
+      budget: data.budget,
+      prNumber: data.prNumber,
       notes: text.slice(0, 500),
     });
-    setActionSteps(getActionsForType(data.serviceType, customActions));
+    setSelectedTypes(detectedTypes);
+    const entries = {};
+    detectedTypes.forEach((type) => {
+      // Only the type the single-guess extractor actually landed on gets the
+      // auto-detected vendor/PR — the others are separate suppliers you fill in.
+      entries[type] = makeTypeEntry(type, type === primaryType ? data.vendor : "", customActions);
+      if (type === primaryType && data.prNumber) entries[type].prNumber = data.prNumber;
+    });
+    setTypeEntries(entries);
   };
 
   const handleExtract = () => {
@@ -3064,41 +3101,58 @@ function EmailParserForm({ requests, onSave, onCancel }) {
     }
   };
 
-  const set = (key) => (e) => setForm({ ...form, [key]: e.target.value });
-
-  const handleServiceChange = (e) => {
-    const serviceType = e.target.value;
-    setForm({ ...form, serviceType });
-    setActionSteps(getActionsForType(serviceType, customActions));
+  const toggleType = (type) => {
+    if (selectedTypes.includes(type)) {
+      setSelectedTypes(selectedTypes.filter((t) => t !== type));
+    } else {
+      setSelectedTypes([...selectedTypes, type]);
+      if (!typeEntries[type]) {
+        setTypeEntries({ ...typeEntries, [type]: makeTypeEntry(type, "", customActions) });
+      }
+    }
   };
 
-  const vendorsForCurrentType = useMemo(
-    () => (form ? getKnownVendors(requests, form.serviceType) : []),
-    [requests, form && form.serviceType]
-  );
+  const updateEntry = (type, patch) => setTypeEntries({ ...typeEntries, [type]: { ...typeEntries[type], ...patch } });
 
-  const updateStep = (i, value) => setActionSteps(actionSteps.map((s, idx) => (idx === i ? value : s)));
-  const removeStep = (i) => setActionSteps(actionSteps.filter((_, idx) => idx !== i));
-  const addStep = () => {
-    if (!newStep.trim()) return;
-    setActionSteps([...actionSteps, newStep.trim()]);
-    setNewStep("");
+  const updateStep = (type, i, value) => {
+    const steps = typeEntries[type].actionSteps.map((s, idx) => (idx === i ? value : s));
+    updateEntry(type, { actionSteps: steps });
   };
-
-  const handleSaveActionsAsDefault = () => {
-    const updated = { ...customActions, [form.serviceType]: actionSteps };
+  const removeStep = (type, i) => updateEntry(type, { actionSteps: typeEntries[type].actionSteps.filter((_, idx) => idx !== i) });
+  const addStep = (type) => {
+    const text = (typeEntries[type].newStep || "").trim();
+    if (!text) return;
+    updateEntry(type, { actionSteps: [...typeEntries[type].actionSteps, text], newStep: "" });
+  };
+  const saveActionsAsDefault = (type) => {
+    const updated = { ...customActions, [type]: typeEntries[type].actionSteps };
     setCustomActions(updated);
     saveCustomActions(updated);
-    appToast(`Saved this checklist as the default for future "${form.serviceType}" requests`);
+    appToast(`Saved this checklist as the default for future "${type}" requests`);
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!form.owner) {
+    if (!extracted.owner) {
       appToast("Please enter the requester's name");
       return;
     }
-    onSave({ ...form, attachments });
+    if (selectedTypes.length === 0) {
+      appToast("Select at least one service this email is requesting");
+      return;
+    }
+    const forms = selectedTypes.map((type) => ({
+      ...emptyForm(),
+      owner: extracted.owner,
+      requiredDate: extracted.requiredDate,
+      budget: extracted.budget,
+      notes: extracted.notes,
+      attachments,
+      serviceType: type,
+      vendor: typeEntries[type].vendor,
+      prNumber: typeEntries[type].prNumber,
+    }));
+    onSave(forms);
   };
 
   return (
@@ -3127,58 +3181,36 @@ function EmailParserForm({ requests, onSave, onCancel }) {
 
       <AttachmentPicker attachments={attachments} onChange={setAttachments} />
 
-      {form && (
+      {extracted && (
         <form onSubmit={handleSubmit} className="flex flex-col gap-4" style={{ borderTop: "1px solid var(--sap-border)", paddingTop: "1rem" }}>
           <div className="sap-panel-info p-3 text-sm" style={{ color: "var(--sap-blue-dark)" }}>
-            <p className="font-semibold mb-2">💡 Suggested actions ({form.serviceType}):</p>
-            <ul className="space-y-1">
-              {actionSteps.map((a, i) => (
-                <li key={i} className="flex items-center gap-2">
-                  <span style={{ color: "var(--sap-blue)" }}>{i + 1}.</span>
-                  <input
-                    value={a}
-                    onChange={(e) => updateStep(i, e.target.value)}
-                    className="sap-input"
-                    style={{ flex: 1, background: "#fff" }}
-                  />
-                  <button type="button" onClick={() => removeStep(i)} className="sap-link-danger">Remove</button>
-                </li>
+            <p className="font-semibold mb-2">
+              🤖 This email seems to request {selectedTypes.length > 1 ? `${selectedTypes.length} separate services` : "one service"} — confirm or adjust which apply. Each checked service becomes its own tracked request (its own supplier, PR, and PO), since they don't share the same approval.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {SERVICE_TYPES.filter((s) => s !== "Other").concat("Other").map((type) => (
+                <label key={type} className="flex items-center gap-1.5 text-sm" style={{ color: "var(--sap-text)" }}>
+                  <input type="checkbox" checked={selectedTypes.includes(type)} onChange={() => toggleType(type)} />
+                  {type}
+                </label>
               ))}
-            </ul>
-            <div className="flex gap-2 mt-2">
-              <input
-                value={newStep}
-                onChange={(e) => setNewStep(e.target.value)}
-                placeholder="Add a new action..."
-                className="sap-input"
-                style={{ flex: 1, background: "#fff" }}
-              />
-              <button type="button" onClick={addStep} className="sap-btn sap-btn-outline">+ Add</button>
             </div>
-            <button
-              type="button"
-              onClick={handleSaveActionsAsDefault}
-              className="mt-2 sap-link"
-              style={{ display: "block" }}
-            >
-              💾 Save this checklist as the default for "{form.serviceType}" requests
-            </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="sap-label">Owner (requester) *</label>
               <input
-                value={form.owner}
-                onChange={(e) => setForm({ ...form, owner: e.target.value, ownerNeedsConfirmation: false })}
+                value={extracted.owner}
+                onChange={(e) => setExtracted({ ...extracted, owner: e.target.value, ownerNeedsConfirmation: false })}
                 className="sap-input"
-                style={!form.owner ? { borderColor: "var(--sap-red)" } : undefined}
+                style={!extracted.owner ? { borderColor: "var(--sap-red)" } : undefined}
                 placeholder="Select or type the requester's name"
                 required
               />
-              {form.ownerNeedsConfirmation && (
+              {extracted.ownerNeedsConfirmation && (
                 <p className="text-xs mt-1 font-semibold" style={{ color: "var(--sap-red)" }}>
-                  ⚠️ Could not confirm the owner from this email (found "{form.ownerGuess}" — might just be a signature/footer line). Please pick or type the real requester below.
+                  ⚠️ Could not confirm the owner from this email (found "{extracted.ownerGuess}" — might just be a signature/footer line). Please pick or type the real requester below.
                 </p>
               )}
               {knownOwners.length > 0 && (
@@ -3188,7 +3220,7 @@ function EmailParserForm({ requests, onSave, onCancel }) {
                     <button
                       type="button"
                       key={o}
-                      onClick={() => setForm({ ...form, owner: o, ownerNeedsConfirmation: false })}
+                      onClick={() => setExtracted({ ...extracted, owner: o, ownerNeedsConfirmation: false })}
                       className="text-xs px-2 py-0.5"
                       style={{ background: "#F5F6F7", border: "1px solid var(--sap-border)", borderRadius: "10px", color: "var(--sap-text)" }}
                     >
@@ -3199,53 +3231,91 @@ function EmailParserForm({ requests, onSave, onCancel }) {
               )}
             </div>
             <div>
-              <label className="sap-label">Service Type</label>
-              <select value={form.serviceType} onChange={handleServiceChange} className="sap-select">
-                {SERVICE_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
+              <label className="sap-label">Required Date (shared across these requests)</label>
+              <input type="date" value={extracted.requiredDate} onChange={(e) => setExtracted({ ...extracted, requiredDate: e.target.value })} className="sap-input" />
             </div>
             <div>
-              <label className="sap-label">Required Date</label>
-              <input type="date" value={form.requiredDate} onChange={set("requiredDate")} className="sap-input" />
-            </div>
-            <div>
-              <label className="sap-label">Budget</label>
-              <input type="number" value={form.budget} onChange={set("budget")} className="sap-input" />
-            </div>
-            <div>
-              <label className="sap-label">PR Number (if any)</label>
-              <input value={form.prNumber} onChange={set("prNumber")} className="sap-input" />
-            </div>
-            <div>
-              <label className="sap-label">Vendor</label>
-              <input value={form.vendor} onChange={set("vendor")} className="sap-input" />
-              {vendorsForCurrentType.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-1.5 items-center">
-                  <span className="text-xs" style={{ color: "var(--sap-gray)" }}>Usual vendors:</span>
-                  {vendorsForCurrentType.slice(0, 6).map((v) => (
-                    <button
-                      type="button"
-                      key={v}
-                      onClick={() => setForm({ ...form, vendor: v })}
-                      className="text-xs px-2 py-0.5"
-                      style={{ background: "#F5F6F7", border: "1px solid var(--sap-border)", borderRadius: "10px", color: "var(--sap-text)" }}
-                    >
-                      {v}
-                    </button>
-                  ))}
-                </div>
-              )}
+              <label className="sap-label">Budget (shared, split it manually per request if needed)</label>
+              <input type="number" value={extracted.budget} onChange={(e) => setExtracted({ ...extracted, budget: e.target.value })} className="sap-input" />
             </div>
           </div>
 
+          {selectedTypes.map((type) => {
+            const entry = typeEntries[type];
+            if (!entry) return null;
+            const vendorsForType = getKnownVendors(requests, type);
+            return (
+              <div key={type} className="sap-card p-3" style={{ borderTop: "3px solid var(--sap-blue)" }}>
+                <p className="font-semibold mb-2" style={{ color: "var(--sap-text)" }}>🧾 {type} request</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                  <div>
+                    <label className="sap-label">Vendor / Supplier</label>
+                    <input value={entry.vendor} onChange={(e) => updateEntry(type, { vendor: e.target.value })} className="sap-input" />
+                    {vendorsForType.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1.5 items-center">
+                        <span className="text-xs" style={{ color: "var(--sap-gray)" }}>Usual vendors:</span>
+                        {vendorsForType.slice(0, 6).map((v) => (
+                          <button
+                            type="button"
+                            key={v}
+                            onClick={() => updateEntry(type, { vendor: v })}
+                            className="text-xs px-2 py-0.5"
+                            style={{ background: "#F5F6F7", border: "1px solid var(--sap-border)", borderRadius: "10px", color: "var(--sap-text)" }}
+                          >
+                            {v}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label className="sap-label">PR Number (if any)</label>
+                    <input value={entry.prNumber} onChange={(e) => updateEntry(type, { prNumber: e.target.value })} className="sap-input" />
+                  </div>
+                </div>
+
+                <p className="text-sm font-semibold mb-1" style={{ color: "var(--sap-blue-dark)" }}>💡 Suggested actions:</p>
+                <ul className="space-y-1">
+                  {entry.actionSteps.map((a, i) => (
+                    <li key={i} className="flex items-center gap-2">
+                      <span style={{ color: "var(--sap-blue)" }}>{i + 1}.</span>
+                      <input
+                        value={a}
+                        onChange={(e) => updateStep(type, i, e.target.value)}
+                        className="sap-input"
+                        style={{ flex: 1 }}
+                      />
+                      <button type="button" onClick={() => removeStep(type, i)} className="sap-link-danger">Remove</button>
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex gap-2 mt-2">
+                  <input
+                    value={entry.newStep}
+                    onChange={(e) => updateEntry(type, { newStep: e.target.value })}
+                    placeholder="Add a new action..."
+                    className="sap-input"
+                    style={{ flex: 1 }}
+                  />
+                  <button type="button" onClick={() => addStep(type)} className="sap-btn sap-btn-outline">+ Add</button>
+                </div>
+                <button type="button" onClick={() => saveActionsAsDefault(type)} className="mt-2 sap-link" style={{ display: "block" }}>
+                  💾 Save this checklist as the default for "{type}" requests
+                </button>
+              </div>
+            );
+          })}
+
           <div>
-            <label className="sap-label">Additional Notes</label>
-            <textarea value={form.notes} onChange={set("notes")} rows="3" className="sap-textarea"></textarea>
+            <label className="sap-label">Additional Notes (shared)</label>
+            <textarea value={extracted.notes} onChange={(e) => setExtracted({ ...extracted, notes: e.target.value })} rows="3" className="sap-textarea"></textarea>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={onCancel} className="sap-btn sap-btn-outline">Cancel</button>
-            <button type="submit" className="sap-btn sap-btn-blue">Save Request</button>
+            <button type="submit" className="sap-btn sap-btn-blue">
+              Save {selectedTypes.length > 1 ? `${selectedTypes.length} Requests` : "Request"}
+            </button>
           </div>
         </form>
       )}
@@ -3499,7 +3569,7 @@ function App() {
 
   const handleSaveNew = (form) => {
     if (form.id) {
-      setRequests(requests.map((r) => (r.id === form.id ? { ...r, ...form, updatedAt: new Date().toISOString() } : r)));
+      setRequests((prev) => prev.map((r) => (r.id === form.id ? { ...r, ...form, updatedAt: new Date().toISOString() } : r)));
     } else {
       const newReq = {
         ...form,
@@ -3507,10 +3577,20 @@ function App() {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-      setRequests([newReq, ...requests]);
+      setRequests((prev) => [newReq, ...prev]);
     }
     setShowForm(false);
     setEditingReq(null);
+  };
+
+  // Used when one email covers several services at once (hotel + car +
+  // ticket) split into separate tracked requests — appends all of them in a
+  // single state update so they don't clobber each other.
+  const handleSaveMultiple = (forms) => {
+    const now = new Date().toISOString();
+    const newReqs = forms.map((form) => ({ ...form, id: uid(), createdAt: now, updatedAt: now }));
+    setRequests((prev) => [...newReqs, ...prev]);
+    setShowParser(false);
   };
 
   const handleStatusSave = (updated) => {
@@ -3717,7 +3797,7 @@ function App() {
         <Modal title="Parse Request From Email" onClose={() => setShowParser(false)}>
           <EmailParserForm
             requests={requests}
-            onSave={(form) => { handleSaveNew(form); setShowParser(false); }}
+            onSave={handleSaveMultiple}
             onCancel={() => setShowParser(false)}
           />
         </Modal>
