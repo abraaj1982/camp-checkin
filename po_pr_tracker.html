@@ -157,7 +157,7 @@ const { useState, useEffect, useMemo } = React;
 const STORAGE_KEY = "po_pr_tracker_requests_v1";
 
 const SERVICE_TYPES = ["Hotel", "Car", "Tickets", "Other"];
-const STATUSES = ["Pending", "Processing", "Approved", "PO Issued", "Completed"];
+const STATUSES = ["Pending", "Processing", "Approved", "PO Issued", "Completed", "Cancelled"];
 
 const STATUS_LABELS = {
   "Pending": "Pending",
@@ -165,6 +165,7 @@ const STATUS_LABELS = {
   "Approved": "Approved",
   "PO Issued": "PO Issued",
   "Completed": "Completed",
+  "Cancelled": "Cancelled",
 };
 
 const STATUS_INLINE_STYLE = {
@@ -173,6 +174,7 @@ const STATUS_INLINE_STYLE = {
   "Approved": { background: "var(--sap-purple-bg)", color: "var(--sap-purple)", borderColor: "#D9CCEA" },
   "PO Issued": { background: "#EAF2FC", color: "var(--sap-blue-dark)", borderColor: "#BEDAF7" },
   "Completed": { background: "var(--sap-green-bg)", color: "var(--sap-green)", borderColor: "#BFE3CB" },
+  "Cancelled": { background: "#F0F0F0", color: "var(--sap-gray)", borderColor: "#D9D9D9" },
 };
 
 function uid() {
@@ -204,14 +206,14 @@ function daysSince(dateStr) {
 }
 
 function isOverdue(req) {
-  if (!req.requiredDate || req.status === "Completed") return false;
+  if (!req.requiredDate || req.status === "Completed" || req.status === "Cancelled") return false;
   const req_d = new Date(req.requiredDate);
   const now = new Date();
   return req_d < now;
 }
 
 function getAlertLevel(req) {
-  if (req.status === "Completed") return null;
+  if (req.status === "Completed" || req.status === "Cancelled") return null;
   if (isOverdue(req)) return "yellow";
   const pendingDays = daysSince(req.createdAt);
   if (req.status === "Pending" && pendingDays > 21) return "red";
@@ -342,6 +344,8 @@ function getNextAction(req) {
       return "Confirm booking/delivery with the supplier, then mark Completed";
     case "Completed":
       return "Completed — no action needed";
+    case "Cancelled":
+      return "Cancelled — no action needed";
     default:
       return "";
   }
@@ -427,6 +431,83 @@ function findCol(row, candidates) {
   return "";
 }
 
+// Real-world "Following PO/PR" style trackers write free-text status notes
+// instead of a clean enum ("waiting PR approval", "please issue PO", "Done",
+// "Deleted"...). This interprets that phrasing into our workflow stages.
+function mapFreeTextStatus(raw, hasPr, hasPo) {
+  const text = String(raw || "").trim().toLowerCase();
+  if (!text) return hasPo ? "PO Issued" : hasPr ? "Processing" : "Pending";
+  if (/delet|cancel/.test(text)) return "Cancelled";
+  if (/^done$|complet/.test(text)) return "Completed";
+  if (/waiting po|please issue po/.test(text)) return "Approved";
+  if (/waiting pr|please issue the pr|creat/.test(text)) return "Processing";
+  if (/still not/.test(text)) return "Pending";
+  // Unrecognized free text (e.g. a name typed in by mistake) — fall back to
+  // what's actually filled in rather than guessing from the words.
+  return hasPo ? "PO Issued" : hasPr ? "Processing" : "Pending";
+}
+
+// The owner/requester name isn't its own column in this format — it's the
+// leading words of the description, e.g. "Samer Al Husaini 10-15 Jan 2025 -
+// Ramada". Pull out the name portion before a date, dash, or digit.
+function extractOwnerFromDescription(desc) {
+  if (!desc) return "";
+  const match = String(desc).match(/^([A-Za-z؀-ۿ][A-Za-z؀-ۿ.\s]{1,35}?)(?=\s*(?:\d|-|,|$))/);
+  return match ? match[1].trim() : "";
+}
+
+// Detects the dual-header "Purchase Order / Purchase Requisition" layout
+// (group titles on row 1, real column names PO/PR/approval/amount on row 2)
+// used by real SAP-exported trackers, as opposed to a single clean header row.
+function detectSapDualHeader(sheet) {
+  const raw = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", blankrows: false });
+  for (let i = 0; i < Math.min(raw.length, 4); i++) {
+    const row = raw[i].map((c) => String(c).trim().toLowerCase());
+    const poIdx = row.indexOf("po");
+    const prIdx = row.indexOf("pr");
+    if (poIdx !== -1 && prIdx !== -1 && prIdx > poIdx) {
+      return { headerRowIndex: i, poIdx, prIdx, raw };
+    }
+  }
+  return null;
+}
+
+function parseSapDualHeaderRows({ headerRowIndex, poIdx, prIdx, raw }) {
+  const dataRows = raw.slice(headerRowIndex + 1);
+  // The PO group has its own (usually unused) approval column right after it;
+  // the real free-text workflow status lives right after the PR column.
+  const prStatusIdx = prIdx + 1;
+  const amountIdx = prIdx + 2;
+  const descIdx = amountIdx + 1;
+  const supplierIdx = descIdx + 1;
+
+  return dataRows
+    .filter((r) => r.some((cell) => String(cell).trim() !== ""))
+    .map((r) => {
+      const poNumber = r[poIdx] ? String(r[poIdx]).trim() : "";
+      const prNumber = r[prIdx] ? String(r[prIdx]).trim() : "";
+      const statusText = r[prStatusIdx] || "";
+      const description = r[descIdx] ? String(r[descIdx]).trim() : "";
+      return {
+        id: uid(),
+        prNumber,
+        poNumber,
+        owner: extractOwnerFromDescription(description),
+        department: "",
+        serviceType: guessServiceType(description + " " + (r[supplierIdx] || "")),
+        vendor: r[supplierIdx] ? String(r[supplierIdx]).trim() : "",
+        budget: r[amountIdx] ? String(r[amountIdx]).trim() : "",
+        finalAmount: "",
+        requiredDate: "",
+        completedDate: "",
+        status: mapFreeTextStatus(statusText, !!prNumber, !!poNumber),
+        notes: description,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+    });
+}
+
 function parseExcelFile(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -435,6 +516,13 @@ function parseExcelFile(file) {
         const data = new Uint8Array(e.target.result);
         const wb = XLSX.read(data, { type: "array" });
         const sheet = wb.Sheets[wb.SheetNames[0]];
+
+        const sapLayout = detectSapDualHeader(sheet);
+        if (sapLayout) {
+          resolve(parseSapDualHeaderRows(sapLayout));
+          return;
+        }
+
         const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
         const parsed = rows.map((row) => ({
           id: uid(),
