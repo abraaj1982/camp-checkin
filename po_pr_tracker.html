@@ -226,10 +226,10 @@ const ALERT_STYLES = {
 };
 
 const ACTION_SUGGESTIONS = {
-  "Hotel": ["Contact the vendor", "Confirm availability", "Get the booking confirmation", "Issue the PO"],
-  "Car": ["Contact the rental company", "Confirm car and driver availability", "Confirm pickup time", "Issue the PO"],
-  "Tickets": ["Contact the travel agency", "Confirm seat availability and fares", "Issue the ticket after approval", "Issue the PO"],
-  "Other": ["Review request details with the requester", "Identify the right vendor", "Issue the PO after approval"],
+  "Hotel": ["Contact the vendor", "Confirm availability", "Get the booking confirmation", "Create the PR in SAP and enter the PR number", "Issue the PO once approved", "Confirm the stay with the hotel"],
+  "Car": ["Contact the rental company", "Confirm car and driver availability", "Confirm pickup time", "Create the PR in SAP and enter the PR number", "Issue the PO once approved", "Confirm the booking with the rental company"],
+  "Tickets": ["Contact the travel agency", "Confirm seat availability and fares", "Create the PR in SAP and enter the PR number", "Issue the ticket after approval", "Issue the PO once approved"],
+  "Other": ["Review request details with the requester", "Identify the right supplier", "Create the PR in SAP and enter the PR number", "Issue the PO after approval"],
 };
 
 function guessServiceType(text) {
@@ -300,6 +300,78 @@ function saveCustomActions(actions) {
 
 function getActionsForType(serviceType, customActions) {
   return (customActions && customActions[serviceType]) || ACTION_SUGGESTIONS[serviceType] || ACTION_SUGGESTIONS["Other"];
+}
+
+// Tells the user exactly what to do next for this request, based on its
+// current status and what's already filled in — the workflow guidance.
+function getNextAction(req) {
+  switch (req.status) {
+    case "Pending":
+      if (!req.vendor) return "Choose a supplier for this request";
+      return "Create the PR in SAP, then enter the PR number here";
+    case "Processing":
+      return "Waiting for PR approval from SAP";
+    case "Approved":
+      if (!req.prNumber) return "Enter the PR number now that it's approved";
+      return "Proceed to issue the PO with the supplier";
+    case "PO Issued":
+      if (!req.poNumber) return "Enter the PO number";
+      return "Confirm booking/delivery with the supplier, then mark Completed";
+    case "Completed":
+      return "Completed — no action needed";
+    default:
+      return "";
+  }
+}
+
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve({ name: file.name, type: file.type, size: file.size, dataUrl: reader.result });
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function AttachmentPicker({ attachments, onChange }) {
+  const [busy, setBusy] = useState(false);
+
+  const handleFiles = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    setBusy(true);
+    try {
+      const read = await Promise.all(files.map(readFileAsDataURL));
+      onChange([...(attachments || []), ...read]);
+    } catch (err) {
+      alert("Could not read one of the files: " + err.message);
+    } finally {
+      setBusy(false);
+      e.target.value = "";
+    }
+  };
+
+  const removeAt = (i) => onChange(attachments.filter((_, idx) => idx !== i));
+
+  return (
+    <div>
+      <label className="sap-label">Attachments (ticket, confirmation, etc.)</label>
+      <input type="file" multiple onChange={handleFiles} className="sap-input" />
+      {busy && <p className="text-xs mt-1" style={{ color: "var(--sap-gray)" }}>Reading file(s)...</p>}
+      {attachments && attachments.length > 0 && (
+        <ul className="mt-2 space-y-1">
+          {attachments.map((a, i) => (
+            <li key={i} className="flex items-center justify-between text-xs sap-card px-2 py-1">
+              <a href={a.dataUrl} target="_blank" rel="noopener noreferrer" className="sap-link">
+                📎 {a.name} {a.size ? `(${Math.round(a.size / 1024)} KB)` : ""}
+              </a>
+              <button type="button" onClick={() => removeAt(i)} className="sap-link-danger">Remove</button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 const EXCEL_STATUS_MAP = {
@@ -653,6 +725,8 @@ function EmailParserForm({ requests, onSave, onCancel }) {
             <textarea value={form.notes} onChange={set("notes")} rows="3" className="sap-textarea"></textarea>
           </div>
 
+          <AttachmentPicker attachments={form.attachments} onChange={(attachments) => setForm({ ...form, attachments })} />
+
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={onCancel} className="sap-btn sap-btn-outline">Cancel</button>
             <button type="submit" className="sap-btn sap-btn-blue">Save Request</button>
@@ -678,6 +752,7 @@ function emptyForm() {
     completedDate: "",
     status: "Pending",
     notes: "",
+    attachments: [],
   };
 }
 
@@ -758,6 +833,9 @@ function RequestForm({ initial, onSave, onCancel }) {
         <label className="sap-label">Notes</label>
         <textarea value={form.notes} onChange={set("notes")} rows="3" className="sap-textarea"></textarea>
       </div>
+      <div className="md:col-span-2">
+        <AttachmentPicker attachments={form.attachments} onChange={(attachments) => setForm({ ...form, attachments })} />
+      </div>
       <div className="md:col-span-2 flex justify-end gap-2 pt-2">
         <button type="button" onClick={onCancel} className="sap-btn sap-btn-outline">Cancel</button>
         <button type="submit" className="sap-btn sap-btn-blue">Save Request</button>
@@ -772,6 +850,7 @@ function StatusUpdateForm({ req, onSave, onCancel }) {
   const [poNumber, setPoNumber] = useState(req.poNumber);
   const [notes, setNotes] = useState(req.notes || "");
   const [completedDate, setCompletedDate] = useState(req.completedDate || "");
+  const [attachments, setAttachments] = useState(req.attachments || []);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -787,6 +866,7 @@ function StatusUpdateForm({ req, onSave, onCancel }) {
       prNumber,
       poNumber,
       notes,
+      attachments,
       completedDate: status === "Completed" && !completedDate
         ? new Date().toISOString().slice(0, 10)
         : completedDate,
@@ -795,6 +875,9 @@ function StatusUpdateForm({ req, onSave, onCancel }) {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <div className="sap-panel-info p-3 text-sm" style={{ color: "var(--sap-blue-dark)" }}>
+        <span className="font-semibold">Next step: </span>{getNextAction(req)}
+      </div>
       <div>
         <label className="sap-label">New Status</label>
         <select value={status} onChange={(e) => setStatus(e.target.value)} className="sap-select">
@@ -819,6 +902,7 @@ function StatusUpdateForm({ req, onSave, onCancel }) {
         <label className="sap-label">Notes</label>
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows="3" className="sap-textarea"></textarea>
       </div>
+      <AttachmentPicker attachments={attachments} onChange={setAttachments} />
       <div className="flex justify-end gap-2 pt-2">
         <button type="button" onClick={onCancel} className="sap-btn sap-btn-outline">Cancel</button>
         <button type="submit" className="sap-btn sap-btn-blue">Update Status</button>
@@ -1045,13 +1129,14 @@ function App() {
                   <th>Required Date</th>
                   <th>Budget</th>
                   <th>Alert</th>
+                  <th>Next Step</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan="10" className="text-center py-10" style={{ color: "var(--sap-gray)" }}>No matching requests</td>
+                    <td colSpan="11" className="text-center py-10" style={{ color: "var(--sap-gray)" }}>No matching requests</td>
                   </tr>
                 )}
                 {filtered.map((r) => {
@@ -1061,7 +1146,12 @@ function App() {
                     <tr key={r.id} style={style ? style.rowStyle : undefined}>
                       <td>{r.prNumber || "—"}</td>
                       <td>{r.poNumber || "—"}</td>
-                      <td>{r.owner}</td>
+                      <td>
+                        {r.owner}
+                        {r.attachments && r.attachments.length > 0 && (
+                          <span className="ml-1" title={`${r.attachments.length} attachment(s)`}>📎{r.attachments.length}</span>
+                        )}
+                      </td>
                       <td>{r.serviceType}</td>
                       <td>{r.vendor || "—"}</td>
                       <td>
@@ -1079,6 +1169,7 @@ function App() {
                           </span>
                         ) : "—"}
                       </td>
+                      <td className="text-xs" style={{ color: "var(--sap-blue-dark)", maxWidth: 220 }}>{getNextAction(r)}</td>
                       <td className="whitespace-nowrap">
                         <button onClick={() => setStatusReq(r)} className="sap-link mr-3">Update Status</button>
                         <button onClick={() => { setEditingReq(r); setShowForm(true); }} className="sap-link mr-3" style={{ color: "var(--sap-gray)" }}>Edit</button>
@@ -1142,6 +1233,7 @@ function App() {
                       {style && <p className="font-semibold" style={{ color: style.text }}>⚠️ {style.label}</p>}
                       {missingPr && <p className="font-semibold" style={{ color: "var(--sap-red)" }}>💾 Reminder: PR number not entered for this request</p>}
                       {missingPo && <p className="font-semibold" style={{ color: "var(--sap-red)" }}>💾 Reminder: PO number not entered for this request</p>}
+                      <p style={{ color: "var(--sap-blue-dark)" }}><span className="font-semibold">Next step:</span> {getNextAction(req)}</p>
                     </div>
                     <button
                       onClick={() => { setShowDaily(false); setStatusReq(req); }}
