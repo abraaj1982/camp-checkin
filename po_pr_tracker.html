@@ -5043,34 +5043,91 @@ async function resolveAttachmentData(attachment) {
   return null;
 }
 
+// The stored form is a data: URL; the download API wants the actual bytes.
+// Handing it the URL string would save the base64 text as the file's contents.
+function dataUrlToBlob(dataUrl) {
+  const match = /^data:([^;,]*)(;base64)?,(.*)$/s.exec(dataUrl);
+  if (!match) return null;
+  const [, mime, isBase64, payload] = match;
+  if (!isBase64) return new Blob([decodeURIComponent(payload)], { type: mime || "application/octet-stream" });
+  const binary = atob(payload);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: mime || "application/octet-stream" });
+}
+
+// The viewer only accepts a fixed set of extensions; Outlook's .msg isn't one
+// of them, which is why opening one did nothing at all before.
+const DOWNLOADABLE_EXTENSIONS = [
+  "gif", "png", "jpg", "jpeg", "webp", "mp4", "webm", "txt", "json", "md",
+  "docx", "pptx", "epub", "csv", "ttf", "html", "svg", "pdf", "xlsx",
+];
+
+function extensionOf(name) {
+  const m = /\.([A-Za-z0-9]+)$/.exec(String(name || ""));
+  return m ? m[1].toLowerCase() : "";
+}
+
+// Returns "" on success, or a reason the caller should surface. Never fails
+// silently: a file that won't open with no explanation is the worst outcome.
 async function openAttachment(attachment) {
   const data = await resolveAttachmentData(attachment);
   if (!data) {
     appToast(`"${attachment.name}" could not be found in this browser's file store`);
     return;
   }
+  const blob = dataUrlToBlob(data);
+
+  let downloads = null;
   try {
     if (window.claude && typeof window.claude.use === "function") {
-      const downloads = await window.claude.use("downloads");
-      if (downloads) {
-        await downloads.save({ filename: attachment.name, data });
-        return;
-      }
+      downloads = await window.claude.use("downloads");
     }
   } catch (err) {
-    // fall through to the plain-browser path below
+    downloads = null;
   }
-  window.open(data, "_blank");
+
+  if (downloads) {
+    if (!DOWNLOADABLE_EXTENSIONS.includes(extensionOf(attachment.name))) {
+      appToast(
+        attachment.text
+          ? `${attachment.name} can't be handed to the browser here — use "View text" to read its contents.`
+          : `${attachment.name} is a file type this viewer can't save. Open the tracker from the local HTML file to get at it.`
+      );
+      return;
+    }
+    try {
+      await downloads.save({ filename: attachment.name, data: blob || data });
+    } catch (err) {
+      const code = err && err.code;
+      if (code === "declined") return; // the viewer said no; nothing to report
+      appToast(`Could not open ${attachment.name}: ${(err && err.message) || code || "unknown error"}`);
+    }
+    return;
+  }
+
+  // Plain browser (local file / GitHub Pages): a blob URL handles large files
+  // far better than a multi-megabyte data: URL.
+  try {
+    const url = blob ? URL.createObjectURL(blob) : data;
+    const win = window.open(url, "_blank");
+    if (!win) appToast(`Your browser blocked opening ${attachment.name} — allow pop-ups for this page.`);
+    if (blob) setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (err) {
+    appToast(`Could not open ${attachment.name}: ${err.message}`);
+  }
 }
 
 // Reads a picked file into the shape stored on a request: the bytes go to
 // IndexedDB (localStorage's few MB can't hold PDFs), while the name, size and
 // any text extracted from a PDF stay on the request so search can reach them.
-async function ingestAttachment(file) {
+async function ingestAttachment(file, textOverride) {
   const base = await readFileAsDataURL(file);
-  const text = /\.pdf$/i.test(file.name) || file.type === "application/pdf"
-    ? await extractPdfText(file)
-    : "";
+  const text = textOverride !== undefined && textOverride !== null && textOverride !== ""
+    ? String(textOverride).slice(0, MAX_EXTRACTED_TEXT)
+    : (/\.pdf$/i.test(file.name) || file.type === "application/pdf"
+        ? await extractPdfText(file)
+        : "");
 
   const blobId = uid();
   try {
@@ -5514,7 +5571,7 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
     setLoadingFile(true);
     try {
       const text = await readEmailFile(file);
-      const fileAttachment = await ingestAttachment(file);
+      const fileAttachment = await ingestAttachment(file, text);
 
       setEmailText(text);
       setAttachments([fileAttachment]);
@@ -6203,33 +6260,63 @@ function BarRow({ label, value, max, formatted, color, note }) {
 
 function AttachmentsView({ req }) {
   const files = req.attachments || [];
+  const [openTextIndex, setOpenTextIndex] = useState(null);
+
   if (!files.length) {
     return <p className="text-center py-8" style={{ color: "var(--sap-gray)" }}>No files attached to this request.</p>;
   }
+
   return (
     <div className="flex flex-col gap-2">
       <p className="text-sm" style={{ color: "var(--sap-gray)" }}>
         {req.serviceType} · {req.owner}{req.beneficiary ? ` · for ${req.beneficiary}` : ""}
       </p>
-      {files.map((a, i) => (
-        <div key={i} className="sap-card p-3 flex items-center justify-between gap-3">
-          <div style={{ minWidth: 0 }}>
-            <button
-              type="button"
-              onClick={() => openAttachment(a)}
-              className="sap-link"
-              style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}
-            >
-              📎 {a.name}
-            </button>
-            <p className="text-xs mt-0.5" style={{ color: "var(--sap-gray)" }}>
-              {a.size ? `${Math.round(a.size / 1024)} KB` : "size unknown"}
-              {a.text ? " · text inside this file is searchable" : ""}
-            </p>
+      {files.map((a, i) => {
+        const downloadable = DOWNLOADABLE_EXTENSIONS.includes(extensionOf(a.name));
+        return (
+          <div key={i} className="sap-card p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div style={{ minWidth: 0 }}>
+                <span className="font-semibold text-sm" style={{ color: "var(--sap-text)" }}>📎 {a.name}</span>
+                <p className="text-xs mt-0.5" style={{ color: "var(--sap-gray)" }}>
+                  {a.size ? `${Math.round(a.size / 1024)} KB` : "size unknown"}
+                  {a.text ? " · its text is searchable" : ""}
+                  {!downloadable ? " · this file type can't be opened by the viewer, read it below" : ""}
+                </p>
+              </div>
+              <div className="flex gap-2 whitespace-nowrap">
+                {a.text ? (
+                  <button
+                    type="button"
+                    onClick={() => setOpenTextIndex(openTextIndex === i ? null : i)}
+                    className="sap-btn sap-btn-outline"
+                  >
+                    {openTextIndex === i ? "Hide text" : "View text"}
+                  </button>
+                ) : null}
+                <button type="button" onClick={() => openAttachment(a)} className="sap-btn sap-btn-outline">Open file</button>
+              </div>
+            </div>
+            {openTextIndex === i && (
+              <pre
+                className="text-xs mt-3 p-3"
+                style={{
+                  background: "#F5F6F7",
+                  border: "1px solid var(--sap-border)",
+                  borderRadius: 2,
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-word",
+                  maxHeight: 320,
+                  overflow: "auto",
+                  color: "var(--sap-text)",
+                }}
+              >
+                {a.text}
+              </pre>
+            )}
           </div>
-          <button type="button" onClick={() => openAttachment(a)} className="sap-btn sap-btn-outline">Open</button>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
