@@ -4241,6 +4241,68 @@ function saveRequests(requests) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Optional shared database — real collaboration when opened via the
+// Artifact link (window.claude.use("db")). Every viewer of that same link
+// then reads and writes the same "requests" collection live. It is a
+// no-op everywhere else (a local HTML file, GitHub Pages): window.claude
+// doesn't exist there, so the app quietly falls back to the private,
+// per-browser localStorage behaviour it always had — nobody loses the
+// "fully local" option by this being added.
+//
+// Attachment BYTES are deliberately excluded from what gets shared: a
+// document in this store is capped at 256 KiB, far under a real PDF/.msg.
+// Only their name, size and any extracted text travel to the shared
+// database (small, and already what search needs); the actual file stays
+// in this browser's IndexedDB and only opens on the device that added it.
+// ---------------------------------------------------------------------------
+const SHARED_MIGRATION_KEY = "po_pr_tracker_shared_migrated_v1";
+
+function stripAttachmentForSharing(a) {
+  return { name: a.name, type: a.type, size: a.size, blobId: a.blobId || null, text: a.text || "" };
+}
+
+// The db body must be a plain JSON object with no `undefined` values, and
+// the platform doesn't know about React's synthetic id-vs-fields shape —
+// this is the one place that translates a request to what actually gets
+// written, so every write path (single, batch, import) stays consistent.
+function sanitizeRequestForDb(req) {
+  const clean = { ...req };
+  delete clean.id; // the id is the document's path, never part of its body
+  clean.attachments = (req.attachments || []).map(stripAttachmentForSharing);
+  Object.keys(clean).forEach((k) => { if (clean[k] === undefined) clean[k] = ""; });
+  return clean;
+}
+
+function docToRequest(doc) {
+  return { ...doc.data(), id: doc.id };
+}
+
+// Runs once per browser: if the shared database is empty but this browser
+// already has locally-saved requests, offer to bring them in rather than
+// silently showing an empty table where real work used to be.
+async function migrateLocalRequestsToSharedDb(db) {
+  try {
+    if (localStorage.getItem(SHARED_MIGRATION_KEY)) return;
+    const existing = await db.collection("requests").limit(1).get();
+    if (!existing.empty) { localStorage.setItem(SHARED_MIGRATION_KEY, "1"); return; }
+    const local = loadRequests();
+    if (!local.length) { localStorage.setItem(SHARED_MIGRATION_KEY, "1"); return; }
+    const proceed = await appConfirm(
+      `This browser has ${local.length} request(s) saved locally, from before sharing was turned on. ` +
+      `Upload them to the shared database so your colleague can see them too?`
+    );
+    localStorage.setItem(SHARED_MIGRATION_KEY, "1");
+    if (!proceed) return;
+    for (const r of local) {
+      await db.collection("requests").doc(r.id || uid()).set(sanitizeRequestForDb(r));
+    }
+    appToast(`Uploaded ${local.length} request(s) to the shared database`);
+  } catch (err) {
+    console.error("Local-to-shared migration failed:", err);
+  }
+}
+
 function daysSince(dateStr) {
   if (!dateStr) return 0;
   const d = new Date(dateStr);
@@ -6595,10 +6657,44 @@ function App() {
   const [viewFilesReq, setViewFilesReq] = useState(null);
   const [showReports, setShowReports] = useState(false);
   const [sla, setSla] = useState(loadSla);
+  const [sharedDb, setSharedDb] = useState(null);
+  const [syncStatus, setSyncStatus] = useState("local"); // local | connecting | shared | error
 
+  // Always keep the private per-browser cache current — a fallback that
+  // costs nothing and matters if sharing ever becomes unavailable mid-session.
   useEffect(() => {
     saveRequests(requests);
   }, [requests]);
+
+  // Try the shared database once on load. Nothing here runs outside the
+  // Artifact link, where window.claude simply doesn't exist.
+  useEffect(() => {
+    let unsubscribe = null;
+    let cancelled = false;
+    (async () => {
+      if (!window.claude || typeof window.claude.use !== "function") return;
+      setSyncStatus("connecting");
+      try {
+        const db = await window.claude.use("db");
+        if (!db || cancelled) return;
+        await migrateLocalRequestsToSharedDb(db);
+        if (cancelled) return;
+        setSharedDb(db);
+        setSyncStatus("shared");
+        unsubscribe = db.collection("requests").onSnapshot(
+          (snap) => setRequests(snap.docs.map(docToRequest)),
+          (err) => {
+            console.error("Shared sync error:", err);
+            setSyncStatus("error");
+            appToast("Shared sync stopped (" + err.code + ") — this browser's own copy is still safe.");
+          }
+        );
+      } catch (err) {
+        setSyncStatus("local");
+      }
+    })();
+    return () => { cancelled = true; if (unsubscribe) unsubscribe(); };
+  }, []);
 
   const owners = useMemo(() => {
     const set = new Set(requests.map((r) => r.owner).filter(Boolean));
@@ -6640,17 +6736,22 @@ function App() {
     return list;
   }, [requests, search, statusFilter, ownerFilter, serviceFilter, waitingFilter, dateFilter]);
 
-  const handleSaveNew = (form) => {
+  const handleSaveNew = async (form) => {
+    const now = new Date().toISOString();
     if (form.id) {
-      setRequests((prev) => prev.map((r) => (r.id === form.id ? { ...r, ...form, updatedAt: new Date().toISOString() } : r)));
+      const updated = { ...form, updatedAt: now };
+      if (sharedDb) {
+        await sharedDb.collection("requests").doc(form.id).set(sanitizeRequestForDb({ ...requests.find((r) => r.id === form.id), ...updated }));
+      } else {
+        setRequests((prev) => prev.map((r) => (r.id === form.id ? { ...r, ...updated } : r)));
+      }
     } else {
-      const newReq = {
-        ...form,
-        id: uid(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setRequests((prev) => [newReq, ...prev]);
+      const newReq = { ...form, id: uid(), createdAt: now, updatedAt: now };
+      if (sharedDb) {
+        await sharedDb.collection("requests").doc(newReq.id).set(sanitizeRequestForDb(newReq));
+      } else {
+        setRequests((prev) => [newReq, ...prev]);
+      }
     }
     setShowForm(false);
     setEditingReq(null);
@@ -6659,25 +6760,42 @@ function App() {
   // Used when one email covers several services at once (hotel + car +
   // ticket) split into separate tracked requests — appends all of them in a
   // single state update so they don't clobber each other.
-  const handleSaveMultiple = (forms) => {
+  const handleSaveMultiple = async (forms) => {
     const now = new Date().toISOString();
     const newReqs = forms.map((form) => ({ ...form, id: uid(), createdAt: now, updatedAt: now }));
-    setRequests((prev) => [...newReqs, ...prev]);
+    if (sharedDb) {
+      await Promise.all(newReqs.map((r) => sharedDb.collection("requests").doc(r.id).set(sanitizeRequestForDb(r))));
+    } else {
+      setRequests((prev) => [...newReqs, ...prev]);
+    }
     setShowParser(false);
   };
 
-  const handleStatusSave = (updated) => {
-    setRequests(requests.map((r) => (r.id === updated.id ? { ...updated, updatedAt: new Date().toISOString() } : r)));
+  const handleStatusSave = async (updated) => {
+    const withStamp = { ...updated, updatedAt: new Date().toISOString() };
+    if (sharedDb) {
+      await sharedDb.collection("requests").doc(updated.id).set(sanitizeRequestForDb(withStamp));
+    } else {
+      setRequests((prev) => prev.map((r) => (r.id === updated.id ? withStamp : r)));
+    }
     setStatusReq(null);
   };
 
   const handleDelete = async (id) => {
     if (!(await appConfirm("Are you sure you want to delete this request?"))) return;
-    setRequests((prev) => prev.filter((r) => r.id !== id));
+    if (sharedDb) {
+      await sharedDb.collection("requests").doc(id).delete();
+    } else {
+      setRequests((prev) => prev.filter((r) => r.id !== id));
+    }
   };
 
-  const handleImport = (parsedRows) => {
-    setRequests((prev) => [...parsedRows, ...prev]);
+  const handleImport = async (parsedRows) => {
+    if (sharedDb) {
+      await Promise.all(parsedRows.map((r) => sharedDb.collection("requests").doc(r.id || uid()).set(sanitizeRequestForDb(r))));
+    } else {
+      setRequests((prev) => [...parsedRows, ...prev]);
+    }
     setShowImport(false);
     appToast(`Successfully imported ${parsedRows.length} request(s)`);
   };
@@ -6727,6 +6845,12 @@ function App() {
           <div>
             <h1 className="text-xl font-extrabold">PR / PO Tracker</h1>
             <p className="text-xs mt-0.5" style={{ color: "var(--sap-gray)" }}>Purchase request &amp; approval tracking</p>
+            <p className="text-xs mt-1 font-semibold" style={{ color: syncStatus === "shared" ? "var(--sap-green)" : syncStatus === "connecting" ? "var(--sap-blue)" : syncStatus === "error" ? "var(--sap-red)" : "var(--sap-gray)" }}>
+              {syncStatus === "shared" && "🔗 Shared — everyone on this link sees the same data"}
+              {syncStatus === "connecting" && "⏳ Connecting to shared data…"}
+              {syncStatus === "error" && "⚠️ Shared sync stopped — showing this browser's own copy"}
+              {syncStatus === "local" && "💻 Local to this browser only"}
+            </p>
           </div>
           <div className="flex gap-2 flex-wrap justify-end">
             <button onClick={() => setShowDaily(true)} className="sap-btn sap-btn-ghost">
