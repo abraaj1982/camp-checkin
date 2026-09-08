@@ -12,6 +12,28 @@
 
 ## 🔗 الروابط الرئيسية
 
+### 📲 **تطبيق الموبايل الشامل (PWA) — جديد**
+تطبيق واحد قابل للتثبيت على الهاتف (Progressive Web App) يجمع تسجيل الدخول/الخروج، لوحة التحكم، وتوزيع الأقمصة في واجهة واحدة بشريط تنقّل سفلي، بدل فتح 3 صفحات منفصلة:
+```
+https://abraaj1982.github.io/camp-checkin/app/index.html
+```
+
+**المميزات:**
+- 🧩 3 أقسام في تطبيق واحد: 🎫 Check-In · 📊 Dashboard · 👕 Shirts
+- 📥 قابل للتثبيت على الشاشة الرئيسية (Add to Home Screen) ويعمل بواجهة ملء الشاشة بدون شريط المتصفح
+- 🔐 تسجيل دخول واحد للمشرف يُستخدم في تبويبي Check-In و Shirts معاً
+- ⚡ نفس منطق ومصادر بيانات الأدوات الثلاثة الأصلية (Google Sheets + Apps Script) بدون أي تغيير في الـ Backend
+- 📶 يعمل Offline لواجهة التطبيق نفسها (App Shell) عبر Service Worker — بيانات الطلبة دائماً تُجلب لحظياً من الإنترنت
+- 🔔 شارة عدد الأقمصة المتبقية على أيقونة تبويب Shirts
+
+**كيف تثبته على الهاتف:**
+- **Android (Chrome):** افتح الرابط ثم اضغط على قائمة المتصفح (⋮) → "Add to Home screen" / "Install app"
+- **iPhone (Safari):** افتح الرابط ثم اضغط زر المشاركة (Share) → "Add to Home Screen"
+
+بعد التثبيت، يظهر التطبيق كأيقونة مستقلة على الهاتف بدون شريط عنوان المتصفح.
+
+---
+
 ### 📱 **تطبيق المشرفين (Supervisor App)**
 للمشرفين الخمسة لتسجيل العمليات:
 ```
@@ -170,8 +192,14 @@ https://docs.google.com/spreadsheets/d/1AbCdEfGhIjKlMnOpQrStUvWxYz/edit
 ```
 camp-checkin/
 ├── README.md                          # هذا الملف
+├── app/                                # 📲 تطبيق الموبايل الشامل (PWA) — جديد
+│   ├── index.html                     #    الأقسام الثلاثة في واجهة واحدة بتنقّل سفلي
+│   ├── manifest.json                  #    بيانات التثبيت على الهاتف (اسم، أيقونات، ألوان)
+│   ├── sw.js                          #    Service Worker لتشغيل الواجهة Offline
+│   └── icons/                         #    أيقونات التطبيق
 ├── supervisor_app_professional.html   # تطبيق المشرفين (مسح QR + Check-In/Out)
 ├── dashboard_v3.html                  # لوحة التحكم (نظام الحافلات)
+├── dashboard_professional.html        # نسخة لوحة التحكم المستخدمة داخل تطبيق الـ PWA
 ├── qr_codes_ready.html                # توليد QR Codes للطباعة (بيانات تجريبية)
 ├── AppsScript_Final_v2.gs             # Google Apps Script لنظام الحافلات (Backend)
 ├── shirt_distribution.html            # توزيع الأقمصة S/M/L/XL + مخزون حي + Roster (مستقل)

@@ -1,0 +1,1841 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<title>Camp Check-In App</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0A6ED4">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Camp App">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.4/html5-qrcode.min.js"></script>
+
+<style>
+:root {
+  --sap-blue: #0A6ED4;
+  --sap-blue-dark: #0052A3;
+  --sap-green: #107E3E;
+  --sap-orange: #E87722;
+  --sap-red: #C30C13;
+  --sap-gray: #6C757D;
+  --sap-text: #32363A;
+  --sap-bg: #F8F9FA;
+  --sap-border: #D3D3D3;
+  --appbar-h: 56px;
+  --supbar-h: 52px;
+  --navbar-h: 62px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  height: 100%;
+  overscroll-behavior-y: contain;
+}
+
+body {
+  font-family: 'Roboto', 'Segoe UI', Helvetica, Arial, sans-serif;
+  background: var(--sap-bg);
+  color: var(--sap-text);
+}
+
+button, select, input, textarea { font-family: inherit; }
+
+/* ===== APP SHELL ===== */
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+}
+
+.appbar {
+  flex: 0 0 auto;
+  height: calc(var(--appbar-h) + var(--safe-top));
+  padding-top: var(--safe-top);
+  background: linear-gradient(135deg, var(--sap-blue) 0%, var(--sap-blue-dark) 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 16px;
+  padding-right: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  z-index: 20;
+}
+
+.appbar-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 17px;
+  font-weight: 500;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.appbar-title small {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 400;
+  opacity: 0.85;
+}
+
+.appbar-icon { font-size: 20px; }
+
+.appbar-install {
+  background: rgba(255,255,255,0.18);
+  border: 1px solid rgba(255,255,255,0.4);
+  color: white;
+  border-radius: 20px;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.appbar-install[hidden] { display: none; }
+
+/* ===== SUPERVISOR BAR ===== */
+.supervisor-bar {
+  flex: 0 0 auto;
+  height: var(--supbar-h);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  background: #E8F4FD;
+  border-bottom: 1px solid var(--sap-border);
+  z-index: 15;
+}
+
+.supervisor-bar[hidden] { display: none; }
+
+.supervisor-bar-icon { font-size: 16px; }
+
+.supervisor-bar select {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--sap-border);
+  border-radius: 6px;
+  font-size: 13px;
+  background: white;
+  color: var(--sap-text);
+}
+
+.supervisor-bar select:disabled { background: #F0F4F8; color: var(--sap-text); opacity: 1; -webkit-text-fill-color: var(--sap-text); }
+
+.btn-ghost-sm {
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--sap-blue);
+  background: white;
+  color: var(--sap-blue);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-ghost-sm[hidden] { display: none; }
+
+/* ===== CONTENT ===== */
+.content {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px 14px calc(20px + var(--safe-bottom));
+}
+
+.panel { display: none; }
+.panel.active { display: block; animation: fadeIn 0.18s ease-out; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ===== BOTTOM NAV ===== */
+.bottom-nav {
+  flex: 0 0 auto;
+  height: calc(var(--navbar-h) + var(--safe-bottom));
+  padding-bottom: var(--safe-bottom);
+  display: flex;
+  background: white;
+  border-top: 1px solid var(--sap-border);
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.06);
+  z-index: 20;
+}
+
+.nav-btn {
+  flex: 1;
+  border: none;
+  background: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: var(--sap-gray);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  position: relative;
+}
+
+.nav-btn .nav-icon { font-size: 21px; line-height: 1; }
+.nav-btn.active { color: var(--sap-blue); }
+.nav-btn.active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 20%;
+  right: 20%;
+  height: 3px;
+  background: var(--sap-blue);
+  border-radius: 0 0 3px 3px;
+}
+.nav-badge {
+  position: absolute;
+  top: 4px;
+  right: 26%;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  background: var(--sap-red);
+  color: white;
+  border-radius: 8px;
+  font-size: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.nav-badge[hidden] { display: none; }
+
+/* ===== SHARED: CARD ===== */
+.card {
+  background: white;
+  border-radius: 10px;
+  padding: 18px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  border: 1px solid var(--sap-border);
+}
+
+.panel-block {
+  background: white;
+  border-radius: 10px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  border: 1px solid var(--sap-border);
+  overflow: hidden;
+}
+.panel-block-header {
+  background: #F5FAFD;
+  border-bottom: 1px solid var(--sap-border);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.panel-block-body { padding: 16px; }
+
+.card-title {
+  font-size: 14.5px;
+  font-weight: 600;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.card-title-icon { font-size: 18px; }
+
+.form-group { margin-bottom: 14px; }
+.form-group:last-child { margin-bottom: 0; }
+
+label { display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 6px; color: var(--sap-text); }
+
+select, input, textarea {
+  width: 100%;
+  padding: 11px;
+  border: 1px solid var(--sap-border);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--sap-text);
+}
+select:focus, input:focus, textarea:focus {
+  outline: none;
+  border-color: var(--sap-blue);
+  box-shadow: 0 0 0 3px rgba(10,110,212,0.12);
+}
+textarea { resize: vertical; min-height: 70px; }
+
+.btn {
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.btn-block { width: 100%; }
+.btn-primary { background: var(--sap-blue); color: white; }
+.btn-primary:active { transform: scale(0.98); }
+.btn-success { background: var(--sap-green); color: white; }
+.btn-warning { background: var(--sap-orange); color: white; }
+.btn-danger { background: var(--sap-red); color: white; }
+.btn-secondary { background: #6C757D; color: white; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+fieldset { border: none; padding: 0; margin: 0; }
+fieldset:disabled { opacity: 0.55; }
+
+.hint { font-size: 12px; color: var(--sap-gray); margin-top: 8px; }
+.hint-warning { color: var(--sap-orange); font-weight: 600; }
+
+/* ===== ALERTS ===== */
+.alert { padding: 14px; border-radius: 8px; margin-bottom: 12px; display: none; border-left: 4px solid; }
+.alert.show { display: block; }
+.alert-success { background: #E1F5EB; border-left-color: var(--sap-green); color: var(--sap-green); }
+.alert-warning { background: #FEF0E8; border-left-color: var(--sap-orange); color: var(--sap-orange); }
+.alert-error { background: #FADAD4; border-left-color: var(--sap-red); color: var(--sap-red); }
+.alert-title { font-weight: 700; margin-bottom: 3px; font-size: 13px; }
+
+/* ===== LOADING ===== */
+.loading { display: none; text-align: center; padding: 16px; }
+.loading.show { display: block; }
+.spinner { border: 3px solid var(--sap-bg); border-top: 3px solid var(--sap-blue); border-radius: 50%; width: 34px; height: 34px; animation: spin 1s linear infinite; margin: 0 auto 10px; }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+/* ===== AUTOCOMPLETE ===== */
+.autocomplete-container { position: relative; }
+.autocomplete-dropdown {
+  position: absolute; top: 100%; left: 0; right: 0; background: white;
+  border: 1px solid var(--sap-border); border-top: none; border-radius: 0 0 8px 8px;
+  max-height: 260px; overflow-y: auto; display: none; z-index: 30; box-shadow: 0 6px 14px rgba(0,0,0,0.12);
+}
+.autocomplete-dropdown.show { display: block; }
+.autocomplete-item { padding: 12px; border-bottom: 1px solid var(--sap-border); cursor: pointer; font-size: 13px; }
+.autocomplete-item:active { background: var(--sap-bg); }
+
+/* ===== CHECK-IN: STUDENT INFO ===== */
+.student-info {
+  display: none;
+  background: linear-gradient(135deg, #E8F4FD 0%, #F5FAFD 100%);
+  border: 2px solid var(--sap-blue);
+  border-radius: 10px;
+  padding: 20px;
+  text-align: center;
+  margin-bottom: 16px;
+}
+.student-info.show { display: block; }
+.student-info.scan-flash { animation: flashSuccess 0.6s ease-out; }
+@keyframes flashSuccess {
+  0% { box-shadow: 0 0 0 0 rgba(16,126,62,0.5); }
+  100% { box-shadow: 0 0 0 14px rgba(16,126,62,0); }
+}
+
+.student-avatar {
+  width: 180px; height: 180px; border-radius: 12px; margin: 0 auto 16px; object-fit: cover;
+  border: 5px solid var(--sap-blue); box-shadow: 0 10px 26px rgba(10,110,212,0.35); background: var(--sap-bg);
+}
+.student-name { font-size: 19px; font-weight: 700; color: var(--sap-blue); margin-bottom: 8px; }
+.student-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.student-meta-item { background: white; padding: 10px; border-radius: 6px; border: 1px solid var(--sap-border); }
+.student-meta-label { font-size: 10px; color: var(--sap-gray); text-transform: uppercase; font-weight: 700; margin-bottom: 3px; }
+.student-meta-value { font-size: 13px; font-weight: 600; }
+
+#ciVerifyIdentityBtn { box-shadow: 0 4px 12px rgba(16,126,62,0.3); }
+#ciVerifyIdentityBtn:disabled { box-shadow: none; }
+
+/* ===== QR SCANNER ===== */
+#qr-reader { width: 100%; margin-bottom: 14px; border-radius: 8px; overflow: hidden; }
+.camera-placeholder {
+  width: 100%; height: 220px; background: var(--sap-bg); border: 2px dashed var(--sap-border);
+  border-radius: 8px; display: flex; align-items: center; justify-content: center;
+  font-size: 13px; color: var(--sap-gray); margin-bottom: 14px; text-align: center; padding: 12px;
+}
+
+.action-buttons { display: grid; grid-template-columns: 1fr; gap: 10px; }
+
+/* ===== ACTIVITY LOG ===== */
+.activity-log-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.activity-item {
+  display: flex; justify-content: space-between; align-items: center; background: white;
+  border: 1px solid var(--sap-border); border-left: 4px solid var(--sap-green); border-radius: 8px;
+  padding: 10px 14px; margin-bottom: 8px; animation: slideIn 0.25s ease-out;
+}
+.activity-item.check-out { border-left-color: var(--sap-orange); }
+.activity-item.withdrawn { border-left-color: var(--sap-red); }
+@keyframes slideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+.activity-item-name { font-weight: 700; font-size: 13px; }
+.activity-item-details { font-size: 11px; color: var(--sap-gray); margin-top: 2px; }
+.activity-item-badge { font-size: 10px; font-weight: 700; padding: 4px 9px; border-radius: 12px; white-space: nowrap; }
+.activity-item-badge.check-in { background: #E1F5EB; color: var(--sap-green); }
+.activity-item-badge.check-out { background: #FEF0E8; color: var(--sap-orange); }
+.activity-item-badge.withdrawn { background: #FADAD4; color: var(--sap-red); }
+.activity-empty { text-align: center; color: var(--sap-gray); font-size: 12.5px; padding: 16px; }
+
+/* ===== DASHBOARD: TILES ===== */
+.tiles-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
+.tile {
+  background: white; border-radius: 10px; padding: 16px 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  border: 1px solid var(--sap-border); text-align: center;
+}
+.tile-icon { font-size: 26px; margin-bottom: 6px; }
+.tile-title { font-size: 10px; color: var(--sap-gray); text-transform: uppercase; margin-bottom: 5px; font-weight: 700; letter-spacing: 0.3px; }
+.tile-value { font-size: 24px; font-weight: 700; }
+.tile-total .tile-value { color: var(--sap-blue); }
+.tile-onbus .tile-value { color: var(--sap-green); }
+.tile-waiting .tile-value { color: var(--sap-orange); }
+.tile-left .tile-value { color: var(--sap-blue); }
+.tile-withdrawn .tile-value { color: var(--sap-red); }
+
+.chart-panel { background: white; border-radius: 10px; padding: 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid var(--sap-border); margin-bottom: 16px; }
+.panel-title { font-size: 13.5px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.pie-chart-container { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.pie-chart-svg { width: 150px; height: 150px; }
+.pie-legend { width: 100%; display: flex; flex-direction: column; gap: 10px; }
+.legend-item { display: flex; align-items: center; gap: 10px; font-size: 12.5px; }
+.legend-color { width: 11px; height: 11px; border-radius: 2px; flex: 0 0 auto; }
+.legend-text { flex: 1; }
+.legend-value { font-weight: 700; }
+.legend-percent { font-size: 11px; color: var(--sap-gray); }
+
+.activity-table-wrap { overflow-x: auto; }
+.activity-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.activity-table th {
+  background: var(--sap-bg); padding: 9px 10px; text-align: left; font-weight: 700; font-size: 10px;
+  color: var(--sap-gray); text-transform: uppercase; border-bottom: 2px solid var(--sap-border); white-space: nowrap;
+}
+.activity-table td { padding: 9px 10px; border-bottom: 1px solid var(--sap-border); white-space: nowrap; }
+.activity-table tr:last-child td { border-bottom: none; }
+
+.badge { display: inline-block; padding: 3px 10px; border-radius: 10px; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+.badge-checkin { background: rgba(16,126,62,0.1); color: var(--sap-green); }
+.badge-checkout { background: rgba(232,119,34,0.1); color: var(--sap-orange); }
+.badge-withdrawn { background: rgba(195,12,19,0.1); color: var(--sap-red); }
+.badge-waiting { background: rgba(108,117,125,0.12); color: var(--sap-gray); }
+.badge-size { background: #E8F4FD; color: var(--sap-blue); }
+.badge-given { background: #E1F5EB; color: var(--sap-green); }
+.badge-pending { background: #FEF0E8; color: var(--sap-orange); }
+
+.status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+.status-dot.green { background: var(--sap-green); }
+.status-dot.orange { background: var(--sap-orange); }
+.status-dot.red { background: var(--sap-red); }
+.status-dot.gray { background: var(--sap-gray); }
+
+.bus-search {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--sap-border); border-radius: 8px; font-size: 13px; margin-bottom: 14px;
+}
+.bus-group { border: 1px solid var(--sap-border); border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
+.bus-group-header {
+  display: flex; align-items: center; justify-content: space-between; padding: 12px 14px;
+  background: var(--sap-bg); cursor: pointer; user-select: none; gap: 8px;
+}
+.bus-group-title { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13.5px; flex-wrap: wrap; }
+.bus-group-counts { display: flex; gap: 6px; flex-wrap: wrap; }
+.count-chip { font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 10px; white-space: nowrap; }
+.count-chip.onbus { background: rgba(16,126,62,0.12); color: var(--sap-green); }
+.count-chip.waiting { background: rgba(232,119,34,0.12); color: var(--sap-orange); }
+.count-chip.left { background: rgba(10,110,212,0.12); color: var(--sap-blue); }
+.count-chip.withdrawn { background: rgba(195,12,19,0.12); color: var(--sap-red); }
+.bus-group-toggle { font-size: 11px; color: var(--sap-gray); transition: transform 0.2s; flex: 0 0 auto; }
+.bus-group.open .bus-group-toggle { transform: rotate(180deg); }
+.bus-group-body { display: none; }
+.bus-group.open .bus-group-body { display: block; }
+.student-row { display: flex; align-items: center; justify-content: space-between; padding: 9px 14px; border-top: 1px solid #EDEDED; font-size: 12.5px; gap: 8px; }
+.student-row-name { font-weight: 600; }
+.student-row-id { color: var(--sap-gray); font-size: 10.5px; margin-left: 5px; }
+.student-row-time { color: var(--sap-gray); font-size: 10.5px; margin-top: 2px; }
+
+.topbar-time-row { display: flex; align-items: center; justify-content: space-between; font-size: 11.5px; color: var(--sap-gray); margin-bottom: 14px; }
+.live-dot { width: 7px; height: 7px; border-radius: 50%; background: #4CD964; display: inline-block; animation: pulse 1.5s infinite; margin-right: 5px; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(76,217,100,0.6); } 70% { box-shadow: 0 0 0 6px rgba(76,217,100,0); } 100% { box-shadow: 0 0 0 0 rgba(76,217,100,0); } }
+
+/* ===== SHIRTS ===== */
+.stats-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
+.stat-tile {
+  background: white; border-radius: 8px; padding: 12px 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  border: 1px solid var(--sap-border); border-left: 4px solid var(--sap-blue);
+}
+.stat-tile.green { border-left-color: var(--sap-green); }
+.stat-tile.orange { border-left-color: var(--sap-orange); }
+.stat-tile.gray { border-left-color: var(--sap-gray); }
+.stat-label { font-size: 10px; color: var(--sap-gray); text-transform: uppercase; font-weight: 700; margin-bottom: 5px; }
+.stat-value { font-family: 'Roboto Mono', monospace; font-size: 20px; font-weight: 700; }
+
+.inventory-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.inventory-tile { border: 2px solid var(--sap-border); border-radius: 8px; padding: 12px; text-align: center; }
+.inventory-tile.status-ok { border-color: var(--sap-green); }
+.inventory-tile.status-low { border-color: var(--sap-orange); }
+.inventory-tile.status-out { border-color: var(--sap-red); }
+.inventory-size { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
+.inventory-remaining { font-family: 'Roboto Mono', monospace; font-size: 22px; font-weight: 700; }
+.status-ok .inventory-remaining { color: var(--sap-green); }
+.status-low .inventory-remaining { color: var(--sap-orange); }
+.status-out .inventory-remaining { color: var(--sap-red); }
+.inventory-of { font-size: 10px; color: var(--sap-gray); margin-bottom: 6px; }
+.inventory-bar { height: 5px; background: #EEEFF0; border-radius: 3px; overflow: hidden; margin-bottom: 6px; }
+.inventory-bar-fill { height: 100%; }
+.status-ok .inventory-bar-fill { background: var(--sap-green); }
+.status-low .inventory-bar-fill { background: var(--sap-orange); }
+.status-out .inventory-bar-fill { background: var(--sap-red); }
+.inventory-label { font-size: 9px; font-weight: 700; text-transform: uppercase; }
+.status-ok .inventory-label { color: var(--sap-green); }
+.status-low .inventory-label { color: var(--sap-orange); }
+.status-out .inventory-label { color: var(--sap-red); }
+.inventory-given { font-size: 10px; color: var(--sap-gray); margin-top: 3px; }
+
+.chip-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.chip { border: 1px solid var(--sap-border); border-radius: 8px; padding: 10px; cursor: pointer; text-align: center; background: white; }
+.chip.given { background: #E1F5EB; border-color: var(--sap-green); }
+.chip-name { font-size: 11.5px; font-weight: 700; margin-bottom: 3px; }
+.chip-status { font-size: 9.5px; color: var(--sap-gray); }
+.chip.given .chip-status { color: var(--sap-green); }
+
+.person-card {
+  display: none; background: linear-gradient(135deg, #E8F4FD 0%, #F5FAFD 100%); border: 2px solid var(--sap-blue);
+  border-radius: 10px; padding: 18px; text-align: center; margin-top: 14px;
+}
+.person-card.show { display: block; }
+.person-name { font-size: 16px; font-weight: 700; color: var(--sap-blue); margin-bottom: 2px; }
+.person-meta { font-size: 11.5px; color: var(--sap-gray); margin-bottom: 14px; }
+.size-picker { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 6px; }
+.size-option {
+  min-width: 48px; height: 48px; padding: 0 8px; border-radius: 8px; border: 2px solid var(--sap-border);
+  background: white; font-size: 14px; font-weight: 700; cursor: pointer;
+}
+.size-option.selected { border-color: var(--sap-blue); background: var(--sap-blue); color: white; }
+.size-registered-hint { font-size: 10.5px; color: var(--sap-gray); margin-bottom: 14px; }
+
+.roster-controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.roster-search { flex: 1; min-width: 140px; padding: 9px 12px; border: 1px solid var(--sap-border); border-radius: 8px; font-size: 12.5px; }
+.tabs { display: flex; gap: 4px; }
+.tab-btn { padding: 7px 11px; border-radius: 6px; border: 1px solid var(--sap-border); background: white; font-size: 11px; font-weight: 700; cursor: pointer; color: var(--sap-gray); }
+.tab-btn.active { background: var(--sap-blue); color: white; border-color: var(--sap-blue); }
+
+.table-wrap { max-height: 380px; overflow: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+thead { background: var(--sap-bg); position: sticky; top: 0; }
+th { padding: 9px 10px; text-align: left; font-weight: 700; font-size: 10px; text-transform: uppercase; border-bottom: 1px solid var(--sap-border); color: var(--sap-gray); white-space: nowrap; }
+td { padding: 9px 10px; border-bottom: 1px solid #EEEFF0; white-space: nowrap; }
+tbody tr:active { background: #F5FAFD; }
+.type-tag { font-size: 10.5px; color: var(--sap-gray); }
+
+.setup-banner { background: #FADAD4; border: 2px solid var(--sap-red); color: var(--sap-red); border-radius: 8px; padding: 14px 16px; margin-bottom: 16px; font-size: 12.5px; line-height: 1.6; }
+.setup-banner strong { display: block; margin-bottom: 5px; font-size: 14px; }
+.setup-banner code { background: rgba(0,0,0,.06); padding: 1px 5px; border-radius: 3px; }
+
+.footer-note { text-align: center; color: var(--sap-gray); font-size: 11px; padding: 6px 0 4px; }
+
+@media (min-width: 560px) {
+  .content { max-width: 640px; margin: 0 auto; }
+  .stats-row, .inventory-grid, .chip-grid { grid-template-columns: repeat(4, 1fr); }
+  .tiles-grid { grid-template-columns: repeat(3, 1fr); }
+  .pie-chart-container { flex-direction: row; justify-content: space-around; }
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- APP BAR -->
+  <header class="appbar">
+    <div class="appbar-title">
+      <span class="appbar-icon" id="appbarIcon">🎫</span>
+      <span>
+        <span id="appbarTitle">Check-In</span>
+        <small>🏕️ Teaching Activity Camp — مخيم نشاط التدريس</small>
+      </span>
+    </div>
+    <button class="appbar-install" id="installBtn" hidden>⬇️ Install</button>
+  </header>
+
+  <!-- SHARED SUPERVISOR BAR -->
+  <div class="supervisor-bar" id="supervisorBar">
+    <span class="supervisor-bar-icon">👤</span>
+    <select id="supervisorName">
+      <option value="">-- Select Your Name --</option>
+      <option value="Yasser Mustafa">Yasser Mustafa</option>
+      <option value="Mohammed Ismail">Mohammed Ismail</option>
+      <option value="Abbas Abdul Rab">Abbas Abdul Rab</option>
+      <option value="Hussain Mustafa">Hussain Mustafa</option>
+      <option value="Hamza">Hamza</option>
+    </select>
+    <button class="btn-ghost-sm" id="changeSupervisorBtn" hidden>🔄 Change</button>
+  </div>
+
+  <!-- CONTENT -->
+  <main class="content">
+
+    <!-- ================= CHECK-IN PANEL ================= -->
+    <section id="panel-checkin" class="panel active">
+
+      <div class="card">
+        <div class="card-title"><span class="card-title-icon">📷</span><span>QR Code Scanner</span></div>
+
+        <fieldset id="ciScanFieldset" disabled>
+          <button class="btn btn-primary btn-block" id="ciStartCameraBtn">📱 Start Camera</button>
+
+          <div id="qr-reader" style="margin-top: 16px;"></div>
+          <div class="camera-placeholder" id="ciCameraPlaceholder">📱 Camera will appear here</div>
+
+          <div class="form-group">
+            <label>Or Search by Student Name</label>
+            <div class="autocomplete-container">
+              <input type="text" id="ciStudentNameInput" placeholder="Enter student name (e.g., محمد علي)" autocomplete="off">
+              <div class="autocomplete-dropdown" id="ciAutocompleteDropdown"></div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Or Enter Student ID Manually</label>
+            <input type="text" id="ciStudentIdInput" placeholder="Enter Student ID (e.g., 1205)" inputmode="numeric" autocomplete="off">
+          </div>
+
+          <button class="btn btn-primary btn-block" id="ciSearchBtn" style="margin-top: 10px;">🔍 Search Student</button>
+        </fieldset>
+        <div class="hint hint-warning" id="ciScanLockHint">⚠️ Select your name above to unlock the scanner</div>
+        <div class="hint" id="ciDataStatus" style="margin-top: 6px;"></div>
+      </div>
+
+      <!-- STUDENT INFO -->
+      <div id="ciStudentInfo" class="student-info">
+        <img id="ciStudentAvatar" class="student-avatar" src="" alt="Student Avatar">
+        <div style="text-align: center; margin-bottom: 16px;">
+          <button class="btn btn-success" id="ciVerifyIdentityBtn" style="width: auto; padding: 10px 22px;">✅ Verify Identity &amp; Proceed</button>
+          <div style="font-size: 11px; color: var(--sap-gray); margin-top: 8px;">Compare photo with student's face</div>
+        </div>
+
+        <div class="student-name" id="ciStudentNameDisplay"></div>
+
+        <div class="student-meta">
+          <div class="student-meta-item"><div class="student-meta-label">ID</div><div class="student-meta-value" id="ciStudentIdDisplay"></div></div>
+          <div class="student-meta-item"><div class="student-meta-label">Class</div><div class="student-meta-value" id="ciStudentClassDisplay"></div></div>
+          <div class="student-meta-item"><div class="student-meta-label">Team</div><div class="student-meta-value" id="ciStudentTeamDisplay"></div></div>
+          <div class="student-meta-item"><div class="student-meta-label">Bus</div><div class="student-meta-value" id="ciStudentBusDisplay"></div></div>
+        </div>
+      </div>
+
+      <div id="ciAlertContainer"></div>
+      <div id="ciLoading" class="loading"><div class="spinner"></div><p>Processing...</p></div>
+
+      <!-- ACTIONS -->
+      <div id="ciActionButtons" style="display: none;">
+        <div class="card">
+          <div class="form-group">
+            <label>Notes (Optional)</label>
+            <textarea id="ciNotesInput" placeholder="Add any notes..."></textarea>
+          </div>
+          <div class="action-buttons">
+            <button class="btn btn-success btn-block" id="ciCheckInBtn">✅ Check-In (Board Bus)</button>
+            <button class="btn btn-warning btn-block" id="ciCheckOutBtn">🚪 Check-Out (Leave Bus)</button>
+            <button class="btn btn-danger btn-block" id="ciWithdrawnBtn">⛔ Withdrawn (Cancelled)</button>
+          </div>
+          <button class="btn btn-secondary btn-block" id="ciResetBtn" style="margin-top: 10px;">🔄 Scan Another Student</button>
+        </div>
+      </div>
+
+      <!-- ACTIVITY LOG -->
+      <div class="card">
+        <div class="activity-log-header">
+          <div class="card-title" style="margin-bottom: 0;"><span class="card-title-icon">📋</span><span>Recent (This Session)</span></div>
+          <button class="btn btn-secondary" id="ciClearLogBtn" style="width: auto; padding: 6px 12px; font-size: 11px;">🗑️ Clear</button>
+        </div>
+        <div id="ciActivityLogList" style="margin-top: 12px;">
+          <div class="activity-empty">No check-ins recorded yet in this session.</div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ================= DASHBOARD PANEL ================= -->
+    <section id="panel-dashboard" class="panel">
+
+      <div class="topbar-time-row">
+        <span><span class="live-dot"></span><span id="dbLastUpdated">Loading...</span></span>
+        <span id="dbCurrentTime">--:--:--</span>
+      </div>
+
+      <div class="tiles-grid">
+        <div class="tile tile-total"><div class="tile-icon">👥</div><div class="tile-title">Total</div><div class="tile-value" id="dbTotalCount">0</div></div>
+        <div class="tile tile-onbus"><div class="tile-icon">✅</div><div class="tile-title">On Bus</div><div class="tile-value" id="dbOnBusCount">0</div></div>
+        <div class="tile tile-waiting"><div class="tile-icon">⏳</div><div class="tile-title">Waiting</div><div class="tile-value" id="dbWaitingCount">0</div></div>
+        <div class="tile tile-left"><div class="tile-icon">🚪</div><div class="tile-title">Left</div><div class="tile-value" id="dbLeftCount">0</div></div>
+        <div class="tile tile-withdrawn"><div class="tile-icon">⛔</div><div class="tile-title">Withdrawn</div><div class="tile-value" id="dbWithdrawnCount">0</div></div>
+      </div>
+
+      <div class="chart-panel">
+        <div class="panel-title">📊 Check-In Status</div>
+        <div class="pie-chart-container">
+          <svg class="pie-chart-svg" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="40" fill="none" stroke="#E0E0E0" stroke-width="10"/>
+            <circle id="dbPieOnBus" cx="50" cy="50" r="40" fill="none" stroke="#107E3E" stroke-width="10"
+              stroke-dasharray="0 251" stroke-dashoffset="0" transform="rotate(-90 50 50)" style="transition: stroke-dasharray 0.3s ease;"/>
+            <circle id="dbPieWaiting" cx="50" cy="50" r="40" fill="none" stroke="#E87722" stroke-width="10"
+              stroke-dasharray="0 251" stroke-dashoffset="0" transform="rotate(0 50 50)" style="transition: stroke-dasharray 0.3s ease;"/>
+            <text id="dbPieText" x="50" y="55" text-anchor="middle" font-size="14" font-weight="bold" fill="#32363A">0%</text>
+          </svg>
+          <div class="pie-legend">
+            <div class="legend-item"><div class="legend-color" style="background:#107E3E;"></div><div class="legend-text"><div class="legend-value">On Bus</div><div class="legend-percent"><span id="dbLegendOnBus">0</span></div></div></div>
+            <div class="legend-item"><div class="legend-color" style="background:#E87722;"></div><div class="legend-text"><div class="legend-value">Waiting</div><div class="legend-percent"><span id="dbLegendWaiting">0</span></div></div></div>
+            <div class="legend-item"><div class="legend-color" style="background:#0A6ED4;"></div><div class="legend-text"><div class="legend-value">Left Bus</div><div class="legend-percent"><span id="dbLegendLeft">0</span></div></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart-panel">
+        <div class="panel-title">🕒 Recent Activity</div>
+        <div class="activity-table-wrap">
+          <table class="activity-table">
+            <thead><tr><th>Time</th><th>Student</th><th>Bus</th><th>Action</th></tr></thead>
+            <tbody id="dbActivityBody"><tr><td colspan="4" style="text-align:center;color:var(--sap-gray);">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="chart-panel">
+        <div class="panel-title">🚌 Bus Distribution</div>
+        <div class="activity-table-wrap">
+          <table class="activity-table">
+            <thead><tr><th>Bus</th><th>Total</th><th>On</th><th>Wait</th><th>Left</th></tr></thead>
+            <tbody id="dbBusBody"><tr><td colspan="5" style="text-align:center;color:var(--sap-gray);">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="chart-panel">
+        <div class="panel-title">👫 Students by Bus</div>
+        <input type="text" class="bus-search" id="dbBusSearch" placeholder="🔍 Filter by student name or ID...">
+        <div id="dbBusGroupsList"></div>
+      </div>
+
+      <div style="text-align:center;">
+        <button class="btn btn-secondary" onclick="window.print()" style="width:auto;padding:9px 18px;font-size:12px;">🖨️ Print Report</button>
+      </div>
+
+    </section>
+
+    <!-- ================= SHIRTS PANEL ================= -->
+    <section id="panel-shirts" class="panel">
+
+      <div id="shSetupBanner" class="setup-banner" style="display:none;">
+        <strong>⚠️ Setup needed before this tab will work</strong>
+        Open <code>app/index.html</code> and replace <code>SHIRTS_SHEET_ID</code> and <code>SHIRTS_APPS_SCRIPT_URL</code> near the top of the
+        <code>&lt;script&gt;</code> section with your dedicated shirts Sheet's ID and its deployed Apps Script Web App URL
+        (see <code>AppsScript_Shirts.gs</code>).
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-tile"><div class="stat-label">Total People</div><div class="stat-value" id="shStatTotal">—</div></div>
+        <div class="stat-tile green"><div class="stat-label">Given</div><div class="stat-value" id="shStatGiven" style="color:var(--sap-green)">—</div></div>
+        <div class="stat-tile orange"><div class="stat-label">Waiting</div><div class="stat-value" id="shStatPending" style="color:var(--sap-orange)">—</div></div>
+        <div class="stat-tile gray"><div class="stat-label">Progress</div><div class="stat-value" id="shStatProgress">—</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span class="card-title-icon">📦</span><span>Remaining Stock by Size</span></div>
+        <div class="inventory-grid" id="shInventoryGrid">
+          <p style="grid-column:1/-1;text-align:center;color:var(--sap-gray);">Loading inventory...</p>
+        </div>
+        <div class="hint" id="shDataStatus" style="margin-top: 12px;"></div>
+      </div>
+
+      <fieldset id="shMainFieldset" disabled>
+        <div class="hint hint-warning" id="shLockHint" style="margin-bottom: 12px;">⚠️ Select your name above to unlock distribution</div>
+
+        <div class="card">
+          <div class="card-title"><span class="card-title-icon">🎓</span><span>Find a Student</span></div>
+          <div class="form-group">
+            <label>Search by Name</label>
+            <div class="autocomplete-container">
+              <input type="text" id="shStudentNameInput" placeholder="Type a student name" autocomplete="off">
+              <div class="autocomplete-dropdown" id="shAutocompleteDropdown"></div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Or Enter Student ID</label>
+            <div style="display:flex; gap:8px;">
+              <input type="text" id="shStudentIdInput" placeholder="e.g. 1205" inputmode="numeric" style="flex:1;">
+              <button class="btn btn-primary" id="shSearchBtn" style="width:auto;">🔍</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title"><span class="card-title-icon">🧑‍🏫</span><span>Or Pick a Supervisor</span></div>
+          <div class="chip-grid" id="shSupervisorChips">
+            <p style="grid-column:1/-1;text-align:center;color:var(--sap-gray);">Loading...</p>
+          </div>
+        </div>
+
+        <div id="shPersonCard" class="person-card">
+          <div class="person-name" id="shPersonName"></div>
+          <div class="person-meta" id="shPersonMeta"></div>
+          <div class="size-picker" id="shSizePicker"></div>
+          <div class="size-registered-hint" id="shSizeRegisteredHint"></div>
+          <div id="shAlertContainer"></div>
+          <button class="btn btn-success btn-block" id="shDistributeBtn">✅ Distribute Shirt</button>
+        </div>
+
+        <div id="shLoading" class="loading"><div class="spinner"></div><p>Saving...</p></div>
+      </fieldset>
+
+      <div class="card">
+        <div class="card-title"><span class="card-title-icon">📋</span><span>Recent (This Session)</span></div>
+        <div id="shActivityLogList" style="margin-top:12px;"><div class="hint">No shirts distributed yet in this session.</div></div>
+      </div>
+
+      <div class="panel-block">
+        <div class="panel-block-header">
+          <div class="card-title" style="margin-bottom:0;"><span class="card-title-icon">📊</span><span>Roster</span></div>
+        </div>
+        <div class="panel-block-body">
+          <div class="roster-controls" style="margin-bottom: 12px;">
+            <div class="tabs">
+              <button class="tab-btn active" data-filter="all">All</button>
+              <button class="tab-btn" data-filter="given">✅</button>
+              <button class="tab-btn" data-filter="pending">⏳</button>
+            </div>
+            <input type="text" class="roster-search" id="shRosterSearch" placeholder="🔍 Search name or ID...">
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Name</th><th>Type</th><th>Size</th><th>Status</th></tr></thead>
+              <tbody id="shRosterTable"><tr><td colspan="4" style="text-align:center;color:var(--sap-gray);padding:16px;">Loading roster...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer-note">🔄 Data refreshes automatically every 30 seconds</div>
+
+    </section>
+
+  </main>
+
+  <!-- BOTTOM NAV -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-panel="checkin" data-icon="🎫" data-title="Check-In">
+      <span class="nav-icon">🎫</span><span>Check-In</span>
+    </button>
+    <button class="nav-btn" data-panel="dashboard" data-icon="📊" data-title="Dashboard">
+      <span class="nav-icon">📊</span><span>Dashboard</span>
+    </button>
+    <button class="nav-btn" data-panel="shirts" data-icon="👕" data-title="Shirts">
+      <span class="nav-icon">👕</span><span>Shirts</span>
+      <span class="nav-badge" id="shNavBadge" hidden></span>
+    </button>
+  </nav>
+
+</div>
+
+<script>
+/* =====================================================================
+   CONFIG
+   ===================================================================== */
+// Bus check-in system (used by the Check-In and Dashboard tabs)
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzZYgQ_IUjIueJeZgVb4gPmIRGXaPCII5MqtSidEe2TdF5_EFqpsA4MHLxcB7pOX1RGAg/exec';
+
+// Shirt distribution system — independent Google Sheet + Apps Script (used
+// by the Shirts tab only). See AppsScript_Shirts.gs for setup steps.
+const SHIRTS_SHEET_ID = '1zkqlD2eFNBbooTOJ1_IUIsSgb_PRLW7DfUt9K4W81u0';
+const SHIRTS_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx-dLqDPnep7xYw5YLq5CyU57H57ETOXVOergJx6ncrDcavUDW94FzI79senB8BnaDR/exec';
+const SHIRTS_SETUP_NOT_DONE = SHIRTS_SHEET_ID.indexOf('PUT_YOUR') === 0 || SHIRTS_APPS_SCRIPT_URL.indexOf('PUT_YOUR') === 0;
+
+/* =====================================================================
+   APP SHELL: tab navigation + shared supervisor login + PWA install
+   ===================================================================== */
+const PANEL_META = {
+  checkin: { icon: '🎫', title: 'Check-In' },
+  dashboard: { icon: '📊', title: 'Dashboard' },
+  shirts: { icon: '👕', title: 'Shirts' }
+};
+
+function switchPanel(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + name));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-panel') === name));
+  document.getElementById('appbarIcon').textContent = PANEL_META[name].icon;
+  document.getElementById('appbarTitle').textContent = PANEL_META[name].title;
+  // Supervisor login is only relevant to Check-In and Shirts
+  document.getElementById('supervisorBar').hidden = (name === 'dashboard');
+  sessionStorage.setItem('activeTab', name);
+  if (name === 'dashboard') loadBusData();
+}
+
+document.querySelectorAll('.nav-btn').forEach(btn => {
+  btn.addEventListener('click', () => switchPanel(btn.getAttribute('data-panel')));
+});
+
+// Shared supervisor selection (same localStorage key used by both the
+// Check-In and Shirts tabs, so logging in once unlocks both).
+function updateSupervisorLock() {
+  const hasSupervisor = !!document.getElementById('supervisorName').value;
+  document.getElementById('ciScanFieldset').disabled = !hasSupervisor;
+  document.getElementById('ciScanLockHint').style.display = hasSupervisor ? 'none' : 'block';
+  document.getElementById('shMainFieldset').disabled = !hasSupervisor;
+  document.getElementById('shLockHint').style.display = hasSupervisor ? 'none' : 'block';
+}
+
+document.getElementById('supervisorName').addEventListener('change', function () {
+  if (this.value) {
+    localStorage.setItem('supervisorName', this.value);
+    this.disabled = true;
+    document.getElementById('changeSupervisorBtn').hidden = false;
+  }
+  updateSupervisorLock();
+});
+
+document.getElementById('changeSupervisorBtn').addEventListener('click', function () {
+  localStorage.removeItem('supervisorName');
+  document.getElementById('supervisorName').value = '';
+  document.getElementById('supervisorName').disabled = false;
+  document.getElementById('changeSupervisorBtn').hidden = true;
+  stopQRScanner();
+  resetStudent();
+  resetPerson();
+  updateSupervisorLock();
+});
+
+// PWA install prompt
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  document.getElementById('installBtn').hidden = false;
+});
+document.getElementById('installBtn').addEventListener('click', async () => {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  document.getElementById('installBtn').hidden = true;
+});
+window.addEventListener('appinstalled', () => {
+  document.getElementById('installBtn').hidden = true;
+});
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+
+/* =====================================================================
+   SHARED BUS DATA (Check-In + Dashboard tabs)
+   ===================================================================== */
+let busStudents = [];   // { id, name, bus, class, photoUrl }
+let busRecords = [];    // { studentId, action, timestamp, supervisor, bus, notes }
+let busDataReady = false;
+let studentStatus = {}; // studentId -> { status, checkInTime, checkOutTime }
+
+function loadBusData() {
+  showCiDataStatus('⏳ Loading student data...', true);
+  fetch(`${APPS_SCRIPT_URL}?action=getDashboardData`)
+    .then(res => res.json())
+    .then(data => {
+      busStudents = data.students || [];
+      busRecords = data.records || [];
+      busDataReady = true;
+      showCiDataStatus(`✅ ${busStudents.length} students loaded — search is instant`, false);
+      computeStudentStatus();
+      updateDashboard();
+      document.getElementById('dbLastUpdated').textContent = 'Live — updated ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    })
+    .catch(() => {
+      showCiDataStatus('⚠️ Could not load data — retrying...', true);
+      document.getElementById('dbLastUpdated').textContent = 'Connection error — retrying...';
+      setTimeout(loadBusData, 4000);
+    });
+}
+
+function showCiDataStatus(text, loading) {
+  const el = document.getElementById('ciDataStatus');
+  if (!el) return;
+  el.textContent = text;
+  el.style.color = loading ? 'var(--sap-orange)' : 'var(--sap-green)';
+}
+
+function getLocalCheckInLog(studentId) {
+  let checkedIn = false, checkedOut = false, checkInTime = '', checkOutTime = '';
+  for (const rec of busRecords) {
+    if (rec.studentId !== String(studentId)) continue;
+    if (rec.action === 'Check-In') { checkedIn = true; checkInTime = rec.timestamp; }
+    if (rec.action === 'Check-Out') { checkedOut = true; checkOutTime = rec.timestamp; }
+  }
+  return { checkedIn, checkedOut, checkInTime, checkOutTime };
+}
+
+function computeStudentStatus() {
+  studentStatus = {};
+  busRecords.forEach(rec => {
+    const id = rec.studentId;
+    if (!studentStatus[id]) studentStatus[id] = { status: 'Waiting', checkInTime: '', checkOutTime: '' };
+    if (rec.action === 'Check-In') { studentStatus[id].status = 'In Bus'; studentStatus[id].checkInTime = rec.timestamp; }
+    else if (rec.action === 'Check-Out') { studentStatus[id].status = 'Left'; studentStatus[id].checkOutTime = rec.timestamp; }
+    else if (rec.action === 'Withdrawn') { studentStatus[id].status = 'Withdrawn'; }
+  });
+}
+function getStatus(studentId) { return (studentStatus[studentId] && studentStatus[studentId].status) || 'Waiting'; }
+
+/* ---------------------------------------------------------------------
+   CHECK-IN TAB
+   --------------------------------------------------------------------- */
+let html5QrcodeScanner = null;
+let currentStudent = null;
+let cameraStarted = false;
+let identityVerified = false;
+let ciActivityLog = JSON.parse(sessionStorage.getItem('activityLog') || '[]');
+
+function setupNameSearch() {
+  const nameInput = document.getElementById('ciStudentNameInput');
+  const dropdown = document.getElementById('ciAutocompleteDropdown');
+
+  nameInput.addEventListener('input', function () {
+    const query = this.value.trim().toLowerCase();
+    if (query.length < 2) { dropdown.classList.remove('show'); return; }
+
+    const matches = busStudents.filter(s => s.name.toLowerCase().includes(query) || s.id.includes(query)).slice(0, 10);
+    if (matches.length === 0) { dropdown.classList.remove('show'); return; }
+
+    dropdown.innerHTML = matches.map(s => `
+      <div class="autocomplete-item" data-id="${s.id}" data-name="${s.name}">
+        <strong>${s.name}</strong> (ID: ${s.id}) - Bus ${s.bus}, Class ${s.class}
+      </div>`).join('');
+    dropdown.classList.add('show');
+
+    dropdown.querySelectorAll('.autocomplete-item').forEach(item => {
+      item.addEventListener('click', function () {
+        const id = this.getAttribute('data-id');
+        nameInput.value = this.getAttribute('data-name');
+        dropdown.classList.remove('show');
+        searchStudent(id);
+      });
+    });
+  });
+
+  document.addEventListener('click', function (e) {
+    if (e.target !== nameInput && !dropdown.contains(e.target)) dropdown.classList.remove('show');
+  });
+
+  nameInput.addEventListener('keypress', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); dropdown.classList.remove('show'); }
+  });
+}
+
+document.getElementById('ciVerifyIdentityBtn').addEventListener('click', function () {
+  identityVerified = true;
+  this.textContent = '✅ Identity Verified!';
+  this.disabled = true;
+  showCiAlert('Identity Verified', 'success', '✅ Photo verified. You can now proceed with Check-In/Out.');
+  setTimeout(() => document.getElementById('ciActionButtons').scrollIntoView({ behavior: 'smooth' }), 300);
+});
+
+document.getElementById('ciStartCameraBtn').addEventListener('click', function () {
+  if (!cameraStarted) startQRScanner(); else stopQRScanner();
+});
+
+document.getElementById('ciSearchBtn').addEventListener('click', function () {
+  const id = document.getElementById('ciStudentIdInput').value.trim();
+  if (id) searchStudent(id); else showCiAlert('Please enter a Student ID', 'error');
+});
+
+document.getElementById('ciStudentIdInput').addEventListener('keypress', function (e) {
+  if (e.key === 'Enter') { e.preventDefault(); document.getElementById('ciSearchBtn').click(); }
+});
+
+function startQRScanner() {
+  html5QrcodeScanner = new Html5Qrcode('qr-reader');
+  html5QrcodeScanner.start(
+    { facingMode: 'environment' },
+    { fps: 10, qrbox: { width: 230, height: 230 } },
+    onQRCodeScanned,
+    () => {}
+  ).catch(() => {
+    showCiAlert('Camera Error', 'error', 'Could not start the camera. Check camera permissions for this app.');
+  });
+  cameraStarted = true;
+  document.getElementById('ciStartCameraBtn').textContent = '⏹️ Stop Camera';
+  document.getElementById('ciCameraPlaceholder').style.display = 'none';
+}
+
+function stopQRScanner() {
+  if (html5QrcodeScanner && cameraStarted) {
+    html5QrcodeScanner.stop().catch(() => {});
+    cameraStarted = false;
+    document.getElementById('ciStartCameraBtn').textContent = '📱 Start Camera';
+    document.getElementById('ciCameraPlaceholder').style.display = 'flex';
+  }
+}
+
+function onQRCodeScanned(result) {
+  const studentId = result.trim();
+  if (studentId) {
+    if (navigator.vibrate) navigator.vibrate(120);
+    searchStudent(studentId);
+    stopQRScanner();
+  }
+}
+
+function searchStudent(studentId) {
+  if (!document.getElementById('supervisorName').value) { showCiAlert('Please select your name', 'error'); return; }
+  studentId = String(studentId).trim();
+
+  if (busDataReady) {
+    const student = busStudents.find(s => s.id === studentId);
+    if (student) {
+      const log = getLocalCheckInLog(studentId);
+      const data = {
+        found: true, studentId: student.id, name: student.name, teamName: student.name,
+        busNumber: student.bus, className: student.class, photoUrl: student.photoUrl,
+        alreadyCheckedIn: log.checkedIn, alreadyCheckedOut: log.checkedOut,
+        checkInTime: log.checkInTime, checkOutTime: log.checkOutTime
+      };
+      currentStudent = data;
+      displayStudent(data);
+      checkForDuplicate(data);
+    } else {
+      showCiAlert('Student not found! Please check the ID and try again.', 'error');
+      resetStudent();
+    }
+    return;
+  }
+
+  showCiLoading(true);
+  fetch(`${APPS_SCRIPT_URL}?action=lookup&studentId=${encodeURIComponent(studentId)}`)
+    .then(res => res.json())
+    .then(data => {
+      showCiLoading(false);
+      if (data.found) { currentStudent = data; displayStudent(data); checkForDuplicate(data); }
+      else { showCiAlert('Student not found! Please check the ID and try again.', 'error'); resetStudent(); }
+    })
+    .catch(err => { showCiLoading(false); showCiAlert('Error searching student: ' + err.message, 'error'); });
+}
+
+function displayStudent(student) {
+  document.getElementById('ciStudentNameDisplay').textContent = student.name;
+  document.getElementById('ciStudentIdDisplay').textContent = student.studentId;
+  document.getElementById('ciStudentClassDisplay').textContent = student.className;
+  document.getElementById('ciStudentTeamDisplay').textContent = student.teamName;
+  document.getElementById('ciStudentBusDisplay').textContent = student.busNumber;
+
+  identityVerified = false;
+  const verifyBtn = document.getElementById('ciVerifyIdentityBtn');
+  verifyBtn.textContent = '✅ Verify Identity & Proceed';
+  verifyBtn.disabled = false;
+
+  document.getElementById('ciStudentAvatar').src = student.photoUrl || '';
+  document.getElementById('ciStudentAvatar').onerror = function () {
+    this.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240"><rect width="240" height="240" fill="%23E8F4FD"/><circle cx="120" cy="80" r="40" fill="%230A6ED4"/><ellipse cx="120" cy="170" rx="60" ry="50" fill="%230A6ED4"/></svg>'
+    );
+  };
+  document.getElementById('ciStudentIdInput').value = student.studentId;
+
+  const infoBox = document.getElementById('ciStudentInfo');
+  infoBox.classList.add('show');
+  infoBox.classList.remove('scan-flash');
+  void infoBox.offsetWidth;
+  infoBox.classList.add('scan-flash');
+
+  document.getElementById('ciActionButtons').style.display = 'block';
+}
+
+function checkForDuplicate(student) {
+  if (student.alreadyCheckedIn) {
+    showCiAlert('Already Checked In', 'warning', `⚠️ This student already boarded the bus at ${student.checkInTime}. You can now Check-Out.`);
+  } else if (student.alreadyCheckedOut) {
+    showCiAlert('Already Checked Out', 'error', `❌ This student already checked out at ${student.checkOutTime}. Cannot check-in again.`);
+  }
+}
+
+document.getElementById('ciCheckInBtn').addEventListener('click', function (e) {
+  e.preventDefault();
+  if (identityVerified && currentStudent) saveCheckInOut('check-in'); else showCiAlert('⚠️ Please verify identity first', 'warning');
+});
+document.getElementById('ciCheckOutBtn').addEventListener('click', function (e) {
+  e.preventDefault();
+  if (identityVerified && currentStudent) saveCheckInOut('check-out'); else showCiAlert('⚠️ Please verify identity first', 'warning');
+});
+document.getElementById('ciWithdrawnBtn').addEventListener('click', function (e) {
+  e.preventDefault();
+  if (identityVerified && currentStudent) {
+    if (confirm('Are you sure you want to mark this student as withdrawn?')) saveCheckInOut('withdrawn');
+  } else {
+    showCiAlert('⚠️ Please verify identity first', 'warning');
+  }
+});
+
+function saveCheckInOut(action) {
+  if (!currentStudent) return;
+  showCiLoading(true);
+
+  const supervisor = document.getElementById('supervisorName').value;
+  const notes = document.getElementById('ciNotesInput').value;
+  const data = { action, studentId: currentStudent.studentId, supervisor, bus: currentStudent.busNumber, notes };
+
+  fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(data) })
+    .then(res => res.json())
+    .then(res => {
+      showCiLoading(false);
+      if (res.success) {
+        const message = action === 'check-in' ? '✅ Check-In Recorded' : action === 'check-out' ? '🚪 Check-Out Recorded' : '⛔ Withdrawn Recorded';
+        showCiAlert(message, 'success', `Student: ${currentStudent.name} - Time: ${res.timestamp}`);
+        addToCiActivityLog(currentStudent.name, currentStudent.studentId, action, res.timestamp);
+
+        const actionLabel = action === 'check-in' ? 'Check-In' : action === 'check-out' ? 'Check-Out' : 'Withdrawn';
+        busRecords.push({ studentId: String(currentStudent.studentId), action: actionLabel, timestamp: res.timestamp, supervisor, bus: currentStudent.busNumber, notes });
+        computeStudentStatus();
+        updateDashboard();
+
+        setTimeout(resetStudent, 2000);
+      } else {
+        showCiAlert('Error saving data', 'error', res.error);
+      }
+    })
+    .catch(err => { showCiLoading(false); showCiAlert('Error: ' + err.message, 'error'); });
+}
+
+function addToCiActivityLog(name, studentId, action, timestamp) {
+  ciActivityLog.unshift({ name, studentId, action, timestamp });
+  ciActivityLog = ciActivityLog.slice(0, 20);
+  sessionStorage.setItem('activityLog', JSON.stringify(ciActivityLog));
+  renderCiActivityLog();
+}
+
+function renderCiActivityLog() {
+  const list = document.getElementById('ciActivityLogList');
+  if (ciActivityLog.length === 0) { list.innerHTML = '<div class="activity-empty">No check-ins recorded yet in this session.</div>'; return; }
+  const labels = { 'check-in': '✅ Check-In', 'check-out': '🚪 Check-Out', 'withdrawn': '⛔ Withdrawn' };
+  list.innerHTML = ciActivityLog.map(item => `
+    <div class="activity-item ${item.action}">
+      <div>
+        <div class="activity-item-name">${item.name}</div>
+        <div class="activity-item-details">ID: ${item.studentId} | ${item.timestamp}</div>
+      </div>
+      <div class="activity-item-badge ${item.action}">${labels[item.action] || item.action}</div>
+    </div>`).join('');
+}
+
+document.getElementById('ciClearLogBtn').addEventListener('click', function () {
+  if (confirm('Clear the recent check-ins list?')) {
+    ciActivityLog = [];
+    sessionStorage.removeItem('activityLog');
+    renderCiActivityLog();
+  }
+});
+
+document.getElementById('ciResetBtn').addEventListener('click', resetStudent);
+
+function resetStudent() {
+  currentStudent = null;
+  identityVerified = false;
+  document.getElementById('ciStudentInfo').classList.remove('show');
+  document.getElementById('ciActionButtons').style.display = 'none';
+  document.getElementById('ciStudentIdInput').value = '';
+  document.getElementById('ciStudentNameInput').value = '';
+  document.getElementById('ciNotesInput').value = '';
+  clearCiAlerts();
+}
+
+function showCiAlert(title, type, message = '') {
+  clearCiAlerts();
+  document.getElementById('ciAlertContainer').innerHTML = `
+    <div class="alert alert-${type} show"><div class="alert-title">${title}</div>${message ? `<div>${message}</div>` : ''}</div>`;
+}
+function clearCiAlerts() { document.getElementById('ciAlertContainer').innerHTML = ''; }
+function showCiLoading(show) { document.getElementById('ciLoading').classList.toggle('show', show); }
+
+/* ---------------------------------------------------------------------
+   DASHBOARD TAB
+   --------------------------------------------------------------------- */
+let openBuses = new Set(JSON.parse(sessionStorage.getItem('openBuses') || '[]'));
+
+function updateDashboard() {
+  if (busStudents.length === 0) return;
+
+  const onBus = busStudents.filter(s => getStatus(s.id) === 'In Bus').length;
+  const waiting = busStudents.filter(s => getStatus(s.id) === 'Waiting').length;
+  const left = busStudents.filter(s => getStatus(s.id) === 'Left').length;
+  const withdrawn = busStudents.filter(s => getStatus(s.id) === 'Withdrawn').length;
+  const total = busStudents.length;
+
+  document.getElementById('dbTotalCount').textContent = total;
+  document.getElementById('dbOnBusCount').textContent = onBus;
+  document.getElementById('dbWaitingCount').textContent = waiting;
+  document.getElementById('dbLeftCount').textContent = left;
+  document.getElementById('dbWithdrawnCount').textContent = withdrawn;
+
+  const onBusPercent = total > 0 ? (onBus / total * 100).toFixed(1) : 0;
+  const waitingPercent = total > 0 ? (waiting / total * 100).toFixed(1) : 0;
+  const circumference = 2 * Math.PI * 40;
+  const onBusDash = (onBusPercent / 100) * circumference;
+  const waitingDash = (waitingPercent / 100) * circumference;
+
+  document.getElementById('dbPieOnBus').setAttribute('stroke-dasharray', `${onBusDash} ${circumference}`);
+  document.getElementById('dbPieWaiting').setAttribute('stroke-dasharray', `${waitingDash} ${circumference}`);
+  document.getElementById('dbPieWaiting').setAttribute('stroke-dashoffset', -onBusDash);
+  document.getElementById('dbPieText').textContent = onBusPercent + '%';
+  document.getElementById('dbLegendOnBus').textContent = onBus;
+  document.getElementById('dbLegendWaiting').textContent = waiting;
+  document.getElementById('dbLegendLeft').textContent = left;
+
+  updateActivityTable();
+  updateBusDistribution();
+  updateBusGroups();
+}
+
+function updateActivityTable() {
+  const recent = busRecords.slice(-12).reverse();
+  const tbody = document.getElementById('dbActivityBody');
+  if (recent.length === 0) { tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--sap-gray);">No activity yet</td></tr>'; return; }
+
+  tbody.innerHTML = recent.map(rec => {
+    const student = busStudents.find(s => s.id === rec.studentId);
+    const name = student ? student.name : rec.studentId;
+    const badgeClass = rec.action === 'Check-In' ? 'badge-checkin' : rec.action === 'Check-Out' ? 'badge-checkout' : 'badge-withdrawn';
+    return `<tr><td>${rec.timestamp}</td><td><strong>${name}</strong></td><td>${rec.bus || (student ? student.bus : '-')}</td><td><span class="badge ${badgeClass}">${rec.action}</span></td></tr>`;
+  }).join('');
+}
+
+function updateBusDistribution() {
+  const buses = {};
+  busStudents.forEach(s => {
+    const bus = s.bus || 'N/A';
+    if (!buses[bus]) buses[bus] = { total: 0, onBus: 0, waiting: 0, left: 0, withdrawn: 0 };
+    buses[bus].total++;
+    const status = getStatus(s.id);
+    if (status === 'In Bus') buses[bus].onBus++;
+    else if (status === 'Left') buses[bus].left++;
+    else if (status === 'Withdrawn') buses[bus].withdrawn++;
+    else buses[bus].waiting++;
+  });
+
+  const sorted = Object.keys(buses).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  const tbody = document.getElementById('dbBusBody');
+  if (sorted.length === 0) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--sap-gray);">No bus data</td></tr>'; return; }
+
+  tbody.innerHTML = sorted.map(busNum => {
+    const d = buses[busNum];
+    return `<tr><td><strong>Bus ${busNum}</strong></td><td>${d.total}</td><td><span class="status-dot green"></span>${d.onBus}</td><td><span class="status-dot orange"></span>${d.waiting}</td><td><span class="status-dot red"></span>${d.left}</td></tr>`;
+  }).join('');
+}
+
+function updateBusGroups() {
+  const filter = (document.getElementById('dbBusSearch').value || '').trim().toLowerCase();
+  const buses = {};
+  busStudents.forEach(s => { const bus = s.bus || 'N/A'; if (!buses[bus]) buses[bus] = []; buses[bus].push(s); });
+  const sorted = Object.keys(buses).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  const container = document.getElementById('dbBusGroupsList');
+
+  const statusMeta = {
+    'In Bus': { label: '✅ On Bus', badge: 'badge-checkin' },
+    'Left': { label: '🚪 Left', badge: 'badge-checkout' },
+    'Withdrawn': { label: '⛔ Withdrawn', badge: 'badge-withdrawn' },
+    'Waiting': { label: '⏳ Waiting', badge: 'badge-waiting' }
+  };
+
+  container.innerHTML = sorted.map(busNum => {
+    let students = buses[busNum].slice().sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+    if (filter) {
+      students = students.filter(s => s.name.toLowerCase().includes(filter) || s.id.includes(filter));
+      if (students.length === 0) return '';
+    }
+
+    const counts = { onbus: 0, waiting: 0, left: 0, withdrawn: 0 };
+    buses[busNum].forEach(s => {
+      const st = getStatus(s.id);
+      if (st === 'In Bus') counts.onbus++;
+      else if (st === 'Left') counts.left++;
+      else if (st === 'Withdrawn') counts.withdrawn++;
+      else counts.waiting++;
+    });
+
+    const isOpen = openBuses.has(busNum) || !!filter;
+
+    const rows = students.map(s => {
+      const st = getStatus(s.id);
+      const meta = statusMeta[st];
+      const info = studentStatus[s.id] || {};
+      const timeLabel = st === 'In Bus' ? info.checkInTime : st === 'Left' ? info.checkOutTime : '';
+      return `
+        <div class="student-row">
+          <div>
+            <span class="student-row-name">${s.name}</span>
+            <span class="student-row-id">#${s.id} · Class ${s.class}</span>
+            ${timeLabel ? `<div class="student-row-time">${timeLabel}</div>` : ''}
+          </div>
+          <span class="badge ${meta.badge}">${meta.label}</span>
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="bus-group ${isOpen ? 'open' : ''}" data-bus="${busNum}">
+        <div class="bus-group-header" onclick="toggleBusGroup('${busNum}')">
+          <div class="bus-group-title">🚌 Bus ${busNum}</div>
+          <span class="bus-group-toggle">▼</span>
+        </div>
+        <div class="bus-group-counts" style="padding: 0 14px 10px;">
+          <span class="count-chip onbus">${counts.onbus} on</span>
+          <span class="count-chip waiting">${counts.waiting} wait</span>
+          <span class="count-chip left">${counts.left} left</span>
+          ${counts.withdrawn > 0 ? `<span class="count-chip withdrawn">${counts.withdrawn} out</span>` : ''}
+        </div>
+        <div class="bus-group-body">${rows}</div>
+      </div>`;
+  }).join('') || '<div style="text-align:center; color: var(--sap-gray); padding: 20px;">No students match your search.</div>';
+}
+
+function toggleBusGroup(busNum) {
+  const el = document.querySelector(`.bus-group[data-bus="${busNum}"]`);
+  if (!el) return;
+  el.classList.toggle('open');
+  if (el.classList.contains('open')) openBuses.add(busNum); else openBuses.delete(busNum);
+  sessionStorage.setItem('openBuses', JSON.stringify([...openBuses]));
+}
+
+document.getElementById('dbBusSearch').addEventListener('input', updateBusGroups);
+
+function updateClock() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2, '0');
+  const m = String(now.getMinutes()).padStart(2, '0');
+  const s = String(now.getSeconds()).padStart(2, '0');
+  document.getElementById('dbCurrentTime').textContent = `${h}:${m}:${s}`;
+}
+
+/* ---------------------------------------------------------------------
+   SHIRTS TAB
+   --------------------------------------------------------------------- */
+let shSizes = ['S', 'M', 'L', 'XL'];
+const SH_KNOWN_SUPERVISORS = ['Yasser Mustafa', 'Mohammed Ismail', 'Abbas Abdul Rab', 'Hussain Mustafa', 'Hamza'];
+
+let shStudents = [];
+let shSupervisors = [];
+let shInventory = {};
+let shBusReady = false, shSupReady = false, shInvReady = false;
+let currentPerson = null;
+let selectedSize = '';
+let rosterFilter = 'all';
+let rosterQuery = '';
+let shActivityLog = JSON.parse(sessionStorage.getItem('shirtActivityLog') || '[]');
+
+function shLoadJsonp(sheetName, callbackName, onError) {
+  const old = document.querySelector('script[data-jsonp="' + sheetName + '"]');
+  if (old) old.remove();
+  const url = 'https://docs.google.com/spreadsheets/d/' + SHIRTS_SHEET_ID +
+    '/gviz/tq?tqx=responseHandler:' + callbackName + '&sheet=' + encodeURIComponent(sheetName);
+  const script = document.createElement('script');
+  script.setAttribute('data-jsonp', sheetName);
+  script.src = url;
+  script.onerror = onError;
+  document.body.appendChild(script);
+}
+
+function shCellStr(cell) { return cell ? String(cell.v) : ''; }
+
+function handleStudentsData(response) {
+  shStudents = [];
+  if (response && response.table && response.table.rows) {
+    response.table.rows.forEach(row => {
+      const c = row.c;
+      const id = c[0] ? shCellStr(c[0]) : '';
+      if (!id) return;
+      shStudents.push({
+        id, name: c[1] ? shCellStr(c[1]) : '', group: c[2] ? shCellStr(c[2]) : '',
+        size: c[3] ? shCellStr(c[3]).trim().toUpperCase() : '',
+        givenAt: c[4] ? shCellStr(c[4]) : '', givenBy: c[5] ? shCellStr(c[5]) : ''
+      });
+    });
+  }
+  shBusReady = true;
+  showShDataStatus(`✅ ${shStudents.length} people loaded — auto-refreshing every 30s`, false);
+  onShDataChanged();
+}
+
+function handleSupervisorsData(response) {
+  shSupervisors = [];
+  if (response && response.table && response.table.rows) {
+    response.table.rows.forEach(row => {
+      const c = row.c;
+      const name = c[0] ? shCellStr(c[0]) : '';
+      if (!name) return;
+      shSupervisors.push({
+        name, size: c[1] ? shCellStr(c[1]).trim().toUpperCase() : '',
+        givenAt: c[2] ? shCellStr(c[2]) : '', givenBy: c[3] ? shCellStr(c[3]) : ''
+      });
+    });
+  }
+  shSupReady = true;
+  onShDataChanged();
+}
+
+function handleInventoryData(response) {
+  shInventory = {};
+  const order = [];
+  if (response && response.table && response.table.rows) {
+    response.table.rows.forEach(row => {
+      const c = row.c;
+      const size = c[0] ? shCellStr(c[0]).trim().toUpperCase() : '';
+      if (!size) return;
+      order.push(size);
+      shInventory[size] = { initial: c[1] ? Number(c[1].v) || 0 : 0, threshold: c[2] ? Number(c[2].v) || 0 : 0 };
+    });
+  }
+  if (order.length > 0) shSizes = order;
+  shInvReady = true;
+  onShDataChanged();
+}
+
+function onShDataChanged() {
+  if (!shBusReady || !shSupReady || !shInvReady) return;
+  renderShInventory();
+  renderShStats();
+  renderShSupervisorChips();
+  renderShSizePicker();
+  renderShRoster();
+  updateShNavBadge();
+}
+
+function updateShNavBadge() {
+  const pending = shStudents.filter(s => !s.givenAt).length + shSupervisors.filter(s => !s.givenAt).length;
+  const badge = document.getElementById('shNavBadge');
+  if (pending > 0) { badge.hidden = false; badge.textContent = pending > 99 ? '99+' : pending; }
+  else { badge.hidden = true; }
+}
+
+function renderShInventory() {
+  const distributed = {};
+  shSizes.forEach(sz => { distributed[sz] = 0; });
+  shStudents.forEach(s => { if (s.givenAt && distributed.hasOwnProperty(s.size)) distributed[s.size]++; });
+  shSupervisors.forEach(s => { if (s.givenAt && distributed.hasOwnProperty(s.size)) distributed[s.size]++; });
+
+  document.getElementById('shInventoryGrid').innerHTML = shSizes.map(size => {
+    const inv = shInventory[size] || { initial: 0, threshold: 0 };
+    const remaining = inv.initial - distributed[size];
+    const pct = inv.initial > 0 ? Math.max(0, Math.min(100, Math.round((remaining / inv.initial) * 100))) : 0;
+    let status = 'status-ok', label = '✅ OK';
+    if (remaining <= 0) { status = 'status-out'; label = '🔴 Out'; }
+    else if (remaining <= inv.threshold) { status = 'status-low'; label = '⚠️ Low'; }
+    return `
+      <div class="inventory-tile ${status}">
+        <div class="inventory-size">${size}</div>
+        <div class="inventory-remaining">${remaining}</div>
+        <div class="inventory-of">of ${inv.initial}</div>
+        <div class="inventory-bar"><div class="inventory-bar-fill" style="width:${pct}%"></div></div>
+        <div class="inventory-label">${label}</div>
+        <div class="inventory-given">${distributed[size]} given</div>
+      </div>`;
+  }).join('');
+}
+
+function renderShStats() {
+  const total = shStudents.length + shSupervisors.length;
+  const given = shStudents.filter(s => s.givenAt).length + shSupervisors.filter(s => s.givenAt).length;
+  const pending = total - given;
+  const pct = total > 0 ? Math.round((given / total) * 100) : 0;
+  document.getElementById('shStatTotal').textContent = total;
+  document.getElementById('shStatGiven').textContent = given;
+  document.getElementById('shStatPending').textContent = pending;
+  document.getElementById('shStatProgress').textContent = pct + '%';
+}
+
+function showShDataStatus(text, loading) {
+  const el = document.getElementById('shDataStatus');
+  el.textContent = text;
+  el.style.color = loading ? 'var(--sap-orange)' : 'var(--sap-green)';
+}
+
+function loadShirtsData() {
+  if (SHIRTS_SETUP_NOT_DONE) return;
+  showShDataStatus('⏳ Loading camp data...', true);
+  shLoadJsonp('Names', 'handleStudentsData', () => { showShDataStatus('⚠️ Failed to load students. Retrying...', true); setTimeout(loadShirtsData, 4000); });
+  shLoadJsonp('Supervisors', 'handleSupervisorsData', () => {});
+  shLoadJsonp('Inventory', 'handleInventoryData', () => {});
+}
+
+function shSetupNameSearch() {
+  const input = document.getElementById('shStudentNameInput');
+  const dropdown = document.getElementById('shAutocompleteDropdown');
+
+  input.addEventListener('input', function () {
+    const q = this.value.trim().toLowerCase();
+    if (q.length < 2) { dropdown.classList.remove('show'); return; }
+    const matches = shStudents.filter(s => s.name.toLowerCase().includes(q) || s.id.includes(q)).slice(0, 10);
+    if (matches.length === 0) { dropdown.classList.remove('show'); return; }
+    dropdown.innerHTML = matches.map(s => `
+      <div class="autocomplete-item" data-id="${s.id}">
+        <strong>${s.name}</strong> (ID: ${s.id}) — ${s.size ? 'Size ' + s.size : 'no size'} ${s.givenAt ? '✅' : ''}
+      </div>`).join('');
+    dropdown.classList.add('show');
+    dropdown.querySelectorAll('.autocomplete-item').forEach(item => {
+      item.addEventListener('click', function () {
+        dropdown.classList.remove('show');
+        input.value = '';
+        selectStudent(this.getAttribute('data-id'));
+      });
+    });
+  });
+
+  document.addEventListener('click', function (e) {
+    if (e.target !== input && !dropdown.contains(e.target)) dropdown.classList.remove('show');
+  });
+}
+
+document.getElementById('shSearchBtn').addEventListener('click', function () {
+  const id = document.getElementById('shStudentIdInput').value.trim();
+  if (!id) { alert('Please enter a Student ID'); return; }
+  selectStudent(id);
+});
+document.getElementById('shStudentIdInput').addEventListener('keypress', function (e) {
+  if (e.key === 'Enter') { e.preventDefault(); document.getElementById('shSearchBtn').click(); }
+});
+
+function selectStudent(id) {
+  const student = shStudents.find(s => s.id === id);
+  if (!student) { alert('Student not found'); resetPerson(); return; }
+  currentPerson = { type: 'student', id: student.id, name: student.name, registeredSize: student.size, givenAt: student.givenAt, givenBy: student.givenBy };
+  showPerson({ name: student.name, meta: `ID: ${student.id}${student.group ? ' | ' + student.group : ''}` });
+}
+
+function renderShSupervisorChips() {
+  const grid = document.getElementById('shSupervisorChips');
+  grid.innerHTML = SH_KNOWN_SUPERVISORS.map(name => {
+    const rec = shSupervisors.find(s => s.name === name);
+    const size = rec ? rec.size : '';
+    const given = rec && rec.givenAt;
+    return `<div class="chip ${given ? 'given' : ''}" data-name="${name}"><div class="chip-name">${name}</div><div class="chip-status">${size ? 'Size ' + size : 'No size'}${given ? ' ✅' : ''}</div></div>`;
+  }).join('');
+  grid.querySelectorAll('.chip').forEach(chip => chip.addEventListener('click', function () { selectSupervisor(this.getAttribute('data-name')); }));
+}
+
+function selectSupervisor(name) {
+  const rec = shSupervisors.find(s => s.name === name);
+  currentPerson = { type: 'supervisor', id: name, name, registeredSize: rec ? rec.size : '', givenAt: rec ? rec.givenAt : '', givenBy: rec ? rec.givenBy : '' };
+  showPerson({ name, meta: 'Supervisor' });
+}
+
+document.getElementById('shSizePicker').addEventListener('click', function (e) {
+  const btn = e.target.closest('.size-option');
+  if (!btn) return;
+  selectedSize = btn.getAttribute('data-size');
+  renderShSizePicker();
+  refreshDistributeState();
+});
+
+function renderShSizePicker() {
+  document.getElementById('shSizePicker').innerHTML = shSizes.map(sz => `<button type="button" class="size-option${sz === selectedSize ? ' selected' : ''}" data-size="${sz}">${sz}</button>`).join('');
+}
+
+function refreshDistributeState() {
+  const btn = document.getElementById('shDistributeBtn');
+  if (!currentPerson) { btn.disabled = true; return; }
+  if (currentPerson.givenAt) { btn.disabled = true; return; }
+  btn.disabled = !selectedSize;
+}
+
+function showPerson(info) {
+  document.getElementById('shPersonName').textContent = info.name;
+  document.getElementById('shPersonMeta').textContent = info.meta;
+  selectedSize = currentPerson.registeredSize || '';
+  renderShSizePicker();
+
+  document.getElementById('shSizeRegisteredHint').textContent = currentPerson.registeredSize
+    ? `Registered size: ${currentPerson.registeredSize} (tap a different size to change it)`
+    : 'No size registered yet — pick one above';
+
+  document.getElementById('shPersonCard').classList.add('show');
+  clearShAlerts();
+
+  if (currentPerson.givenAt) {
+    showShAlert('Already Distributed', 'warning', `Given at ${currentPerson.givenAt}${currentPerson.givenBy ? ' by ' + currentPerson.givenBy : ''}.`);
+  }
+
+  refreshDistributeState();
+  document.getElementById('shPersonCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function resetPerson() {
+  currentPerson = null;
+  selectedSize = '';
+  renderShSizePicker();
+  document.getElementById('shPersonCard').classList.remove('show');
+  document.getElementById('shStudentIdInput').value = '';
+  document.getElementById('shStudentNameInput').value = '';
+  clearShAlerts();
+}
+
+document.getElementById('shDistributeBtn').addEventListener('click', function () {
+  if (!currentPerson || !selectedSize) return;
+  const supervisor = document.getElementById('supervisorName').value;
+  if (!supervisor) { alert('Please select your name first'); return; }
+
+  showShLoading(true);
+  document.getElementById('shDistributeBtn').disabled = true;
+
+  fetch(SHIRTS_APPS_SCRIPT_URL, {
+    method: 'POST',
+    body: JSON.stringify({ requestType: 'shirt', personType: currentPerson.type, personId: currentPerson.id, size: selectedSize, supervisor })
+  })
+    .then(res => res.json())
+    .then(data => {
+      showShLoading(false);
+      if (data.success) {
+        showShAlert('✅ Shirt Distributed', 'success', `${currentPerson.name} — Size ${data.size} — ${data.timestamp}`);
+        addToShActivityLog(currentPerson.name, currentPerson.type, data.size, data.timestamp);
+
+        if (currentPerson.type === 'student') {
+          const s = shStudents.find(x => x.id === currentPerson.id);
+          if (s) { s.size = data.size; s.givenAt = data.timestamp; s.givenBy = supervisor; }
+        } else {
+          const s = shSupervisors.find(x => x.name === currentPerson.id);
+          if (s) { s.size = data.size; s.givenAt = data.timestamp; s.givenBy = supervisor; }
+        }
+        renderShInventory(); renderShStats(); renderShSupervisorChips(); renderShRoster(); updateShNavBadge();
+        setTimeout(resetPerson, 2000);
+      } else if (data.alreadyGiven) {
+        showShAlert('Already Distributed', 'warning', `Given at ${data.givenAt}.`);
+      } else {
+        showShAlert('Error', 'error', data.error || 'Could not save.');
+        document.getElementById('shDistributeBtn').disabled = false;
+      }
+    })
+    .catch(err => { showShLoading(false); showShAlert('Error', 'error', err.message); document.getElementById('shDistributeBtn').disabled = false; });
+});
+
+function shSetupRosterControls() {
+  document.querySelectorAll('#panel-shirts .tab-btn').forEach(btn => {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('#panel-shirts .tab-btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      rosterFilter = this.getAttribute('data-filter');
+      renderShRoster();
+    });
+  });
+  document.getElementById('shRosterSearch').addEventListener('input', function () {
+    rosterQuery = this.value.trim().toLowerCase();
+    renderShRoster();
+  });
+}
+
+function renderShRoster() {
+  const rows = [];
+  shStudents.forEach(s => rows.push({ name: s.name, id: s.id, type: 'Student', size: s.size, givenAt: s.givenAt }));
+  shSupervisors.forEach(s => rows.push({ name: s.name, id: s.name, type: 'Supervisor', size: s.size, givenAt: s.givenAt }));
+
+  let filtered = rows;
+  if (rosterFilter === 'given') filtered = filtered.filter(r => r.givenAt);
+  if (rosterFilter === 'pending') filtered = filtered.filter(r => !r.givenAt);
+  if (rosterQuery) filtered = filtered.filter(r => r.name.toLowerCase().includes(rosterQuery) || r.id.toLowerCase().includes(rosterQuery));
+
+  const tbody = document.getElementById('shRosterTable');
+  if (filtered.length === 0) { tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--sap-gray);padding:16px;">No matches</td></tr>'; return; }
+
+  tbody.innerHTML = filtered.slice(0, 400).map(r => `
+    <tr data-type="${r.type.toLowerCase()}" data-id="${r.id}">
+      <td><strong>${r.name}</strong></td>
+      <td><span class="type-tag">${r.type}</span></td>
+      <td>${r.size ? `<span class="badge badge-size">${r.size}</span>` : '—'}</td>
+      <td>${r.givenAt ? '<span class="badge badge-given">✅</span>' : '<span class="badge badge-pending">⏳</span>'}</td>
+    </tr>`).join('');
+
+  tbody.querySelectorAll('tr').forEach(tr => {
+    tr.addEventListener('click', function () {
+      const type = this.getAttribute('data-type');
+      const id = this.getAttribute('data-id');
+      switchToShirtsAndSelect(type, id);
+    });
+  });
+}
+
+function switchToShirtsAndSelect(type, id) {
+  if (type === 'student') selectStudent(id); else selectSupervisor(id);
+}
+
+function addToShActivityLog(name, type, size, timestamp) {
+  shActivityLog.unshift({ name, type, size, timestamp });
+  shActivityLog = shActivityLog.slice(0, 20);
+  sessionStorage.setItem('shirtActivityLog', JSON.stringify(shActivityLog));
+  renderShActivityLog();
+}
+
+function renderShActivityLog() {
+  const list = document.getElementById('shActivityLogList');
+  if (shActivityLog.length === 0) { list.innerHTML = '<div class="hint">No shirts distributed yet in this session.</div>'; return; }
+  list.innerHTML = shActivityLog.map(item => `
+    <div style="display:flex;justify-content:space-between;align-items:center;background:white;border:1px solid var(--sap-border);border-left:4px solid var(--sap-green);border-radius:8px;padding:10px 14px;margin-bottom:8px;">
+      <div>
+        <div style="font-weight:700;font-size:13px;">${item.name}</div>
+        <div style="font-size:11px;color:var(--sap-gray);margin-top:2px;">${item.type === 'student' ? 'Student' : 'Supervisor'} | ${item.timestamp}</div>
+      </div>
+      <span class="badge badge-size">${item.size}</span>
+    </div>`).join('');
+}
+
+function showShAlert(title, type, message = '') {
+  clearShAlerts();
+  document.getElementById('shAlertContainer').innerHTML = `<div class="alert alert-${type} show"><div class="alert-title">${title}</div>${message ? `<div>${message}</div>` : ''}</div>`;
+}
+function clearShAlerts() { document.getElementById('shAlertContainer').innerHTML = ''; }
+function showShLoading(show) { document.getElementById('shLoading').classList.toggle('show', show); }
+
+/* =====================================================================
+   INIT
+   ===================================================================== */
+function updateDateTime() {
+  // kept for parity with the original supervisor app (used nowhere visible
+  // in the app-shell UI, but harmless to keep ticking for future use)
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  // Restore last active tab (defaults to Check-In)
+  const savedTab = sessionStorage.getItem('activeTab') || 'checkin';
+  switchPanel(savedTab);
+
+  // Restore saved supervisor
+  const savedSupervisor = localStorage.getItem('supervisorName');
+  if (savedSupervisor) {
+    document.getElementById('supervisorName').value = savedSupervisor;
+    document.getElementById('supervisorName').disabled = true;
+    document.getElementById('changeSupervisorBtn').hidden = false;
+  }
+  updateSupervisorLock();
+
+  if (SHIRTS_SETUP_NOT_DONE) {
+    document.getElementById('shSetupBanner').style.display = 'block';
+    showShDataStatus('⏳ Waiting for setup — see the banner above', true);
+  }
+
+  loadBusData();
+  setupNameSearch();
+  renderCiActivityLog();
+
+  loadShirtsData();
+  shSetupNameSearch();
+  shSetupRosterControls();
+  renderShActivityLog();
+
+  setInterval(updateClock, 1000);
+  updateClock();
+  setInterval(loadBusData, 5000);
+  setInterval(() => { if (shBusReady && shSupReady && shInvReady) loadShirtsData(); }, 30000);
+});
+</script>
+
+</body>
+</html>
