@@ -3960,6 +3960,11 @@ exports.decompressRTF = decompressRTF;
 </script>
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
+  /* Click-and-drag horizontal scrolling for wide tables — grab anywhere in
+     the scroll area and pull left/right instead of hunting for the thin
+     native scrollbar or using arrow keys. */
+  .drag-scroll { cursor: grab; }
+  .drag-scroll.dragging { cursor: grabbing; user-select: none; }
   :root {
     --sap-blue: #0A6ED4;
     --sap-blue-dark: #05386B;
@@ -4142,6 +4147,43 @@ const STATUS_INLINE_STYLE = {
   "Completed": { background: "var(--sap-green-bg)", color: "var(--sap-green)", borderColor: "#BFE3CB" },
   "Cancelled": { background: "#F0F0F0", color: "var(--sap-gray)", borderColor: "#D9D9D9" },
 };
+
+// Grab-and-drag horizontal scroll for wide tables. Mouse only — touch
+// already scrolls natively, and adding touch handlers here would fight it.
+function useDragScroll() {
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let dragging = false;
+    let startX = 0;
+    let startScroll = 0;
+    const onDown = (e) => {
+      dragging = true;
+      startX = e.pageX;
+      startScroll = el.scrollLeft;
+      el.classList.add("dragging");
+    };
+    const onMove = (e) => {
+      if (!dragging) return;
+      e.preventDefault();
+      el.scrollLeft = startScroll - (e.pageX - startX);
+    };
+    const stop = () => {
+      dragging = false;
+      el.classList.remove("dragging");
+    };
+    el.addEventListener("mousedown", onDown);
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", stop);
+    return () => {
+      el.removeEventListener("mousedown", onDown);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", stop);
+    };
+  }, []);
+  return ref;
+}
 
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -6659,6 +6701,8 @@ function App() {
   const [sla, setSla] = useState(loadSla);
   const [sharedDb, setSharedDb] = useState(null);
   const [syncStatus, setSyncStatus] = useState("local"); // local | connecting | shared | error
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const dragScrollRef = useDragScroll();
 
   // Always keep the private per-browser cache current — a fallback that
   // costs nothing and matters if sharing ever becomes unavailable mid-session.
@@ -6789,6 +6833,67 @@ function App() {
       setRequests((prev) => prev.filter((r) => r.id !== id));
     }
   };
+
+  // Partial-field update shared by the Service Entry Sheet checkbox and any
+  // other single-field toggle — goes through the same shared-db-or-local
+  // path as every other mutation so it stays in sync across browsers.
+  const handleFieldUpdate = async (id, patch) => {
+    const withStamp = { ...patch, updatedAt: new Date().toISOString() };
+    if (sharedDb) {
+      const current = requests.find((r) => r.id === id);
+      await sharedDb.collection("requests").doc(id).set(sanitizeRequestForDb({ ...current, ...withStamp }));
+    } else {
+      setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, ...withStamp } : r)));
+    }
+  };
+
+  const handleToggleSes = (req) => handleFieldUpdate(req.id, { serviceEntrySheet: !req.serviceEntrySheet });
+
+  const toggleSelected = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllFiltered = () => {
+    setSelectedIds((prev) => {
+      const allSelected = filtered.length > 0 && filtered.every((r) => prev.has(r.id));
+      if (allSelected) return new Set();
+      return new Set(filtered.map((r) => r.id));
+    });
+  };
+
+  // Shared by "Cancel selected" and "Cancel all" — takes an explicit id list
+  // rather than reading selectedIds itself so "cancel all" can pass every
+  // filtered id without requiring them to be checked first.
+  const cancelRequests = async (ids) => {
+    const targets = ids.filter((id) => {
+      const r = requests.find((x) => x.id === id);
+      return r && r.status !== "Cancelled" && r.status !== "Completed";
+    });
+    if (targets.length === 0) {
+      appToast("Nothing to cancel — selected requests are already Completed or Cancelled.");
+      return;
+    }
+    const label = targets.length === 1 ? "this request" : `these ${targets.length} requests`;
+    if (!(await appConfirm(`Cancel ${label}? This sets their status to Cancelled.`))) return;
+    const now = new Date().toISOString();
+    if (sharedDb) {
+      await Promise.all(targets.map((id) => {
+        const current = requests.find((r) => r.id === id);
+        return sharedDb.collection("requests").doc(id).set(sanitizeRequestForDb({ ...current, status: "Cancelled", updatedAt: now }));
+      }));
+    } else {
+      setRequests((prev) => prev.map((r) => (targets.includes(r.id) ? { ...r, status: "Cancelled", updatedAt: now } : r)));
+    }
+    setSelectedIds(new Set());
+    appToast(`Cancelled ${targets.length} request(s).`);
+  };
+
+  const handleCancelSelected = () => cancelRequests(Array.from(selectedIds));
+  const handleCancelAll = () => cancelRequests(filtered.map((r) => r.id));
 
   const handleImport = async (parsedRows) => {
     if (sharedDb) {
@@ -6940,11 +7045,44 @@ function App() {
           )}
         </div>
 
+        <div className="flex items-center gap-3 mb-2" style={{ flexWrap: "wrap" }}>
+          <span className="text-xs" style={{ color: "var(--sap-gray)" }}>
+            {selectedIds.size > 0 ? `${selectedIds.size} selected` : `${filtered.length} shown`}
+          </span>
+          <button
+            type="button"
+            onClick={handleCancelSelected}
+            disabled={selectedIds.size === 0}
+            className="sap-btn sap-btn-outline"
+            style={selectedIds.size === 0 ? { opacity: 0.5, cursor: "not-allowed" } : { color: "var(--sap-red)", borderColor: "var(--sap-red)" }}
+          >
+            Cancel selected
+          </button>
+          <button
+            type="button"
+            onClick={handleCancelAll}
+            disabled={filtered.length === 0}
+            className="sap-btn sap-btn-outline"
+            style={filtered.length === 0 ? { opacity: 0.5, cursor: "not-allowed" } : { color: "var(--sap-red)", borderColor: "var(--sap-red)" }}
+            title="Cancel every request currently shown by the filters above"
+          >
+            Cancel all shown
+          </button>
+        </div>
+
         <div className="sap-card overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto drag-scroll" ref={dragScrollRef}>
             <table className="sap-table">
               <thead>
                 <tr>
+                  <th style={{ width: 30 }}>
+                    <input
+                      type="checkbox"
+                      checked={filtered.length > 0 && filtered.every((r) => selectedIds.has(r.id))}
+                      onChange={toggleSelectAllFiltered}
+                      title="Select all shown"
+                    />
+                  </th>
                   <th>PR</th>
                   <th>PO</th>
                   <th>Requester / For</th>
@@ -6956,13 +7094,14 @@ function App() {
                   <th>Service Dates</th>
                   <th>Budget</th>
                   <th>Next Step</th>
+                  <th>SES</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan="12" className="text-center py-10" style={{ color: "var(--sap-gray)" }}>No matching requests</td>
+                    <td colSpan="14" className="text-center py-10" style={{ color: "var(--sap-gray)" }}>No matching requests</td>
                   </tr>
                 )}
                 {filtered.map((r) => {
@@ -6982,6 +7121,9 @@ function App() {
                         ...(groupColor ? { boxShadow: `inset 4px 0 0 0 ${groupColor}` } : {}),
                       }}
                     >
+                      <td>
+                        <input type="checkbox" checked={selectedIds.has(r.id)} onChange={() => toggleSelected(r.id)} />
+                      </td>
                       <td>{r.prNumber || "—"}</td>
                       <td>{r.poNumber || "—"}</td>
                       <td style={{ minWidth: 130 }}>
@@ -7046,6 +7188,14 @@ function App() {
                       </td>
                       <td>{r.budget ? Number(r.budget).toLocaleString() : "—"}</td>
                       <td className="text-xs" style={{ color: "var(--sap-blue-dark)", minWidth: 130, maxWidth: 170 }} title={getNextAction(r)}>{getNextAction(r)}</td>
+                      <td className="text-center">
+                        <input
+                          type="checkbox"
+                          checked={!!r.serviceEntrySheet}
+                          onChange={() => handleToggleSes(r)}
+                          title="Service Entry Sheet done — mark once you've closed this PO's SES"
+                        />
+                      </td>
                       <td className="whitespace-nowrap">
                         <button onClick={() => setStatusReq(r)} className="sap-link mr-3">Update Status</button>
                         <button onClick={() => { setEditingReq(r); setShowForm(true); }} className="sap-link mr-3" style={{ color: "var(--sap-gray)" }}>Edit</button>
