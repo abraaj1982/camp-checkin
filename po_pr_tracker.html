@@ -4131,24 +4131,25 @@ const { useState, useEffect, useMemo, useRef } = React;
 const STORAGE_KEY = "po_pr_tracker_requests_v1";
 
 const SERVICE_TYPES = ["Hotel", "Car", "Tickets", "Other"];
-const STATUSES = ["Pending", "Processing", "Approved", "PO Issued", "Completed", "Cancelled"];
+const STATUSES = ["Pending", "Waiting PR approval", "Waiting PO approval", "Completed", "Cancelled"];
 
 const STATUS_LABELS = {
   "Pending": "Pending",
-  "Processing": "Processing",
-  "Approved": "Approved",
-  "PO Issued": "PO Issued",
+  "Waiting PR approval": "Waiting PR approval",
+  "Waiting PO approval": "Waiting PO approval",
   "Completed": "Completed",
   "Cancelled": "Cancelled",
 };
 
+// Each status gets its own strong, unmistakable color so scanning the table
+// (or the search results) tells the stage apart at a glance without reading
+// the text — amber/blue/purple/green/red, never two stages sharing a hue.
 const STATUS_INLINE_STYLE = {
   "Pending": { background: "var(--sap-amber-bg)", color: "var(--sap-amber)", borderColor: "#F5DFA6" },
-  "Processing": { background: "#EAF2FC", color: "var(--sap-blue)", borderColor: "#BEDAF7" },
-  "Approved": { background: "var(--sap-purple-bg)", color: "var(--sap-purple)", borderColor: "#D9CCEA" },
-  "PO Issued": { background: "#EAF2FC", color: "var(--sap-blue-dark)", borderColor: "#BEDAF7" },
+  "Waiting PR approval": { background: "#EAF2FC", color: "var(--sap-blue)", borderColor: "#BEDAF7" },
+  "Waiting PO approval": { background: "var(--sap-purple-bg)", color: "var(--sap-purple)", borderColor: "#D9CCEA" },
   "Completed": { background: "var(--sap-green-bg)", color: "var(--sap-green)", borderColor: "#BFE3CB" },
-  "Cancelled": { background: "#F0F0F0", color: "var(--sap-gray)", borderColor: "#D9D9D9" },
+  "Cancelled": { background: "var(--sap-red-bg)", color: "var(--sap-red)", borderColor: "#F5C2C2" },
 };
 
 // Grab-and-drag horizontal scroll for wide tables. Mouse only — touch
@@ -4725,14 +4726,12 @@ function getNextAction(req) {
     case "Pending":
       if (!req.vendor) return "Choose a supplier for this request";
       return "Create the PR in SAP, then enter the PR number here";
-    case "Processing":
+    case "Waiting PR approval":
+      if (!req.prNumber) return "Enter the PR number, then wait for PR approval from SAP";
       return "Waiting for PR approval from SAP";
-    case "Approved":
-      if (!req.prNumber) return "Enter the PR number now that it's approved";
-      return "Proceed to issue the PO with the supplier";
-    case "PO Issued":
-      if (!req.poNumber) return "Enter the PO number";
-      return "Confirm booking/delivery with the supplier, then mark Completed";
+    case "Waiting PO approval":
+      if (!req.poNumber) return "Enter the PO number, then wait for PO approval";
+      return "Waiting for PO approval — confirm booking/delivery once approved";
     case "Completed":
       return "Completed — no action needed";
     case "Cancelled":
@@ -4762,9 +4761,8 @@ const WAITING_ON_LABELS = {
 // stays accurate without extra typing.
 const DEFAULT_WAITING_ON = {
   "Pending": "Me",
-  "Processing": "SAP",
-  "Approved": "Me",
-  "PO Issued": "Supplier",
+  "Waiting PR approval": "SAP",
+  "Waiting PO approval": "SAP",
   "Completed": "",
   "Cancelled": "",
 };
@@ -4783,9 +4781,8 @@ const SLA_STORAGE_KEY = "po_pr_tracker_sla_v1";
 
 const DEFAULT_SLA_DAYS = {
   "Pending": 2,
-  "Processing": 5,
-  "Approved": 3,
-  "PO Issued": 7,
+  "Waiting PR approval": 5,
+  "Waiting PO approval": 3,
 };
 
 function loadSla() {
@@ -5386,12 +5383,14 @@ const EXCEL_STATUS_MAP = {
   "منتهي": "Completed",
   "pending": "Pending",
   "معلق": "Pending",
-  "processing": "Processing",
-  "قيد المعالجة": "Processing",
-  "approved": "Approved",
-  "تمت الموافقة": "Approved",
-  "po issued": "PO Issued",
-  "تم إصدار po": "PO Issued",
+  "processing": "Waiting PR approval",
+  "قيد المعالجة": "Waiting PR approval",
+  "approved": "Waiting PO approval",
+  "تمت الموافقة": "Waiting PO approval",
+  "po issued": "Waiting PO approval",
+  "تم إصدار po": "Waiting PO approval",
+  "cancelled": "Cancelled",
+  "ملغي": "Cancelled",
 };
 
 function mapExcelStatus(raw) {
@@ -5414,15 +5413,15 @@ function findCol(row, candidates) {
 // "Deleted"...). This interprets that phrasing into our workflow stages.
 function mapFreeTextStatus(raw, hasPr, hasPo) {
   const text = String(raw || "").trim().toLowerCase();
-  if (!text) return hasPo ? "PO Issued" : hasPr ? "Processing" : "Pending";
+  if (!text) return hasPo ? "Waiting PO approval" : hasPr ? "Waiting PR approval" : "Pending";
   if (/delet|cancel/.test(text)) return "Cancelled";
   if (/^done$|complet/.test(text)) return "Completed";
-  if (/waiting po|please issue po/.test(text)) return "Approved";
-  if (/waiting pr|please issue the pr|creat/.test(text)) return "Processing";
+  if (/waiting po|please issue po/.test(text)) return "Waiting PO approval";
+  if (/waiting pr|please issue the pr|creat/.test(text)) return "Waiting PR approval";
   if (/still not/.test(text)) return "Pending";
   // Unrecognized free text (e.g. a name typed in by mistake) — fall back to
   // what's actually filled in rather than guessing from the words.
-  return hasPo ? "PO Issued" : hasPr ? "Processing" : "Pending";
+  return hasPo ? "Waiting PO approval" : hasPr ? "Waiting PR approval" : "Pending";
 }
 
 // The owner/requester name isn't its own column in this format — it's the
@@ -6398,11 +6397,11 @@ function StatusUpdateForm({ req, onSave, onCancel }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (status === "Approved" && !prNumber) {
-      if (!(await appConfirm("Make sure to enter the PR number before approving. Continue without a PR number?"))) return;
+    if (status === "Waiting PO approval" && !prNumber) {
+      if (!(await appConfirm("Make sure to enter the PR number now that it's approved. Continue without a PR number?"))) return;
     }
-    if (status === "PO Issued" && !poNumber) {
-      if (!(await appConfirm("Make sure to enter the PO number before marking as 'PO Issued'. Continue?"))) return;
+    if (status === "Completed" && !poNumber) {
+      if (!(await appConfirm("Make sure to enter the PO number before marking as Completed. Continue?"))) return;
     }
     const stageChanged = status !== req.status || waitingOn !== (req.waitingOn || "");
     onSave({
@@ -6905,7 +6904,7 @@ function App() {
 
   const stats = useMemo(() => {
     const pending = requests.filter((r) => r.status === "Pending").length;
-    const processing = requests.filter((r) => r.status === "Processing").length;
+    const processing = requests.filter((r) => r.status === "Waiting PR approval").length;
     const completed = requests.filter((r) => r.status === "Completed").length;
     const overdue = requests.filter((r) => isOverdue(r)).length;
     return { pending, processing, completed, overdue, total: requests.length };
@@ -6929,7 +6928,7 @@ function App() {
       );
     }
 
-    const statusOrder = { Pending: 0, Processing: 1, Approved: 2, "PO Issued": 3, Completed: 4 };
+    const statusOrder = { Pending: 0, "Waiting PR approval": 1, "Waiting PO approval": 2, Completed: 3 };
     list.sort((a, b) => {
       const diff = statusOrder[a.status] - statusOrder[b.status];
       if (diff !== 0) return diff;
@@ -7072,8 +7071,7 @@ function App() {
       .map((r) => ({ req: r, alert: getAlertLevel(r), breach: slaBreach(r, sla) }))
       .filter(({ req, alert, breach }) =>
         alert || breach ||
-        (req.status === "Approved" && !req.prNumber) ||
-        (req.status === "PO Issued" && !req.poNumber))
+        (req.status === "Waiting PO approval" && (!req.prNumber || !req.poNumber)))
       // What's sitting with me comes first — that's the part I can actually
       // move today; the rest is chasing other people.
       .sort((a, b) => {
@@ -7153,7 +7151,7 @@ function App() {
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
           <StatCard label="Total" value={stats.total} borderColor="var(--sap-gray)" />
           <StatCard label="Pending" value={stats.pending} borderColor="var(--sap-amber)" />
-          <StatCard label="Processing" value={stats.processing} borderColor="var(--sap-blue)" />
+          <StatCard label="Waiting PR approval" value={stats.processing} borderColor="var(--sap-blue)" />
           <StatCard label="Completed" value={stats.completed} borderColor="var(--sap-green)" />
           <StatCard label="Overdue" value={stats.overdue} borderColor="var(--sap-red)" />
         </div>
@@ -7385,8 +7383,8 @@ function App() {
             <div className="flex flex-col gap-3">
               {dailyItems.map(({ req, alert, breach }) => {
                 const style = alert ? ALERT_STYLES[alert] : null;
-                const missingPr = req.status === "Approved" && !req.prNumber;
-                const missingPo = req.status === "PO Issued" && !req.poNumber;
+                const missingPr = req.status === "Waiting PO approval" && !req.prNumber;
+                const missingPo = req.status === "Waiting PO approval" && !req.poNumber;
                 return (
                   <div key={req.id} className="sap-card p-3" style={style ? style.rowStyle : { background: "#F5F6F7" }}>
                     <div className="flex items-center justify-between">
