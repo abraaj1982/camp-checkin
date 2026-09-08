@@ -4336,10 +4336,27 @@ function ToastHost() {
   );
 }
 
+// Requests saved under the older 6-stage status list ("Processing", "Approved",
+// "PO Issued") still carry those exact strings — since STATUS_LABELS and
+// STATUS_INLINE_STYLE only know the current 5 stages, an unmigrated record
+// would render a blank badge and fall through every workflow check. This maps
+// old values onto their closest current stage the moment a request is read,
+// so existing data displays and behaves correctly without a one-time script.
+const LEGACY_STATUS_MAP = {
+  "Processing": "Waiting PR approval",
+  "Approved": "Waiting PO approval",
+  "PO Issued": "Waiting PO approval",
+};
+
+function normalizeStatus(req) {
+  const mapped = LEGACY_STATUS_MAP[req.status];
+  return mapped ? { ...req, status: mapped } : req;
+}
+
 function loadRequests() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    return raw ? JSON.parse(raw).map(normalizeStatus) : [];
   } catch (e) {
     return [];
   }
@@ -4397,7 +4414,7 @@ function sanitizeRequestForDb(req) {
 }
 
 function docToRequest(doc) {
-  return { ...doc.data(), id: doc.id };
+  return normalizeStatus({ ...doc.data(), id: doc.id });
 }
 
 // Runs once per browser: if the shared database is empty but this browser
