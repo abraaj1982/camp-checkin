@@ -6467,6 +6467,13 @@ function StatusUpdateForm({ req, onSave, onCancel }) {
     if (status === "Waiting PO approval" && !prNumber) {
       if (!(await appConfirm("Make sure to enter the PR number now that it's approved. Continue without a PR number?"))) return;
     }
+    // Hard requirement, not a confirm-and-continue: Completed must have the
+    // PO document attached first. No bypass — this stays open until one is
+    // actually attached below.
+    if (status === "Completed" && attachments.length === 0) {
+      appToast("Attach the PO document below before marking this request as Completed.");
+      return;
+    }
     if (status === "Completed" && !poNumber) {
       if (!(await appConfirm("Make sure to enter the PO number before marking as Completed. Continue?"))) return;
     }
@@ -6500,6 +6507,11 @@ function StatusUpdateForm({ req, onSave, onCancel }) {
           {breach ? <span style={{ color: "var(--sap-red)" }}> · {breach.over} day(s) past the {breach.target}-day target</span> : null}
         </div>
       </div>
+      {status === "Completed" && attachments.length === 0 && (
+        <div className="p-3 text-sm font-semibold" style={{ background: "var(--sap-red-bg)", border: "1px solid #F5C2C2", borderRadius: "10px", color: "var(--sap-red)" }}>
+          ⚠️ Attach the PO document below first — Completed can't be saved without it.
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="sap-label">New Status</label>
