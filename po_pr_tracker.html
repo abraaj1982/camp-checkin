@@ -5529,13 +5529,18 @@ function parseExcelFile(file) {
   });
 }
 
-function exportToExcel(requests) {
+// XLSX.writeFile() drives a plain <a download> click under the hood, which is
+// inert inside the Artifacts viewer sandbox (same restriction that affects
+// attachment downloads) — it looked like the button did nothing at all. This
+// builds the file's bytes and hands them to the declared "downloads"
+// capability when running as an Artifact, falling back to the normal
+// anchor-click download for a local HTML file / GitHub Pages.
+async function exportToExcel(requests) {
   const rows = requests.map((r) => ({
     "PR Number": r.prNumber,
     "PO Number": r.poNumber,
     "Requester": r.owner,
     "Beneficiary": r.beneficiary,
-    "Waiting On": r.waitingOn,
     "Service From": r.serviceDateFrom,
     "Service To": r.serviceDateTo,
     "Department": r.department,
@@ -5553,7 +5558,36 @@ function exportToExcel(requests) {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Requests");
   const stamp = new Date().toISOString().slice(0, 10);
-  XLSX.writeFile(wb, `PR_PO_Tracker_${stamp}.xlsx`);
+  const filename = `PR_PO_Tracker_${stamp}.xlsx`;
+  const bytes = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+  const blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+
+  let downloads = null;
+  try {
+    if (window.claude && typeof window.claude.use === "function") {
+      downloads = await window.claude.use("downloads");
+    }
+  } catch (err) {
+    downloads = null;
+  }
+
+  if (downloads) {
+    try {
+      await downloads.save({ filename, data: blob });
+    } catch (err) {
+      const code = err && err.code;
+      if (code === "declined") return; // the viewer said no; nothing to report
+      appToast(`Could not export Excel: ${(err && err.message) || code || "unknown error"}`);
+    }
+    return;
+  }
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
 function ImportExcelModal({ onImport, onCancel }) {
@@ -7000,35 +7034,19 @@ function App() {
     });
   };
 
-  // Shared by "Cancel selected" and "Cancel all" — takes an explicit id list
-  // rather than reading selectedIds itself so "cancel all" can pass every
-  // filtered id without requiring them to be checked first.
-  const cancelRequests = async (ids) => {
-    const targets = ids.filter((id) => {
-      const r = requests.find((x) => x.id === id);
-      return r && r.status !== "Cancelled" && r.status !== "Completed";
-    });
-    if (targets.length === 0) {
-      appToast("Nothing to cancel — selected requests are already Completed or Cancelled.");
-      return;
-    }
-    const label = targets.length === 1 ? "this request" : `these ${targets.length} requests`;
-    if (!(await appConfirm(`Cancel ${label}? This sets their status to Cancelled.`))) return;
-    const now = new Date().toISOString();
+  const handleDeleteSelected = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    const label = ids.length === 1 ? "this request" : `these ${ids.length} requests`;
+    if (!(await appConfirm(`Delete ${label}? This cannot be undone.`))) return;
     if (sharedDb) {
-      await Promise.all(targets.map((id) => {
-        const current = requests.find((r) => r.id === id);
-        return sharedDb.collection("requests").doc(id).set(sanitizeRequestForDb({ ...current, status: "Cancelled", updatedAt: now }));
-      }));
+      await Promise.all(ids.map((id) => sharedDb.collection("requests").doc(id).delete()));
     } else {
-      setRequests((prev) => prev.map((r) => (targets.includes(r.id) ? { ...r, status: "Cancelled", updatedAt: now } : r)));
+      setRequests((prev) => prev.filter((r) => !ids.includes(r.id)));
     }
     setSelectedIds(new Set());
-    appToast(`Cancelled ${targets.length} request(s).`);
+    appToast(`Deleted ${ids.length} request(s).`);
   };
-
-  const handleCancelSelected = () => cancelRequests(Array.from(selectedIds));
-  const handleCancelAll = () => cancelRequests(filtered.map((r) => r.id));
 
   const handleImport = async (parsedRows) => {
     if (sharedDb) {
@@ -7199,22 +7217,12 @@ function App() {
           </span>
           <button
             type="button"
-            onClick={handleCancelSelected}
+            onClick={handleDeleteSelected}
             disabled={selectedIds.size === 0}
             className="sap-btn sap-btn-outline"
             style={selectedIds.size === 0 ? { opacity: 0.5, cursor: "not-allowed" } : { color: "var(--sap-red)", borderColor: "var(--sap-red)" }}
           >
-            Cancel selected
-          </button>
-          <button
-            type="button"
-            onClick={handleCancelAll}
-            disabled={filtered.length === 0}
-            className="sap-btn sap-btn-outline"
-            style={filtered.length === 0 ? { opacity: 0.5, cursor: "not-allowed" } : { color: "var(--sap-red)", borderColor: "var(--sap-red)" }}
-            title="Cancel every request currently shown by the filters above"
-          >
-            Cancel all shown
+            🗑 Delete selected
           </button>
         </div>
 
@@ -7238,10 +7246,6 @@ function App() {
                   <th>Service</th>
                   <th>Vendor</th>
                   <th>Status</th>
-                  <th>Waiting On</th>
-                  <th>Service Dates</th>
-                  <th>Budget</th>
-                  <th>Next Step</th>
                   <th style={{ whiteSpace: "nowrap" }}>Service Entry Sheet</th>
                   <th>Actions</th>
                 </tr>
@@ -7249,7 +7253,7 @@ function App() {
               <tbody>
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan="14" className="text-center py-10" style={{ color: "var(--sap-gray)" }}>No matching requests</td>
+                    <td colSpan="10" className="text-center py-10" style={{ color: "var(--sap-gray)" }}>No matching requests</td>
                   </tr>
                 )}
                 {filtered.map((r) => {
@@ -7315,27 +7319,6 @@ function App() {
                           {STATUS_LABELS[r.status]}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap">
-                        {r.waitingOn ? (
-                          <span className="sap-badge" style={WAITING_ON_STYLE[r.waitingOn]} title={`In this stage for ${stageDays} day(s)`}>
-                            {WAITING_ON_LABELS[r.waitingOn]} · {stageDays}d
-                          </span>
-                        ) : "—"}
-                        {breach ? (
-                          <div className="text-xs font-semibold mt-1" style={{ color: "var(--sap-red)" }}>
-                            {breach.over}d past target
-                          </div>
-                        ) : style ? (
-                          <div className="text-xs font-semibold mt-1" style={{ color: style.text }}>{style.label}</div>
-                        ) : null}
-                      </td>
-                      <td className="whitespace-nowrap">
-                        {r.serviceDateFrom
-                          ? (r.serviceDateTo ? `${r.serviceDateFrom} → ${r.serviceDateTo}` : r.serviceDateFrom)
-                          : (r.requiredDate || "—")}
-                      </td>
-                      <td>{r.budget ? Number(r.budget).toLocaleString() : "—"}</td>
-                      <td className="text-xs" style={{ color: "var(--sap-blue-dark)", minWidth: 130, maxWidth: 170 }} title={getNextAction(r)}>{getNextAction(r)}</td>
                       <td className="text-center">
                         <input
                           type="checkbox"
