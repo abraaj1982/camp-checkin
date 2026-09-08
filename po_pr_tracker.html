@@ -5583,6 +5583,10 @@ const EXCEL_COLUMNS = [
 ];
 
 async function exportToExcel(requests) {
+  if (!window.XLSX || typeof window.XLSX.write !== "function") {
+    appToast("Could not load the Excel export library — check your internet connection and try again.");
+    return;
+  }
   const rows = requests.map((r) => ({
     "PR Number": r.prNumber,
     "PO Number": r.poNumber,
@@ -5745,33 +5749,6 @@ function ImportExcelModal({ onImport, onCancel }) {
           Confirm Import ({pending ? pending.length : 0})
         </button>
       </div>
-    </div>
-  );
-}
-
-function PrintablePO({ req }) {
-  return (
-    <div id="print-area" className="fixed inset-0 bg-white z-[100] p-8 overflow-auto">
-      <h1 className="text-xl font-bold mb-4">Purchase Order Form (PO)</h1>
-      <table className="w-full text-sm border-collapse">
-        <tbody>
-          <tr><td className="border p-2 font-semibold w-1/3">PR Number</td><td className="border p-2">{req.prNumber || "—"}</td></tr>
-          <tr><td className="border p-2 font-semibold">PO Number</td><td className="border p-2">{req.poNumber || "—"}</td></tr>
-          <tr><td className="border p-2 font-semibold">Requester</td><td className="border p-2">{req.owner}</td></tr>
-          <tr><td className="border p-2 font-semibold">Beneficiary / traveller</td><td className="border p-2">{req.beneficiary || req.owner}</td></tr>
-          <tr><td className="border p-2 font-semibold">Service dates</td><td className="border p-2">{req.serviceDateFrom ? (req.serviceDateTo ? `${req.serviceDateFrom} → ${req.serviceDateTo}` : req.serviceDateFrom) : "—"}</td></tr>
-          <tr><td className="border p-2 font-semibold">Department</td><td className="border p-2">{req.department || "—"}</td></tr>
-          <tr><td className="border p-2 font-semibold">Service Type</td><td className="border p-2">{req.serviceType}</td></tr>
-          <tr><td className="border p-2 font-semibold">Vendor</td><td className="border p-2">{req.vendor || "—"}</td></tr>
-          <tr><td className="border p-2 font-semibold">Budget</td><td className="border p-2">{req.budget || "—"}</td></tr>
-          <tr><td className="border p-2 font-semibold">Final Amount</td><td className="border p-2">{req.finalAmount || "—"}</td></tr>
-          <tr><td className="border p-2 font-semibold">Required Date</td><td className="border p-2">{req.requiredDate || "—"}</td></tr>
-          <tr><td className="border p-2 font-semibold">Completed Date</td><td className="border p-2">{req.completedDate || "—"}</td></tr>
-          <tr><td className="border p-2 font-semibold">Status</td><td className="border p-2">{STATUS_LABELS[req.status]}</td></tr>
-          <tr><td className="border p-2 font-semibold">Notes</td><td className="border p-2">{req.notes || "—"}</td></tr>
-        </tbody>
-      </table>
-      <p className="text-xs mt-6" style={{ color: "var(--sap-gray)" }}>Printed on {new Date().toLocaleDateString("en-US")}</p>
     </div>
   );
 }
@@ -6620,13 +6597,41 @@ function BarRow({ label, value, max, formatted, color, note }) {
   );
 }
 
+// Types the browser can render directly in an <iframe>/<img> from a data:
+// URL — no download needed, so no "Let this Artifact download a file?"
+// prompt either. PDFs and common image formats cover the vast majority of
+// what actually gets attached (tickets, PO scans, confirmations).
+const INLINE_PREVIEWABLE_EXTENSIONS = ["pdf", "png", "jpg", "jpeg", "gif", "webp", "svg"];
+
 function AttachmentsView({ req }) {
   const files = req.attachments || [];
   const [openTextIndex, setOpenTextIndex] = useState(null);
+  const [previewIndex, setPreviewIndex] = useState(null);
+  const [previewSrc, setPreviewSrc] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   if (!files.length) {
     return <p className="text-center py-8" style={{ color: "var(--sap-gray)" }}>No files attached to this request.</p>;
   }
+
+  const togglePreview = async (a, i) => {
+    if (previewIndex === i) {
+      setPreviewIndex(null);
+      setPreviewSrc(null);
+      return;
+    }
+    setPreviewIndex(i);
+    setPreviewSrc(null);
+    setPreviewLoading(true);
+    const data = await resolveAttachmentData(a);
+    setPreviewLoading(false);
+    if (!data) {
+      appToast(`"${a.name}" could not be found in this browser's file store`);
+      setPreviewIndex(null);
+      return;
+    }
+    setPreviewSrc(data);
+  };
 
   return (
     <div className="flex flex-col gap-2">
@@ -6635,6 +6640,8 @@ function AttachmentsView({ req }) {
       </p>
       {files.map((a, i) => {
         const downloadable = DOWNLOADABLE_EXTENSIONS.includes(extensionOf(a.name));
+        const canPreview = INLINE_PREVIEWABLE_EXTENSIONS.includes(extensionOf(a.name));
+        const isPdf = extensionOf(a.name) === "pdf";
         return (
           <div key={i} className="sap-card p-3">
             <div className="flex items-center justify-between gap-3">
@@ -6643,7 +6650,7 @@ function AttachmentsView({ req }) {
                 <p className="text-xs mt-0.5" style={{ color: "var(--sap-gray)" }}>
                   {a.size ? `${Math.round(a.size / 1024)} KB` : "size unknown"}
                   {a.text ? " · its text is searchable" : ""}
-                  {!downloadable ? " · this file type can't be opened by the viewer, read it below" : ""}
+                  {!downloadable && !canPreview ? " · this file type can't be opened by the viewer, read it below" : ""}
                 </p>
               </div>
               <div className="flex gap-2 whitespace-nowrap">
@@ -6656,7 +6663,13 @@ function AttachmentsView({ req }) {
                     {openTextIndex === i ? "Hide text" : "View text"}
                   </button>
                 ) : null}
-                <button type="button" onClick={() => openAttachment(a)} className="sap-btn sap-btn-outline">Open file</button>
+                {canPreview ? (
+                  <button type="button" onClick={() => togglePreview(a, i)} className="sap-btn sap-btn-outline">
+                    {previewIndex === i ? "Hide preview" : "Preview"}
+                  </button>
+                ) : (
+                  <button type="button" onClick={() => openAttachment(a)} className="sap-btn sap-btn-outline">Open file</button>
+                )}
               </div>
             </div>
             {openTextIndex === i && (
@@ -6675,6 +6688,19 @@ function AttachmentsView({ req }) {
               >
                 {a.text}
               </pre>
+            )}
+            {previewIndex === i && (
+              <div className="mt-3" style={{ border: "1px solid var(--sap-border)", borderRadius: 8, overflow: "hidden" }}>
+                {previewLoading ? (
+                  <p className="text-xs p-3" style={{ color: "var(--sap-gray)" }}>Loading preview…</p>
+                ) : previewSrc ? (
+                  isPdf ? (
+                    <iframe src={previewSrc} title={a.name} style={{ width: "100%", height: 480, border: "none" }} />
+                  ) : (
+                    <img src={previewSrc} alt={a.name} style={{ width: "100%", display: "block" }} />
+                  )
+                ) : null}
+              </div>
             )}
           </div>
         );
@@ -6952,7 +6978,6 @@ function App() {
   const [statusReq, setStatusReq] = useState(null);
   const [showParser, setShowParser] = useState(false);
   const [showImport, setShowImport] = useState(false);
-  const [printReq, setPrintReq] = useState(null);
   const [showDaily, setShowDaily] = useState(false);
   const [showSuppliers, setShowSuppliers] = useState(false);
   const [viewBatchId, setViewBatchId] = useState(null);
@@ -7186,14 +7211,6 @@ function App() {
     }
     setShowImport(false);
     appToast(`Successfully imported ${parsedRows.length} request(s)`);
-  };
-
-  const handlePrint = (req) => {
-    setPrintReq(req);
-    setTimeout(() => {
-      window.print();
-      setPrintReq(null);
-    }, 100);
   };
 
   const dailyItems = useMemo(() => {
@@ -7459,7 +7476,6 @@ function App() {
                       </td>
                       <td className="whitespace-nowrap">
                         <button onClick={() => setStatusReq(r)} className="sap-link mr-3">Update Status</button>
-                        <button onClick={() => handlePrint(r)} className="sap-link-green mr-3">Print PO</button>
                         <button onClick={() => handleAttachPoClick(r)} className="sap-link mr-3" style={{ color: "var(--sap-purple)" }}>📎 Attach PO</button>
                         <button onClick={() => handleDelete(r.id)} className="sap-link-danger">Delete</button>
                       </td>
@@ -7558,7 +7574,6 @@ function App() {
         </Modal>
       )}
 
-      {printReq && <PrintablePO req={printReq} />}
 
       {viewFilesReq && (
         <Modal title="📎 Attachments" onClose={() => setViewFilesReq(null)}>
