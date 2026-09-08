@@ -1,0 +1,29 @@
+name: Legislation Monitor
+
+on:
+  schedule:
+    # كل يوم الساعة 06:00 UTC (~09:00-10:00 بتوقيت مسقط)
+    - cron: "0 6 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  check-and-process:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        working-directory: legislation_monitor
+        run: pip install -r requirements.txt
+
+      - name: Run monitor
+        working-directory: legislation_monitor
+        env:
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python main.py
