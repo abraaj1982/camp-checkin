@@ -3958,7 +3958,7 @@ exports.decompressRTF = decompressRTF;
 })(typeof window !== "undefined" ? window : this);
 
 </script>
-<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   /* Click-and-drag horizontal scrolling for wide tables — grab anywhere in
      the scroll area and pull left/right instead of hunting for the thin
@@ -3966,150 +3966,153 @@ exports.decompressRTF = decompressRTF;
   .drag-scroll { cursor: grab; }
   .drag-scroll.dragging { cursor: grabbing; user-select: none; }
   :root {
-    --sap-blue: #0A6ED4;
-    --sap-blue-dark: #05386B;
-    --sap-green: #107E3E;
-    --sap-green-bg: #E6F4EA;
-    --sap-orange: #E9730C;
-    --sap-orange-bg: #FEF3E6;
-    --sap-red: #BB0000;
-    --sap-red-bg: #FDEDED;
-    --sap-purple: #6B4A96;
-    --sap-purple-bg: #F0EBF7;
-    --sap-amber: #DF9000;
-    --sap-amber-bg: #FEF6E6;
-    --sap-gray: #6A6D70;
-    --sap-text: #32363A;
-    /* Fiori Launchpad: a soft blue canvas, not flat grey — tiles read as
-       raised white cards against it. */
-    --sap-bg: #dee7f0;
-    --sap-bg-2: #eef3f8;
-    --sap-shell: #eff4f9;
-    --sap-shell-border: #c8d6e5;
-    --sap-tile-border: #e5e9ee;
-    --sap-border: #D9D9D9;
+    /* Modern fintech-app palette — deeper indigo primary, softer neutrals,
+       pill-shaped status colors instead of flat SAP Fiori tones. */
+    --sap-blue: #3D5AFE;
+    --sap-blue-dark: #12162B;
+    --sap-green: #00B37E;
+    --sap-green-bg: #E4F9F1;
+    --sap-orange: #FF8A3D;
+    --sap-orange-bg: #FFEEE0;
+    --sap-red: #FF4D6A;
+    --sap-red-bg: #FFE9ED;
+    --sap-purple: #8B5CF6;
+    --sap-purple-bg: #F1EBFE;
+    --sap-amber: #C97A00;
+    --sap-amber-bg: #FFF4E0;
+    --sap-gray: #6B7186;
+    --sap-text: #12162B;
+    --sap-bg: #F4F6FB;
+    --sap-bg-2: #F4F6FB;
+    --sap-shell: rgba(244, 246, 251, .85);
+    --sap-shell-border: #E7EAF3;
+    --sap-tile-border: #E7EAF3;
+    --sap-border: #E7EAF3;
   }
 
   * { box-sizing: border-box; }
   body {
-    font-family: 'Roboto', 'Segoe UI', sans-serif;
-    background: linear-gradient(180deg, var(--sap-bg) 0%, var(--sap-bg-2) 60%, var(--sap-bg-2) 100%);
-    background-attachment: fixed;
+    font-family: 'Inter', 'Segoe UI', sans-serif;
+    background: var(--sap-bg);
     color: var(--sap-text);
+    -webkit-font-smoothing: antialiased;
   }
   ::-webkit-scrollbar { width: 8px; height: 8px; }
-  ::-webkit-scrollbar-thumb { background: #b9bdc2; border-radius: 2px; }
+  ::-webkit-scrollbar-thumb { background: #c7ccdb; border-radius: 4px; }
 
   .sap-shell { min-height: 100vh; }
 
   .sap-header {
     background: var(--sap-shell);
+    backdrop-filter: blur(10px);
     color: var(--sap-text);
     border-bottom: 1px solid var(--sap-shell-border);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   }
-  .sap-header h1 { color: var(--sap-blue-dark); }
+  .sap-header h1 { color: var(--sap-text); letter-spacing: -0.01em; font-weight: 800; }
 
   .sap-btn {
-    border-radius: 2px;
+    border-radius: 12px;
     font-weight: 600;
-    font-size: 13px;
-    padding: 8px 14px;
+    font-size: 13.5px;
+    padding: 10px 16px;
     border: 1px solid transparent;
-    transition: background .15s ease;
+    transition: all .15s ease;
     white-space: nowrap;
   }
-  .sap-btn-primary { background: var(--sap-blue); color: #fff; border-color: var(--sap-blue); }
-  .sap-btn-primary:hover { background: #085caf; }
-  .sap-btn-ghost { background: transparent; color: var(--sap-blue); border-color: transparent; }
-  .sap-btn-ghost:hover { background: rgba(10, 110, 212, 0.08); }
+  .sap-btn-primary { background: var(--sap-blue); color: #fff; border-color: var(--sap-blue); box-shadow: 0 8px 20px rgba(61,90,254,.3); }
+  .sap-btn-primary:hover { background: #2A3FD6; }
+  .sap-btn-ghost { background: #fff; color: var(--sap-text); border-color: var(--sap-border); }
+  .sap-btn-ghost:hover { border-color: var(--sap-blue); color: var(--sap-blue); }
   .sap-btn-outline { background: #fff; color: var(--sap-text); border-color: var(--sap-border); }
-  .sap-btn-outline:hover { background: #F5F6F7; }
-  .sap-btn-blue { background: var(--sap-blue); color: #fff; }
-  .sap-btn-blue:hover { background: #085caf; }
-  .sap-btn-blue:disabled { background: #a9c8ea; cursor: not-allowed; }
-  .sap-link { color: var(--sap-blue); font-size: 12.5px; font-weight: 600; }
+  .sap-btn-outline:hover { border-color: var(--sap-blue); color: var(--sap-blue); }
+  .sap-btn-blue { background: var(--sap-blue); color: #fff; box-shadow: 0 8px 20px rgba(61,90,254,.3); }
+  .sap-btn-blue:hover { background: #2A3FD6; }
+  .sap-btn-blue:disabled { background: #b9c2f7; cursor: not-allowed; box-shadow: none; }
+  .sap-link { color: var(--sap-blue); font-size: 12.5px; font-weight: 700; }
   .sap-link:hover { text-decoration: underline; }
-  .sap-link-danger { color: var(--sap-red); font-size: 12.5px; font-weight: 600; }
+  .sap-link-danger { color: var(--sap-red); font-size: 12.5px; font-weight: 700; }
   .sap-link-danger:hover { text-decoration: underline; }
-  .sap-link-green { color: var(--sap-green); font-size: 12.5px; font-weight: 600; }
+  .sap-link-green { color: var(--sap-green); font-size: 12.5px; font-weight: 700; }
   .sap-link-green:hover { text-decoration: underline; }
 
   .sap-card {
     background: #fff;
     border: 1px solid var(--sap-tile-border);
-    border-radius: 4px;
-    box-shadow: 0 1px 3px rgba(34, 54, 79, 0.06);
+    border-radius: 20px;
+    box-shadow: 0 1px 2px rgba(18,22,43,.04), 0 8px 24px rgba(18,22,43,.06);
   }
 
   .sap-tile {
     background: #fff;
     border: 1px solid var(--sap-tile-border);
-    border-top: 3px solid var(--sap-gray);
-    border-radius: 4px;
-    padding: 14px 16px;
-    box-shadow: 0 1px 3px rgba(34, 54, 79, 0.08);
+    border-top: none;
+    border-radius: 18px;
+    padding: 18px 20px;
+    box-shadow: 0 1px 2px rgba(18,22,43,.04), 0 8px 24px rgba(18,22,43,.06);
     transition: box-shadow .15s ease;
   }
-  .sap-tile:hover { box-shadow: 0 3px 8px rgba(34, 54, 79, 0.14); }
-  .sap-tile-value { font-size: 26px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
-  .sap-tile-label { font-size: 12px; color: var(--sap-gray); margin-top: 4px; }
+  .sap-tile:hover { box-shadow: 0 4px 8px rgba(18,22,43,.06), 0 12px 32px rgba(18,22,43,.1); }
+  .sap-tile-value { font-size: 28px; font-weight: 800; line-height: 1.1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .sap-tile-label { font-size: 12.5px; color: var(--sap-gray); margin-top: 4px; font-weight: 500; }
 
   .sap-input, .sap-select, .sap-textarea {
     border: 1px solid var(--sap-border);
-    border-radius: 2px;
-    padding: 7px 10px;
+    border-radius: 10px;
+    padding: 9px 12px;
     font-size: 13.5px;
-    background: #fff;
+    background: #FAFBFF;
     color: var(--sap-text);
     width: 100%;
+    font-family: inherit;
   }
   .sap-input:focus, .sap-select:focus, .sap-textarea:focus {
     outline: none;
     border-color: var(--sap-blue);
-    box-shadow: 0 0 0 2px rgba(10,110,212,0.15);
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(61,90,254,0.12);
   }
-  .sap-label { display: block; font-size: 12px; font-weight: 600; color: var(--sap-gray); margin-bottom: 4px; }
+  .sap-label { display: block; font-size: 11.5px; font-weight: 700; color: var(--sap-gray); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.03em; }
 
-  .sap-table { width: 100%; font-size: 13px; border-collapse: collapse; }
+  .sap-table { width: 100%; font-size: 13.5px; border-collapse: collapse; }
   .sap-table thead th {
-    background: #f4f7fa;
+    background: #FAFBFF;
     color: var(--sap-gray);
     font-weight: 700;
-    font-size: 12px;
+    font-size: 11px;
     text-transform: uppercase;
-    letter-spacing: 0.02em;
-    padding: 10px 14px;
-    border-bottom: 2px solid var(--sap-border);
+    letter-spacing: 0.04em;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--sap-border);
     text-align: left;
   }
-  .sap-table tbody td { padding: 10px 14px; border-bottom: 1px solid #ECECEC; }
-  .sap-table tbody tr:hover { background: #F5FAFF; }
+  .sap-table tbody td { padding: 16px 18px; border-bottom: 1px solid #F1F2F8; }
+  .sap-table tbody tr:hover { background: #FAFBFF; }
 
   .sap-badge {
     display: inline-block;
-    padding: 2px 10px;
+    padding: 5px 12px;
     font-size: 11.5px;
     font-weight: 700;
-    border-radius: 10px;
+    border-radius: 999px;
     border: 1px solid transparent;
   }
 
-  .sap-modal-overlay { background: rgba(50,54,58,0.55); }
+  .sap-modal-overlay { background: rgba(18,22,43,.5); backdrop-filter: blur(2px); }
   .sap-modal {
     background: #fff;
-    border-radius: 2px;
-    box-shadow: 0 8px 28px rgba(0,0,0,0.25);
+    border-radius: 20px;
+    box-shadow: 0 24px 60px rgba(18,22,43,.25);
   }
   .sap-modal-header {
-    background: var(--sap-shell);
+    background: #FAFBFF;
     border-bottom: 1px solid var(--sap-shell-border);
+    border-radius: 20px 20px 0 0;
   }
 
   .sap-panel-info {
-    background: #EAF2FC;
-    border: 1px solid #BEDAF7;
-    border-radius: 2px;
+    background: #EEF1FF;
+    border: 1px solid #DCE2FF;
+    border-radius: 14px;
   }
 
   @media print {
@@ -7079,15 +7082,28 @@ function App() {
     <div className="sap-shell">
       <header className="sap-header sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <h1 className="text-xl font-extrabold">PR / PO Tracker</h1>
-            <p className="text-xs mt-0.5" style={{ color: "var(--sap-gray)" }}>Purchase request &amp; approval tracking</p>
-            <p className="text-xs mt-1 font-semibold" style={{ color: syncStatus === "shared" ? "var(--sap-green)" : syncStatus === "connecting" ? "var(--sap-blue)" : syncStatus === "error" ? "var(--sap-red)" : "var(--sap-gray)" }}>
-              {syncStatus === "shared" && "🔗 Shared — everyone on this link sees the same data"}
-              {syncStatus === "connecting" && "⏳ Connecting to shared data…"}
-              {syncStatus === "error" && "⚠️ Shared sync stopped — showing this browser's own copy"}
-              {syncStatus === "local" && "💻 Local to this browser only"}
-            </p>
+          <div className="flex items-center gap-3">
+            <div
+              style={{
+                width: 40, height: 40, borderRadius: 12, flexShrink: 0,
+                background: "linear-gradient(135deg, var(--sap-blue), #6C7CFF)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "#fff", fontWeight: 800, fontSize: 15,
+                boxShadow: "0 6px 16px rgba(61,90,254,.35)",
+              }}
+            >
+              PO
+            </div>
+            <div>
+              <h1 className="text-xl font-extrabold">PR / PO Tracker</h1>
+              <p className="text-xs mt-0.5" style={{ color: "var(--sap-gray)" }}>Purchase request &amp; approval tracking</p>
+              <p className="text-xs mt-1 font-semibold" style={{ color: syncStatus === "shared" ? "var(--sap-green)" : syncStatus === "connecting" ? "var(--sap-blue)" : syncStatus === "error" ? "var(--sap-red)" : "var(--sap-gray)" }}>
+                {syncStatus === "shared" && "🔗 Shared — everyone on this link sees the same data"}
+                {syncStatus === "connecting" && "⏳ Connecting to shared data…"}
+                {syncStatus === "error" && "⚠️ Shared sync stopped — showing this browser's own copy"}
+                {syncStatus === "local" && "💻 Local to this browser only"}
+              </p>
+            </div>
           </div>
           <div className="flex gap-2 flex-wrap justify-end">
             <button onClick={() => setShowDaily(true)} className="sap-btn sap-btn-ghost">
