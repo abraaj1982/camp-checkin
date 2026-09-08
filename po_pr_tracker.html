@@ -4100,6 +4100,7 @@ exports.decompressRTF = decompressRTF;
     font-weight: 700;
     border-radius: 999px;
     border: 1px solid transparent;
+    white-space: nowrap;
   }
 
   .sap-modal-overlay { background: rgba(18,22,43,.5); backdrop-filter: blur(2px); }
@@ -6964,6 +6965,10 @@ function App() {
   const [syncStatus, setSyncStatus] = useState("local"); // local | connecting | shared | error
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const dragScrollRef = useDragScroll();
+  // "Attach PO" doesn't need its own modal — one hidden file input shared by
+  // every row, aimed at whichever row's button was clicked last.
+  const [attachPoRowId, setAttachPoRowId] = useState(null);
+  const attachPoInputRef = useRef(null);
 
   // Always keep the private per-browser cache current — a fallback that
   // costs nothing and matters if sharing ever becomes unavailable mid-session.
@@ -7120,6 +7125,28 @@ function App() {
   };
 
   const handleToggleSes = (req) => handleFieldUpdate(req.id, { serviceEntrySheet: !req.serviceEntrySheet });
+
+  const handleAttachPoClick = (req) => {
+    setAttachPoRowId(req.id);
+    if (attachPoInputRef.current) attachPoInputRef.current.click();
+  };
+
+  const handleAttachPoFile = async (e) => {
+    const file = e.target.files[0];
+    const rowId = attachPoRowId;
+    e.target.value = "";
+    setAttachPoRowId(null);
+    if (!file || !rowId) return;
+    const req = requests.find((r) => r.id === rowId);
+    if (!req) return;
+    try {
+      const attachment = await ingestAttachment(file);
+      await handleFieldUpdate(rowId, { attachments: [...(req.attachments || []), attachment] });
+      appToast(`Attached "${file.name}" — open it from the 📎 Files column`);
+    } catch (err) {
+      appToast("Could not attach this file: " + err.message);
+    }
+  };
 
   const toggleSelected = (id) => {
     setSelectedIds((prev) => {
@@ -7432,8 +7459,8 @@ function App() {
                       </td>
                       <td className="whitespace-nowrap">
                         <button onClick={() => setStatusReq(r)} className="sap-link mr-3">Update Status</button>
-                        <button onClick={() => { setEditingReq(r); setShowForm(true); }} className="sap-link mr-3" style={{ color: "var(--sap-gray)" }}>Edit</button>
                         <button onClick={() => handlePrint(r)} className="sap-link-green mr-3">Print PO</button>
+                        <button onClick={() => handleAttachPoClick(r)} className="sap-link mr-3" style={{ color: "var(--sap-purple)" }}>📎 Attach PO</button>
                         <button onClick={() => handleDelete(r.id)} className="sap-link-danger">Delete</button>
                       </td>
                     </tr>
@@ -7444,6 +7471,12 @@ function App() {
           </div>
           <TableScrollbar targetRef={dragScrollRef} />
         </div>
+        <input
+          ref={attachPoInputRef}
+          type="file"
+          onChange={handleAttachPoFile}
+          style={{ display: "none" }}
+        />
       </main>
 
       {showForm && (
