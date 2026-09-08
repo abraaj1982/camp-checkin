@@ -4185,6 +4185,82 @@ function useDragScroll() {
   return ref;
 }
 
+// A fat, always-visible horizontal scrollbar drawn below the table and kept
+// in sync with it both ways — the browser's native thin scrollbar is easy to
+// miss entirely, this bar is not. Hidden once everything already fits.
+function TableScrollbar({ targetRef }) {
+  const trackRef = useRef(null);
+  const [metrics, setMetrics] = useState({ thumbPct: 100, leftPct: 0, canScroll: false });
+  const draggingRef = useRef(false);
+
+  useEffect(() => {
+    const el = targetRef.current;
+    if (!el) return;
+    const update = () => {
+      const scrollable = el.scrollWidth - el.clientWidth;
+      const thumbPct = Math.max((el.clientWidth / el.scrollWidth) * 100, 5);
+      const leftPct = scrollable > 0 ? (el.scrollLeft / scrollable) * (100 - thumbPct) : 0;
+      setMetrics({ thumbPct, leftPct, canScroll: scrollable > 2 });
+    };
+    update();
+    el.addEventListener("scroll", update);
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener("scroll", update);
+      ro.disconnect();
+    };
+  }, [targetRef]);
+
+  const scrollToClientX = (clientX) => {
+    const el = targetRef.current;
+    const track = trackRef.current;
+    if (!el || !track) return;
+    const rect = track.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    el.scrollLeft = ratio * (el.scrollWidth - el.clientWidth);
+  };
+
+  const onTrackDown = (e) => {
+    draggingRef.current = true;
+    scrollToClientX(e.clientX);
+  };
+
+  useEffect(() => {
+    const onMove = (e) => { if (draggingRef.current) scrollToClientX(e.clientX); };
+    const onUp = () => { draggingRef.current = false; };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, []);
+
+  if (!metrics.canScroll) return null;
+
+  return (
+    <div
+      ref={trackRef}
+      onMouseDown={onTrackDown}
+      style={{ height: 14, background: "#EDEFF1", borderTop: "1px solid var(--sap-border)", position: "relative", cursor: "pointer" }}
+      title="Drag to scroll the table left/right"
+    >
+      <div
+        style={{
+          position: "absolute",
+          top: 2,
+          left: `${metrics.leftPct}%`,
+          width: `${metrics.thumbPct}%`,
+          height: 10,
+          background: "var(--sap-gray)",
+          borderRadius: 5,
+        }}
+      />
+    </div>
+  );
+}
+
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
@@ -6108,16 +6184,48 @@ function StatCard({ label, value, borderColor }) {
 
 function RequestForm({ initial, onSave, onCancel, requests }) {
   const [form, setForm] = useState(initial || emptyForm());
+  // Only a brand-new request can cover several services at once (its own
+  // supplier/PR/PO per service, same as the email parser) — an existing
+  // request is already tied to one service and stays a single edit.
+  const [multiTypes, setMultiTypes] = useState(initial ? [initial.serviceType] : [form.serviceType]);
 
   const set = (key) => (e) => setForm({ ...form, [key]: e.target.value });
 
+  const toggleType = (type) => {
+    setMultiTypes((prev) =>
+      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
+    );
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.owner || !form.serviceType) {
-      appToast("Please enter at least the requester and service type");
+    if (!form.owner || multiTypes.length === 0) {
+      appToast("Please enter the requester and select at least one service");
       return;
     }
-    const duplicates = findPossibleDuplicates(form, requests || []);
+
+    if (!initial && multiTypes.length > 1) {
+      // Same shared fields, one tracked request per selected service — each
+      // gets its own row so its own vendor/PR/PO/status can be set later.
+      const forms = multiTypes.map((type) => ({ ...form, serviceType: type }));
+      const clashes = forms
+        .map((f) => ({ form: f, dup: findPossibleDuplicates(f, requests || [])[0] }))
+        .filter((x) => x.dup);
+      if (clashes.length) {
+        const { form: f, dup } = clashes[0];
+        const proceed = await appConfirm(
+          `A ${f.serviceType} request for ${dup.beneficiary || dup.owner} already covers overlapping dates ` +
+          `(${dup.serviceDateFrom || "?"} → ${dup.serviceDateTo || "?"}, status ${STATUS_LABELS[dup.status]}` +
+          `${dup.poNumber ? `, PO ${dup.poNumber}` : ""}). Save these anyway?`
+        );
+        if (!proceed) return;
+      }
+      onSave(forms);
+      return;
+    }
+
+    const singleForm = { ...form, serviceType: multiTypes[0] };
+    const duplicates = findPossibleDuplicates(singleForm, requests || []);
     if (duplicates.length) {
       const d = duplicates[0];
       const proceed = await appConfirm(
@@ -6127,7 +6235,7 @@ function RequestForm({ initial, onSave, onCancel, requests }) {
       );
       if (!proceed) return;
     }
-    onSave(form);
+    onSave(singleForm);
   };
 
   return (
@@ -6165,10 +6273,23 @@ function RequestForm({ initial, onSave, onCancel, requests }) {
         </select>
       </div>
       <div>
-        <label className="sap-label">Service Type *</label>
-        <select value={form.serviceType} onChange={set("serviceType")} className="sap-select">
-          {SERVICE_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
+        <label className="sap-label">
+          Service Type * {!initial && <span className="font-normal" style={{ color: "var(--sap-gray)" }}>(check more than one if this request covers several services)</span>}
+        </label>
+        {initial ? (
+          <select value={multiTypes[0]} onChange={(e) => setMultiTypes([e.target.value])} className="sap-select">
+            {SERVICE_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        ) : (
+          <div className="flex flex-wrap gap-3 sap-input" style={{ height: "auto" }}>
+            {SERVICE_TYPES.map((type) => (
+              <label key={type} className="flex items-center gap-1.5 text-sm" style={{ color: "var(--sap-text)" }}>
+                <input type="checkbox" checked={multiTypes.includes(type)} onChange={() => toggleType(type)} />
+                {type}
+              </label>
+            ))}
+          </div>
+        )}
       </div>
       <div>
         <label className="sap-label">Vendor</label>
@@ -6780,7 +6901,14 @@ function App() {
     return list;
   }, [requests, search, statusFilter, ownerFilter, serviceFilter, waitingFilter, dateFilter]);
 
-  const handleSaveNew = async (form) => {
+  const handleSaveNew = async (formOrForms) => {
+    if (Array.isArray(formOrForms)) {
+      await saveNewRequests(formOrForms);
+      setShowForm(false);
+      setEditingReq(null);
+      return;
+    }
+    const form = formOrForms;
     const now = new Date().toISOString();
     if (form.id) {
       const updated = { ...form, updatedAt: now };
@@ -6804,7 +6932,7 @@ function App() {
   // Used when one email covers several services at once (hotel + car +
   // ticket) split into separate tracked requests — appends all of them in a
   // single state update so they don't clobber each other.
-  const handleSaveMultiple = async (forms) => {
+  const saveNewRequests = async (forms) => {
     const now = new Date().toISOString();
     const newReqs = forms.map((form) => ({ ...form, id: uid(), createdAt: now, updatedAt: now }));
     if (sharedDb) {
@@ -6812,6 +6940,10 @@ function App() {
     } else {
       setRequests((prev) => [...newReqs, ...prev]);
     }
+  };
+
+  const handleSaveMultiple = async (forms) => {
+    await saveNewRequests(forms);
     setShowParser(false);
   };
 
@@ -7094,7 +7226,7 @@ function App() {
                   <th>Service Dates</th>
                   <th>Budget</th>
                   <th>Next Step</th>
-                  <th>SES</th>
+                  <th title="Service Entry Sheet">SES</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -7189,12 +7321,19 @@ function App() {
                       <td>{r.budget ? Number(r.budget).toLocaleString() : "—"}</td>
                       <td className="text-xs" style={{ color: "var(--sap-blue-dark)", minWidth: 130, maxWidth: 170 }} title={getNextAction(r)}>{getNextAction(r)}</td>
                       <td className="text-center">
-                        <input
-                          type="checkbox"
-                          checked={!!r.serviceEntrySheet}
-                          onChange={() => handleToggleSes(r)}
-                          title="Service Entry Sheet done — mark once you've closed this PO's SES"
-                        />
+                        <button
+                          type="button"
+                          onClick={() => handleToggleSes(r)}
+                          title="Service Entry Sheet — click to toggle once you've closed this PO's SES"
+                          className="sap-badge"
+                          style={
+                            r.serviceEntrySheet
+                              ? { background: "var(--sap-green-bg)", color: "var(--sap-green)", borderColor: "#BFE3CB", cursor: "pointer" }
+                              : { background: "#F5F6F7", color: "var(--sap-gray)", borderColor: "var(--sap-border)", cursor: "pointer" }
+                          }
+                        >
+                          {r.serviceEntrySheet ? "✓ Done" : "Mark done"}
+                        </button>
                       </td>
                       <td className="whitespace-nowrap">
                         <button onClick={() => setStatusReq(r)} className="sap-link mr-3">Update Status</button>
@@ -7208,6 +7347,7 @@ function App() {
               </tbody>
             </table>
           </div>
+          <TableScrollbar targetRef={dragScrollRef} />
         </div>
       </main>
 
