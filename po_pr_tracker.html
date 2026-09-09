@@ -7274,10 +7274,12 @@ function App() {
       (mine > 0 ? `, ${mine} of them waiting on you.` : ".");
   }, [dailyItems]);
 
+  const [showAutoReminder, setShowAutoReminder] = useState(false);
   useEffect(() => {
     if (spokenRef.current || !reminderMessage) return;
     spokenRef.current = true;
     speakReminder(reminderMessage);
+    setShowAutoReminder(true);
   }, [reminderMessage]);
 
   const batchSiblings = useMemo(() => {
@@ -7582,6 +7584,30 @@ function App() {
       {showImport && (
         <Modal title="Import From Excel" onClose={() => setShowImport(false)}>
           <ImportExcelModal onImport={handleImport} onCancel={() => setShowImport(false)} />
+        </Modal>
+      )}
+
+      {showAutoReminder && (
+        <Modal title="🔔 Reminder" onClose={() => setShowAutoReminder(false)}>
+          <div className="flex flex-col gap-4">
+            <p className="text-sm" style={{ color: "var(--sap-text)" }}>{reminderMessage}</p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowAutoReminder(false)}
+                className="sap-btn sap-btn-outline"
+              >
+                Dismiss
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowAutoReminder(false); setShowDaily(true); }}
+                className="sap-btn sap-btn-blue"
+              >
+                View details
+              </button>
+            </div>
+          </div>
         </Modal>
       )}
 
