@@ -4271,6 +4271,24 @@ function TableScrollbar({ targetRef }) {
   );
 }
 
+// Speaks a plain-language reminder out loud using the browser's built-in
+// text-to-speech — no server, no API key, works offline. Browsers sometimes
+// block the very first speech attempt on a page until the visitor has
+// clicked/tapped somewhere, so callers should also expose a manual replay
+// button rather than relying on this firing silently.
+function speakReminder(text) {
+  try {
+    if (!window.speechSynthesis || typeof SpeechSynthesisUtterance !== "function") return false;
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.rate = 0.98;
+    window.speechSynthesis.speak(utter);
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
@@ -7244,6 +7262,24 @@ function App() {
       });
   }, [requests, sla]);
 
+  // Voice reminder: once the data has actually loaded (not on the very first
+  // empty render) and there's something needing action, say so out loud. Only
+  // once per page load — reopening the tab or reloading will say it again,
+  // but it won't repeat itself every time requests re-renders.
+  const spokenRef = useRef(false);
+  const reminderMessage = useMemo(() => {
+    if (dailyItems.length === 0) return "";
+    const mine = dailyItems.filter((x) => x.req.waitingOn === "Me").length;
+    return `You have ${dailyItems.length} pending request${dailyItems.length === 1 ? "" : "s"} that need attention` +
+      (mine > 0 ? `, ${mine} of them waiting on you.` : ".");
+  }, [dailyItems]);
+
+  useEffect(() => {
+    if (spokenRef.current || !reminderMessage) return;
+    spokenRef.current = true;
+    speakReminder(reminderMessage);
+  }, [reminderMessage]);
+
   const batchSiblings = useMemo(() => {
     const map = {};
     requests.forEach((r) => {
@@ -7285,6 +7321,15 @@ function App() {
             <button onClick={() => setShowDaily(true)} className="sap-btn sap-btn-ghost">
               ⏰ Today's Follow-up {dailyItems.length > 0 && `(${dailyItems.length})`}
             </button>
+            {reminderMessage && (
+              <button
+                onClick={() => speakReminder(reminderMessage)}
+                className="sap-btn sap-btn-ghost"
+                title="Play the voice reminder again — browsers sometimes block it from playing automatically until you click something on the page"
+              >
+                🔊 Voice reminder
+              </button>
+            )}
             <button onClick={() => setShowImport(true)} className="sap-btn sap-btn-ghost">
               📥 Import Excel
             </button>
