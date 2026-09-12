@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "Boom Oman",
+    "slug": "boom-oman",
+    "scheme": "boomoman",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#7C3AED"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "bundleIdentifier": "om.boom.customer",
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "om.boom.customer"
+    },
+    "plugins": ["expo-router"]
+  }
+}
