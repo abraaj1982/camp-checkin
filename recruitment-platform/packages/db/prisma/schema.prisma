@@ -294,6 +294,16 @@ model Candidate {
   phone     String?
   source    String?
   createdAt DateTime @default(now())
+  // Set when the candidate's PII is anonymized under the retention policy
+  // (Phase 2 hardening: "retained/anonymized historical representation").
+  // The row itself is never hard-deleted once Evidence/Assessment/HrDecision
+  // reference it — Evidence.candidate/Assessment.candidate/HrDecision.candidate
+  // are onDelete: Restrict below, so the DB refuses a delete that would
+  // orphan historical records. Purging PII means updating fullName/email/
+  // phone in place and setting this timestamp, not deleting the row. The
+  // actual purge job is Phase 7+ scope; this field only makes the model
+  // ready for it.
+  piiPurgedAt DateTime?
 
   documents      CandidateDocument[]
   projectLinks   CandidateProjectLink[]
@@ -304,6 +314,7 @@ model Candidate {
   languages      CandidateLanguage[]
   evidence       Evidence[]
   assessments    Assessment[]
+  hrDecisions    HrDecision[]
 }
 
 // Per-project blind-screening label ("Candidate #007"); a candidate can be
@@ -390,16 +401,23 @@ model CandidateLanguage {
   proficiency String?
 }
 
-// The traceability spine: Requirement -> Evidence -> Assessment.
+// The traceability spine: Requirement -> Evidence -> Assessment. Evidence
+// rows are never deleted by a candidate-profile removal (onDelete: Restrict
+// below) — a candidate with any Evidence must be anonymized in place, never
+// hard-deleted (see Candidate.piiPurgedAt).
 model Evidence {
   id               String              @id @default(uuid())
   requirementId    String
   requirement      JobRequirement      @relation(fields: [requirementId], references: [id], onDelete: Cascade)
   candidateId      String
-  candidate        Candidate           @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  candidate        Candidate           @relation(fields: [candidateId], references: [id], onDelete: Restrict)
   projectId        String
   sourceDocumentId String?
-  sourceDocument   CandidateDocument?  @relation(fields: [sourceDocumentId], references: [id])
+  // The original CV is the shortest-lived record under the retention model
+  // (Section: Security — Retention) and may be purged while the Evidence
+  // row — which already carries its own extracted evidenceText/sourcePage —
+  // survives; SetNull lets that purge happen without touching Evidence.
+  sourceDocument   CandidateDocument?  @relation(fields: [sourceDocumentId], references: [id], onDelete: SetNull)
   sourcePage       Int?
   evidenceText     String?
   evidenceType     EvidenceType
@@ -409,14 +427,18 @@ model Evidence {
   aiPromptVersion  String?
   aiInteractionId  String?
   createdAt        DateTime            @default(now())
+
+  assessmentLinks AssessmentEvidence[]
 }
 
 // One row per candidate x requirement; the AI assessment is immutable once
-// written — HR reactions are separate HrDecision/HrOverride rows.
+// written — HR reactions are separate HrDecision/HrOverride rows. Never
+// deleted by a candidate-profile removal (onDelete: Restrict) for the same
+// reason as Evidence.
 model Assessment {
   id                     String            @id @default(uuid())
   candidateId            String
-  candidate              Candidate         @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  candidate              Candidate         @relation(fields: [candidateId], references: [id], onDelete: Restrict)
   projectId              String
   requirementId          String
   requirement            JobRequirement    @relation(fields: [requirementId], references: [id], onDelete: Cascade)
@@ -431,9 +453,39 @@ model Assessment {
   aiInteractionId        String?
   createdAt              DateTime          @default(now())
 
-  overrides HrOverride[]
+  overrides    HrOverride[]
+  evidenceLinks AssessmentEvidence[]
 
   @@index([candidateId, projectId])
+}
+
+// Explicit traceability between an Assessment and the Evidence rows behind
+// it (Phase 2 hardening, Section 1) — deliberately NOT inferred from
+// matching candidateId+projectId+requirementId, because that can't
+// distinguish evidence that was actually used from evidence that existed
+// for the same requirement but was judged weaker/irrelevant, and can't
+// order multiple supporting quotes. SUPPORTING rows are what the assessment
+// summary is built from; CONSIDERED_REJECTED rows record evidence the AI
+// looked at for this requirement but did not rely on (e.g. a weaker or
+// contradictory quote) — both are audit-visible, matching the evidence-first
+// philosophy that missing/rejected evidence is as answerable as used
+// evidence (master instruction Section 51: "What is missing?").
+model AssessmentEvidence {
+  id           String                  @id @default(uuid())
+  assessmentId String
+  assessment   Assessment              @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  evidenceId   String
+  evidence     Evidence                @relation(fields: [evidenceId], references: [id], onDelete: Restrict)
+  role         AssessmentEvidenceRole
+  rationale    String? // why this evidence was used or set aside for this assessment
+  createdAt    DateTime                @default(now())
+
+  @@unique([assessmentId, evidenceId])
+}
+
+enum AssessmentEvidenceRole {
+  SUPPORTING
+  CONSIDERED_REJECTED
 }
 
 model CandidateComparison {
@@ -446,9 +498,14 @@ model CandidateComparison {
   createdAt   DateTime           @default(now())
 }
 
+// A decision is itself a historical record (master instruction Section 51:
+// "What did HR decide?") — candidate is now an explicit, enforced relation
+// (previously a bare unindexed string) so it gets the same Restrict
+// protection as Evidence/Assessment rather than silently going orphaned.
 model HrDecision {
   id          String         @id @default(uuid())
   candidateId String
+  candidate   Candidate      @relation(fields: [candidateId], references: [id], onDelete: Restrict)
   projectId   String
   decision    HrDecisionType
   decidedBy   String

@@ -46,6 +46,23 @@ Implemented in Phase 2 (Recruitment Project & Job Requirements):
   criteria per requirement — evidence-first, not a single score
 - Full audit trail for every action above
 
+Phase 2 hardening pass (closing gaps flagged in the Phase 2 completion
+report, before Phase 3):
+- Explicit `AssessmentEvidence` join (SUPPORTING / CONSIDERED_REJECTED,
+  each with a rationale) — an assessment's supporting evidence is no longer
+  inferred by matching candidateId+projectId+requirementId
+- `Evidence`/`Assessment`/`HrDecision` → `Candidate` changed from
+  cascade-delete to `onDelete: Restrict`: the database now refuses to
+  hard-delete a candidate with any historical record, forcing a future
+  purge to anonymize the `Candidate` row in place (`Candidate.piiPurgedAt`)
+  rather than delete it — a candidate with no history can still be deleted
+  normally
+- `Evidence.sourceDocument` stays `onDelete: SetNull`: the original CV can
+  be purged independently without touching the Evidence row that cites it
+- `/candidates/:id/decisions` moved to `/projects/:projectId/candidates/:id/decisions`
+  and now uses `requireProjectAccess()`, closing the one route that was
+  inconsistent with the Phase 2 authorization model
+
 Not yet implemented (later phases per the approved plan):
 - PDF/DOCX parsing and the real document-processing pipeline (Phase 3)
 - Evidence extraction / semantic matching / career analysis AI calls wired

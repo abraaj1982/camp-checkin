@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "@recruitment-platform/db";
-import { requireAuth } from "../auth/rbac.js";
+import { requireProjectAccess } from "../projects/authorization.js";
 import { recordAudit } from "../../lib/audit.js";
 
 /**
@@ -8,15 +8,23 @@ import { recordAudit } from "../../lib/audit.js";
  * 25/12 of the master instruction: "never silently modify historical AI
  * assessments"). An override is a separate HrOverride row pointing back at
  * the original, untouched assessmentId.
+ *
+ * Nested under /projects/:projectId (Phase 2 hardening, Section 3) rather
+ * than the old bare /candidates/:candidateId/decisions — a decision is
+ * always made in the context of one project (HrDecision.projectId is
+ * required), so it gets the same requireProjectAccess gate as every other
+ * project-scoped route, including the HR_ADMIN/SYSTEM_ADMIN bypass. This
+ * does not add any Phase 6 functionality — the route body/behavior is
+ * unchanged, only where projectId comes from and how access is checked.
  */
 export async function registerDecisionRoutes(app: FastifyInstance): Promise<void> {
   app.post(
-    "/candidates/:candidateId/decisions",
-    { preHandler: requireAuth() },
+    "/projects/:projectId/candidates/:candidateId/decisions",
+    { preHandler: requireProjectAccess() },
     async (request, reply) => {
-      const { candidateId } = request.params as { candidateId: string };
+      const { candidateId } = request.params as { candidateId: string; projectId: string };
+      const project = request.project!;
       const body = request.body as {
-        projectId: string;
         decision: "SHORTLIST" | "HOLD" | "REJECT" | "INTERVIEW";
         notes?: string;
         // The assessment HR is reacting to, if this decision overrides one.
@@ -27,7 +35,7 @@ export async function registerDecisionRoutes(app: FastifyInstance): Promise<void
       const decision = await prisma.hrDecision.create({
         data: {
           candidateId,
-          projectId: body.projectId,
+          projectId: project.id,
           decision: body.decision,
           decidedBy: identity.userId,
           notes: body.notes,
@@ -37,6 +45,9 @@ export async function registerDecisionRoutes(app: FastifyInstance): Promise<void
       if (body.assessmentId) {
         const assessment = await prisma.assessment.findUnique({ where: { id: body.assessmentId } });
         if (!assessment) return reply.code(404).send({ error: "assessment_not_found" });
+        if (assessment.projectId !== project.id) {
+          return reply.code(400).send({ error: "assessment_not_in_project" });
+        }
 
         const overridden =
           (assessment.status === "MANDATORY_GAP" || assessment.status === "REVIEW_REQUIRED") &&
