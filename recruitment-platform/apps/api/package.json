@@ -1,0 +1,28 @@
+{
+  "name": "@recruitment-platform/api",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^9.4.0",
+    "@fastify/session": "^10.9.0",
+    "@recruitment-platform/ai-gateway": "*",
+    "@recruitment-platform/db": "*",
+    "@recruitment-platform/shared-types": "*",
+    "bcryptjs": "^2.4.3",
+    "fastify": "^4.28.1",
+    "pino": "^9.4.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20.14.10",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.3"
+  }
+}

@@ -1,0 +1,373 @@
+// Recruitment Intelligence Platform — core schema (Phase 1 foundation).
+// Evidence -> Assessment -> Decision stays traceable: assessments reference
+// evidence, decisions reference assessments, overrides never edit either.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  HR_USER
+  HR_ADMIN
+  SYSTEM_ADMIN
+}
+
+enum RequirementCategory {
+  EDUCATION
+  RELEVANT_EXPERIENCE
+  MANAGEMENT_EXPERIENCE
+  TECHNICAL_SKILLS
+  PROFESSIONAL_SKILLS
+  INDUSTRY_EXPERIENCE
+  FUNCTIONAL_EXPERIENCE
+  CERTIFICATIONS
+  LANGUAGES
+  LOCATION_MOBILITY
+  OTHER
+}
+
+enum EvidenceStrength {
+  STRONG
+  MODERATE
+  PARTIAL
+  WEAK
+  NOT_FOUND
+  CONTRADICTORY
+}
+
+enum EvidenceConfidence {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum EvidenceType {
+  DIRECT
+  INFERRED
+  MISSING
+}
+
+enum AssessmentStatus {
+  STRONG_EVIDENCE
+  REVIEW_REQUIRED
+  MANDATORY_GAP
+  INSUFFICIENT_EVIDENCE
+}
+
+enum CandidateDocumentStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED_RETRY
+  FAILED_NEEDS_OCR
+}
+
+enum HrDecisionType {
+  SHORTLIST
+  HOLD
+  REJECT
+  INTERVIEW
+}
+
+enum AiTaskType {
+  REQUIREMENT_INTERPRETATION
+  WEIGHTING_RECOMMENDATION
+  RESUME_INTELLIGENCE
+  REQUIREMENT_EVIDENCE_ANALYSIS
+  CAREER_CONSISTENCY_ANALYSIS
+  CANDIDATE_COMPARISON
+}
+
+enum AiValidationStatus {
+  VALID
+  RETRIED_VALID
+  FAILED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         UserRole @default(HR_USER)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  createdProjects    RecruitmentProject[]      @relation("ProjectCreator")
+  weightApprovals    RequirementWeightApproval[]
+  hrDecisions        HrDecision[]
+  auditLogs          AuditLog[]
+}
+
+model RecruitmentProject {
+  id         String   @id @default(uuid())
+  title      String
+  department String?
+  status     String   @default("OPEN")
+  createdBy  String
+  creator    User     @relation("ProjectCreator", fields: [createdBy], references: [id])
+  createdAt  DateTime @default(now())
+
+  requirements JobRequirement[]
+  candidateLinks CandidateProjectLink[]
+  comparisons  CandidateComparison[]
+}
+
+model JobRequirement {
+  id                 String              @id @default(uuid())
+  projectId          String
+  project            RecruitmentProject  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  category           RequirementCategory
+  description        String
+  mandatory          Boolean             @default(false)
+  evidenceCriteria   String?
+  aiSuggestedWeight  Decimal?            @db.Decimal(5, 2)
+  hrApprovedWeight   Decimal?            @db.Decimal(5, 2)
+  status             String              @default("DRAFT")
+  notes              String?
+  createdAt          DateTime            @default(now())
+
+  weightApprovals RequirementWeightApproval[]
+  evidence        Evidence[]
+  assessments     Assessment[]
+}
+
+model RequirementWeightApproval {
+  id             String         @id @default(uuid())
+  requirementId  String
+  requirement    JobRequirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  approvedBy     String
+  approver       User           @relation(fields: [approvedBy], references: [id])
+  previousWeight Decimal?       @db.Decimal(5, 2)
+  newWeight      Decimal        @db.Decimal(5, 2)
+  approvedAt     DateTime       @default(now())
+}
+
+model Candidate {
+  id        String   @id @default(uuid())
+  fullName  String
+  email     String?
+  phone     String?
+  source    String?
+  createdAt DateTime @default(now())
+
+  documents      CandidateDocument[]
+  projectLinks   CandidateProjectLink[]
+  experiences    CandidateExperience[]
+  education      CandidateEducation[]
+  skills         CandidateSkill[]
+  certifications CandidateCertification[]
+  languages      CandidateLanguage[]
+  evidence       Evidence[]
+  assessments    Assessment[]
+}
+
+// Per-project blind-screening label ("Candidate #007"); a candidate can be
+// linked to many projects but each link gets its own anonymized label.
+model CandidateProjectLink {
+  id               String             @id @default(uuid())
+  candidateId      String
+  candidate        Candidate          @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  projectId        String
+  project          RecruitmentProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  anonymizedLabel  String
+  status           String             @default("ACTIVE")
+  createdAt        DateTime           @default(now())
+
+  @@unique([candidateId, projectId])
+}
+
+model CandidateDocument {
+  id               String                   @id @default(uuid())
+  candidateId      String
+  candidate        Candidate                @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  projectId        String?
+  fileType         String
+  storageKey       String
+  originalFilename String
+  status           CandidateDocumentStatus  @default(QUEUED)
+  failureReason    String?
+  uploadedBy       String
+  uploadedAt       DateTime                 @default(now())
+  purgedAt         DateTime?
+
+  evidence Evidence[]
+}
+
+model CandidateExperience {
+  id                  String    @id @default(uuid())
+  candidateId         String
+  candidate           Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  documentId          String?
+  employer            String
+  title               String
+  startDate           DateTime?
+  endDate             DateTime?
+  isCurrent           Boolean   @default(false)
+  responsibilities    String[]
+  functionalAreaTags  String[]
+  extractedConfidence EvidenceConfidence?
+  createdAt           DateTime  @default(now())
+}
+
+model CandidateEducation {
+  id          String    @id @default(uuid())
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  institution String
+  degree      String?
+  field       String?
+  startDate   DateTime?
+  endDate     DateTime?
+}
+
+model CandidateSkill {
+  id          String    @id @default(uuid())
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  skillName   String
+  category    String?
+}
+
+model CandidateCertification {
+  id           String    @id @default(uuid())
+  candidateId  String
+  candidate    Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  name         String
+  issuer       String?
+  dateObtained DateTime?
+}
+
+model CandidateLanguage {
+  id          String    @id @default(uuid())
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  language    String
+  proficiency String?
+}
+
+// The traceability spine: Requirement -> Evidence -> Assessment.
+model Evidence {
+  id               String              @id @default(uuid())
+  requirementId    String
+  requirement      JobRequirement      @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  candidateId      String
+  candidate        Candidate           @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  projectId        String
+  sourceDocumentId String?
+  sourceDocument   CandidateDocument?  @relation(fields: [sourceDocumentId], references: [id])
+  sourcePage       Int?
+  evidenceText     String?
+  evidenceType     EvidenceType
+  evidenceStrength EvidenceStrength
+  confidence       EvidenceConfidence
+  aiModel          String?
+  aiPromptVersion  String?
+  aiInteractionId  String?
+  createdAt        DateTime            @default(now())
+}
+
+// One row per candidate x requirement; the AI assessment is immutable once
+// written — HR reactions are separate HrDecision/HrOverride rows.
+model Assessment {
+  id                     String            @id @default(uuid())
+  candidateId            String
+  candidate              Candidate         @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  projectId              String
+  requirementId          String
+  requirement            JobRequirement    @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  aiAssessmentSummary    String
+  status                 AssessmentStatus
+  computedScoreContribution Decimal?       @db.Decimal(6, 4)
+  aiInteractionId        String?
+  createdAt              DateTime          @default(now())
+
+  overrides HrOverride[]
+
+  @@index([candidateId, projectId])
+}
+
+model CandidateComparison {
+  id          String             @id @default(uuid())
+  projectId   String
+  project     RecruitmentProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  candidateIds String[]
+  createdBy   String
+  summaryJson Json
+  createdAt   DateTime           @default(now())
+}
+
+model HrDecision {
+  id          String         @id @default(uuid())
+  candidateId String
+  projectId   String
+  decision    HrDecisionType
+  decidedBy   String
+  decider     User           @relation(fields: [decidedBy], references: [id])
+  notes       String?
+  decidedAt   DateTime       @default(now())
+
+  override HrOverride?
+}
+
+// Links a decision back to the untouched original AI assessment — never
+// mutates Assessment; overridden=false just records that HR agreed with AI.
+model HrOverride {
+  id              String     @id @default(uuid())
+  decisionId      String     @unique
+  decision        HrDecision @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+  assessmentId    String
+  assessment      Assessment @relation(fields: [assessmentId], references: [id])
+  overridden      Boolean
+  hrNote          String?
+  createdAt       DateTime   @default(now())
+}
+
+// Every AI Gateway call, regardless of provider, for audit + debugging.
+model AiInteraction {
+  id               String             @id @default(uuid())
+  taskType         AiTaskType
+  provider         String
+  model            String
+  promptVersion    String
+  inputRef         String?
+  outputJson       Json?
+  validationStatus AiValidationStatus
+  latencyMs        Int?
+  createdAt        DateTime           @default(now())
+}
+
+// System/admin-only — never exposed to ordinary HR users (Section 43).
+model AiModelConfiguration {
+  id            String     @id @default(uuid())
+  taskType      AiTaskType @unique
+  provider      String
+  model         String
+  temperature   Decimal?   @db.Decimal(3, 2)
+  maxTokens     Int?
+  timeoutMs     Int?
+  retryPolicy   Json?
+  promptVersion String
+  isActive      Boolean    @default(true)
+  updatedAt     DateTime   @updatedAt
+}
+
+// Append-only at the application layer (DB role has INSERT only in prod).
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id])
+  action     String
+  entityType String
+  entityId   String
+  beforeJson Json?
+  afterJson  Json?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+}

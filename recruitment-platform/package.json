@@ -1,0 +1,26 @@
+{
+  "name": "recruitment-platform",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "worker",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev -w @recruitment-platform/api",
+    "dev:web": "npm run dev -w @recruitment-platform/web",
+    "dev:worker": "npm run dev -w @recruitment-platform/worker",
+    "db:generate": "npm run generate -w @recruitment-platform/db",
+    "db:migrate": "npm run migrate -w @recruitment-platform/db",
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

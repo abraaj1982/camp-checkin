@@ -1,0 +1,35 @@
+version: "3.9"
+
+# Local development only (architecture doc, Decision 5: Phase 1 targets
+# local/Docker; production hosting is a later decision). Postgres is the
+# only external service — pg-boss runs its queue tables inside the same
+# database, so no Redis or separate queue service is started (Decision 10).
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: recruitment
+      POSTGRES_PASSWORD: recruitment
+      POSTGRES_DB: recruitment_platform
+    ports:
+      - "5433:5432" # non-default host port so it never collides with another local Postgres
+    volumes:
+      - recruitment_platform_pg_data:/var/lib/postgresql/data
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: recruitment
+      MINIO_ROOT_PASSWORD: recruitment123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - recruitment_platform_minio_data:/data
+
+volumes:
+  recruitment_platform_pg_data:
+  recruitment_platform_minio_data:
