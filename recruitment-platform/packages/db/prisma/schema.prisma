@@ -17,18 +17,65 @@ enum UserRole {
   SYSTEM_ADMIN
 }
 
+// Project-scoped role, distinct from the system-wide UserRole. OWNER is set
+// on the creator automatically; MEMBER is any HR user later assigned to
+// collaborate on the project (architecture doc Phase 2: "can later support
+// multiple HR users working on the same recruitment project").
+enum ProjectMemberRole {
+  OWNER
+  MEMBER
+}
+
+enum ProjectStatus {
+  DRAFT
+  ACTIVE
+  ON_HOLD
+  READY_FOR_CV_UPLOAD
+  COMPLETED
+  ARCHIVED
+}
+
 enum RequirementCategory {
   EDUCATION
-  RELEVANT_EXPERIENCE
-  MANAGEMENT_EXPERIENCE
-  TECHNICAL_SKILLS
-  PROFESSIONAL_SKILLS
-  INDUSTRY_EXPERIENCE
+  PROFESSIONAL_EXPERIENCE
   FUNCTIONAL_EXPERIENCE
+  TECHNICAL_SKILLS
+  INDUSTRY_EXPERIENCE
   CERTIFICATIONS
   LANGUAGES
+  BEHAVIORAL_COMPETENCY
+  MANAGEMENT_LEADERSHIP
   LOCATION_MOBILITY
   OTHER
+}
+
+enum RequirementPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// DRAFT -> AI_ANALYZED (interpretation run) -> HR_REVIEW (weighting proposed,
+// awaiting HR) -> APPROVED (weight approved, version snapshotted) -> CHANGED
+// (edited after approval — see JobRequirementVersion) -> ARCHIVED.
+enum RequirementStatus {
+  DRAFT
+  AI_ANALYZED
+  HR_REVIEW
+  APPROVED
+  CHANGED
+  ARCHIVED
+}
+
+// How closely an AI-identified concept relates to a requirement's literal
+// wording (architecture doc Phase 2, Section 4) — never collapsed into a
+// single "relevant/not relevant" bit.
+enum SemanticRelevance {
+  DIRECT
+  RELEVANT
+  PARTIALLY_RELEVANT
+  NOT_RELEVANT
 }
 
 enum EvidenceStrength {
@@ -99,44 +146,135 @@ model User {
   createdAt    DateTime @default(now())
 
   createdProjects    RecruitmentProject[]      @relation("ProjectCreator")
+  projectMemberships ProjectMember[]
   weightApprovals    RequirementWeightApproval[]
+  requirementVersionsApproved JobRequirementVersion[]
   hrDecisions        HrDecision[]
   auditLogs          AuditLog[]
 }
 
 model RecruitmentProject {
-  id         String   @id @default(uuid())
-  title      String
-  department String?
-  status     String   @default("OPEN")
-  createdBy  String
-  creator    User     @relation("ProjectCreator", fields: [createdBy], references: [id])
-  createdAt  DateTime @default(now())
+  id             String        @id @default(uuid())
+  title          String
+  department     String?
+  businessUnit   String?
+  location       String?
+  hiringManager  String?
+  vacancies      Int           @default(1)
+  employmentType String?
+  description    String?
+  status         ProjectStatus @default(DRAFT)
+  createdBy      String
+  creator        User          @relation("ProjectCreator", fields: [createdBy], references: [id])
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
-  requirements JobRequirement[]
+  members        ProjectMember[]
+  requirements   JobRequirement[]
   candidateLinks CandidateProjectLink[]
-  comparisons  CandidateComparison[]
+  comparisons    CandidateComparison[]
+}
+
+// Project-level authorization spine (Phase 2, Section 1): the creator is
+// auto-added as OWNER; HR_ADMIN/SYSTEM_ADMIN bypass this table entirely
+// (see apps/api/src/modules/projects/authorization.ts) — it only governs
+// which projects an ordinary HR_USER can reach.
+model ProjectMember {
+  id        String            @id @default(uuid())
+  projectId String
+  project   RecruitmentProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User              @relation(fields: [userId], references: [id])
+  role      ProjectMemberRole @default(MEMBER)
+  addedAt   DateTime          @default(now())
+
+  @@unique([projectId, userId])
 }
 
 model JobRequirement {
-  id                 String              @id @default(uuid())
-  projectId          String
-  project            RecruitmentProject  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  category           RequirementCategory
-  description        String
-  mandatory          Boolean             @default(false)
-  evidenceCriteria   String?
-  aiSuggestedWeight  Decimal?            @db.Decimal(5, 2)
-  hrApprovedWeight   Decimal?            @db.Decimal(5, 2)
-  status             String              @default("DRAFT")
-  notes              String?
-  createdAt          DateTime            @default(now())
+  id                     String              @id @default(uuid())
+  projectId              String
+  project                RecruitmentProject  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  category               RequirementCategory
+  customCategoryLabel    String?             // set when category = OTHER; the extensibility point (Phase 2, Section 3)
+  description            String
+  mandatory              Boolean             @default(false)
+  priority               RequirementPriority @default(MEDIUM)
+  evidenceCriteria       String?             // free-text HR-entered criteria; structured AI criteria live in RequirementEvidenceCriterion
+  hrNotes                String?
+  aiInterpretationSummary String?
+  aiInteractionId        String?
+  aiSuggestedWeight      Decimal?            @db.Decimal(5, 2)
+  hrApprovedWeight       Decimal?            @db.Decimal(5, 2)
+  status                 RequirementStatus   @default(DRAFT)
+  currentVersionNumber   Int                 @default(0) // 0 = never approved yet
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
 
-  weightApprovals RequirementWeightApproval[]
-  evidence        Evidence[]
-  assessments     Assessment[]
+  semanticConcepts  RequirementSemanticConcept[]
+  criteria          RequirementEvidenceCriterion[] @relation("RequirementCriteria")
+  versions          JobRequirementVersion[]
+  weightApprovals   RequirementWeightApproval[]
+  evidence          Evidence[]
+  assessments       Assessment[]
 }
 
+// AI-identified concepts semantically related to a requirement (Phase 2,
+// Section 4) — e.g. "grievance handling" for "employee relations
+// experience" — each carries its own relevance tier and a stated rationale,
+// never a flat keyword list.
+model RequirementSemanticConcept {
+  id            String            @id @default(uuid())
+  requirementId String
+  requirement   JobRequirement    @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  concept       String
+  relevance     SemanticRelevance
+  rationale     String
+  createdAt     DateTime          @default(now())
+}
+
+// Structured "what would convincing evidence look like" criteria (Phase 2,
+// Section 5), AI-generated per requirement, distinct from the free-text
+// JobRequirement.evidenceCriteria HR can type directly.
+model RequirementEvidenceCriterion {
+  id            String         @id @default(uuid())
+  requirementId String
+  requirement   JobRequirement @relation("RequirementCriteria", fields: [requirementId], references: [id], onDelete: Cascade)
+  description   String
+  sortOrder     Int            @default(0)
+  createdAt     DateTime       @default(now())
+}
+
+// Immutable snapshot taken at approval time (Phase 2, Section 10). Editing a
+// JobRequirement after it has an approved version never overwrites this row
+// — JobRequirement.status moves to CHANGED and a later re-approval creates
+// versionNumber + 1. Assessment.requirementVersionId (added below) lets
+// Phase 4 pin a candidate's analysis to the exact version used.
+model JobRequirementVersion {
+  id                  String              @id @default(uuid())
+  requirementId       String
+  requirement         JobRequirement      @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  versionNumber       Int
+  category            RequirementCategory
+  customCategoryLabel String?
+  description         String
+  mandatory           Boolean
+  priority            RequirementPriority
+  evidenceCriteriaSnapshot Json           // RequirementEvidenceCriterion[] at approval time
+  aiInterpretationSummary  String?
+  aiSuggestedWeight   Decimal?            @db.Decimal(5, 2)
+  hrApprovedWeight    Decimal             @db.Decimal(5, 2)
+  approvedBy          String
+  approver            User                @relation(fields: [approvedBy], references: [id])
+  approvedAt          DateTime            @default(now())
+
+  assessments Assessment[]
+
+  @@unique([requirementId, versionNumber])
+}
+
+// History of every weight change, proposed or HR-modified — separate from
+// JobRequirementVersion, which only snapshots the state AT approval.
 model RequirementWeightApproval {
   id             String         @id @default(uuid())
   requirementId  String
@@ -145,6 +283,7 @@ model RequirementWeightApproval {
   approver       User           @relation(fields: [approvedBy], references: [id])
   previousWeight Decimal?       @db.Decimal(5, 2)
   newWeight      Decimal        @db.Decimal(5, 2)
+  hrNote         String?
   approvedAt     DateTime       @default(now())
 }
 
@@ -281,6 +420,11 @@ model Assessment {
   projectId              String
   requirementId          String
   requirement            JobRequirement    @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  // Pins the assessment to the exact approved requirement version it was
+  // scored against (Phase 2, Section 10) — nullable because Phase 1 predates
+  // versioning; Phase 4's assessment-writing code should always set this.
+  requirementVersionId   String?
+  requirementVersion     JobRequirementVersion? @relation(fields: [requirementVersionId], references: [id])
   aiAssessmentSummary    String
   status                 AssessmentStatus
   computedScoreContribution Decimal?       @db.Decimal(6, 4)

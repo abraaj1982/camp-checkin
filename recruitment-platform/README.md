@@ -8,23 +8,43 @@ This app is fully isolated from the `camp-checkin` files at the repo root:
 own `package.json`/workspaces, own database, own deployment. Nothing at the
 repo root is read, written, or depended on by anything in this directory.
 
-## Status (Phase 1 — Foundation)
+## Status (Phase 2 — Recruitment Project & Job Requirements)
 
-Implemented:
+Implemented in Phase 1 (Foundation):
 - Monorepo workspace layout (`apps/web`, `apps/api`, `worker`, `packages/*`)
-- Prisma schema for the full data model (projects, requirements, candidates,
-  evidence, assessments, decisions, overrides, audit log, AI config)
 - `AIProvider` abstraction + `ClaudeProvider` + `AiGateway` (schema
   validation, retry-once, `AiInteraction` logging)
 - Deterministic Experience Intelligence calculator (Total/Functional/
   Relevant/Directly-Relevant experience)
 - Evidence Redaction Layer (V1 deterministic pass: direct identifiers +
-  employer tokenization)
+  employer tokenization) — not yet wired into any route (no candidate data
+  flows yet)
 - Email/password auth behind an `AuthStrategy` abstraction, session-based,
   server-side RBAC (`HR_USER` / `HR_ADMIN` / `SYSTEM_ADMIN`)
 - Audit log service (single write path, append-only)
 - pg-boss queue skeleton + worker with per-candidate status tracking
-- Basic Next.js UI shell (login page only)
+
+Implemented in Phase 2 (Recruitment Project & Job Requirements):
+- Project-level authorization (`ProjectMember`: OWNER/MEMBER), enforced
+  server-side on every project-scoped route — an unrelated HR_USER gets 404,
+  not 403, on a project they can't see
+- Recruitment Project CRUD, status lifecycle (DRAFT → ACTIVE → ON_HOLD →
+  READY_FOR_CV_UPLOAD → COMPLETED → ARCHIVED) with a deterministic
+  allowed-transition table, HR user assignment
+- Job Requirements CRUD with category/priority/mandatory, a
+  Requirement Interpretation AI task producing semantic concepts
+  (DIRECT/RELEVANT/PARTIALLY_RELEVANT/NOT_RELEVANT, each with a rationale)
+  and structured evidence criteria
+- AI Weighting recommendation (proposal only) + HR weight approval, with
+  deterministic weight-total validation (must equal 100%) and an
+  HR-note requirement when a weight diverges from the AI suggestion
+- Requirement versioning: approving a requirement snapshots it into an
+  immutable `JobRequirementVersion`; editing an approved requirement never
+  overwrites that snapshot, only moves it to CHANGED pending re-approval
+- Weighting Review UI (`/projects/:id/requirements`) with a "Why this
+  weight?" panel showing the AI's interpretation, rationale, and evidence
+  criteria per requirement — evidence-first, not a single score
+- Full audit trail for every action above
 
 Not yet implemented (later phases per the approved plan):
 - PDF/DOCX parsing and the real document-processing pipeline (Phase 3)
@@ -36,6 +56,26 @@ Not yet implemented (later phases per the approved plan):
 - OIDC/SAML SSO (interface is ready; no concrete strategy implemented)
 - Object storage wiring (MinIO container is in `infra/docker-compose.yml`;
   no upload code yet)
+- A people-picker for assigning HR users (Phase 2 ships an exact-email
+  lookup via `GET /users?search=`, not a directory browser)
+
+## Tests
+
+- Unit tests (`packages/shared-types`, `packages/ai-gateway`): pure domain
+  logic — Experience Intelligence, project authorization rules, weight-total
+  validation, requirement version snapshotting, evidence redaction. No DB,
+  no network.
+- Integration tests (`apps/api`): real Fastify routes via `app.inject()`
+  against a real Postgres database (never mocked), with the AI Gateway's
+  Claude provider swapped for a canned `FakeAIProvider` — no live Claude API
+  calls are made in tests. Run with:
+  ```bash
+  DATABASE_URL=postgresql://recruitment:recruitment@localhost:5433/recruitment_platform \
+    npm run test -w @recruitment-platform/api
+  ```
+  Test files share one database and reset it in `beforeEach`, so they run
+  sequentially (`fileParallelism: false` in `apps/api/vitest.config.ts`) —
+  do not parallelize them without giving each file its own database.
 
 ## Local development
 

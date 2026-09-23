@@ -131,27 +131,37 @@ export const candidateComparisonOutputSchema = z.object({
 
 export type CandidateComparisonOutput = z.infer<typeof candidateComparisonOutputSchema>;
 
-// ---- Requirement Interpretation & Weighting (project setup phase) --------
+// ---- Requirement Interpretation (Phase 2, Sections 4 & 5) -----------------
+// HR enters requirements manually; this task performs semantic
+// interpretation + structured evidence-criteria generation over the
+// requirements HR already wrote, per requirement, in one batched call per
+// project (not a call per requirement — same call-efficiency principle as
+// the candidate-side tasks).
+
+export const semanticRelevanceSchema = z.enum([
+  "DIRECT",
+  "RELEVANT",
+  "PARTIALLY_RELEVANT",
+  "NOT_RELEVANT",
+]);
 
 export const requirementInterpretationOutputSchema = z.object({
-  requirements: z.array(
+  interpretations: z.array(
     z.object({
-      category: z.enum([
-        "EDUCATION",
-        "RELEVANT_EXPERIENCE",
-        "MANAGEMENT_EXPERIENCE",
-        "TECHNICAL_SKILLS",
-        "PROFESSIONAL_SKILLS",
-        "INDUSTRY_EXPERIENCE",
-        "FUNCTIONAL_EXPERIENCE",
-        "CERTIFICATIONS",
-        "LANGUAGES",
-        "LOCATION_MOBILITY",
-        "OTHER",
-      ]),
-      description: z.string(),
-      mandatory: z.boolean(),
-      evidenceCriteria: z.string(),
+      requirementId: z.string(),
+      interpretationSummary: z.string(), // plain-language restatement of what the requirement means
+      semanticConcepts: z.array(
+        z.object({
+          concept: z.string(), // e.g. "grievance handling"
+          relevance: semanticRelevanceSchema,
+          rationale: z.string(), // why this concept relates (or doesn't) — never a bare label
+        }),
+      ),
+      // "What would convincing evidence of this requirement look like inside
+      // a CV?" — ordered, concrete criteria (Section 5). Never conflated
+      // with whether a given candidate has that evidence; this task defines
+      // the requirement's evidence shape once, up front.
+      evidenceCriteria: z.array(z.string()),
     }),
   ),
 });
