@@ -5,18 +5,27 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js"
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/index.js",
+    "test": "vitest run"
   },
   "dependencies": {
     "@recruitment-platform/ai-gateway": "*",
     "@recruitment-platform/db": "*",
-    "pg-boss": "^10.1.5",
+    "@recruitment-platform/queue": "*",
+    "@recruitment-platform/shared-types": "*",
+    "@recruitment-platform/storage": "*",
+    "mammoth": "^1.8.0",
+    "pdfjs-dist": "^4.10.38",
     "pino": "^9.4.0"
   },
   "devDependencies": {
     "@types/node": "^20.14.10",
+    "@types/pdfkit": "^0.13.5",
+    "docx": "^9.1.1",
+    "pdfkit": "^0.15.1",
     "tsx": "^4.19.1",
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.2"
   }
 }

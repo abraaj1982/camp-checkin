@@ -8,7 +8,7 @@ This app is fully isolated from the `camp-checkin` files at the repo root:
 own `package.json`/workspaces, own database, own deployment. Nothing at the
 repo root is read, written, or depended on by anything in this directory.
 
-## Status (Phase 2 — Recruitment Project & Job Requirements)
+## Status (Phase 3 — Document & CV Engine)
 
 Implemented in Phase 1 (Foundation):
 - Monorepo workspace layout (`apps/web`, `apps/api`, `worker`, `packages/*`)
@@ -63,36 +63,81 @@ report, before Phase 3):
   and now uses `requireProjectAccess()`, closing the one route that was
   inconsistent with the Phase 2 authorization model
 
+Implemented in Phase 3 (Document & CV Engine):
+- `ObjectStorage` abstraction (mirrors `AIProvider`): `S3ObjectStorage`
+  (S3-compatible, works against the MinIO container in
+  `infra/docker-compose.yml`) and `LocalObjectStorage` (filesystem, for
+  local dev/tests without MinIO) — no application module imports an S3 SDK
+  directly
+- `CandidateDocumentQueue` abstraction over pg-boss (`packages/queue`),
+  shared by the API (enqueues on upload) and the worker (consumes); a
+  `FakeCandidateDocumentQueue` stands in for tests
+- Batch CV upload (`POST /projects/:id/candidates/upload`, `@fastify/multipart`,
+  up to 30 files): validates each file (extension + magic-number check, not
+  just the declared MIME type), stores the *original, unmodified* bytes,
+  creates `Candidate`/`CandidateProjectLink`/`CandidateDocument` rows, and
+  enqueues one job per document — an invalid file is rejected and reported
+  without failing the rest of the batch
+- Real PDF (`pdfjs-dist`, page-by-page text) and DOCX (`mammoth`) parsing in
+  the worker; a near-empty extraction is flagged `FAILED_NEEDS_OCR` rather
+  than silently processed
+- Resume Intelligence now actually runs through the existing `AiGateway` →
+  `ClaudeProvider` (worker/src/pipeline.ts), persisting normalized
+  `CandidateExperience`/`Education`/`Skill`/`Certification`/`Language` rows;
+  invalid AI output never reaches those tables (existing schema validation)
+- Extracted text and per-page text are preserved on `CandidateDocument`
+  (`extractedText`, `extractedPageTexts`) independently of the original
+  file, so Phase 4 can cite a source page without re-parsing and the
+  original can later be purged under the retention policy without losing
+  what was extracted from it
+- Per-document retry (`POST .../documents/:id/retry`, only from
+  `FAILED_RETRY`) and a Processing Status UI
+  (`/projects/:id/candidates`) showing per-candidate, per-document status,
+  polling while anything is in flight
+- Full audit trail for upload, processing (success/OCR-needed/AI failure),
+  and retry
+
 Not yet implemented (later phases per the approved plan):
-- PDF/DOCX parsing and the real document-processing pipeline (Phase 3)
-- Evidence extraction / semantic matching / career analysis AI calls wired
-  into the worker (Phase 4) — the pipeline function exists and fails loudly
-  rather than faking success (see `worker/src/pipeline.ts`)
+- Evidence extraction / semantic matching / career analysis AI calls
+  (Phase 4) — Resume Intelligence (extraction) is done; Requirement
+  Evidence Analysis and Career/Consistency Analysis are not
 - Blind screening UI, Evidence Viewer, Candidate Comparison (Phase 5)
 - HR decision UI, candidate database/reuse screens (Phases 6-7)
 - OIDC/SAML SSO (interface is ready; no concrete strategy implemented)
-- Object storage wiring (MinIO container is in `infra/docker-compose.yml`;
-  no upload code yet)
 - A people-picker for assigning HR users (Phase 2 ships an exact-email
   lookup via `GET /users?search=`, not a directory browser)
+- OCR for scanned/image-only documents (`FAILED_NEEDS_OCR` is detected and
+  reported, not processed)
+- Candidate deduplication/reuse across projects (Section 26) — every upload
+  creates a new `Candidate` row; a returning candidate isn't recognized
 
 ## Tests
 
-- Unit tests (`packages/shared-types`, `packages/ai-gateway`): pure domain
-  logic — Experience Intelligence, project authorization rules, weight-total
-  validation, requirement version snapshotting, evidence redaction. No DB,
-  no network.
-- Integration tests (`apps/api`): real Fastify routes via `app.inject()`
-  against a real Postgres database (never mocked), with the AI Gateway's
-  Claude provider swapped for a canned `FakeAIProvider` — no live Claude API
-  calls are made in tests. Run with:
+- Unit tests (`packages/shared-types`, `packages/ai-gateway`,
+  `packages/storage`, `packages/queue`): pure domain logic — Experience
+  Intelligence, project authorization rules, weight-total validation,
+  requirement version snapshotting, evidence redaction, file-upload
+  validation, `LocalObjectStorage` byte round-tripping, the fake queue. No
+  DB, no network.
+- Integration tests (`apps/api`, `worker`): real Fastify routes via
+  `app.inject()` and the real document-processing pipeline, both against a
+  real Postgres database (never mocked) and a temp-dir `LocalObjectStorage`
+  (never MinIO in tests), with the AI Gateway's Claude provider swapped for
+  a canned `FakeAIProvider` — no live Claude API calls are made in tests.
+  `worker/src/__tests__/queue-end-to-end.test.ts` goes one step further:
+  it enqueues through the real `PgBossCandidateDocumentQueue` (the API's
+  actual enqueue path) and consumes with a real pg-boss worker, proving the
+  queue plumbing itself, not just the pipeline function in isolation. Run
+  with:
   ```bash
   DATABASE_URL=postgresql://recruitment:recruitment@localhost:5433/recruitment_platform \
     npm run test -w @recruitment-platform/api
+  DATABASE_URL=postgresql://recruitment:recruitment@localhost:5433/recruitment_platform \
+    npm run test -w @recruitment-platform/worker
   ```
-  Test files share one database and reset it in `beforeEach`, so they run
-  sequentially (`fileParallelism: false` in `apps/api/vitest.config.ts`) —
-  do not parallelize them without giving each file its own database.
+  Test files within each package share one database and reset it in
+  `beforeEach`, so they run sequentially (`fileParallelism: false`) — do not
+  parallelize them without giving each file its own database.
 
 ## Local development
 

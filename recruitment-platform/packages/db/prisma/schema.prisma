@@ -340,11 +340,22 @@ model CandidateDocument {
   fileType         String
   storageKey       String
   originalFilename String
+  fileSizeBytes    Int?
   status           CandidateDocumentStatus  @default(QUEUED)
   failureReason    String?
   uploadedBy       String
   uploadedAt       DateTime                 @default(now())
   purgedAt         DateTime?
+  // Full extracted text, preserved separately from the (purgeable) original
+  // file so Phase 4 evidence extraction never has to re-parse the source
+  // document — and so the original can be purged later under the retention
+  // policy without losing what was extracted from it (architecture doc,
+  // Section: Retention). extractedPageTexts is one string per PDF page for
+  // page-level source references (Evidence.sourcePage); null for DOCX,
+  // which has no fixed pagination.
+  extractedText      String?
+  extractedPageTexts Json?
+  parsedAt           DateTime?
 
   evidence Evidence[]
 }

@@ -1,13 +1,21 @@
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { prisma } from "@recruitment-platform/db";
-import { buildApp } from "../app.js";
-import { createUser, loginAs, resetDatabase, FakeAIProvider, seedAiModelConfig } from "./test-utils.js";
+import {
+  createTestStorage,
+  buildTestApp,
+  createUser,
+  loginAs,
+  resetDatabase,
+  FakeAIProvider,
+  seedAiModelConfig,
+} from "./test-utils.js";
 
 describe("job requirements: AI interpretation, weighting, approval, versioning, audit", () => {
   let app: FastifyInstance;
   let cookie: string;
   let projectId: string;
+  let cleanupStorage: () => Promise<void>;
 
   const fakeProvider = new FakeAIProvider({
     REQUIREMENT_INTERPRETATION: (requirementIds) => ({
@@ -32,12 +40,9 @@ describe("job requirements: AI interpretation, weighting, approval, versioning, 
 
   beforeEach(async () => {
     await resetDatabase();
-    app = await buildApp({
-      sessionSecret: "test-session-secret-not-for-production-use-only",
-      nodeEnv: "test",
-      providers: { fake: fakeProvider },
-      logger: false,
-    });
+    const { storage, cleanup } = await createTestStorage();
+    cleanupStorage = cleanup;
+    app = await buildTestApp({ storage, providers: { fake: fakeProvider } });
     await createUser("hr@example.com", "HR_USER");
     cookie = await loginAs(app, "hr@example.com");
     const createRes = await app.inject({
@@ -47,6 +52,10 @@ describe("job requirements: AI interpretation, weighting, approval, versioning, 
       payload: { title: "HR Manager" },
     });
     projectId = createRes.json().id;
+  });
+
+  afterEach(async () => {
+    await cleanupStorage();
   });
 
   afterAll(async () => {

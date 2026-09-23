@@ -11,10 +11,13 @@
   },
   "dependencies": {
     "@fastify/cookie": "^9.4.0",
+    "@fastify/multipart": "^8.3.0",
     "@fastify/session": "^10.9.0",
     "@recruitment-platform/ai-gateway": "*",
     "@recruitment-platform/db": "*",
+    "@recruitment-platform/queue": "*",
     "@recruitment-platform/shared-types": "*",
+    "@recruitment-platform/storage": "*",
     "bcryptjs": "^2.4.3",
     "fastify": "^4.28.1",
     "pino": "^9.4.0",
@@ -23,6 +26,7 @@
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20.14.10",
+    "form-data": "^4.0.0",
     "tsx": "^4.19.1",
     "typescript": "^5.6.3",
     "vitest": "^2.1.2"

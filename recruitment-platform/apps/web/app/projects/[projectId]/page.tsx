@@ -156,6 +156,11 @@ export default function ProjectOverviewPage() {
       <p>
         <Link href={`/projects/${projectId}/requirements`}>Open requirements & weighting review →</Link>
       </p>
+
+      <h2>Candidates</h2>
+      <p>
+        <Link href={`/projects/${projectId}/candidates`}>Upload CVs & view processing status →</Link>
+      </p>
     </main>
   );
 }

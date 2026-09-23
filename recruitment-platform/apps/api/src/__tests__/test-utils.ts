@@ -1,7 +1,39 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { FastifyInstance } from "fastify";
 import { prisma } from "@recruitment-platform/db";
 import type { AIProvider, AiRunRequest, AiRunResult } from "@recruitment-platform/ai-gateway";
+import { LocalObjectStorage, type ObjectStorage } from "@recruitment-platform/storage";
+import { FakeCandidateDocumentQueue } from "@recruitment-platform/queue";
 import { EmailPasswordStrategy } from "../modules/auth/email-password-strategy.js";
+import { buildApp, type BuildAppOptions } from "../app.js";
+
+export const TEST_SESSION_SECRET = "test-session-secret-not-for-production-use-only";
+
+/**
+ * A fresh local-filesystem ObjectStorage per test run, under the OS temp
+ * dir — never touches the real infra/docker-compose.yml MinIO. Call
+ * cleanup() in an afterAll/afterEach to remove the temp directory.
+ */
+export async function createTestStorage(): Promise<{ storage: ObjectStorage; cleanup: () => Promise<void> }> {
+  const dir = await mkdtemp(join(tmpdir(), "rip-test-storage-"));
+  return { storage: new LocalObjectStorage(dir), cleanup: () => rm(dir, { recursive: true, force: true }) };
+}
+
+/** Builds the app with sane test defaults; override only what a test needs. */
+export async function buildTestApp(
+  overrides: Partial<BuildAppOptions> & { storage: ObjectStorage },
+): Promise<FastifyInstance> {
+  return buildApp({
+    sessionSecret: TEST_SESSION_SECRET,
+    nodeEnv: "test",
+    providers: {},
+    queue: new FakeCandidateDocumentQueue(),
+    logger: false,
+    ...overrides,
+  });
+}
 
 /** Deletes every row in dependency order — cheap and safe between tests. */
 export async function resetDatabase(): Promise<void> {

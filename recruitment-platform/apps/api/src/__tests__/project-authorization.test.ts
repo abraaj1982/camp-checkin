@@ -1,20 +1,21 @@
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { prisma } from "@recruitment-platform/db";
-import { buildApp } from "../app.js";
-import { createUser, loginAs, resetDatabase } from "./test-utils.js";
+import { createTestStorage, buildTestApp, createUser, loginAs, resetDatabase } from "./test-utils.js";
 
 describe("project-level authorization (Phase 2, Section 1)", () => {
   let app: FastifyInstance;
+  let cleanupStorage: () => Promise<void>;
 
   beforeEach(async () => {
     await resetDatabase();
-    app = await buildApp({
-      sessionSecret: "test-session-secret-not-for-production-use-only",
-      nodeEnv: "test",
-      providers: {},
-      logger: false,
-    });
+    const { storage, cleanup } = await createTestStorage();
+    cleanupStorage = cleanup;
+    app = await buildTestApp({ storage });
+  });
+
+  afterEach(async () => {
+    await cleanupStorage();
   });
 
   afterAll(async () => {
