@@ -1,0 +1,295 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { apiFetch, ApiError } from "../../../../../lib/api";
+import { StatusBadge } from "../../../status-badge";
+
+/**
+ * Phase 5B — read-only Evidence Viewer / Career Consistency Viewer.
+ *
+ * Security note: the server (Phase 5A) is the ONLY redaction/blind-screening
+ * boundary. This page renders exactly the fields the API sends — it never
+ * hides a field the API already returned, because the API never returns
+ * an identifying field to begin with. The types below are deliberately
+ * narrow (only the fields these two endpoints actually send) rather than a
+ * reused, broader "Candidate" type — a defensive allow-list at the type
+ * boundary, not a second redaction layer.
+ */
+
+type AssessmentStatus = "STRONG_EVIDENCE" | "REVIEW_REQUIRED" | "MANDATORY_GAP" | "INSUFFICIENT_EVIDENCE";
+type EvidenceRole = "SUPPORTING" | "CONSIDERED_REJECTED";
+
+interface EvidenceItem {
+  role: EvidenceRole;
+  rationale: string | null;
+  evidenceStrength: string;
+  confidence: string;
+  evidenceType: string;
+  sourcePage: number | null;
+  evidenceText: string | null;
+  source: string | null;
+}
+
+interface AssessmentItem {
+  status: AssessmentStatus;
+  requirement: {
+    id: string;
+    description: string;
+    mandatory: boolean;
+    category: string;
+    hrApprovedWeight: string | null;
+  };
+  requirementVersion: { id: string; versionNumber: number; evidenceCriteriaSnapshot: unknown } | null;
+  evidence: EvidenceItem[];
+}
+
+interface AssessmentsResponse {
+  candidate: { id: string; anonymizedLabel: string };
+  assessments: AssessmentItem[];
+}
+
+interface ConsistencyFinding {
+  findingType: string;
+  severity: string;
+  description: string;
+  sourcePage: number | null;
+  evidenceText: string | null;
+  confidence: string;
+  source: string | null;
+}
+
+interface ConsistencyResponse {
+  candidate: { id: string; anonymizedLabel: string };
+  findings: ConsistencyFinding[];
+}
+
+// Deliberately narrow slice of the /projects/:id/candidates response (which
+// also returns fullName/email/phone/originalFilename on the wire) — this
+// page reads ONLY anonymizedLabel and each document's status +
+// currentProcessingRunId, and the type below declares nothing else, so
+// nothing else can be accidentally rendered from it. currentProcessingRunId
+// is read (never rendered) purely to tell "a current run exists but had
+// nothing to report" apart from "no run has ever completed" — without it,
+// a candidate whose current run legitimately produced zero
+// assessments/findings could be misread as FAILED_RETRY merely because a
+// different, unrelated document for the same candidate failed.
+type DocumentStatus = "QUEUED" | "PROCESSING" | "COMPLETED" | "FAILED_RETRY" | "FAILED_NEEDS_OCR";
+interface CandidateStatusLink {
+  candidateId: string;
+  anonymizedLabel: string;
+  candidate: { documents: { status: DocumentStatus; currentProcessingRunId: string | null }[] };
+}
+
+function sourceLabel(source: string | null, sourcePage: number | null): string {
+  if (!source) return "No source";
+  return sourcePage !== null ? `${source}, page ${sourcePage}` : source;
+}
+
+function EvidenceCard({ item }: { item: EvidenceItem }) {
+  return (
+    <div style={{ border: "1px solid #eee", borderRadius: 4, padding: 12, marginTop: 8 }}>
+      <p style={{ margin: 0, fontSize: 13, color: "#555" }}>
+        Strength: <strong>{item.evidenceStrength}</strong> · Confidence: <strong>{item.confidence}</strong> · Type:{" "}
+        {item.evidenceType}
+      </p>
+      {item.evidenceText && <p style={{ margin: "8px 0" }}>&ldquo;{item.evidenceText}&rdquo;</p>}
+      {item.rationale && <p style={{ margin: "8px 0", color: "#555" }}>{item.rationale}</p>}
+      <p style={{ margin: 0, fontSize: 12, color: "#888" }}>{sourceLabel(item.source, item.sourcePage)}</p>
+    </div>
+  );
+}
+
+function AssessmentCard({ assessment }: { assessment: AssessmentItem }) {
+  const [criteriaOpen, setCriteriaOpen] = useState(false);
+  const supporting = assessment.evidence.filter((e) => e.role === "SUPPORTING");
+  const rejected = assessment.evidence.filter((e) => e.role === "CONSIDERED_REJECTED");
+  const criteria = Array.isArray(assessment.requirementVersion?.evidenceCriteriaSnapshot)
+    ? (assessment.requirementVersion!.evidenceCriteriaSnapshot as unknown[])
+    : null;
+
+  return (
+    <section style={{ border: "1px solid #ddd", borderRadius: 6, padding: 16, marginBottom: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+        <div>
+          <h3 style={{ margin: 0 }}>{assessment.requirement.description}</h3>
+          <p style={{ margin: "4px 0", fontSize: 13, color: "#555" }}>
+            {assessment.requirement.mandatory ? "Mandatory" : "Optional"} · {assessment.requirement.category}
+            {assessment.requirement.hrApprovedWeight !== null && ` · Weight: ${assessment.requirement.hrApprovedWeight}`}
+          </p>
+        </div>
+        <StatusBadge status={assessment.status} />
+      </div>
+
+      {criteria && criteria.length > 0 && (
+        <div style={{ marginTop: 8 }}>
+          <button onClick={() => setCriteriaOpen((v) => !v)} style={{ fontSize: 13 }}>
+            {criteriaOpen ? "Hide" : "Show"} Evidence Criteria
+          </button>
+          {criteriaOpen && (
+            <ul style={{ marginTop: 8 }}>
+              {criteria.map((c, i) => (
+                <li key={i} style={{ fontSize: 13, color: "#555" }}>
+                  {String(c)}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      <div style={{ marginTop: 12 }}>
+        <h4 style={{ margin: "0 0 4px" }}>Supporting Evidence</h4>
+        {supporting.length === 0 ? (
+          <p style={{ fontSize: 13, color: "#888" }}>None.</p>
+        ) : (
+          supporting.map((e, i) => <EvidenceCard key={i} item={e} />)
+        )}
+      </div>
+      <div style={{ marginTop: 12 }}>
+        <h4 style={{ margin: "0 0 4px" }}>Considered Rejected Evidence</h4>
+        {rejected.length === 0 ? (
+          <p style={{ fontSize: 13, color: "#888" }}>None.</p>
+        ) : (
+          rejected.map((e, i) => <EvidenceCard key={i} item={e} />)
+        )}
+      </div>
+    </section>
+  );
+}
+
+function FindingCard({ finding }: { finding: ConsistencyFinding }) {
+  return (
+    <div style={{ border: "1px solid #ddd", borderRadius: 6, padding: 12, marginBottom: 8 }}>
+      <p style={{ margin: 0, fontWeight: 600 }}>
+        {finding.findingType.replaceAll("_", " ")} — <span style={{ fontWeight: 400 }}>{finding.severity.replaceAll("_", " ")}</span>
+      </p>
+      <p style={{ margin: "8px 0" }}>{finding.description}</p>
+      {finding.evidenceText && <p style={{ margin: "8px 0", color: "#555" }}>&ldquo;{finding.evidenceText}&rdquo;</p>}
+      <p style={{ margin: 0, fontSize: 12, color: "#888" }}>
+        Confidence: {finding.confidence} · {sourceLabel(finding.source, finding.sourcePage)}
+      </p>
+    </div>
+  );
+}
+
+export default function CandidateDetailPage() {
+  const { projectId, candidateId } = useParams<{ projectId: string; candidateId: string }>();
+  const [assessments, setAssessments] = useState<AssessmentsResponse | null>(null);
+  const [findings, setFindings] = useState<ConsistencyResponse | null>(null);
+  const [statusLink, setStatusLink] = useState<CandidateStatusLink | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [notFound, setNotFound] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    setNotFound(false);
+    try {
+      const [assessmentsRes, findingsRes, links] = await Promise.all([
+        apiFetch<AssessmentsResponse>(`/projects/${projectId}/candidates/${candidateId}/assessments`),
+        apiFetch<ConsistencyResponse>(`/projects/${projectId}/candidates/${candidateId}/consistency-findings`),
+        apiFetch<CandidateStatusLink[]>(`/projects/${projectId}/candidates`),
+      ]);
+      setAssessments(assessmentsRes);
+      setFindings(findingsRes);
+      setStatusLink(links.find((l) => l.candidateId === candidateId) ?? null);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) {
+        setNotFound(true);
+      } else {
+        setError("Could not load candidate results.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId, candidateId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  if (loading) {
+    return (
+      <main style={{ padding: 32, maxWidth: 900 }}>
+        <p>Loading…</p>
+      </main>
+    );
+  }
+
+  if (notFound) {
+    return (
+      <main style={{ padding: 32, maxWidth: 900 }}>
+        <p><Link href={`/projects/${projectId}/candidates`}>← Back to candidates</Link></p>
+        <p>Candidate not found in this project.</p>
+      </main>
+    );
+  }
+
+  if (error || !assessments || !findings) {
+    return (
+      <main style={{ padding: 32, maxWidth: 900 }}>
+        <p><Link href={`/projects/${projectId}/candidates`}>← Back to candidates</Link></p>
+        <p style={{ color: "crimson" }}>{error ?? "Could not load candidate results."}</p>
+      </main>
+    );
+  }
+
+  const documents = statusLink?.candidate.documents ?? [];
+  const isProcessing = documents.some((d) => d.status === "QUEUED" || d.status === "PROCESSING");
+  const hasResults = assessments.assessments.length > 0 || findings.findings.length > 0;
+  // A current run that legitimately produced zero assessments/findings
+  // (hasResults === false) must never be mistaken for "no run at all" just
+  // because some OTHER document for this candidate happens to be
+  // FAILED_RETRY — currentProcessingRunId (already present on this
+  // existing response) is the one signal that distinguishes them, so the
+  // failed state is shown only when no document has a current run.
+  const hasCurrentRun = documents.some((d) => d.currentProcessingRunId !== null);
+  const isFailed =
+    !hasResults && !isProcessing && !hasCurrentRun && documents.some((d) => d.status === "FAILED_RETRY");
+
+  return (
+    <main style={{ padding: 32, maxWidth: 900 }}>
+      <p><Link href={`/projects/${projectId}/candidates`}>← Back to candidates</Link></p>
+      <h1>{assessments.candidate.anonymizedLabel}</h1>
+
+      {isProcessing && (
+        <p style={{ color: "#a15c00" }} role="status">
+          Processing — results will appear once analysis completes.
+        </p>
+      )}
+
+      {!hasResults && !isProcessing && isFailed && (
+        <p style={{ color: "crimson" }} role="status">
+          Processing failed. Retry from the candidates list.
+        </p>
+      )}
+
+      {!hasResults && !isProcessing && !isFailed && <p role="status">No results available yet.</p>}
+
+      {hasResults && (
+        <>
+          <section style={{ marginTop: 24 }}>
+            <h2>Requirements &amp; Evidence</h2>
+            {assessments.assessments.length === 0 ? (
+              <p style={{ color: "#888" }}>No requirement assessments yet.</p>
+            ) : (
+              assessments.assessments.map((a, i) => <AssessmentCard key={i} assessment={a} />)
+            )}
+          </section>
+
+          <section style={{ marginTop: 24 }}>
+            <h2>Career Consistency</h2>
+            {findings.findings.length === 0 ? (
+              <p style={{ color: "#888" }}>No consistency findings.</p>
+            ) : (
+              findings.findings.map((f, i) => <FindingCard key={i} finding={f} />)
+            )}
+          </section>
+        </>
+      )}
+    </main>
+  );
+}

@@ -145,7 +145,9 @@ export default function CandidatesPage() {
           {links.flatMap((l) =>
             l.candidate.documents.map((d) => (
               <tr key={d.id} style={{ borderBottom: "1px solid #eee" }}>
-                <td style={{ padding: 8 }}>{l.anonymizedLabel}</td>
+                <td style={{ padding: 8 }}>
+                  <Link href={`/projects/${projectId}/candidates/${l.candidateId}`}>{l.anonymizedLabel}</Link>
+                </td>
                 <td style={{ padding: 8 }}>{d.originalFilename}</td>
                 <td style={{ padding: 8 }}>{STATUS_LABEL[d.status]}</td>
                 <td style={{ padding: 8, color: "#a00" }}>{d.failureReason ?? ""}</td>
