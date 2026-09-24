@@ -12,6 +12,7 @@
   "dependencies": {
     "@recruitment-platform/ai-gateway": "*",
     "@recruitment-platform/db": "*",
+    "@recruitment-platform/document-parsing": "*",
     "@recruitment-platform/queue": "*",
     "@recruitment-platform/shared-types": "*",
     "@recruitment-platform/storage": "*",

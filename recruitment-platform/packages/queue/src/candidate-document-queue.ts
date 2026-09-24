@@ -8,6 +8,20 @@ export interface ProcessCandidateDocumentJobData {
   projectId: string;
 }
 
+// Phase 7 — Candidate Deduplication. A second, independent job type: runs
+// BEFORE any CandidateDocument exists (deterministic identity extraction +
+// duplicate match check against a StagedUpload, which has no candidateId).
+// Kept on the same queue abstraction as PROCESS_CANDIDATE_DOCUMENT_JOB
+// (same pg-boss connection, same fake-for-tests pattern) rather than a
+// second parallel interface, since both are "candidate upload" queue
+// concerns and the existing abstraction already generalizes cleanly.
+export const RESOLVE_CANDIDATE_IDENTITY_JOB = "resolve-candidate-identity";
+
+export interface ResolveCandidateIdentityJobData {
+  stagedUploadId: string;
+  projectId: string;
+}
+
 /**
  * The one queue interface both the API (enqueues on upload) and the worker
  * (consumes) depend on — same abstraction-over-a-vendor-library pattern as
@@ -17,6 +31,7 @@ export interface ProcessCandidateDocumentJobData {
  */
 export interface CandidateDocumentQueue {
   enqueue(data: ProcessCandidateDocumentJobData): Promise<void>;
+  enqueueIdentityResolution(data: ResolveCandidateIdentityJobData): Promise<void>;
 }
 
 export class PgBossCandidateDocumentQueue implements CandidateDocumentQueue {
@@ -34,6 +49,7 @@ export class PgBossCandidateDocumentQueue implements CandidateDocumentQueue {
         });
         await boss.start();
         await boss.createQueue(PROCESS_CANDIDATE_DOCUMENT_JOB);
+        await boss.createQueue(RESOLVE_CANDIDATE_IDENTITY_JOB);
         return boss;
       })();
     }
@@ -43,6 +59,11 @@ export class PgBossCandidateDocumentQueue implements CandidateDocumentQueue {
   async enqueue(data: ProcessCandidateDocumentJobData): Promise<void> {
     const boss = await this.getBoss();
     await boss.send(PROCESS_CANDIDATE_DOCUMENT_JOB, data);
+  }
+
+  async enqueueIdentityResolution(data: ResolveCandidateIdentityJobData): Promise<void> {
+    const boss = await this.getBoss();
+    await boss.send(RESOLVE_CANDIDATE_IDENTITY_JOB, data);
   }
 
   async stop(): Promise<void> {
@@ -56,8 +77,13 @@ export class PgBossCandidateDocumentQueue implements CandidateDocumentQueue {
 /** In-memory fake for tests — captures enqueued jobs, never touches Postgres. */
 export class FakeCandidateDocumentQueue implements CandidateDocumentQueue {
   readonly enqueued: ProcessCandidateDocumentJobData[] = [];
+  readonly enqueuedIdentityResolution: ResolveCandidateIdentityJobData[] = [];
 
   async enqueue(data: ProcessCandidateDocumentJobData): Promise<void> {
     this.enqueued.push(data);
+  }
+
+  async enqueueIdentityResolution(data: ResolveCandidateIdentityJobData): Promise<void> {
+    this.enqueuedIdentityResolution.push(data);
   }
 }

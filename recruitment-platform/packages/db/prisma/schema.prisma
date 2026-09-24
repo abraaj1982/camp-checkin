@@ -151,6 +151,7 @@ model User {
   requirementVersionsApproved JobRequirementVersion[]
   hrDecisions        HrDecision[]
   auditLogs          AuditLog[]
+  resolvedMatchReviews CandidateMatchReview[]
 }
 
 model RecruitmentProject {
@@ -174,6 +175,8 @@ model RecruitmentProject {
   candidateLinks CandidateProjectLink[]
   comparisons    CandidateComparison[]
   uploadBatches  CandidateUploadBatch[]
+  stagedUploads  StagedUpload[]
+  matchReviews   CandidateMatchReview[]
 }
 
 // Project-level authorization spine (Phase 2, Section 1): the creator is
@@ -293,6 +296,7 @@ model CandidateUploadBatch {
 
   documents      CandidateDocument[]
   versionPins    CandidateBatchRequirementVersion[]
+  stagedUploads  StagedUpload[]
 }
 
 // The pin itself: "in this batch, requirement X means version Y" — resolved
@@ -346,6 +350,19 @@ model Candidate {
   // ready for it.
   piiPurgedAt DateTime?
 
+  // Phase 7 — Candidate Deduplication / Reuse. Deterministic identity
+  // matching keys, distinct from the raw fullName/email/phone above:
+  // email/phone hold the original extracted value (or remain unset, as
+  // today); normalizedEmail/normalizedPhone are the exact, deterministic
+  // lookup keys used only for duplicate matching (see
+  // worker/src/identity-extraction.ts). Never unique — a collision must
+  // route to CandidateMatchReview for HR resolution, never a DB error.
+  // Excluded from matching entirely once piiPurgedAt is set (Phase 7A
+  // Decision: PII purge itself remains out of scope, but a purged
+  // candidate must never be silently reintroduced via a match).
+  normalizedEmail String?
+  normalizedPhone String?
+
   documents      CandidateDocument[]
   projectLinks   CandidateProjectLink[]
   experiences    CandidateExperience[]
@@ -357,6 +374,11 @@ model Candidate {
   assessments          Assessment[]
   hrDecisions          HrDecision[]
   consistencyFindings  CandidateConsistencyFinding[]
+  emailMatchReviews CandidateMatchReview[] @relation("MatchReviewEmailMatch")
+  phoneMatchReviews CandidateMatchReview[] @relation("MatchReviewPhoneMatch")
+
+  @@index([normalizedEmail])
+  @@index([normalizedPhone])
 }
 
 // Per-project blind-screening label ("Candidate #007"); a candidate can be
@@ -415,10 +437,130 @@ model CandidateDocument {
   currentProcessingRunId   String?
   currentProcessingRun     ProcessingRun? @relation("CurrentProcessingRun", fields: [currentProcessingRunId], references: [id], onDelete: SetNull)
 
+  // Phase 7 — set only when this document was promoted from a StagedUpload
+  // (deduplication review path) rather than created immediately at upload
+  // time. @unique is the database-enforced half of the "one staged upload
+  // -> at most one CandidateDocument" invariant (the atomic status-claim on
+  // StagedUpload/CandidateMatchReview is the primary guard; this is the
+  // backstop). storageKey above is, in that case, the literal same key the
+  // StagedUpload was written to — never copied or moved.
+  stagedUploadId String?      @unique
+  stagedUpload   StagedUpload? @relation(fields: [stagedUploadId], references: [id], onDelete: SetNull)
+
   evidence            Evidence[]
   consistencyFindings CandidateConsistencyFinding[]
   batch               CandidateUploadBatch?         @relation(fields: [batchId], references: [id], onDelete: SetNull)
   processingRuns      ProcessingRun[]               @relation("DocumentProcessingRuns")
+}
+
+// Phase 7 — Candidate Deduplication / Reuse across Projects.
+//
+// Represents an uploaded file whose Candidate identity has not yet been
+// resolved. Deliberately has NO candidateId: identity resolution happens
+// BEFORE any Candidate-scoped row (CandidateDocument, ProcessingRun,
+// Assessment, Evidence, CandidateConsistencyFinding) is ever created, so
+// there is never a temporary/placeholder Candidate and never a need to
+// re-key processing history onto a different candidate afterward.
+//
+// No raw or normalized email/phone is persisted here (data minimization,
+// Phase 7A approved correction): identity extraction is recomputed
+// transiently, in memory, from the immutable stored object at both (a) the
+// initial match check during RESOLVING and (b) promotion time — never
+// written to this row.
+model StagedUpload {
+  id               String                @id @default(uuid())
+
+  projectId        String
+  project          RecruitmentProject    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  batchId          String?
+  batch            CandidateUploadBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+
+  storageKey       String
+  originalFilename String
+  fileType         String
+  fileSizeBytes    Int?
+
+  uploadedBy       String
+  uploadedAt       DateTime              @default(now())
+
+  status           StagedUploadStatus    @default(PENDING_IDENTITY_RESOLUTION)
+  failureReason    String?
+
+  matchReview      CandidateMatchReview?
+  promotedDocument CandidateDocument?
+  createdAt        DateTime              @default(now())
+
+  @@index([projectId, status])
+}
+
+enum StagedUploadStatus {
+  PENDING_IDENTITY_RESOLUTION
+  RESOLVING
+  PENDING_REVIEW
+  PROMOTED
+  FAILED
+}
+
+// One row per StagedUpload that produced at least one deterministic
+// identity match. Never deleted and never has its candidate reference(s)
+// nulled after resolution — it remains a permanent, Restrict-protected
+// historical record of what was flagged and what an administrator decided
+// (Phase 7A: audit and Restrict-protection precedent, matching HrOverride).
+//
+// emailMatchedCandidateId/phoneMatchedCandidateId are two independent,
+// nullable FKs rather than one — capped at 2 by the fixed two-signal
+// design (email, phone; no others in Phase 7) — because a single FK cannot
+// safely represent the case where email matches one existing Candidate and
+// phone matches a DIFFERENT one (matchSignal = CONFLICT). No raw/normalized
+// email or phone value is stored here — only the categorical matchSignal
+// and the matched Candidate id(s) (Phase 7A approved minimization).
+model CandidateMatchReview {
+  id                      String                     @id @default(uuid())
+
+  stagedUploadId          String                     @unique
+  stagedUpload            StagedUpload               @relation(fields: [stagedUploadId], references: [id], onDelete: Cascade)
+
+  projectId               String
+  project                 RecruitmentProject         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  matchSignal             CandidateMatchSignal
+
+  emailMatchedCandidateId String?
+  emailMatchedCandidate   Candidate?                 @relation("MatchReviewEmailMatch", fields: [emailMatchedCandidateId], references: [id], onDelete: Restrict)
+
+  phoneMatchedCandidateId String?
+  phoneMatchedCandidate   Candidate?                 @relation("MatchReviewPhoneMatch", fields: [phoneMatchedCandidateId], references: [id], onDelete: Restrict)
+
+  // Doubles as the resolution outcome: PENDING -> LINK_EXISTING or
+  // PENDING -> CREATE_NEW, exactly once (enforced by an atomic compare-
+  // and-set on this field, never a second write path).
+  status                  CandidateMatchReviewStatus @default(PENDING)
+  resolvedBy              String?
+  resolver                User?                      @relation(fields: [resolvedBy], references: [id])
+  resolvedAt              DateTime?
+
+  createdAt               DateTime                   @default(now())
+
+  @@index([projectId, status])
+}
+
+enum CandidateMatchReviewStatus {
+  PENDING
+  LINK_EXISTING
+  CREATE_NEW
+}
+
+// EMAIL/PHONE: exactly one signal matched, to one Candidate. BOTH: both
+// signals matched the SAME Candidate (stronger corroboration, still not
+// automatic). CONFLICT: the two signals matched two DIFFERENT Candidates —
+// neither is auto-selected; the administrator must choose, and the
+// identity-enrichment rules (worker/src/identity-resolution.ts) forbid
+// writing either field onto either candidate in this case.
+enum CandidateMatchSignal {
+  EMAIL
+  PHONE
+  BOTH
+  CONFLICT
 }
 
 enum ProcessingRunStatus {

@@ -30,13 +30,27 @@ async function multipartRequest(
   });
 }
 
-describe("candidate CV batch upload and processing status (Phase 3)", () => {
+/**
+ * Candidate CV batch upload (Phase 3), revised for Phase 7 — Candidate
+ * Deduplication: the upload route no longer creates Candidate/
+ * CandidateProjectLink/CandidateDocument synchronously (identity isn't
+ * known until the worker parses the file). It creates a StagedUpload per
+ * accepted file and enqueues an identity-resolution job; that job's own
+ * behavior (no-match promotion, match -> CandidateMatchReview) is covered
+ * separately in candidate-identity-resolution.test.ts. This file covers
+ * exactly what the API route itself is responsible for: validation,
+ * per-file independence, storage, staging, and the unchanged
+ * document-retry route (which still requires an existing CandidateDocument
+ * — seeded directly here, since upload no longer produces one).
+ */
+describe("candidate CV batch upload and processing status (Phase 3, revised for Phase 7)", () => {
   let app: FastifyInstance;
   let storage: ObjectStorage;
   let cleanupStorage: () => Promise<void>;
   let queue: FakeCandidateDocumentQueue;
   let cookie: string;
   let projectId: string;
+  let userId: string;
 
   beforeEach(async () => {
     await resetDatabase();
@@ -46,7 +60,8 @@ describe("candidate CV batch upload and processing status (Phase 3)", () => {
     queue = new FakeCandidateDocumentQueue();
     app = await buildTestApp({ storage, queue });
 
-    await createUser("hr@example.com", "HR_USER");
+    const user = await createUser("hr@example.com", "HR_USER");
+    userId = user.id;
     cookie = await loginAs(app, "hr@example.com");
     const projectRes = await app.inject({
       method: "POST",
@@ -65,7 +80,7 @@ describe("candidate CV batch upload and processing status (Phase 3)", () => {
     await prisma.$disconnect();
   });
 
-  it("uploads a batch of valid PDF/DOCX files: creates Candidate/CandidateProjectLink/CandidateDocument rows, stores the original bytes, and enqueues one job per document", async () => {
+  it("stages a batch of valid PDF/DOCX files: creates StagedUpload rows (no Candidate yet), stores the original bytes, and enqueues one identity-resolution job per file", async () => {
     const res = await multipartRequest(app, `/projects/${projectId}/candidates/upload`, cookie, [
       { filename: "jane-doe.pdf", content: VALID_PDF_BYTES },
       { filename: "john_smith.docx", content: VALID_DOCX_BYTES },
@@ -73,34 +88,35 @@ describe("candidate CV batch upload and processing status (Phase 3)", () => {
 
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(body.uploaded).toHaveLength(2);
+    expect(body.staged).toHaveLength(2);
     expect(body.rejected).toHaveLength(0);
 
-    const documents = await prisma.candidateDocument.findMany({ where: { projectId } });
-    expect(documents).toHaveLength(2);
-    expect(documents.every((d) => d.status === "QUEUED")).toBe(true);
-    expect(documents.map((d) => d.originalFilename).sort()).toEqual(["jane-doe.pdf", "john_smith.docx"]);
+    const stagedUploads = await prisma.stagedUpload.findMany({ where: { projectId } });
+    expect(stagedUploads).toHaveLength(2);
+    expect(stagedUploads.every((s) => s.status === "PENDING_IDENTITY_RESOLUTION")).toBe(true);
+    expect(stagedUploads.map((s) => s.originalFilename).sort()).toEqual(["jane-doe.pdf", "john_smith.docx"]);
 
-    const links = await prisma.candidateProjectLink.findMany({ where: { projectId } });
-    expect(links).toHaveLength(2);
-    expect(links.map((l) => l.anonymizedLabel).sort()).toEqual(["Candidate #001", "Candidate #002"]);
+    // No Candidate-scoped row exists yet — identity hasn't been resolved.
+    expect(await prisma.candidate.count()).toBe(0);
+    expect(await prisma.candidateProjectLink.count({ where: { projectId } })).toBe(0);
+    expect(await prisma.candidateDocument.count({ where: { projectId } })).toBe(0);
 
-    expect(queue.enqueued).toHaveLength(2);
-    expect(queue.enqueued.every((j) => j.projectId === projectId)).toBe(true);
+    expect(queue.enqueuedIdentityResolution).toHaveLength(2);
+    expect(queue.enqueuedIdentityResolution.every((j) => j.projectId === projectId)).toBe(true);
   });
 
-  it("stores the original bytes unchanged in object storage", async () => {
+  it("stores the original bytes unchanged in object storage under the staged upload's own key", async () => {
     const res = await multipartRequest(app, `/projects/${projectId}/candidates/upload`, cookie, [
       { filename: "jane-doe.pdf", content: VALID_PDF_BYTES },
     ]);
-    const { documentId } = res.json().uploaded[0];
+    const { stagedUploadId } = res.json().staged[0];
 
-    const document = await prisma.candidateDocument.findUniqueOrThrow({ where: { id: documentId } });
-    const storedBytes = await storage.getObject(document.storageKey);
+    const stagedUpload = await prisma.stagedUpload.findUniqueOrThrow({ where: { id: stagedUploadId } });
+    const storedBytes = await storage.getObject(stagedUpload.storageKey);
     expect(storedBytes.equals(VALID_PDF_BYTES)).toBe(true);
   });
 
-  it("rejects a corrupted/mislabeled file but still processes the rest of the batch", async () => {
+  it("rejects a corrupted/mislabeled file but still stages the rest of the batch", async () => {
     const res = await multipartRequest(app, `/projects/${projectId}/candidates/upload`, cookie, [
       { filename: "good.pdf", content: VALID_PDF_BYTES },
       { filename: "bad.pdf", content: CORRUPTED_PDF_BYTES },
@@ -108,13 +124,13 @@ describe("candidate CV batch upload and processing status (Phase 3)", () => {
 
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(body.uploaded).toHaveLength(1);
-    expect(body.uploaded[0].filename).toBe("good.pdf");
+    expect(body.staged).toHaveLength(1);
+    expect(body.staged[0].filename).toBe("good.pdf");
     expect(body.rejected).toEqual([{ filename: "bad.pdf", error: "corrupted_or_mislabeled_pdf" }]);
 
-    // The rejected file never got a Candidate/CandidateDocument row at all.
-    const documents = await prisma.candidateDocument.findMany({ where: { projectId } });
-    expect(documents).toHaveLength(1);
+    // The rejected file never got a StagedUpload row at all.
+    const stagedUploads = await prisma.stagedUpload.findMany({ where: { projectId } });
+    expect(stagedUploads).toHaveLength(1);
   });
 
   it("rejects an unsupported file type", async () => {
@@ -124,10 +140,17 @@ describe("candidate CV batch upload and processing status (Phase 3)", () => {
     expect(res.json().rejected).toEqual([{ filename: "notes.txt", error: "unsupported_file_type" }]);
   });
 
-  it("lists candidates with per-document processing status for the project", async () => {
-    await multipartRequest(app, `/projects/${projectId}/candidates/upload`, cookie, [
-      { filename: "jane-doe.pdf", content: VALID_PDF_BYTES },
-    ]);
+  it("lists candidates with per-document processing status for the project (unchanged GET endpoint, seeded directly since upload no longer produces a Candidate synchronously)", async () => {
+    const candidate = await prisma.candidate.create({ data: { fullName: "Jane Doe" } });
+    await prisma.candidateProjectLink.create({
+      data: { candidateId: candidate.id, projectId, anonymizedLabel: "Candidate #001" },
+    });
+    await prisma.candidateDocument.create({
+      data: {
+        candidateId: candidate.id, projectId, fileType: "pdf", storageKey: "s3://bucket/key.pdf",
+        originalFilename: "jane-doe.pdf", uploadedBy: userId, status: "QUEUED",
+      },
+    });
 
     const listRes = await app.inject({
       method: "GET",
@@ -141,11 +164,8 @@ describe("candidate CV batch upload and processing status (Phase 3)", () => {
     expect(links[0].anonymizedLabel).toBe("Candidate #001");
   });
 
-  it("returns only the approved candidate-list DTO fields — no candidate identity or internal document fields (Phase 5C hardening)", async () => {
+  it("returns only the approved candidate-list DTO fields — no candidate identity or internal document fields (Phase 5C hardening, unaffected by Phase 7)", async () => {
     const user = await prisma.user.findFirstOrThrow({ where: { email: "hr@example.com" } });
-    // Seed a candidate directly with real identity values (the upload route
-    // itself never accepts fullName/email/phone, so this proves the
-    // hardening even for data that predates or bypasses the upload flow).
     const candidate = await prisma.candidate.create({
       data: { fullName: "Jordan Doe", email: "jordan.doe@example.com", phone: "+1 (555) 123-4567" },
     });
@@ -210,6 +230,7 @@ describe("candidate CV batch upload and processing status (Phase 3)", () => {
     expect(doc.purgedAt).toBeUndefined();
     expect(doc.candidateId).toBeUndefined();
     expect(doc.projectId).toBeUndefined();
+    expect(doc.stagedUploadId).toBeUndefined();
 
     // Regression check: the literal seeded identity values never appear
     // anywhere in the raw response body, as a second, independent proof
@@ -260,9 +281,10 @@ describe("candidate CV batch upload and processing status (Phase 3)", () => {
   });
 
   it("denies the candidate list to an unrelated HR_USER (404, not 403), and allows HR_ADMIN through", async () => {
-    await multipartRequest(app, `/projects/${projectId}/candidates/upload`, cookie, [
-      { filename: "jane-doe.pdf", content: VALID_PDF_BYTES },
-    ]);
+    const candidate = await prisma.candidate.create({ data: { fullName: "Jane Doe" } });
+    await prisma.candidateProjectLink.create({
+      data: { candidateId: candidate.id, projectId, anonymizedLabel: "Candidate #001" },
+    });
 
     await createUser("outsider-list@example.com", "HR_USER");
     const outsiderCookie = await loginAs(app, "outsider-list@example.com");
@@ -293,85 +315,85 @@ describe("candidate CV batch upload and processing status (Phase 3)", () => {
     ]);
     expect(res.statusCode).toBe(404);
 
-    const documents = await prisma.candidateDocument.findMany({ where: { projectId } });
-    expect(documents).toHaveLength(0);
+    const stagedUploads = await prisma.stagedUpload.findMany({ where: { projectId } });
+    expect(stagedUploads).toHaveLength(0);
   });
 
-  it("allows retrying a FAILED_RETRY document, re-queues it, and audits the retry", async () => {
-    const uploadRes = await multipartRequest(app, `/projects/${projectId}/candidates/upload`, cookie, [
-      { filename: "jane-doe.pdf", content: VALID_PDF_BYTES },
-    ]);
-    const { candidateId, documentId } = uploadRes.json().uploaded[0];
-
-    await prisma.candidateDocument.update({
-      where: { id: documentId },
-      data: { status: "FAILED_RETRY", failureReason: "Simulated parse failure." },
+  it("allows retrying a FAILED_RETRY document, re-queues it, and audits the retry (CandidateDocument retry route is unchanged — a document is seeded directly)", async () => {
+    const candidate = await prisma.candidate.create({ data: { fullName: "Jane Doe" } });
+    await prisma.candidateProjectLink.create({
+      data: { candidateId: candidate.id, projectId, anonymizedLabel: "Candidate #001" },
+    });
+    const document = await prisma.candidateDocument.create({
+      data: {
+        candidateId: candidate.id, projectId, fileType: "pdf", storageKey: "s3://bucket/key.pdf",
+        originalFilename: "jane-doe.pdf", uploadedBy: userId, status: "FAILED_RETRY",
+        failureReason: "Simulated parse failure.",
+      },
     });
 
     const retryRes = await app.inject({
       method: "POST",
-      url: `/projects/${projectId}/candidates/${candidateId}/documents/${documentId}/retry`,
+      url: `/projects/${projectId}/candidates/${candidate.id}/documents/${document.id}/retry`,
       headers: { cookie },
     });
     expect(retryRes.statusCode).toBe(200);
 
-    const updated = await prisma.candidateDocument.findUniqueOrThrow({ where: { id: documentId } });
+    const updated = await prisma.candidateDocument.findUniqueOrThrow({ where: { id: document.id } });
     expect(updated.status).toBe("QUEUED");
     expect(updated.failureReason).toBeNull();
-    expect(queue.enqueued.filter((j) => j.candidateDocumentId === documentId)).toHaveLength(2); // initial + retry
+    expect(queue.enqueued.filter((j) => j.candidateDocumentId === document.id)).toHaveLength(1);
 
-    const auditEntries = await prisma.auditLog.findMany({ where: { entityId: documentId } });
+    const auditEntries = await prisma.auditLog.findMany({ where: { entityId: document.id } });
     expect(auditEntries.map((a) => a.action)).toContain("CANDIDATE_DOCUMENT_RETRY_REQUESTED");
   });
 
-  it("never lets two concurrent retry requests both enqueue a job for the same document (Phase 4A ProcessingRun concurrency precondition)", async () => {
-    // worker/src/processing-run.ts's startProcessingRun() unconditionally
-    // marks every existing RUNNING run for a document FAILED when a new
-    // attempt starts — it relies on this route making it impossible for two
-    // jobs to ever be actively processing the same CandidateDocument at
-    // once. That guarantee has to come from an atomic compare-and-swap on
-    // this route, not a find-then-update (which two concurrent requests
-    // could both pass). This proves exactly one of two simultaneous retry
-    // requests succeeds.
-    const uploadRes = await multipartRequest(app, `/projects/${projectId}/candidates/upload`, cookie, [
-      { filename: "jane-doe.pdf", content: VALID_PDF_BYTES },
-    ]);
-    const { candidateId, documentId } = uploadRes.json().uploaded[0];
-
-    await prisma.candidateDocument.update({
-      where: { id: documentId },
-      data: { status: "FAILED_RETRY", failureReason: "Simulated parse failure." },
+  it("never lets two concurrent retry requests both enqueue a job for the same document (Phase 4A ProcessingRun concurrency precondition, unaffected by Phase 7)", async () => {
+    const candidate = await prisma.candidate.create({ data: { fullName: "Jane Doe" } });
+    await prisma.candidateProjectLink.create({
+      data: { candidateId: candidate.id, projectId, anonymizedLabel: "Candidate #001" },
+    });
+    const document = await prisma.candidateDocument.create({
+      data: {
+        candidateId: candidate.id, projectId, fileType: "pdf", storageKey: "s3://bucket/key.pdf",
+        originalFilename: "jane-doe.pdf", uploadedBy: userId, status: "FAILED_RETRY",
+        failureReason: "Simulated parse failure.",
+      },
     });
 
     const [resA, resB] = await Promise.all([
       app.inject({
         method: "POST",
-        url: `/projects/${projectId}/candidates/${candidateId}/documents/${documentId}/retry`,
+        url: `/projects/${projectId}/candidates/${candidate.id}/documents/${document.id}/retry`,
         headers: { cookie },
       }),
       app.inject({
         method: "POST",
-        url: `/projects/${projectId}/candidates/${candidateId}/documents/${documentId}/retry`,
+        url: `/projects/${projectId}/candidates/${candidate.id}/documents/${document.id}/retry`,
         headers: { cookie },
       }),
     ]);
 
     const statusCodes = [resA.statusCode, resB.statusCode].sort();
     expect(statusCodes).toEqual([200, 400]); // exactly one succeeds, the other sees it's no longer FAILED_RETRY
-
-    // Only one new job was enqueued for this document by the retry (plus the initial upload job).
-    expect(queue.enqueued.filter((j) => j.candidateDocumentId === documentId)).toHaveLength(2);
+    expect(queue.enqueued.filter((j) => j.candidateDocumentId === document.id)).toHaveLength(1);
   });
 
   it("refuses to retry a document that is not in FAILED_RETRY status", async () => {
-    const uploadRes = await multipartRequest(app, `/projects/${projectId}/candidates/upload`, cookie, [
-      { filename: "jane-doe.pdf", content: VALID_PDF_BYTES },
-    ]);
-    const { candidateId, documentId } = uploadRes.json().uploaded[0];
+    const candidate = await prisma.candidate.create({ data: { fullName: "Jane Doe" } });
+    await prisma.candidateProjectLink.create({
+      data: { candidateId: candidate.id, projectId, anonymizedLabel: "Candidate #001" },
+    });
+    const document = await prisma.candidateDocument.create({
+      data: {
+        candidateId: candidate.id, projectId, fileType: "pdf", storageKey: "s3://bucket/key.pdf",
+        originalFilename: "jane-doe.pdf", uploadedBy: userId, status: "QUEUED",
+      },
+    });
 
     const retryRes = await app.inject({
       method: "POST",
-      url: `/projects/${projectId}/candidates/${candidateId}/documents/${documentId}/retry`,
+      url: `/projects/${projectId}/candidates/${candidate.id}/documents/${document.id}/retry`,
       headers: { cookie },
     });
     expect(retryRes.statusCode).toBe(400);
@@ -385,6 +407,6 @@ describe("candidate CV batch upload and processing status (Phase 3)", () => {
 
     const auditEntries = await prisma.auditLog.findMany({ where: { entityId: projectId, action: "CANDIDATE_DOCUMENTS_UPLOADED" } });
     expect(auditEntries).toHaveLength(1);
-    expect((auditEntries[0].afterJson as { uploadedCount: number }).uploadedCount).toBe(1);
+    expect((auditEntries[0].afterJson as { stagedCount: number }).stagedCount).toBe(1);
   });
 });

@@ -38,7 +38,7 @@ export default function CandidatesPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const [links, setLinks] = useState<CandidateLink[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [uploadResult, setUploadResult] = useState<{ uploaded: number; rejected: { filename: string; error: string }[] } | null>(null);
+  const [uploadResult, setUploadResult] = useState<{ staged: number; rejected: { filename: string; error: string }[] } | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Selection is a plain array, never sorted/reordered by any candidate's
@@ -88,11 +88,11 @@ export default function CandidatesPage() {
     setUploading(true);
     setError(null);
     try {
-      const result = await apiFetch<{ uploaded: unknown[]; rejected: { filename: string; error: string }[] }>(
+      const result = await apiFetch<{ staged: unknown[]; rejected: { filename: string; error: string }[] }>(
         `/projects/${projectId}/candidates/upload`,
         { method: "POST", body: form },
       );
-      setUploadResult({ uploaded: result.uploaded.length, rejected: result.rejected });
+      setUploadResult({ staged: result.staged.length, rejected: result.rejected });
       if (fileInputRef.current) fileInputRef.current.value = "";
       await load();
     } catch (e) {
@@ -131,7 +131,7 @@ export default function CandidatesPage() {
       </form>
       {uploadResult && (
         <p style={{ color: uploadResult.rejected.length > 0 ? "#a15c00" : "#2a7a2a" }}>
-          Uploaded {uploadResult.uploaded}.{" "}
+          Staged {uploadResult.staged} for processing.{" "}
           {uploadResult.rejected.length > 0 &&
             `Rejected: ${uploadResult.rejected.map((r) => `${r.filename} (${r.error})`).join(", ")}`}
         </p>

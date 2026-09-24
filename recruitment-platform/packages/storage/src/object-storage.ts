@@ -32,3 +32,19 @@ export function buildCandidateDocumentKey(params: {
 }): string {
   return `projects/${params.projectId}/candidates/${params.candidateId}/documents/${params.documentId}.${params.fileExtension}`;
 }
+
+/**
+ * Phase 7 — a StagedUpload has no candidateId yet (identity is resolved
+ * AFTER storage, before any CandidateDocument exists), so it cannot use
+ * buildCandidateDocumentKey's shape. storageKey is treated as an opaque
+ * string everywhere in this codebase (never parsed, only ever passed back
+ * to getObject) — so a promoted CandidateDocument keeping this key's shape
+ * permanently (Phase 7A: no copy, no move) is safe by construction.
+ */
+export function buildStagedUploadKey(params: {
+  projectId: string;
+  stagedUploadId: string;
+  fileExtension: string;
+}): string {
+  return `projects/${params.projectId}/staged-uploads/${params.stagedUploadId}.${params.fileExtension}`;
+}

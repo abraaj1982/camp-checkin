@@ -3,9 +3,13 @@ import { AiGateway, ClaudeProvider, type AIProvider } from "@recruitment-platfor
 import { S3ObjectStorage, LocalObjectStorage, type ObjectStorage } from "@recruitment-platform/storage";
 import {
   PROCESS_CANDIDATE_DOCUMENT_JOB,
+  RESOLVE_CANDIDATE_IDENTITY_JOB,
   type ProcessCandidateDocumentJobData,
+  type ResolveCandidateIdentityJobData,
+  PgBossCandidateDocumentQueue,
 } from "@recruitment-platform/queue";
 import { runDocumentProcessingPipeline } from "./pipeline.js";
+import { runIdentityResolutionPipeline } from "./identity-resolution.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("Missing required environment variable: DATABASE_URL");
@@ -45,13 +49,20 @@ async function main() {
 
 async function runWorker(storage: ObjectStorage, gateway: AiGateway) {
   // @recruitment-platform/queue's PgBossCandidateDocumentQueue only exposes
-  // enqueue() (the API's view of the queue); the worker needs the
-  // underlying PgBoss instance to register a consumer, so it manages its
-  // own connection here against the same pg-boss-managed tables.
+  // enqueue()/enqueueIdentityResolution() (the API's view of the queue);
+  // the worker needs the underlying PgBoss instance to register consumers,
+  // so it manages its own connection here against the same
+  // pg-boss-managed tables. The same PgBossCandidateDocumentQueue is also
+  // constructed below so the identity-resolution job can re-use the
+  // existing enqueue() abstraction (never a raw boss.send call) when a
+  // no-match upload promotes straight to normal processing.
   const PgBoss = (await import("pg-boss")).default;
   const boss = new PgBoss({ connectionString: databaseUrl!, retryLimit: 3, retryBackoff: true });
   await boss.start();
   await boss.createQueue(PROCESS_CANDIDATE_DOCUMENT_JOB);
+  await boss.createQueue(RESOLVE_CANDIDATE_IDENTITY_JOB);
+
+  const queue = new PgBossCandidateDocumentQueue(databaseUrl!);
 
   await boss.work<ProcessCandidateDocumentJobData>(
     PROCESS_CANDIDATE_DOCUMENT_JOB,
@@ -79,6 +90,18 @@ async function runWorker(storage: ObjectStorage, gateway: AiGateway) {
           },
         });
       }
+    },
+  );
+
+  // Phase 7 — Candidate Deduplication. Failure handling lives entirely
+  // inside runIdentityResolutionPipeline (StagedUpload -> FAILED on any
+  // thrown error) so this handler never needs its own catch — mirrors how
+  // the pipeline above keeps its own terminal-state writes internal.
+  await boss.work<ResolveCandidateIdentityJobData>(
+    RESOLVE_CANDIDATE_IDENTITY_JOB,
+    { batchSize: 5 },
+    async ([job]) => {
+      await runIdentityResolutionPipeline(job.data, { storage, queue });
     },
   );
 

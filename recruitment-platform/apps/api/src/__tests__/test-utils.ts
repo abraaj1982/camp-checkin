@@ -43,6 +43,8 @@ export async function resetDatabase(): Promise<void> {
     prisma.hrOverride.deleteMany(),
     prisma.hrDecision.deleteMany(),
     prisma.candidateComparison.deleteMany(),
+    prisma.candidateMatchReview.deleteMany(),
+    prisma.stagedUpload.deleteMany(),
     prisma.candidateConsistencyFinding.deleteMany(),
     prisma.assessmentEvidence.deleteMany(),
     prisma.assessment.deleteMany(),

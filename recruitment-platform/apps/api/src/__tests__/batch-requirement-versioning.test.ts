@@ -78,7 +78,7 @@ describe("batch requirement-version pinning", () => {
     });
 
     const uploadRes = await uploadOne(app, `/projects/${projectId}/candidates/upload`, cookie, "jane.pdf");
-    const { batchId, uploaded } = uploadRes.json();
+    const { batchId, staged } = uploadRes.json();
     expect(batchId).toBeTruthy();
 
     const pins = await prisma.candidateBatchRequirementVersion.findMany({ where: { batchId } });
@@ -86,8 +86,11 @@ describe("batch requirement-version pinning", () => {
     expect(pins[0].requirementId).toBe(requirementId);
     expect(pins[0].requirementVersionId).toBe(versionBeforeUpload.id);
 
-    const document = await prisma.candidateDocument.findUniqueOrThrow({ where: { id: uploaded[0].documentId } });
-    expect(document.batchId).toBe(batchId);
+    // Phase 7: upload no longer creates a CandidateDocument synchronously —
+    // the batch pin is on the StagedUpload row instead until identity is
+    // resolved and it's promoted.
+    const stagedUpload = await prisma.stagedUpload.findUniqueOrThrow({ where: { id: staged[0].stagedUploadId } });
+    expect(stagedUpload.batchId).toBe(batchId);
   });
 
   it("keeps two upload batches pinned to different versions when the requirement is edited and re-approved in between", async () => {
@@ -147,13 +150,13 @@ describe("batch requirement-version pinning", () => {
       headers: { cookie, ...form.getHeaders() },
       payload: form.getBuffer(),
     });
-    const { batchId, uploaded } = res.json();
-    expect(uploaded).toHaveLength(3);
+    const { batchId, staged } = res.json();
+    expect(staged).toHaveLength(3);
 
-    const documents = await prisma.candidateDocument.findMany({
-      where: { id: { in: uploaded.map((u: { documentId: string }) => u.documentId) } },
+    const stagedUploads = await prisma.stagedUpload.findMany({
+      where: { id: { in: staged.map((s: { stagedUploadId: string }) => s.stagedUploadId) } },
     });
-    expect(documents.every((d) => d.batchId === batchId)).toBe(true);
+    expect(stagedUploads.every((s) => s.batchId === batchId)).toBe(true);
 
     // Only one pin exists for the whole batch — every one of the three
     // candidates' future Assessment rows would resolve to this same row,

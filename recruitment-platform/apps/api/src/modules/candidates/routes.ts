@@ -1,19 +1,13 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "@recruitment-platform/db";
 import type { ObjectStorage } from "@recruitment-platform/storage";
-import { buildCandidateDocumentKey } from "@recruitment-platform/storage";
+import { buildStagedUploadKey } from "@recruitment-platform/storage";
 import type { CandidateDocumentQueue } from "@recruitment-platform/queue";
 import { validateUpload } from "@recruitment-platform/shared-types";
 import { requireProjectAccess } from "../projects/authorization.js";
 import { recordAudit } from "../../lib/audit.js";
 
 const MAX_FILES_PER_BATCH = 30; // architecture doc: "approximately 10-30 CVs per recruitment project"
-
-function deriveFullNameFromFilename(filename: string): string {
-  const withoutExtension = filename.replace(/\.[^.]+$/, "");
-  const spaced = withoutExtension.replace(/[_-]+/g, " ").trim();
-  return spaced.length > 0 ? spaced : filename;
-}
 
 /**
  * Creates the batch and pins every currently-APPROVED requirement's latest
@@ -51,6 +45,17 @@ async function createUploadBatch(projectId: string, createdBy: string) {
  * Section: Document Processing Pipeline / Batch Processing Architecture).
  * One candidate's invalid/corrupted file is reported and skipped — it never
  * fails the whole batch (Section 41).
+ *
+ * Phase 7 — Candidate Deduplication: this route no longer creates
+ * Candidate/CandidateProjectLink/CandidateDocument directly. Identity is
+ * unknown until the file is parsed, and parsing only happens in the
+ * worker — so every accepted file becomes a StagedUpload (no candidateId)
+ * and is handed to the new identity-resolution job, which either promotes
+ * it immediately (no duplicate found) or creates a CandidateMatchReview
+ * for an HR_ADMIN/SYSTEM_ADMIN to resolve. The response therefore can only
+ * ever truthfully report "staged," never "a candidate now exists" — see
+ * Phase 7A/7B: "staged"/"rejected" replace the old "uploaded"/"rejected"
+ * buckets for exactly this reason.
  */
 export async function registerCandidateRoutes(
   app: FastifyInstance,
@@ -68,7 +73,7 @@ export async function registerCandidateRoutes(
         return reply.code(400).send({ error: "project_archived" });
       }
 
-      const uploaded: { candidateId: string; documentId: string; filename: string }[] = [];
+      const staged: { stagedUploadId: string; filename: string }[] = [];
       const rejected: { filename: string; error: string }[] = [];
 
       const batch = await createUploadBatch(project.id, identity.userId);
@@ -95,38 +100,22 @@ export async function registerCandidateRoutes(
           continue;
         }
 
-        const candidate = await prisma.candidate.create({
-          data: { fullName: deriveFullNameFromFilename(part.filename) },
-        });
-
-        const existingLinks = await prisma.candidateProjectLink.count({ where: { projectId: project.id } });
-        await prisma.candidateProjectLink.create({
+        const stagedUpload = await prisma.stagedUpload.create({
           data: {
-            candidateId: candidate.id,
-            projectId: project.id,
-            anonymizedLabel: `Candidate #${String(existingLinks + 1).padStart(3, "0")}`,
-          },
-        });
-
-        const document = await prisma.candidateDocument.create({
-          data: {
-            candidateId: candidate.id,
             projectId: project.id,
             batchId: batch.id,
             fileType: validation.fileType,
-            // placeholder — replaced immediately below once we know the document id
+            // placeholder — replaced immediately below once we know the staged upload's own id
             storageKey: "pending",
             originalFilename: part.filename,
             fileSizeBytes: buffer.byteLength,
-            status: "QUEUED",
             uploadedBy: identity.userId,
           },
         });
 
-        const storageKey = buildCandidateDocumentKey({
+        const storageKey = buildStagedUploadKey({
           projectId: project.id,
-          candidateId: candidate.id,
-          documentId: document.id,
+          stagedUploadId: stagedUpload.id,
           fileExtension: validation.fileType,
         });
 
@@ -136,15 +125,11 @@ export async function registerCandidateRoutes(
           contentType: validation.fileType === "pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         });
 
-        await prisma.candidateDocument.update({ where: { id: document.id }, data: { storageKey } });
+        await prisma.stagedUpload.update({ where: { id: stagedUpload.id }, data: { storageKey } });
 
-        await queue.enqueue({
-          candidateDocumentId: document.id,
-          candidateId: candidate.id,
-          projectId: project.id,
-        });
+        await queue.enqueueIdentityResolution({ stagedUploadId: stagedUpload.id, projectId: project.id });
 
-        uploaded.push({ candidateId: candidate.id, documentId: document.id, filename: part.filename });
+        staged.push({ stagedUploadId: stagedUpload.id, filename: part.filename });
       }
 
       await recordAudit({
@@ -152,10 +137,10 @@ export async function registerCandidateRoutes(
         action: "CANDIDATE_DOCUMENTS_UPLOADED",
         entityType: "RecruitmentProject",
         entityId: project.id,
-        after: { batchId: batch.id, uploadedCount: uploaded.length, rejectedCount: rejected.length },
+        after: { batchId: batch.id, stagedCount: staged.length, rejectedCount: rejected.length },
       });
 
-      return { batchId: batch.id, uploaded, rejected };
+      return { batchId: batch.id, staged, rejected };
     },
   );
 
