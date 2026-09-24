@@ -32,7 +32,7 @@ function mockResponses({
 }: {
   assessments?: unknown[];
   findings?: unknown[];
-  documents?: { status: string; currentProcessingRunId?: string | null }[];
+  documents?: { status: string; hasCurrentRun?: boolean }[];
 } = {}) {
   apiFetchMock.mockImplementation((path: string) => {
     if (path.endsWith("/assessments")) {
@@ -42,13 +42,14 @@ function mockResponses({
       return Promise.resolve({ candidate: CANDIDATE, findings });
     }
     if (path.endsWith("/candidates")) {
+      // Matches the Phase 5C-hardened /projects/:id/candidates DTO: flat
+      // (no nested `candidate` wrapper), hasCurrentRun instead of the raw
+      // currentProcessingRunId.
       return Promise.resolve([
         {
           candidateId: "cand-1",
           anonymizedLabel: "Candidate #001",
-          candidate: {
-            documents: documents.map((d) => ({ currentProcessingRunId: null, ...d })),
-          },
+          documents: documents.map((d) => ({ hasCurrentRun: false, ...d })),
         },
       ]);
     }
@@ -237,39 +238,41 @@ describe("CandidateDetailPage", () => {
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent(/no results available yet/i));
   });
 
-  it("keeps current results visible and does NOT show failed/retry when another document for the same candidate is FAILED_RETRY", async () => {
+  it("[precedence 1] keeps current results visible and does NOT show failed/retry when another document for the same candidate is FAILED_RETRY", async () => {
     mockResponses({
       assessments: [baseAssessment()],
-      documents: [
-        { status: "COMPLETED", currentProcessingRunId: "run-current" }, // this document's current run produced the results above
-        { status: "FAILED_RETRY", currentProcessingRunId: null }, // an unrelated, previously-failed document for the same candidate
-      ],
+      documents: [{ status: "COMPLETED", hasCurrentRun: true }, { status: "FAILED_RETRY" }],
     });
     render(<CandidateDetailPage />);
     await waitFor(() => expect(screen.getByText("5 years Employee Relations")).toBeInTheDocument());
     expect(screen.queryByRole("status")).toBeNull(); // no processing/failed/no-results banner — results are current and shown
   });
 
-  it("does not show failed/retry when a current run exists but legitimately produced zero results, even if another document is FAILED_RETRY", async () => {
+  it("[precedence 2] does not show failed/retry when a current run exists but legitimately produced zero results, even if another document is FAILED_RETRY", async () => {
     mockResponses({
       assessments: [],
       findings: [],
-      documents: [
-        { status: "COMPLETED", currentProcessingRunId: "run-current" }, // completed with nothing to report
-        { status: "FAILED_RETRY", currentProcessingRunId: null },
-      ],
+      documents: [{ status: "COMPLETED", hasCurrentRun: true }, { status: "FAILED_RETRY" }],
     });
     render(<CandidateDetailPage />);
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent(/no results available yet/i));
     expect(screen.queryByText(/failed/i)).toBeNull();
   });
 
-  it("shows the failed/retry state only when no document has a current run", async () => {
+  it("[precedence 3] shows the failed/retry state when there is no current run and a document is FAILED_RETRY", async () => {
     mockResponses({
-      documents: [{ status: "FAILED_RETRY", currentProcessingRunId: null }],
+      documents: [{ status: "FAILED_RETRY", hasCurrentRun: false }],
     });
     render(<CandidateDetailPage />);
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent(/failed/i));
+  });
+
+  it("[precedence 4] shows the processing state for QUEUED/PROCESSING regardless of any other document's status", async () => {
+    mockResponses({
+      documents: [{ status: "PROCESSING", hasCurrentRun: false }, { status: "FAILED_RETRY", hasCurrentRun: false }],
+    });
+    render(<CandidateDetailPage />);
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent(/processing/i));
   });
 
   it("shows a not-found message on a 404 from the API", async () => {

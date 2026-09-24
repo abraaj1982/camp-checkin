@@ -65,21 +65,21 @@ interface ConsistencyResponse {
   findings: ConsistencyFinding[];
 }
 
-// Deliberately narrow slice of the /projects/:id/candidates response (which
-// also returns fullName/email/phone/originalFilename on the wire) — this
+// Deliberately narrow slice of the /projects/:id/candidates response — this
 // page reads ONLY anonymizedLabel and each document's status +
-// currentProcessingRunId, and the type below declares nothing else, so
-// nothing else can be accidentally rendered from it. currentProcessingRunId
-// is read (never rendered) purely to tell "a current run exists but had
-// nothing to report" apart from "no run has ever completed" — without it,
-// a candidate whose current run legitimately produced zero
-// assessments/findings could be misread as FAILED_RETRY merely because a
-// different, unrelated document for the same candidate failed.
+// hasCurrentRun. The type below declares nothing else, so nothing else can
+// be accidentally rendered from it.
+//
+// hasCurrentRun (Phase 5C hardening: apps/api/src/modules/candidates/routes.ts)
+// is a boolean derived server-side from currentProcessingRunId !== null —
+// the run id itself is never exposed. It exists purely so this page can
+// tell "a current run exists but produced zero results" apart from "no run
+// has ever completed," without needing the internal run id at all.
 type DocumentStatus = "QUEUED" | "PROCESSING" | "COMPLETED" | "FAILED_RETRY" | "FAILED_NEEDS_OCR";
 interface CandidateStatusLink {
   candidateId: string;
   anonymizedLabel: string;
-  candidate: { documents: { status: DocumentStatus; currentProcessingRunId: string | null }[] };
+  documents: { status: DocumentStatus; hasCurrentRun: boolean }[];
 }
 
 function sourceLabel(source: string | null, sourcePage: number | null): string {
@@ -237,16 +237,17 @@ export default function CandidateDetailPage() {
     );
   }
 
-  const documents = statusLink?.candidate.documents ?? [];
+  const documents = statusLink?.documents ?? [];
   const isProcessing = documents.some((d) => d.status === "QUEUED" || d.status === "PROCESSING");
   const hasResults = assessments.assessments.length > 0 || findings.findings.length > 0;
   // A current run that legitimately produced zero assessments/findings
   // (hasResults === false) must never be mistaken for "no run at all" just
   // because some OTHER document for this candidate happens to be
-  // FAILED_RETRY — currentProcessingRunId (already present on this
-  // existing response) is the one signal that distinguishes them, so the
-  // failed state is shown only when no document has a current run.
-  const hasCurrentRun = documents.some((d) => d.currentProcessingRunId !== null);
+  // FAILED_RETRY — hasCurrentRun (a boolean derived server-side from
+  // currentProcessingRunId, Phase 5C hardening) is the minimal, non-
+  // identifying signal that distinguishes them, so the failed state is
+  // shown only when no document has a current run.
+  const hasCurrentRun = documents.some((d) => d.hasCurrentRun);
   const isFailed =
     !hasResults && !isProcessing && !hasCurrentRun && documents.some((d) => d.status === "FAILED_RETRY");
 

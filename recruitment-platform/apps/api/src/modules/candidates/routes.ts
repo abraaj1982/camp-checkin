@@ -163,18 +163,63 @@ export async function registerCandidateRoutes(
     "/projects/:projectId/candidates",
     { preHandler: requireProjectAccess() },
     async (request) => {
+      // Explicit select + explicit response mapping (Phase 5C hardening) —
+      // never `include` + raw-return here. The candidates management UI
+      // only ever reads anonymizedLabel and each document's
+      // id/originalFilename/fileType/status/failureReason/uploadedAt; this
+      // route must not send anything beyond that over the wire, regardless
+      // of what the UI currently chooses to render. Candidate identity
+      // fields (fullName/email/phone/source/piiPurgedAt/createdAt) and
+      // internal document fields (extractedText/extractedPageTexts/
+      // storageKey/uploadedBy/batchId/processingAttemptCounter/
+      // fileSizeBytes/purgedAt) are never selected in the first place, not
+      // merely omitted after the fact.
+      //
+      // currentProcessingRunId itself is selected (never returned) purely
+      // to derive the boolean hasCurrentRun below — the candidate detail
+      // viewer needs to tell "a current run exists but produced zero
+      // results" apart from "no run has ever completed," and a boolean
+      // that answers exactly that question is the minimal signal for it,
+      // without exposing the run id itself.
       const links = await prisma.candidateProjectLink.findMany({
         where: { projectId: request.project!.id },
-        include: {
+        select: {
+          candidateId: true,
+          anonymizedLabel: true,
           candidate: {
-            include: {
-              documents: { where: { projectId: request.project!.id }, orderBy: { uploadedAt: "desc" } },
+            select: {
+              documents: {
+                where: { projectId: request.project!.id },
+                orderBy: { uploadedAt: "desc" },
+                select: {
+                  id: true,
+                  originalFilename: true,
+                  fileType: true,
+                  status: true,
+                  failureReason: true,
+                  uploadedAt: true,
+                  currentProcessingRunId: true,
+                },
+              },
             },
           },
         },
         orderBy: { createdAt: "asc" },
       });
-      return links;
+
+      return links.map((link) => ({
+        candidateId: link.candidateId,
+        anonymizedLabel: link.anonymizedLabel,
+        documents: link.candidate.documents.map((document) => ({
+          id: document.id,
+          originalFilename: document.originalFilename,
+          fileType: document.fileType,
+          status: document.status,
+          failureReason: document.failureReason,
+          uploadedAt: document.uploadedAt,
+          hasCurrentRun: document.currentProcessingRunId !== null,
+        })),
+      }));
     },
   );
 

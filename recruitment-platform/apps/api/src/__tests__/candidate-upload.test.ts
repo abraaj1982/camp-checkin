@@ -137,8 +137,151 @@ describe("candidate CV batch upload and processing status (Phase 3)", () => {
     expect(listRes.statusCode).toBe(200);
     const links = listRes.json();
     expect(links).toHaveLength(1);
-    expect(links[0].candidate.documents[0].status).toBe("QUEUED");
+    expect(links[0].documents[0].status).toBe("QUEUED");
     expect(links[0].anonymizedLabel).toBe("Candidate #001");
+  });
+
+  it("returns only the approved candidate-list DTO fields — no candidate identity or internal document fields (Phase 5C hardening)", async () => {
+    const user = await prisma.user.findFirstOrThrow({ where: { email: "hr@example.com" } });
+    // Seed a candidate directly with real identity values (the upload route
+    // itself never accepts fullName/email/phone, so this proves the
+    // hardening even for data that predates or bypasses the upload flow).
+    const candidate = await prisma.candidate.create({
+      data: { fullName: "Jordan Doe", email: "jordan.doe@example.com", phone: "+1 (555) 123-4567" },
+    });
+    await prisma.candidateProjectLink.create({
+      data: { candidateId: candidate.id, projectId, anonymizedLabel: "Candidate #001" },
+    });
+    const document = await prisma.candidateDocument.create({
+      data: {
+        candidateId: candidate.id,
+        projectId,
+        fileType: "pdf",
+        storageKey: "s3://bucket/very-internal-key.pdf",
+        originalFilename: "jordan-doe-resume.pdf",
+        uploadedBy: user.id,
+        status: "COMPLETED",
+        extractedText: "Full resume text that must never leave this endpoint.",
+        extractedPageTexts: ["Page 1 text"],
+      },
+    });
+
+    const res = await app.inject({
+      method: "GET",
+      url: `/projects/${projectId}/candidates`,
+      headers: { cookie },
+    });
+    expect(res.statusCode).toBe(200);
+    const links = res.json();
+    const link = links.find((l: { candidateId: string }) => l.candidateId === candidate.id);
+
+    // Exact shape: top-level keys.
+    expect(Object.keys(link).sort()).toEqual(["anonymizedLabel", "candidateId", "documents"].sort());
+    expect(link.candidateId).toBe(candidate.id);
+    expect(link.anonymizedLabel).toBe("Candidate #001");
+
+    // Exact shape: document keys — nothing beyond the approved DTO.
+    const doc = link.documents.find((d: { id: string }) => d.id === document.id);
+    expect(Object.keys(doc).sort()).toEqual(
+      ["failureReason", "fileType", "hasCurrentRun", "id", "originalFilename", "status", "uploadedAt"].sort(),
+    );
+    expect(doc.originalFilename).toBe("jordan-doe-resume.pdf");
+    expect(doc.status).toBe("COMPLETED");
+    expect(typeof doc.hasCurrentRun).toBe("boolean");
+
+    // No candidate identity fields anywhere in the response.
+    expect(link.fullName).toBeUndefined();
+    expect(link.email).toBeUndefined();
+    expect(link.phone).toBeUndefined();
+    expect(link.source).toBeUndefined();
+    expect(link.piiPurgedAt).toBeUndefined();
+    expect(link.createdAt).toBeUndefined();
+    expect(link.candidate).toBeUndefined(); // no nested raw Candidate object at all
+
+    // No internal document fields anywhere in the response.
+    expect(doc.extractedText).toBeUndefined();
+    expect(doc.extractedPageTexts).toBeUndefined();
+    expect(doc.storageKey).toBeUndefined();
+    expect(doc.uploadedBy).toBeUndefined();
+    expect(doc.batchId).toBeUndefined();
+    expect(doc.processingAttemptCounter).toBeUndefined();
+    expect(doc.currentProcessingRunId).toBeUndefined();
+    expect(doc.fileSizeBytes).toBeUndefined();
+    expect(doc.purgedAt).toBeUndefined();
+    expect(doc.candidateId).toBeUndefined();
+    expect(doc.projectId).toBeUndefined();
+
+    // Regression check: the literal seeded identity values never appear
+    // anywhere in the raw response body, as a second, independent proof
+    // beyond the exact-keys assertions above.
+    const raw = res.body;
+    expect(raw).not.toContain("Jordan Doe");
+    expect(raw).not.toContain("jordan.doe@example.com");
+    expect(raw).not.toContain("555");
+    expect(raw).not.toContain("Full resume text");
+    expect(raw).not.toContain("very-internal-key");
+    expect(raw).not.toContain("currentProcessingRunId");
+    expect(doc.hasCurrentRun).toBe(false); // no ProcessingRun ever completed for this document
+  });
+
+  it("sets hasCurrentRun to true once a ProcessingRun has completed for the document, without ever exposing the run id", async () => {
+    const user = await prisma.user.findFirstOrThrow({ where: { email: "hr@example.com" } });
+    const candidate = await prisma.candidate.create({ data: { fullName: "Alex Kim" } });
+    await prisma.candidateProjectLink.create({
+      data: { candidateId: candidate.id, projectId, anonymizedLabel: "Candidate #001" },
+    });
+    const document = await prisma.candidateDocument.create({
+      data: {
+        candidateId: candidate.id,
+        projectId,
+        fileType: "pdf",
+        storageKey: "s3://bucket/key.pdf",
+        originalFilename: "resume.pdf",
+        uploadedBy: user.id,
+        status: "COMPLETED",
+      },
+    });
+    const run = await prisma.processingRun.create({
+      data: { candidateDocumentId: document.id, attemptNumber: 1, status: "COMPLETED", completedAt: new Date() },
+    });
+    await prisma.candidateDocument.update({ where: { id: document.id }, data: { currentProcessingRunId: run.id } });
+
+    const res = await app.inject({
+      method: "GET",
+      url: `/projects/${projectId}/candidates`,
+      headers: { cookie },
+    });
+    const link = res.json().find((l: { candidateId: string }) => l.candidateId === candidate.id);
+    const doc = link.documents.find((d: { id: string }) => d.id === document.id);
+
+    expect(doc.hasCurrentRun).toBe(true);
+    expect(doc.currentProcessingRunId).toBeUndefined();
+    expect(res.body).not.toContain(run.id);
+  });
+
+  it("denies the candidate list to an unrelated HR_USER (404, not 403), and allows HR_ADMIN through", async () => {
+    await multipartRequest(app, `/projects/${projectId}/candidates/upload`, cookie, [
+      { filename: "jane-doe.pdf", content: VALID_PDF_BYTES },
+    ]);
+
+    await createUser("outsider-list@example.com", "HR_USER");
+    const outsiderCookie = await loginAs(app, "outsider-list@example.com");
+    const outsiderRes = await app.inject({
+      method: "GET",
+      url: `/projects/${projectId}/candidates`,
+      headers: { cookie: outsiderCookie },
+    });
+    expect(outsiderRes.statusCode).toBe(404);
+
+    await createUser("admin-list@example.com", "HR_ADMIN");
+    const adminCookie = await loginAs(app, "admin-list@example.com");
+    const adminRes = await app.inject({
+      method: "GET",
+      url: `/projects/${projectId}/candidates`,
+      headers: { cookie: adminCookie },
+    });
+    expect(adminRes.statusCode).toBe(200);
+    expect(adminRes.json()).toHaveLength(1);
   });
 
   it("denies upload access to an unrelated HR_USER (project authorization applies to Phase 3 routes too)", async () => {

@@ -16,7 +16,7 @@ interface CandidateDocument {
 interface CandidateLink {
   candidateId: string;
   anonymizedLabel: string;
-  candidate: { id: string; fullName: string; documents: CandidateDocument[] };
+  documents: CandidateDocument[];
 }
 
 const STATUS_LABEL: Record<CandidateDocument["status"], string> = {
@@ -57,7 +57,7 @@ export default function CandidatesPage() {
   // fire-and-forget upload confirmation.
   useEffect(() => {
     const hasInFlight = links.some((l) =>
-      l.candidate.documents.some((d) => d.status === "QUEUED" || d.status === "PROCESSING"),
+      l.documents.some((d) => d.status === "QUEUED" || d.status === "PROCESSING"),
     );
     if (!hasInFlight) return;
     const timer = setInterval(load, 3000);
@@ -101,7 +101,7 @@ export default function CandidatesPage() {
   }
 
   const counts = links.reduce<Record<string, number>>((acc, l) => {
-    for (const d of l.candidate.documents) acc[d.status] = (acc[d.status] ?? 0) + 1;
+    for (const d of l.documents) acc[d.status] = (acc[d.status] ?? 0) + 1;
     return acc;
   }, {});
 
@@ -143,7 +143,7 @@ export default function CandidatesPage() {
         </thead>
         <tbody>
           {links.flatMap((l) =>
-            l.candidate.documents.map((d) => (
+            l.documents.map((d) => (
               <tr key={d.id} style={{ borderBottom: "1px solid #eee" }}>
                 <td style={{ padding: 8 }}>
                   <Link href={`/projects/${projectId}/candidates/${l.candidateId}`}>{l.anonymizedLabel}</Link>
