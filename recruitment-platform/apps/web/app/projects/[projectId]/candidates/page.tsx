@@ -27,6 +27,9 @@ const STATUS_LABEL: Record<CandidateDocument["status"], string> = {
   FAILED_NEEDS_OCR: "Failed — needs OCR (not supported yet)",
 };
 
+const MIN_COMPARE = 2;
+const MAX_COMPARE = 5;
+
 // Processing Status screen (Phase 3, Section 8): each candidate document is
 // independent — one failure never blocks the rest of the batch (Section 41
 // of the master instruction), and that independence is visible here as a
@@ -38,6 +41,16 @@ export default function CandidatesPage() {
   const [uploadResult, setUploadResult] = useState<{ uploaded: number; rejected: { filename: string; error: string }[] } | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Selection is a plain array, never sorted/reordered by any candidate's
+  // processing status or assessment outcome — Compare Selected passes this
+  // exact order through to the comparison view.
+  const [selectedCandidateIds, setSelectedCandidateIds] = useState<string[]>([]);
+
+  function toggleSelected(candidateId: string) {
+    setSelectedCandidateIds((prev) =>
+      prev.includes(candidateId) ? prev.filter((id) => id !== candidateId) : [...prev, candidateId],
+    );
+  }
 
   const load = useCallback(async () => {
     try {
@@ -131,9 +144,29 @@ export default function CandidatesPage() {
           .join(" · ") || "No candidates yet."}
       </p>
 
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <Link
+          href={`/projects/${projectId}/candidates/compare?candidateIds=${selectedCandidateIds.join(",")}`}
+          aria-disabled={selectedCandidateIds.length < MIN_COMPARE}
+          onClick={(e) => {
+            if (selectedCandidateIds.length < MIN_COMPARE) e.preventDefault();
+          }}
+          style={{
+            pointerEvents: selectedCandidateIds.length < MIN_COMPARE ? "none" : "auto",
+            opacity: selectedCandidateIds.length < MIN_COMPARE ? 0.5 : 1,
+          }}
+        >
+          <button type="button" disabled={selectedCandidateIds.length < MIN_COMPARE}>
+            Compare Selected ({selectedCandidateIds.length})
+          </button>
+        </Link>
+        <span style={{ fontSize: 13, color: "#888" }}>Select {MIN_COMPARE}–{MAX_COMPARE} candidates to compare.</span>
+      </div>
+
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead>
           <tr style={{ textAlign: "left", borderBottom: "2px solid #ddd" }}>
+            <th style={{ padding: 8 }}></th>
             <th style={{ padding: 8 }}>Candidate</th>
             <th style={{ padding: 8 }}>File</th>
             <th style={{ padding: 8 }}>Status</th>
@@ -145,6 +178,15 @@ export default function CandidatesPage() {
           {links.flatMap((l) =>
             l.documents.map((d) => (
               <tr key={d.id} style={{ borderBottom: "1px solid #eee" }}>
+                <td style={{ padding: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedCandidateIds.includes(l.candidateId)}
+                    disabled={!selectedCandidateIds.includes(l.candidateId) && selectedCandidateIds.length >= MAX_COMPARE}
+                    onChange={() => toggleSelected(l.candidateId)}
+                    aria-label={`Select ${l.anonymizedLabel} for comparison`}
+                  />
+                </td>
                 <td style={{ padding: 8 }}>
                   <Link href={`/projects/${projectId}/candidates/${l.candidateId}`}>{l.anonymizedLabel}</Link>
                 </td>
