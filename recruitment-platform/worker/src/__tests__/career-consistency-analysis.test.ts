@@ -2,6 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "@recruitment-platform/db";
 import { AiGateway, AiValidationError } from "@recruitment-platform/ai-gateway";
 import { runCareerConsistencyAnalysis } from "../career-consistency-analysis.js";
+import { startProcessingRun } from "../processing-run.js";
 import { FakeAIProvider, createUser, resetDatabase, seedAiModelConfig } from "./test-utils.js";
 
 /**
@@ -93,13 +94,17 @@ describe("runCareerConsistencyAnalysis", () => {
       }),
     });
 
-    await runCareerConsistencyAnalysis(document, jobData(candidate.id, project.id, document.id), "resume text", gateway);
+    const run = await startProcessingRun(document.id);
+    await runCareerConsistencyAnalysis(document, jobData(candidate.id, project.id, document.id), "resume text", gateway, run.id);
 
     const findings = await prisma.candidateConsistencyFinding.findMany({ where: { candidateId: candidate.id } });
     expect(findings).toHaveLength(2);
     const byType = new Map(findings.map((f) => [f.findingType, f]));
     expect(byType.get("EMPLOYMENT_GAP")?.severity).toBe("INFORMATION_UNCLEAR");
     expect(byType.get("UNCLEAR_CHRONOLOGY")?.severity).toBe("VERIFICATION_REQUIRED");
+    // One ProcessingRun can hold multiple findings — no uniqueness
+    // constraint on (processingRunId, findingType) or similar prevents it.
+    expect(findings.every((f) => f.processingRunId === run.id)).toBe(true);
   });
 
   it("always sets sourceDocumentId from the application/document, never from the AI (the AI schema has no such field)", async () => {
@@ -123,7 +128,8 @@ describe("runCareerConsistencyAnalysis", () => {
       }),
     });
 
-    await runCareerConsistencyAnalysis(document, jobData(candidate.id, project.id, document.id), "resume text", gateway);
+    const run = await startProcessingRun(document.id);
+    await runCareerConsistencyAnalysis(document, jobData(candidate.id, project.id, document.id), "resume text", gateway, run.id);
 
     const finding = await prisma.candidateConsistencyFinding.findFirstOrThrow({ where: { candidateId: candidate.id } });
     expect(finding.sourceDocumentId).toBe(document.id);
@@ -152,7 +158,8 @@ describe("runCareerConsistencyAnalysis", () => {
       }),
     });
 
-    await runCareerConsistencyAnalysis(document, jobData(candidate.id, project.id, document.id), "resume text", gateway);
+    const run = await startProcessingRun(document.id);
+    await runCareerConsistencyAnalysis(document, jobData(candidate.id, project.id, document.id), "resume text", gateway, run.id);
 
     const finding = await prisma.candidateConsistencyFinding.findFirstOrThrow({ where: { candidateId: candidate.id } });
     expect(finding.sourcePage).toBeNull();
@@ -180,7 +187,8 @@ describe("runCareerConsistencyAnalysis", () => {
       }),
     });
 
-    await runCareerConsistencyAnalysis(document, jobData(candidate.id, project.id, document.id), "resume text", gateway);
+    const run = await startProcessingRun(document.id);
+    await runCareerConsistencyAnalysis(document, jobData(candidate.id, project.id, document.id), "resume text", gateway, run.id);
 
     const finding = await prisma.candidateConsistencyFinding.findFirstOrThrow({ where: { candidateId: candidate.id } });
     expect(finding.aiInteractionId).not.toBeNull();
@@ -201,7 +209,8 @@ describe("runCareerConsistencyAnalysis", () => {
       }),
     });
 
-    await runCareerConsistencyAnalysis(document, jobData(candidate.id, project.id, document.id), "resume text", gateway);
+    const run = await startProcessingRun(document.id);
+    await runCareerConsistencyAnalysis(document, jobData(candidate.id, project.id, document.id), "resume text", gateway, run.id);
 
     // No findings when the AI reports none — an empty array is a legitimate
     // "nothing worth flagging" result, not an error.
@@ -223,8 +232,9 @@ describe("runCareerConsistencyAnalysis", () => {
       }),
     });
 
+    const run = await startProcessingRun(document.id);
     await expect(
-      runCareerConsistencyAnalysis(document, jobData(candidate.id, project.id, document.id), "resume text", gateway),
+      runCareerConsistencyAnalysis(document, jobData(candidate.id, project.id, document.id), "resume text", gateway, run.id),
     ).rejects.toBeInstanceOf(AiValidationError);
 
     expect(await prisma.candidateConsistencyFinding.count({ where: { candidateId: candidate.id } })).toBe(0);
@@ -252,11 +262,16 @@ describe("runCareerConsistencyAnalysis", () => {
     });
 
     const data = jobData(candidate.id, project.id, document.id);
-    await runCareerConsistencyAnalysis(document, data, "resume text", gateway);
-    await runCareerConsistencyAnalysis(document, data, "resume text", gateway); // simulated retry
+    const run1 = await startProcessingRun(document.id);
+    await runCareerConsistencyAnalysis(document, data, "resume text", gateway, run1.id);
+    await prisma.processingRun.update({ where: { id: run1.id }, data: { status: "COMPLETED", completedAt: new Date() } });
+
+    const run2 = await startProcessingRun(document.id); // simulated retry
+    await runCareerConsistencyAnalysis(document, data, "resume text", gateway, run2.id);
 
     const findings = await prisma.candidateConsistencyFinding.findMany({ where: { candidateId: candidate.id } });
     expect(findings).toHaveLength(2); // both runs' findings coexist — none deleted
+    expect(new Set(findings.map((f) => f.processingRunId))).toEqual(new Set([run1.id, run2.id]));
   });
 
   it("keeps findings isolated between two different candidates/projects", async () => {
@@ -281,8 +296,10 @@ describe("runCareerConsistencyAnalysis", () => {
       }),
     });
 
-    await runCareerConsistencyAnalysis(seedA.document, jobData(seedA.candidate.id, seedA.project.id, seedA.document.id), "resume text", gateway);
-    await runCareerConsistencyAnalysis(seedB.document, jobData(seedB.candidate.id, seedB.project.id, seedB.document.id), "resume text", gateway);
+    const runA = await startProcessingRun(seedA.document.id);
+    const runB = await startProcessingRun(seedB.document.id);
+    await runCareerConsistencyAnalysis(seedA.document, jobData(seedA.candidate.id, seedA.project.id, seedA.document.id), "resume text", gateway, runA.id);
+    await runCareerConsistencyAnalysis(seedB.document, jobData(seedB.candidate.id, seedB.project.id, seedB.document.id), "resume text", gateway, runB.id);
 
     const findingsA = await prisma.candidateConsistencyFinding.findMany({ where: { projectId: seedA.project.id } });
     const findingsB = await prisma.candidateConsistencyFinding.findMany({ where: { projectId: seedB.project.id } });

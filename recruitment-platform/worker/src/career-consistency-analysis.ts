@@ -25,18 +25,19 @@ import type { ProcessCandidateDocumentJobData } from "@recruitment-platform/queu
  * like any other step failure — there is no partial-success status and no
  * separate "optional analysis" carve-out.
  *
- * CandidateConsistencyFinding deliberately has no processingRunId (matching
- * Evidence, and unlike Assessment) — this is an explicit, documented,
- * deferred architectural gap, not an oversight: a retry's findings are not
- * currently distinguishable from a prior run's findings except by
- * createdAt/aiInteractionId. Do not silently "fix" this with a schema
- * change; it needs its own decision.
+ * CandidateConsistencyFinding.processingRunId (Phase 5A follow-up, approved)
+ * completes the ProcessingRun traceability model: every finding created
+ * here links to the run that produced it, exactly like Assessment already
+ * does, so a reader can distinguish a run's findings from a prior run's
+ * findings after a retry — never deleted or reassigned, only ever set at
+ * creation.
  */
 export async function runCareerConsistencyAnalysis(
   document: CandidateDocument,
   data: ProcessCandidateDocumentJobData,
   extractedText: string,
   gateway: AiGateway,
+  processingRunId: string,
 ): Promise<void> {
   const experiences = await prisma.candidateExperience.findMany({
     where: { candidateId: data.candidateId },
@@ -112,6 +113,7 @@ export async function runCareerConsistencyAnalysis(
           evidenceText: finding.evidenceText,
           confidence: finding.confidence,
           aiInteractionId: interaction?.id,
+          processingRunId,
         },
       });
     }

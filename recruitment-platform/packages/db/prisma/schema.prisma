@@ -445,6 +445,7 @@ model ProcessingRun {
   createdAt           DateTime            @default(now())
 
   assessments         Assessment[]
+  consistencyFindings CandidateConsistencyFinding[]
   currentForDocuments CandidateDocument[] @relation("CurrentProcessingRun")
 
   @@unique([candidateDocumentId, attemptNumber])
@@ -667,6 +668,16 @@ model CandidateConsistencyFinding {
   evidenceText     String?
   confidence       EvidenceConfidence
   aiInteractionId  String?
+  // Completes the ProcessingRun traceability model (Phase 5A follow-up):
+  // Assessment already carries this; CandidateConsistencyFinding was the
+  // one sibling model produced by the same per-document pipeline run left
+  // without it. Lets a reader distinguish findings from a run that later
+  // failed/was retried from the candidate's current, authoritative run —
+  // never deleted or reassigned by a retry (a retry creates new findings
+  // under its own new run; historical findings and their processingRunId
+  // stay exactly as written).
+  processingRunId  String
+  processingRun    ProcessingRun               @relation(fields: [processingRunId], references: [id], onDelete: Restrict)
   createdAt        DateTime                    @default(now())
   updatedAt        DateTime                    @updatedAt
 

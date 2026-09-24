@@ -194,6 +194,7 @@ describe("Phase 4 foundation: evidence traceability, career-consistency findings
         },
       });
 
+      const run = await seedProcessingRun(candidate.id, project.id, user.id);
       const finding = await prisma.candidateConsistencyFinding.create({
         data: {
           candidateId: candidate.id,
@@ -205,6 +206,7 @@ describe("Phase 4 foundation: evidence traceability, career-consistency findings
           sourcePage: 2,
           evidenceText: "HR Officer, Acme (2019-2021); HR Supervisor, Acme (2020-2022).",
           confidence: "MEDIUM",
+          processingRunId: run.id,
         },
       });
 
@@ -222,6 +224,7 @@ describe("Phase 4 foundation: evidence traceability, career-consistency findings
 
     it("allows a date-math-only finding (no single quote) with null document/page/text, still carrying a description and confidence", async () => {
       const { project, candidate } = await seedProjectRequirementCandidate();
+      const run = await seedProcessingRun(candidate.id, project.id, (await prisma.user.findFirstOrThrow()).id);
 
       const finding = await prisma.candidateConsistencyFinding.create({
         data: {
@@ -231,6 +234,7 @@ describe("Phase 4 foundation: evidence traceability, career-consistency findings
           severity: "INFORMATION_UNCLEAR",
           description: "Approximately 8-month gap between the two most recent roles.",
           confidence: "MEDIUM",
+          processingRunId: run.id,
         },
       });
 
@@ -241,6 +245,7 @@ describe("Phase 4 foundation: evidence traceability, career-consistency findings
 
     it("keeps CandidateConsistencyFinding conceptually separate from Evidence/AssessmentEvidence — no shared rows", async () => {
       const { project, requirement, candidate } = await seedProjectRequirementCandidate();
+      const run = await seedProcessingRun(candidate.id, project.id, (await prisma.user.findFirstOrThrow()).id);
 
       await prisma.candidateConsistencyFinding.create({
         data: {
@@ -250,6 +255,7 @@ describe("Phase 4 foundation: evidence traceability, career-consistency findings
           severity: "POTENTIAL_INCONSISTENCY",
           description: "Overlapping employment dates.",
           confidence: "LOW",
+          processingRunId: run.id,
         },
       });
       await prisma.evidence.create({
@@ -284,6 +290,7 @@ describe("Phase 4 foundation: evidence traceability, career-consistency findings
           uploadedBy: user.id,
         },
       });
+      const run = await seedProcessingRun(candidate.id, project.id, user.id);
       const finding = await prisma.candidateConsistencyFinding.create({
         data: {
           candidateId: candidate.id,
@@ -295,6 +302,7 @@ describe("Phase 4 foundation: evidence traceability, career-consistency findings
           sourcePage: 1,
           evidenceText: "Preserved quote.",
           confidence: "MEDIUM",
+          processingRunId: run.id,
         },
       });
 

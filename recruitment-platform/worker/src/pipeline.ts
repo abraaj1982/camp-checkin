@@ -180,7 +180,7 @@ export async function runDocumentProcessingPipeline(
   // analysis — its failure fails the whole ProcessingRun exactly like any
   // other step failure, with no partial-success status).
   try {
-    await runCareerConsistencyAnalysis(document, data, parsed.text, deps.gateway);
+    await runCareerConsistencyAnalysis(document, data, parsed.text, deps.gateway, run.id);
   } catch (err) {
     await failProcessingRun(run.id);
     throw err; // retryable — caller marks FAILED_RETRY
