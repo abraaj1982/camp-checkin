@@ -33,7 +33,7 @@ import { requireProjectAccess } from "../projects/authorization.js";
  * endpoints below so Assessment and Career Consistency resolve "current"
  * identically.
  */
-async function resolveCurrentRunIds(candidateId: string, projectId: string): Promise<string[]> {
+export async function resolveCurrentRunIds(candidateId: string, projectId: string): Promise<string[]> {
   const currentDocuments = await prisma.candidateDocument.findMany({
     where: { candidateId, projectId, currentProcessingRunId: { not: null } },
     select: { currentProcessingRunId: true },
@@ -141,6 +141,13 @@ export async function registerAssessmentRoutes(app: FastifyInstance): Promise<vo
       return {
         candidate: { id: candidateId, anonymizedLabel: link.anonymizedLabel },
         assessments: assessments.map((assessment) => ({
+          // Phase 6: the HR Decision UI's "override this assessment" picker
+          // needs a stable handle to POST back as decisions.assessmentId —
+          // this is the Assessment's own id, not a candidate identity field
+          // or an internal document/run reference, so it's safe to expose
+          // (the decisions POST route re-validates it belongs to this
+          // candidate's current run regardless of what the client sends).
+          id: assessment.id,
           status: assessment.status,
           requirement: {
             id: assessment.requirement.id,

@@ -41,6 +41,9 @@ function mockResponses({
     if (path.endsWith("/consistency-findings")) {
       return Promise.resolve({ candidate: CANDIDATE, findings });
     }
+    if (path.endsWith("/decisions")) {
+      return Promise.resolve({ decisions: [] });
+    }
     if (path.endsWith("/candidates")) {
       // Matches the Phase 5C-hardened /projects/:id/candidates DTO: flat
       // (no nested `candidate` wrapper), hasCurrentRun instead of the raw
@@ -58,6 +61,7 @@ function mockResponses({
 }
 
 const baseAssessment = (overrides: Partial<Record<string, unknown>> = {}) => ({
+  id: "assessment-1",
   status: "STRONG_EVIDENCE",
   requirement: {
     id: "req-1",
@@ -99,7 +103,10 @@ describe("CandidateDetailPage", () => {
 
     await waitFor(() => expect(screen.getByText("5 years Employee Relations")).toBeInTheDocument());
     expect(screen.getByText("Candidate #001")).toBeInTheDocument();
-    expect(screen.getByText(/strong evidence/i)).toBeInTheDocument();
+    // Scoped to the assessment card: Phase 6's Decisions panel legitimately
+    // repeats the status text in its "override this assessment" picker.
+    const card = screen.getByText("5 years Employee Relations").closest("section")!;
+    expect(within(card).getByText(/strong evidence/i)).toBeInTheDocument();
     expect(screen.getByText(/Led grievance handling for 200\+ staff\./)).toBeInTheDocument();
     expect(screen.getByText(/Source Document, page 2/)).toBeInTheDocument();
   });
@@ -109,17 +116,20 @@ describe("CandidateDetailPage", () => {
     async (status) => {
       mockResponses({ assessments: [baseAssessment({ status })] });
       render(<CandidateDetailPage />);
-      await waitFor(() =>
-        expect(screen.getByText(new RegExp(status.replaceAll("_", " "), "i"))).toBeInTheDocument(),
-      );
+      await waitFor(() => expect(screen.getByText("5 years Employee Relations")).toBeInTheDocument());
+      // Scoped to the assessment card's own status badge — Phase 6 added a
+      // second, legitimate occurrence of this same status text in the
+      // Decisions panel's "override this assessment" picker.
+      const card = screen.getByText("5 years Employee Relations").closest("section")!;
+      expect(within(card).getByText(new RegExp(status.replaceAll("_", " "), "i"))).toBeInTheDocument();
     },
   );
 
   it("distinguishes mandatory vs optional requirements", async () => {
     mockResponses({
       assessments: [
-        baseAssessment({ requirement: { ...baseAssessment().requirement, mandatory: true, description: "Req A" } }),
-        baseAssessment({ requirement: { ...baseAssessment().requirement, mandatory: false, description: "Req B" } }),
+        baseAssessment({ id: "a1", requirement: { ...baseAssessment().requirement, mandatory: true, description: "Req A" } }),
+        baseAssessment({ id: "a2", requirement: { ...baseAssessment().requirement, mandatory: false, description: "Req B" } }),
       ],
     });
     render(<CandidateDetailPage />);
@@ -291,6 +301,7 @@ describe("CandidateDetailPage", () => {
     apiFetchMock.mockImplementation((path: string) => {
       if (path.endsWith("/assessments")) return Promise.resolve({ candidate: CANDIDATE, assessments: [baseAssessment()] });
       if (path.endsWith("/consistency-findings")) return Promise.resolve({ candidate: CANDIDATE, findings: [] });
+      if (path.endsWith("/decisions")) return Promise.resolve({ decisions: [] });
       if (path.endsWith("/candidates")) {
         return Promise.resolve([
           {
@@ -328,5 +339,136 @@ describe("CandidateDetailPage", () => {
     for (const forbidden of ["score", "rank", "recommend", "suitab", "hire", "reject candidate", "overall match"]) {
       expect(bodyText).not.toContain(forbidden);
     }
+  });
+
+  describe("Decisions panel (Phase 6)", () => {
+    it("loads and renders existing decision history, newest first", async () => {
+      apiFetchMock.mockImplementation((path: string) => {
+        if (path.endsWith("/assessments")) return Promise.resolve({ candidate: CANDIDATE, assessments: [] });
+        if (path.endsWith("/consistency-findings")) return Promise.resolve({ candidate: CANDIDATE, findings: [] });
+        if (path.endsWith("/decisions")) {
+          return Promise.resolve({
+            decisions: [
+              {
+                id: "d2",
+                decision: "SHORTLIST",
+                notes: "Second look confirms fit.",
+                decidedAt: "2026-01-02T00:00:00.000Z",
+                decidedByName: "Alex HR",
+                override: null,
+              },
+              {
+                id: "d1",
+                decision: "HOLD",
+                notes: null,
+                decidedAt: "2026-01-01T00:00:00.000Z",
+                decidedByName: "Alex HR",
+                override: { assessmentId: "a1", overridden: true, hrNote: null },
+              },
+            ],
+          });
+        }
+        if (path.endsWith("/candidates")) return Promise.resolve([{ candidateId: "cand-1", anonymizedLabel: "Candidate #001", documents: [] }]);
+        throw new Error(`Unexpected path: ${path}`);
+      });
+      render(<CandidateDetailPage />);
+      await waitFor(() => expect(screen.getByText("Second look confirms fit.")).toBeInTheDocument());
+      const items = screen.getAllByText(/^(SHORTLIST|HOLD)$/);
+      expect(items[0]).toHaveTextContent("SHORTLIST"); // newest first
+      expect(items[1]).toHaveTextContent("HOLD");
+      expect(screen.getByText("Overrides an AI assessment gap.")).toBeInTheDocument();
+      expect(screen.getAllByText((_, el) => el?.textContent === "by Alex HR").length).toBe(2);
+    });
+
+    it("shows a no-decisions message when history is empty", async () => {
+      mockResponses({ assessments: [baseAssessment()] });
+      render(<CandidateDetailPage />);
+      await waitFor(() => expect(screen.getByText("No decisions recorded yet.")).toBeInTheDocument());
+    });
+
+    it("only offers the candidate's current-run assessments in the override picker", async () => {
+      mockResponses({
+        assessments: [baseAssessment({ id: "a1", requirement: { ...baseAssessment().requirement, description: "Req A" } })],
+      });
+      render(<CandidateDetailPage />);
+      await waitFor(() => expect(screen.getByText("Override assessment (optional)")).toBeInTheDocument());
+      const select = screen.getByLabelText(/override assessment/i) as HTMLSelectElement;
+      const options = Array.from(select.options).map((o) => o.textContent);
+      expect(options).toEqual(["None", "Req A — STRONG EVIDENCE"]);
+    });
+
+    it("hides the override picker entirely when there are no current-run assessments", async () => {
+      mockResponses({ assessments: [] });
+      render(<CandidateDetailPage />);
+      await waitFor(() => expect(screen.getByText("No decisions recorded yet.")).toBeInTheDocument());
+      expect(screen.queryByText("Override assessment (optional)")).toBeNull();
+    });
+
+    it("submits a decision and refreshes the history", async () => {
+      let decisions: unknown[] = [];
+      apiFetchMock.mockImplementation((path: string, options?: { method?: string; body?: string }) => {
+        if (path.endsWith("/assessments")) return Promise.resolve({ candidate: CANDIDATE, assessments: [] });
+        if (path.endsWith("/consistency-findings")) return Promise.resolve({ candidate: CANDIDATE, findings: [] });
+        if (path.endsWith("/candidates")) return Promise.resolve([{ candidateId: "cand-1", anonymizedLabel: "Candidate #001", documents: [] }]);
+        if (path.endsWith("/decisions") && options?.method === "POST") {
+          const body = JSON.parse(options.body ?? "{}");
+          decisions = [
+            { id: "new-1", decision: body.decision, notes: body.notes ?? null, decidedAt: "2026-01-03T00:00:00.000Z", decidedByName: "Alex HR", override: null },
+          ];
+          return Promise.resolve({ id: "new-1", decision: body.decision, notes: body.notes ?? null, decidedAt: "2026-01-03T00:00:00.000Z", override: null });
+        }
+        if (path.endsWith("/decisions")) return Promise.resolve({ decisions });
+        throw new Error(`Unexpected path: ${path}`);
+      });
+      render(<CandidateDetailPage />);
+      await waitFor(() => expect(screen.getByText("No decisions recorded yet.")).toBeInTheDocument());
+
+      screen.getByRole("button", { name: /record decision/i }).click();
+      await waitFor(() => expect(screen.getByText("SHORTLIST")).toBeInTheDocument());
+      const postCall = apiFetchMock.mock.calls.find((call) => {
+        const [path, options] = call as [string, { method?: string } | undefined];
+        return path.endsWith("/decisions") && options?.method === "POST";
+      });
+      expect(postCall).toBeDefined();
+    });
+
+    it("shows an error message when submitting a decision fails", async () => {
+      const { ApiError } = await import("../../../../../lib/api");
+      apiFetchMock.mockImplementation((path: string, options?: { method?: string }) => {
+        if (path.endsWith("/assessments")) return Promise.resolve({ candidate: CANDIDATE, assessments: [] });
+        if (path.endsWith("/consistency-findings")) return Promise.resolve({ candidate: CANDIDATE, findings: [] });
+        if (path.endsWith("/candidates")) return Promise.resolve([{ candidateId: "cand-1", anonymizedLabel: "Candidate #001", documents: [] }]);
+        if (path.endsWith("/decisions") && options?.method === "POST") {
+          return Promise.reject(new ApiError(404, { error: "candidate_not_found" }));
+        }
+        if (path.endsWith("/decisions")) return Promise.resolve({ decisions: [] });
+        throw new Error(`Unexpected path: ${path}`);
+      });
+      render(<CandidateDetailPage />);
+      await waitFor(() => expect(screen.getByText("No decisions recorded yet.")).toBeInTheDocument());
+
+      screen.getByRole("button", { name: /record decision/i }).click();
+      await waitFor(() => expect(screen.getByText("Could not record decision.")).toBeInTheDocument());
+    });
+
+    it("never renders a decision-history aggregate count or dashboard-like summary", async () => {
+      apiFetchMock.mockImplementation((path: string) => {
+        if (path.endsWith("/assessments")) return Promise.resolve({ candidate: CANDIDATE, assessments: [] });
+        if (path.endsWith("/consistency-findings")) return Promise.resolve({ candidate: CANDIDATE, findings: [] });
+        if (path.endsWith("/candidates")) return Promise.resolve([{ candidateId: "cand-1", anonymizedLabel: "Candidate #001", documents: [] }]);
+        if (path.endsWith("/decisions")) {
+          return Promise.resolve({
+            decisions: [
+              { id: "d1", decision: "SHORTLIST", notes: null, decidedAt: "2026-01-01T00:00:00.000Z", decidedByName: "Alex HR", override: null },
+              { id: "d2", decision: "REJECT", notes: null, decidedAt: "2026-01-02T00:00:00.000Z", decidedByName: "Alex HR", override: null },
+            ],
+          });
+        }
+        throw new Error(`Unexpected path: ${path}`);
+      });
+      render(<CandidateDetailPage />);
+      await waitFor(() => expect(screen.getAllByText(/^(SHORTLIST|REJECT)$/).length).toBe(2));
+      expect(screen.queryByText(/\d+\s+of\s+\d+/)).toBeNull();
+    });
   });
 });

@@ -39,6 +39,9 @@ describe("decision route project authorization", () => {
     });
     const project = projectRes.json();
     const candidate = await prisma.candidate.create({ data: { fullName: "Jordan Doe" } });
+    await prisma.candidateProjectLink.create({
+      data: { candidateId: candidate.id, projectId: project.id, anonymizedLabel: "Candidate #001" },
+    });
     return { cookie, project, candidate };
   }
 

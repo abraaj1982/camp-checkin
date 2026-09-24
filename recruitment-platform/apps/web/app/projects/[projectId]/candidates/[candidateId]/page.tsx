@@ -33,6 +33,7 @@ interface EvidenceItem {
 }
 
 interface AssessmentItem {
+  id: string;
   status: AssessmentStatus;
   requirement: {
     id: string;
@@ -80,6 +81,28 @@ interface CandidateStatusLink {
   candidateId: string;
   anonymizedLabel: string;
   documents: { status: DocumentStatus; hasCurrentRun: boolean }[];
+}
+
+type DecisionType = "SHORTLIST" | "HOLD" | "REJECT" | "INTERVIEW";
+const DECISION_OPTIONS: DecisionType[] = ["SHORTLIST", "INTERVIEW", "HOLD", "REJECT"];
+
+interface DecisionOverride {
+  assessmentId: string;
+  overridden: boolean;
+  hrNote: string | null;
+}
+
+interface Decision {
+  id: string;
+  decision: DecisionType;
+  notes: string | null;
+  decidedAt: string;
+  decidedByName: string;
+  override: DecisionOverride | null;
+}
+
+interface DecisionsResponse {
+  decisions: Decision[];
 }
 
 function sourceLabel(source: string | null, sourcePage: number | null): string {
@@ -155,6 +178,145 @@ function AssessmentCard({ assessment }: { assessment: AssessmentItem }) {
           rejected.map((e, i) => <EvidenceCard key={i} item={e} />)
         )}
       </div>
+    </section>
+  );
+}
+
+/**
+ * Phase 6 — HR Decision UI. A decision is a human action taken in response
+ * to the evidence already shown above; this panel never computes, ranks, or
+ * suggests one. The override picker offers ONLY the candidate's current-run
+ * assessments (Decision 3) — the same list already rendered above, so no
+ * separate/looser fetch is introduced. Decision notes are HR's own
+ * free text about their own reasoning, not AI-extracted candidate text, so
+ * they are intentionally not passed through blind redaction (Decision 8).
+ */
+function DecisionsPanel({
+  projectId,
+  candidateId,
+  currentAssessments,
+}: {
+  projectId: string;
+  candidateId: string;
+  currentAssessments: AssessmentItem[];
+}) {
+  const [decisions, setDecisions] = useState<Decision[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [decisionType, setDecisionType] = useState<DecisionType>("SHORTLIST");
+  const [notes, setNotes] = useState("");
+  const [assessmentId, setAssessmentId] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await apiFetch<DecisionsResponse>(`/projects/${projectId}/candidates/${candidateId}/decisions`);
+      setDecisions(res.decisions);
+      setError(null);
+    } catch {
+      setError("Could not load decision history.");
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId, candidateId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    try {
+      await apiFetch(`/projects/${projectId}/candidates/${candidateId}/decisions`, {
+        method: "POST",
+        body: JSON.stringify({
+          decision: decisionType,
+          notes: notes.trim() || undefined,
+          assessmentId: assessmentId || undefined,
+        }),
+      });
+      setNotes("");
+      setAssessmentId("");
+      await load();
+    } catch {
+      setError("Could not record decision.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <section style={{ marginTop: 24 }}>
+      <h2>Decisions</h2>
+
+      <form onSubmit={handleSubmit} style={{ border: "1px solid #ddd", borderRadius: 6, padding: 16, marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
+          <label>
+            <div style={{ fontSize: 13, marginBottom: 4 }}>Decision</div>
+            <select value={decisionType} onChange={(e) => setDecisionType(e.target.value as DecisionType)}>
+              {DECISION_OPTIONS.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {currentAssessments.length > 0 && (
+            <label>
+              <div style={{ fontSize: 13, marginBottom: 4 }}>Override assessment (optional)</div>
+              <select value={assessmentId} onChange={(e) => setAssessmentId(e.target.value)}>
+                <option value="">None</option>
+                {currentAssessments.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.requirement.description} — {a.status.replaceAll("_", " ")}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          <button type="submit" disabled={submitting}>
+            {submitting ? "Recording…" : "Record Decision"}
+          </button>
+        </div>
+        <label style={{ display: "block", marginTop: 12 }}>
+          <div style={{ fontSize: 13, marginBottom: 4 }}>Notes (optional)</div>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={2}
+            style={{ width: "100%" }}
+            placeholder="Why this decision?"
+          />
+        </label>
+      </form>
+
+      {error && <p style={{ color: "crimson" }}>{error}</p>}
+
+      {loading ? (
+        <p>Loading decisions…</p>
+      ) : decisions.length === 0 ? (
+        <p style={{ color: "#888" }}>No decisions recorded yet.</p>
+      ) : (
+        decisions.map((d) => (
+          <div key={d.id} style={{ border: "1px solid #ddd", borderRadius: 6, padding: 12, marginBottom: 8 }}>
+            <p style={{ margin: 0, fontWeight: 600 }}>
+              {d.decision} <span style={{ fontWeight: 400, fontSize: 12, color: "#888" }}>by {d.decidedByName}</span>
+            </p>
+            {d.notes && <p style={{ margin: "8px 0" }}>{d.notes}</p>}
+            {d.override && (
+              <p style={{ margin: 0, fontSize: 12, color: "#888" }}>
+                {d.override.overridden ? "Overrides an AI assessment gap." : "Agrees with the AI assessment."}
+              </p>
+            )}
+            <p style={{ margin: "4px 0 0", fontSize: 11, color: "#888" }}>{new Date(d.decidedAt).toLocaleString()}</p>
+          </div>
+        ))
+      )}
     </section>
   );
 }
@@ -291,6 +453,14 @@ export default function CandidateDetailPage() {
           </section>
         </>
       )}
+
+      {/* A decision is a human action HR can take independently of whether
+          AI results exist yet — never gated behind hasResults. */}
+      <DecisionsPanel
+        projectId={String(projectId)}
+        candidateId={String(candidateId)}
+        currentAssessments={assessments?.assessments ?? []}
+      />
     </main>
   );
 }
