@@ -5,6 +5,7 @@ import { needsOcr } from "@recruitment-platform/shared-types";
 import type { ProcessCandidateDocumentJobData } from "@recruitment-platform/queue";
 import { parseDocument } from "./parsing.js";
 import { runRequirementEvidenceAnalysis } from "./requirement-evidence-analysis.js";
+import { runCareerConsistencyAnalysis } from "./career-consistency-analysis.js";
 import { startProcessingRun, failProcessingRun, completeProcessingRun } from "./processing-run.js";
 
 /**
@@ -171,6 +172,19 @@ export async function runDocumentProcessingPipeline(
       languages: extraction.languages.length,
     },
   });
+
+  // Career/Consistency Analysis (master instruction Section 16) — runs
+  // immediately after Resume Intelligence's CandidateExperience rows are
+  // persisted, and before Requirement Evidence Analysis (explicit
+  // decision: this is a REQUIRED pipeline step, not an independent/optional
+  // analysis — its failure fails the whole ProcessingRun exactly like any
+  // other step failure, with no partial-success status).
+  try {
+    await runCareerConsistencyAnalysis(document, data, parsed.text, deps.gateway);
+  } catch (err) {
+    await failProcessingRun(run.id);
+    throw err; // retryable — caller marks FAILED_RETRY
+  }
 
   // Requirement Evidence Analysis (Phase 4A) runs in the same job,
   // immediately after Resume Intelligence — one call per candidate, not a

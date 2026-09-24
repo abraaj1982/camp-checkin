@@ -29,6 +29,11 @@ const RESUME_INTELLIGENCE_HAPPY_PATH = {
   languages: [{ language: "English", proficiency: "Native" }],
 };
 
+const CAREER_CONSISTENCY_HAPPY_PATH = {
+  progressionNarrative: "Steady, consistent HR career progression with no gaps.",
+  findings: [],
+};
+
 describe("runDocumentProcessingPipeline", () => {
   let storageDir: string;
   let storage: LocalObjectStorage;
@@ -80,13 +85,19 @@ describe("runDocumentProcessingPipeline", () => {
 
   it("parses a PDF, extracts via Resume Intelligence, and persists the normalized profile", async () => {
     await seedAiModelConfig("RESUME_INTELLIGENCE");
+    await seedAiModelConfig("CAREER_CONSISTENCY_ANALYSIS");
     const pdf = await buildTestPdf(
       "Jane Doe. HR Manager at Acme Corp since 2018. Led grievance handling and disciplinary " +
         "investigations across multiple regions. BA in Human Resources, State University. " +
         "Certified SHRM-CP. Fluent in English.",
     );
     const { candidate, document } = await seedCandidateWithDocument(pdf, "pdf");
-    const gateway = new AiGateway({ fake: new FakeAIProvider({ RESUME_INTELLIGENCE: RESUME_INTELLIGENCE_HAPPY_PATH }) });
+    const gateway = new AiGateway({
+      fake: new FakeAIProvider({
+        RESUME_INTELLIGENCE: RESUME_INTELLIGENCE_HAPPY_PATH,
+        CAREER_CONSISTENCY_ANALYSIS: CAREER_CONSISTENCY_HAPPY_PATH,
+      }),
+    });
 
     await runDocumentProcessingPipeline(
       { candidateDocumentId: document.id, candidateId: candidate.id, projectId: "unused" },
@@ -122,13 +133,19 @@ describe("runDocumentProcessingPipeline", () => {
 
   it("parses a DOCX the same way", async () => {
     await seedAiModelConfig("RESUME_INTELLIGENCE");
+    await seedAiModelConfig("CAREER_CONSISTENCY_ANALYSIS");
     const docx = await buildTestDocx([
       "Jane Doe",
       "HR Manager at Acme Corp since 2018.",
       "Led grievance handling and disciplinary investigations across multiple regions.",
     ]);
     const { candidate, document } = await seedCandidateWithDocument(docx, "docx");
-    const gateway = new AiGateway({ fake: new FakeAIProvider({ RESUME_INTELLIGENCE: RESUME_INTELLIGENCE_HAPPY_PATH }) });
+    const gateway = new AiGateway({
+      fake: new FakeAIProvider({
+        RESUME_INTELLIGENCE: RESUME_INTELLIGENCE_HAPPY_PATH,
+        CAREER_CONSISTENCY_ANALYSIS: CAREER_CONSISTENCY_HAPPY_PATH,
+      }),
+    });
 
     await runDocumentProcessingPipeline(
       { candidateDocumentId: document.id, candidateId: candidate.id, projectId: "unused" },
@@ -195,9 +212,15 @@ describe("runDocumentProcessingPipeline", () => {
 
   it("never overwrites the original document bytes in storage during processing", async () => {
     await seedAiModelConfig("RESUME_INTELLIGENCE");
+    await seedAiModelConfig("CAREER_CONSISTENCY_ANALYSIS");
     const pdf = await buildTestPdf("Jane Doe. HR Manager at Acme Corp. Led grievance handling.");
     const { candidate, document } = await seedCandidateWithDocument(pdf, "pdf");
-    const gateway = new AiGateway({ fake: new FakeAIProvider({ RESUME_INTELLIGENCE: RESUME_INTELLIGENCE_HAPPY_PATH }) });
+    const gateway = new AiGateway({
+      fake: new FakeAIProvider({
+        RESUME_INTELLIGENCE: RESUME_INTELLIGENCE_HAPPY_PATH,
+        CAREER_CONSISTENCY_ANALYSIS: CAREER_CONSISTENCY_HAPPY_PATH,
+      }),
+    });
 
     await runDocumentProcessingPipeline(
       { candidateDocumentId: document.id, candidateId: candidate.id, projectId: "unused" },
@@ -211,6 +234,7 @@ describe("runDocumentProcessingPipeline", () => {
 
   it("does not mark the document COMPLETED if Resume Intelligence succeeds but Requirement Evidence Analysis fails (Decision 5)", async () => {
     await seedAiModelConfig("RESUME_INTELLIGENCE");
+    await seedAiModelConfig("CAREER_CONSISTENCY_ANALYSIS");
     await seedAiModelConfig("REQUIREMENT_EVIDENCE_ANALYSIS");
     const pdf = await buildTestPdf("Jane Doe. HR Manager at Acme Corp since 2018. Led grievance handling.");
     const { project, candidate, document } = await seedCandidateWithDocument(pdf, "pdf");
@@ -250,6 +274,7 @@ describe("runDocumentProcessingPipeline", () => {
     const gateway = new AiGateway({
       fake: new FakeAIProvider({
         RESUME_INTELLIGENCE: RESUME_INTELLIGENCE_HAPPY_PATH,
+        CAREER_CONSISTENCY_ANALYSIS: CAREER_CONSISTENCY_HAPPY_PATH,
         // Violates evidenceCandidates.min(1) -> fails schema validation even after the gateway's retry.
         REQUIREMENT_EVIDENCE_ANALYSIS: { items: [{ requirementId: requirement.id, evidenceCandidates: [] }] },
       }),
@@ -276,5 +301,90 @@ describe("runDocumentProcessingPipeline", () => {
     const runs = await prisma.processingRun.findMany({ where: { candidateDocumentId: document.id } });
     expect(runs).toHaveLength(1);
     expect(runs[0].status).toBe("FAILED");
+  });
+
+  it("does not mark the document COMPLETED if Career Consistency Analysis fails (required pipeline step, Decision A)", async () => {
+    await seedAiModelConfig("RESUME_INTELLIGENCE");
+    await seedAiModelConfig("CAREER_CONSISTENCY_ANALYSIS");
+    const pdf = await buildTestPdf("Jane Doe. HR Manager at Acme Corp since 2018. Led grievance handling.");
+    const { candidate, document } = await seedCandidateWithDocument(pdf, "pdf");
+
+    const gateway = new AiGateway({
+      fake: new FakeAIProvider({
+        RESUME_INTELLIGENCE: RESUME_INTELLIGENCE_HAPPY_PATH,
+        // Missing "findings" -> fails careerConsistencyOutputSchema even after the gateway's retry.
+        CAREER_CONSISTENCY_ANALYSIS: { progressionNarrative: "Narrative only, no findings array." },
+      }),
+    });
+
+    await expect(
+      runDocumentProcessingPipeline(
+        { candidateDocumentId: document.id, candidateId: candidate.id, projectId: "unused" },
+        { storage, gateway },
+      ),
+    ).rejects.toBeInstanceOf(AiValidationError);
+
+    // Career Consistency is a REQUIRED step (Decision A) — its failure fails
+    // the whole ProcessingRun exactly like a Requirement Evidence Analysis
+    // failure, with no partial-success status. The document is never left
+    // reading as COMPLETED, and currentProcessingRunId stays null. The
+    // caller (worker/src/index.ts) is what actually flips the document to
+    // FAILED_RETRY on this throw — the pipeline itself leaves status alone,
+    // same established pattern as every other pipeline-step failure test above.
+    const updated = await prisma.candidateDocument.findUniqueOrThrow({ where: { id: document.id } });
+    expect(updated.status).not.toBe("COMPLETED");
+    expect(updated.currentProcessingRunId).toBeNull();
+
+    const runs = await prisma.processingRun.findMany({ where: { candidateDocumentId: document.id } });
+    expect(runs).toHaveLength(1);
+    expect(runs[0].status).toBe("FAILED"); // not RUNNING, and no partial-success status exists
+
+    // Requirement Evidence Analysis never even runs when Career Consistency
+    // fails first (it's ordered before it) — no Assessment rows exist.
+    expect(await prisma.assessment.count({ where: { candidateId: candidate.id } })).toBe(0);
+
+    const auditEntries = await prisma.auditLog.findMany({ where: { entityId: document.id } });
+    expect(auditEntries.map((a) => a.action)).toContain("CANDIDATE_CONSISTENCY_ANALYSIS_AI_FAILED");
+  });
+
+  it("reaches COMPLETED when Career Consistency succeeds, and persists its findings alongside the rest of the pipeline's output", async () => {
+    await seedAiModelConfig("RESUME_INTELLIGENCE");
+    await seedAiModelConfig("CAREER_CONSISTENCY_ANALYSIS");
+    const pdf = await buildTestPdf("Jane Doe. HR Manager at Acme Corp since 2018. Led grievance handling.");
+    const { candidate, document } = await seedCandidateWithDocument(pdf, "pdf");
+
+    const gateway = new AiGateway({
+      fake: new FakeAIProvider({
+        RESUME_INTELLIGENCE: RESUME_INTELLIGENCE_HAPPY_PATH,
+        CAREER_CONSISTENCY_ANALYSIS: {
+          progressionNarrative: "This narrative must not be persisted anywhere.",
+          findings: [
+            {
+              findingType: "EMPLOYMENT_GAP",
+              severity: "INFORMATION_UNCLEAR",
+              description: "Gap between two roles.",
+              sourcePage: null,
+              evidenceText: null,
+              confidence: "MEDIUM",
+            },
+          ],
+        },
+      }),
+    });
+
+    await runDocumentProcessingPipeline(
+      { candidateDocumentId: document.id, candidateId: candidate.id, projectId: "unused" },
+      { storage, gateway },
+    );
+
+    const updated = await prisma.candidateDocument.findUniqueOrThrow({ where: { id: document.id } });
+    expect(updated.status).toBe("COMPLETED");
+    expect(updated.currentProcessingRunId).not.toBeNull();
+
+    const findings = await prisma.candidateConsistencyFinding.findMany({ where: { candidateId: candidate.id } });
+    expect(findings).toHaveLength(1);
+    expect(findings[0].sourceDocumentId).toBe(document.id);
+    expect(findings[0].sourcePage).toBeNull();
+    expect(findings[0].evidenceText).toBeNull();
   });
 });

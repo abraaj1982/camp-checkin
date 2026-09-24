@@ -53,6 +53,7 @@ describe("pg-boss end-to-end: enqueue -> consume -> process", () => {
 
   it("processes a job enqueued via the API-side queue with a real worker consumer", async () => {
     await seedAiModelConfig("RESUME_INTELLIGENCE");
+    await seedAiModelConfig("CAREER_CONSISTENCY_ANALYSIS");
     const user = await createUser("hr@example.com");
     const project = await prisma.recruitmentProject.create({ data: { title: "HR Manager", createdBy: user.id } });
     const candidate = await prisma.candidate.create({ data: { fullName: "resume" } });
@@ -102,6 +103,7 @@ describe("pg-boss end-to-end: enqueue -> consume -> process", () => {
           certifications: [],
           languages: [],
         },
+        CAREER_CONSISTENCY_ANALYSIS: { progressionNarrative: "Consistent career progression.", findings: [] },
       }),
     });
 
