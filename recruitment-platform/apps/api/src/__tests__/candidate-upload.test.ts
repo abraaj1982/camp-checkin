@@ -181,6 +181,45 @@ describe("candidate CV batch upload and processing status (Phase 3)", () => {
     expect(auditEntries.map((a) => a.action)).toContain("CANDIDATE_DOCUMENT_RETRY_REQUESTED");
   });
 
+  it("never lets two concurrent retry requests both enqueue a job for the same document (Phase 4A ProcessingRun concurrency precondition)", async () => {
+    // worker/src/processing-run.ts's startProcessingRun() unconditionally
+    // marks every existing RUNNING run for a document FAILED when a new
+    // attempt starts — it relies on this route making it impossible for two
+    // jobs to ever be actively processing the same CandidateDocument at
+    // once. That guarantee has to come from an atomic compare-and-swap on
+    // this route, not a find-then-update (which two concurrent requests
+    // could both pass). This proves exactly one of two simultaneous retry
+    // requests succeeds.
+    const uploadRes = await multipartRequest(app, `/projects/${projectId}/candidates/upload`, cookie, [
+      { filename: "jane-doe.pdf", content: VALID_PDF_BYTES },
+    ]);
+    const { candidateId, documentId } = uploadRes.json().uploaded[0];
+
+    await prisma.candidateDocument.update({
+      where: { id: documentId },
+      data: { status: "FAILED_RETRY", failureReason: "Simulated parse failure." },
+    });
+
+    const [resA, resB] = await Promise.all([
+      app.inject({
+        method: "POST",
+        url: `/projects/${projectId}/candidates/${candidateId}/documents/${documentId}/retry`,
+        headers: { cookie },
+      }),
+      app.inject({
+        method: "POST",
+        url: `/projects/${projectId}/candidates/${candidateId}/documents/${documentId}/retry`,
+        headers: { cookie },
+      }),
+    ]);
+
+    const statusCodes = [resA.statusCode, resB.statusCode].sort();
+    expect(statusCodes).toEqual([200, 400]); // exactly one succeeds, the other sees it's no longer FAILED_RETRY
+
+    // Only one new job was enqueued for this document by the retry (plus the initial upload job).
+    expect(queue.enqueued.filter((j) => j.candidateDocumentId === documentId)).toHaveLength(2);
+  });
+
   it("refuses to retry a document that is not in FAILED_RETRY status", async () => {
     const uploadRes = await multipartRequest(app, `/projects/${projectId}/candidates/upload`, cookie, [
       { filename: "jane-doe.pdf", content: VALID_PDF_BYTES },

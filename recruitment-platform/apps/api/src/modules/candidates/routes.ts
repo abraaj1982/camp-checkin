@@ -16,6 +16,37 @@ function deriveFullNameFromFilename(filename: string): string {
 }
 
 /**
+ * Creates the batch and pins every currently-APPROVED requirement's latest
+ * version to it (Phase 4 foundation, Decision 3) — resolved ONCE here, at
+ * upload time, never re-queried per candidate later. A requirement with no
+ * approved version yet (project still mid-setup) simply gets no pin; that's
+ * fine — Phase 4's evidence-analysis code will have nothing to evaluate
+ * that requirement against for this batch, which is the correct behavior
+ * for an unapproved requirement.
+ */
+async function createUploadBatch(projectId: string, createdBy: string) {
+  const batch = await prisma.candidateUploadBatch.create({ data: { projectId, createdBy } });
+
+  const approvedRequirements = await prisma.jobRequirement.findMany({
+    where: { projectId, status: "APPROVED", currentVersionNumber: { gt: 0 } },
+  });
+
+  for (const requirement of approvedRequirements) {
+    const latestVersion = await prisma.jobRequirementVersion.findFirst({
+      where: { requirementId: requirement.id },
+      orderBy: { versionNumber: "desc" },
+    });
+    if (!latestVersion) continue; // shouldn't happen given currentVersionNumber > 0, but never assume
+
+    await prisma.candidateBatchRequirementVersion.create({
+      data: { batchId: batch.id, requirementId: requirement.id, requirementVersionId: latestVersion.id },
+    });
+  }
+
+  return batch;
+}
+
+/**
  * Batch CV upload + per-candidate independent processing (architecture doc,
  * Section: Document Processing Pipeline / Batch Processing Architecture).
  * One candidate's invalid/corrupted file is reported and skipped — it never
@@ -39,6 +70,8 @@ export async function registerCandidateRoutes(
 
       const uploaded: { candidateId: string; documentId: string; filename: string }[] = [];
       const rejected: { filename: string; error: string }[] = [];
+
+      const batch = await createUploadBatch(project.id, identity.userId);
 
       let fileCount = 0;
       for await (const part of request.files()) {
@@ -79,6 +112,7 @@ export async function registerCandidateRoutes(
           data: {
             candidateId: candidate.id,
             projectId: project.id,
+            batchId: batch.id,
             fileType: validation.fileType,
             // placeholder — replaced immediately below once we know the document id
             storageKey: "pending",
@@ -118,10 +152,10 @@ export async function registerCandidateRoutes(
         action: "CANDIDATE_DOCUMENTS_UPLOADED",
         entityType: "RecruitmentProject",
         entityId: project.id,
-        after: { uploadedCount: uploaded.length, rejectedCount: rejected.length },
+        after: { batchId: batch.id, uploadedCount: uploaded.length, rejectedCount: rejected.length },
       });
 
-      return { uploaded, rejected };
+      return { batchId: batch.id, uploaded, rejected };
     },
   );
 
@@ -152,18 +186,27 @@ export async function registerCandidateRoutes(
       const project = request.project!;
       const identity = request.session.get("identity")!;
 
-      const document = await prisma.candidateDocument.findFirst({
-        where: { id: documentId, candidateId, projectId: project.id },
-      });
-      if (!document) return reply.code(404).send({ error: "document_not_found" });
-      if (document.status !== "FAILED_RETRY") {
-        return reply.code(400).send({ error: "not_retryable", status: document.status });
-      }
-
-      await prisma.candidateDocument.update({
-        where: { id: documentId },
+      // Atomic compare-and-swap, not a find-then-update: two concurrent
+      // retry requests for the same document must never both flip it to
+      // QUEUED and both enqueue a job (that would let two worker jobs run
+      // the pipeline for the same CandidateDocument at once — see
+      // worker/src/processing-run.ts's stale-RUNNING cleanup, which assumes
+      // that can't happen). Postgres serializes two concurrent UPDATEs
+      // matching the same row: only the one that still sees status =
+      // FAILED_RETRY at the time it acquires the row lock succeeds: the
+      // other's WHERE no longer matches after the first commits, so it
+      // updates zero rows and falls through to the not-retryable response.
+      const { count } = await prisma.candidateDocument.updateMany({
+        where: { id: documentId, candidateId, projectId: project.id, status: "FAILED_RETRY" },
         data: { status: "QUEUED", failureReason: null },
       });
+      if (count === 0) {
+        const document = await prisma.candidateDocument.findFirst({
+          where: { id: documentId, candidateId, projectId: project.id },
+        });
+        if (!document) return reply.code(404).send({ error: "document_not_found" });
+        return reply.code(400).send({ error: "not_retryable", status: document.status });
+      }
 
       await queue.enqueue({ candidateDocumentId: documentId, candidateId, projectId: project.id });
 

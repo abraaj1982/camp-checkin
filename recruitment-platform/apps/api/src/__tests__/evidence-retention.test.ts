@@ -37,6 +37,21 @@ describe("Assessment <-> Evidence traceability and candidate retention safety", 
     return { user, project, requirement, candidate };
   }
 
+  /** Every Assessment now requires a ProcessingRun (Phase 4A) — seed a minimal one directly via Prisma. */
+  async function seedProcessingRun(candidateId: string, projectId: string, uploadedBy: string) {
+    const document = await prisma.candidateDocument.create({
+      data: {
+        candidateId,
+        projectId,
+        fileType: "pdf",
+        storageKey: "s3://bucket/key.pdf",
+        originalFilename: "resume.pdf",
+        uploadedBy,
+      },
+    });
+    return prisma.processingRun.create({ data: { candidateDocumentId: document.id, attemptNumber: 1, status: "RUNNING" } });
+  }
+
   it("links an assessment to multiple evidence rows with distinct roles (supporting vs. considered-and-rejected)", async () => {
     const { project, requirement, candidate } = await seedProjectRequirementCandidate();
 
@@ -63,11 +78,13 @@ describe("Assessment <-> Evidence traceability and candidate retention safety", 
       },
     });
 
+    const run = await seedProcessingRun(candidate.id, project.id, (await prisma.user.findFirstOrThrow()).id);
     const assessment = await prisma.assessment.create({
       data: {
         candidateId: candidate.id,
         projectId: project.id,
         requirementId: requirement.id,
+        processingRunId: run.id,
         aiAssessmentSummary: "Strong direct evidence of employee relations casework.",
         status: "STRONG_EVIDENCE",
         evidenceLinks: {
@@ -114,11 +131,15 @@ describe("Assessment <-> Evidence traceability and candidate retention safety", 
         confidence: "HIGH",
       },
     });
+    const hrUser = await prisma.user.findFirstOrThrow();
+    const runA = await seedProcessingRun(candidate.id, project.id, hrUser.id);
+    const runB = await seedProcessingRun(candidate.id, project.id, hrUser.id);
     const assessmentA = await prisma.assessment.create({
       data: {
         candidateId: candidate.id,
         projectId: project.id,
         requirementId: requirement.id,
+        processingRunId: runA.id,
         aiAssessmentSummary: "First pass.",
         status: "STRONG_EVIDENCE",
         evidenceLinks: { create: [{ evidenceId: evidence.id, role: "SUPPORTING" }] },
@@ -129,6 +150,7 @@ describe("Assessment <-> Evidence traceability and candidate retention safety", 
         candidateId: candidate.id,
         projectId: project.id,
         requirementId: requirement.id,
+        processingRunId: runB.id,
         aiAssessmentSummary: "Re-run after a requirement edit.",
         status: "STRONG_EVIDENCE",
       },
@@ -168,11 +190,13 @@ describe("Assessment <-> Evidence traceability and candidate retention safety", 
 
   it("refuses to hard-delete a candidate with a historical Assessment row", async () => {
     const { project, requirement, candidate } = await seedProjectRequirementCandidate();
+    const run = await seedProcessingRun(candidate.id, project.id, (await prisma.user.findFirstOrThrow()).id);
     await prisma.assessment.create({
       data: {
         candidateId: candidate.id,
         projectId: project.id,
         requirementId: requirement.id,
+        processingRunId: run.id,
         aiAssessmentSummary: "Historical assessment.",
         status: "REVIEW_REQUIRED",
       },

@@ -173,6 +173,7 @@ model RecruitmentProject {
   requirements   JobRequirement[]
   candidateLinks CandidateProjectLink[]
   comparisons    CandidateComparison[]
+  uploadBatches  CandidateUploadBatch[]
 }
 
 // Project-level authorization spine (Phase 2, Section 1): the creator is
@@ -217,6 +218,7 @@ model JobRequirement {
   weightApprovals   RequirementWeightApproval[]
   evidence          Evidence[]
   assessments       Assessment[]
+  batchVersionPins  CandidateBatchRequirementVersion[]
 }
 
 // AI-identified concepts semantically related to a requirement (Phase 2,
@@ -269,8 +271,47 @@ model JobRequirementVersion {
   approvedAt          DateTime            @default(now())
 
   assessments Assessment[]
+  batchPins   CandidateBatchRequirementVersion[]
 
   @@unique([requirementId, versionNumber])
+}
+
+// One row per CV upload call (Phase 4 foundation, Decision 3). Its purpose
+// is entirely to anchor CandidateBatchRequirementVersion below — pinning,
+// once at upload time, which JobRequirementVersion every candidate in that
+// batch is evaluated against, so a requirement edited mid-batch never
+// causes candidate #1 and candidate #20 to be scored against different
+// versions of the same requirement. This durably records that pin in the
+// database (not just in worker memory) because batch documents are
+// processed asynchronously, potentially far apart in time.
+model CandidateUploadBatch {
+  id        String             @id @default(uuid())
+  projectId String
+  project   RecruitmentProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy String
+  createdAt DateTime           @default(now())
+
+  documents      CandidateDocument[]
+  versionPins    CandidateBatchRequirementVersion[]
+}
+
+// The pin itself: "in this batch, requirement X means version Y" — resolved
+// once when the batch is created (see the upload route) from each
+// requirement's latest APPROVED JobRequirementVersion at that moment, never
+// re-queried per candidate during processing (Decision 3, points 1 and 4).
+// Phase 4's evidence-analysis/assessment-writing code reads this table
+// instead of asking "what's the current version" again.
+model CandidateBatchRequirementVersion {
+  id                   String                 @id @default(uuid())
+  batchId              String
+  batch                CandidateUploadBatch   @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  requirementId        String
+  requirement          JobRequirement         @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+  requirementVersionId String
+  requirementVersion   JobRequirementVersion  @relation(fields: [requirementVersionId], references: [id], onDelete: Restrict)
+  createdAt            DateTime               @default(now())
+
+  @@unique([batchId, requirementId])
 }
 
 // History of every weight change, proposed or HR-modified — separate from
@@ -312,9 +353,10 @@ model Candidate {
   skills         CandidateSkill[]
   certifications CandidateCertification[]
   languages      CandidateLanguage[]
-  evidence       Evidence[]
-  assessments    Assessment[]
-  hrDecisions    HrDecision[]
+  evidence             Evidence[]
+  assessments          Assessment[]
+  hrDecisions          HrDecision[]
+  consistencyFindings  CandidateConsistencyFinding[]
 }
 
 // Per-project blind-screening label ("Candidate #007"); a candidate can be
@@ -356,8 +398,56 @@ model CandidateDocument {
   extractedText      String?
   extractedPageTexts Json?
   parsedAt           DateTime?
+  batchId            String?
+  // Atomic claim counter for ProcessingRun.attemptNumber (Phase 4A retry
+  // design) — claimed via `UPDATE ... SET processingAttemptCounter =
+  // processingAttemptCounter + 1 RETURNING ...`, never via a separate
+  // SELECT MAX(attemptNumber)+1, so two concurrent processing attempts for
+  // the same document can never claim the same attempt number (Postgres
+  // serializes concurrent UPDATEs to the same row).
+  processingAttemptCounter Int     @default(0)
+  // The authoritative successful run for this document. Written ONLY when
+  // a ProcessingRun reaches COMPLETED, in the same transaction as that
+  // run's own completedAt write — never touched on FAILED or a stale
+  // RUNNING run, so a failed/crashed run can never become current, and a
+  // document with no successful run yet stays null (architecture doc,
+  // Phase 4A retry design, Decision: no isCurrent on Assessment).
+  currentProcessingRunId   String?
+  currentProcessingRun     ProcessingRun? @relation("CurrentProcessingRun", fields: [currentProcessingRunId], references: [id], onDelete: SetNull)
 
-  evidence Evidence[]
+  evidence            Evidence[]
+  consistencyFindings CandidateConsistencyFinding[]
+  batch               CandidateUploadBatch?         @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  processingRuns      ProcessingRun[]               @relation("DocumentProcessingRuns")
+}
+
+enum ProcessingRunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+// One row per execution of the whole CandidateDocument processing pipeline
+// (parse -> Resume Intelligence -> Requirement Evidence Analysis) — Phase
+// 4A retry design. Never deleted, never updated once terminal (COMPLETED
+// or FAILED); a retry creates a NEW row rather than touching this one, so
+// every historical attempt stays fully intact and queryable. Assessment
+// rows reference the run that produced them
+// (Assessment.processingRunId) — never deleted or mutated by a later run.
+model ProcessingRun {
+  id                  String              @id @default(uuid())
+  candidateDocumentId String
+  candidateDocument   CandidateDocument   @relation("DocumentProcessingRuns", fields: [candidateDocumentId], references: [id], onDelete: Restrict)
+  attemptNumber       Int
+  status              ProcessingRunStatus @default(RUNNING)
+  startedAt           DateTime            @default(now())
+  completedAt         DateTime?
+  createdAt           DateTime            @default(now())
+
+  assessments         Assessment[]
+  currentForDocuments CandidateDocument[] @relation("CurrentProcessingRun")
+
+  @@unique([candidateDocumentId, attemptNumber])
 }
 
 model CandidateExperience {
@@ -415,11 +505,15 @@ model CandidateLanguage {
 // The traceability spine: Requirement -> Evidence -> Assessment. Evidence
 // rows are never deleted by a candidate-profile removal (onDelete: Restrict
 // below) — a candidate with any Evidence must be anonymized in place, never
-// hard-deleted (see Candidate.piiPurgedAt).
+// hard-deleted (see Candidate.piiPurgedAt). Same protection applies to the
+// requirement side (Phase 4 foundation, Decision 4): no route deletes a
+// JobRequirement today (the "delete" endpoint only archives it), but once
+// Phase 4 starts writing real Evidence/Assessment history, a requirement
+// must never be hard-deletable out from under it either.
 model Evidence {
   id               String              @id @default(uuid())
   requirementId    String
-  requirement      JobRequirement      @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  requirement      JobRequirement      @relation(fields: [requirementId], references: [id], onDelete: Restrict)
   candidateId      String
   candidate        Candidate           @relation(fields: [candidateId], references: [id], onDelete: Restrict)
   projectId        String
@@ -446,20 +540,33 @@ model Evidence {
 // written — HR reactions are separate HrDecision/HrOverride rows. Never
 // deleted by a candidate-profile removal (onDelete: Restrict) for the same
 // reason as Evidence.
+// Immutable once written (Phase 1 design, reaffirmed in the Phase 4A retry
+// review): never updated, never deleted by a retry. A retry creates a new
+// ProcessingRun with its own new Assessment rows instead — the old ones
+// stay exactly as they were written, forever. processingRunId + the
+// [processingRunId, requirementId] unique constraint below is what makes a
+// single run's Assessment set well-defined and duplicate-proof; which run
+// is "current" for a document lives on CandidateDocument.currentProcessingRunId,
+// never as a field on Assessment itself.
 model Assessment {
   id                     String            @id @default(uuid())
   candidateId            String
   candidate              Candidate         @relation(fields: [candidateId], references: [id], onDelete: Restrict)
   projectId              String
   requirementId          String
-  requirement            JobRequirement    @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  requirement            JobRequirement    @relation(fields: [requirementId], references: [id], onDelete: Restrict)
   // Pins the assessment to the exact approved requirement version it was
   // scored against (Phase 2, Section 10) — nullable because Phase 1 predates
   // versioning; Phase 4's assessment-writing code should always set this.
   requirementVersionId   String?
   requirementVersion     JobRequirementVersion? @relation(fields: [requirementVersionId], references: [id])
+  processingRunId        String
+  processingRun          ProcessingRun     @relation(fields: [processingRunId], references: [id], onDelete: Restrict)
   aiAssessmentSummary    String
   status                 AssessmentStatus
+  // Deliberately left null in Phase 4A — no approved deterministic scoring
+  // formula exists yet (the formula previously drafted here was explicitly
+  // rejected). Populate only once a formula is approved; do not infer one.
   computedScoreContribution Decimal?       @db.Decimal(6, 4)
   aiInteractionId        String?
   createdAt              DateTime          @default(now())
@@ -468,6 +575,7 @@ model Assessment {
   evidenceLinks AssessmentEvidence[]
 
   @@index([candidateId, projectId])
+  @@unique([processingRunId, requirementId])
 }
 
 // Explicit traceability between an Assessment and the Evidence rows behind
@@ -497,6 +605,72 @@ model AssessmentEvidence {
 enum AssessmentEvidenceRole {
   SUPPORTING
   CONSIDERED_REJECTED
+}
+
+// Categories for Career/Consistency Analysis findings (architecture doc
+// master instruction Section 16: employment gaps, overlapping dates,
+// unclear chronology, responsibilities inconsistent with stated seniority,
+// and general "something here needs a human look" cases not covered by a
+// more specific category).
+enum ConsistencyFindingType {
+  EMPLOYMENT_GAP
+  OVERLAPPING_DATES
+  UNCLEAR_CHRONOLOGY
+  RESPONSIBILITY_SENIORITY_MISMATCH
+  POTENTIAL_INCONSISTENCY
+  OTHER
+}
+
+// Neutral-language severity only (master instruction Section 16: "Avoid
+// unsupported conclusions about candidate integrity, honesty, reliability
+// or character") — never a judgment stronger than "needs a look."
+enum ConsistencyFindingSeverity {
+  INFORMATION_UNCLEAR
+  VERIFICATION_REQUIRED
+  POTENTIAL_INCONSISTENCY
+}
+
+// Career-Consistency Analysis findings (Phase 4 foundation, Decision 2) —
+// deliberately a separate model from Evidence/AssessmentEvidence: a career
+// gap or chronology issue is a fact about the candidate's own timeline, not
+// evidence for or against a specific job requirement, and conflating the
+// two would misuse the Requirement Evidence traceability chain for
+// something it wasn't built to represent. Every finding still carries its
+// own traceability back to a source document/page/quote whenever it is
+// based on documentary evidence (sourceDocumentId/sourcePage/evidenceText
+// nullable together only for a finding inferred purely from date math
+// across CandidateExperience rows, e.g. a gap between two employers' dates,
+// which has no single quote to cite).
+//
+// candidateId (Restrict, matching Evidence/Assessment — a candidate with
+// findings can't be hard-deleted) + projectId (plain scalar, matching how
+// Evidence.projectId is *not* backed by an explicit RecruitmentProject
+// relation either) is used instead of the field list's suggested
+// `assessmentId`: Assessment is strictly per-requirement in this schema
+// (Assessment.requirementId is required, non-nullable), and a consistency
+// finding about a candidate's overall career timeline isn't "for" any one
+// requirement, so pinning it to one arbitrary Assessment row would be
+// semantically wrong. projectId is the scoping field Evidence already
+// establishes as this schema's convention for "which project was this
+// produced for."
+model CandidateConsistencyFinding {
+  id               String                      @id @default(uuid())
+  candidateId      String
+  candidate        Candidate                   @relation(fields: [candidateId], references: [id], onDelete: Restrict)
+  projectId        String
+  findingType      ConsistencyFindingType
+  severity         ConsistencyFindingSeverity
+  description      String
+  sourceDocumentId String?
+  sourceDocument   CandidateDocument?          @relation(fields: [sourceDocumentId], references: [id], onDelete: SetNull)
+  sourcePage       Int?
+  evidenceText     String?
+  confidence       EvidenceConfidence
+  aiInteractionId  String?
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+
+  @@index([candidateId, projectId])
 }
 
 model CandidateComparison {

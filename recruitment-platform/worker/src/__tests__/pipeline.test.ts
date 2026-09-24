@@ -98,6 +98,13 @@ describe("runDocumentProcessingPipeline", () => {
     expect(updated.extractedText).toContain("Jane Doe");
     expect(updated.parsedAt).not.toBeNull();
 
+    // Phase 4A: a successful pipeline run creates exactly one COMPLETED
+    // ProcessingRun and promotes it to currentProcessingRunId.
+    expect(updated.currentProcessingRunId).not.toBeNull();
+    const run = await prisma.processingRun.findUniqueOrThrow({ where: { id: updated.currentProcessingRunId! } });
+    expect(run.status).toBe("COMPLETED");
+    expect(run.attemptNumber).toBe(1);
+
     const experiences = await prisma.candidateExperience.findMany({ where: { candidateId: candidate.id } });
     expect(experiences).toHaveLength(1);
     expect(experiences[0].employer).toBe("Acme Corp");
@@ -200,5 +207,74 @@ describe("runDocumentProcessingPipeline", () => {
     const updated = await prisma.candidateDocument.findUniqueOrThrow({ where: { id: document.id } });
     const storedBytes = await storage.getObject(updated.storageKey);
     expect(storedBytes.equals(pdf)).toBe(true); // byte-for-byte identical to what was uploaded
+  });
+
+  it("does not mark the document COMPLETED if Resume Intelligence succeeds but Requirement Evidence Analysis fails (Decision 5)", async () => {
+    await seedAiModelConfig("RESUME_INTELLIGENCE");
+    await seedAiModelConfig("REQUIREMENT_EVIDENCE_ANALYSIS");
+    const pdf = await buildTestPdf("Jane Doe. HR Manager at Acme Corp since 2018. Led grievance handling.");
+    const { project, candidate, document } = await seedCandidateWithDocument(pdf, "pdf");
+
+    // Pin a requirement to this document's batch so evidence analysis
+    // actually runs (rather than returning early for lack of a batch).
+    const user = await prisma.user.findFirstOrThrow();
+    const requirement = await prisma.jobRequirement.create({
+      data: {
+        projectId: project.id,
+        category: "FUNCTIONAL_EXPERIENCE",
+        description: "Employee Relations",
+        mandatory: true,
+        status: "APPROVED",
+        currentVersionNumber: 1,
+      },
+    });
+    const version = await prisma.jobRequirementVersion.create({
+      data: {
+        requirementId: requirement.id,
+        versionNumber: 1,
+        category: requirement.category,
+        description: requirement.description,
+        mandatory: true,
+        priority: "MEDIUM",
+        evidenceCriteriaSnapshot: [],
+        hrApprovedWeight: 100,
+        approvedBy: user.id,
+      },
+    });
+    const batch = await prisma.candidateUploadBatch.create({ data: { projectId: project.id, createdBy: user.id } });
+    await prisma.candidateBatchRequirementVersion.create({
+      data: { batchId: batch.id, requirementId: requirement.id, requirementVersionId: version.id },
+    });
+    await prisma.candidateDocument.update({ where: { id: document.id }, data: { batchId: batch.id } });
+
+    const gateway = new AiGateway({
+      fake: new FakeAIProvider({
+        RESUME_INTELLIGENCE: RESUME_INTELLIGENCE_HAPPY_PATH,
+        // Violates evidenceCandidates.min(1) -> fails schema validation even after the gateway's retry.
+        REQUIREMENT_EVIDENCE_ANALYSIS: { items: [{ requirementId: requirement.id, evidenceCandidates: [] }] },
+      }),
+    });
+
+    await expect(
+      runDocumentProcessingPipeline(
+        { candidateDocumentId: document.id, candidateId: candidate.id, projectId: project.id },
+        { storage, gateway },
+      ),
+    ).rejects.toBeInstanceOf(AiValidationError);
+
+    // Resume Intelligence's own writes (extracted text, profile rows) did
+    // persist — but the document must NOT read as COMPLETED, since the
+    // pipeline as a whole did not finish.
+    const updated = await prisma.candidateDocument.findUniqueOrThrow({ where: { id: document.id } });
+    expect(updated.status).not.toBe("COMPLETED");
+    expect(updated.extractedText).toContain("Jane Doe");
+    expect(updated.currentProcessingRunId).toBeNull(); // a failed run never becomes current
+    const experiences = await prisma.candidateExperience.findMany({ where: { candidateId: candidate.id } });
+    expect(experiences).toHaveLength(1); // Resume Intelligence's persistence still happened
+
+    // The ProcessingRun this attempt created is FAILED, not left RUNNING.
+    const runs = await prisma.processingRun.findMany({ where: { candidateDocumentId: document.id } });
+    expect(runs).toHaveLength(1);
+    expect(runs[0].status).toBe("FAILED");
   });
 });

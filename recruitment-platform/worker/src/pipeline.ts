@@ -4,6 +4,8 @@ import { AiGateway, AiValidationError } from "@recruitment-platform/ai-gateway";
 import { needsOcr } from "@recruitment-platform/shared-types";
 import type { ProcessCandidateDocumentJobData } from "@recruitment-platform/queue";
 import { parseDocument } from "./parsing.js";
+import { runRequirementEvidenceAnalysis } from "./requirement-evidence-analysis.js";
+import { startProcessingRun, failProcessingRun, completeProcessingRun } from "./processing-run.js";
 
 /**
  * Document/CV processing pipeline (architecture doc, Section: Document
@@ -22,6 +24,14 @@ export async function runDocumentProcessingPipeline(
     where: { id: data.candidateDocumentId },
   });
 
+  // Phase 4A retry design: one ProcessingRun per execution of this whole
+  // pipeline. startProcessingRun refuses (throws) if a run is already
+  // RUNNING for this document rather than invalidating it — see
+  // processing-run.ts docs for the concurrency invariant. A thrown
+  // ProcessingRunAlreadyActiveError propagates like any other pipeline
+  // error: worker/src/index.ts's catch marks the document FAILED_RETRY.
+  const run = await startProcessingRun(document.id);
+
   const originalBytes = await deps.storage.getObject(document.storageKey);
   const fileType = document.fileType === "pdf" ? "pdf" : "docx";
   const parsed = await parseDocument(originalBytes, fileType);
@@ -37,6 +47,7 @@ export async function runDocumentProcessingPipeline(
         parsedAt: new Date(),
       },
     });
+    await failProcessingRun(run.id);
     await recordAudit({
       actorId: null,
       action: "CANDIDATE_DOCUMENT_NEEDS_OCR",
@@ -61,6 +72,7 @@ export async function runDocumentProcessingPipeline(
       inputRef: `candidateDocument:${document.id}`,
     });
   } catch (err) {
+    await failProcessingRun(run.id);
     if (err instanceof AiValidationError) {
       await recordAudit({
         actorId: null,
@@ -129,10 +141,15 @@ export async function runDocumentProcessingPipeline(
       });
     }
 
+    // NOT the terminal COMPLETED write (Decision 5, Phase 4A review) — this
+    // pipeline now has two AI steps (Resume Intelligence, then Requirement
+    // Evidence Analysis below); COMPLETED must mean "every step succeeded,"
+    // not just "extraction succeeded." Status stays PROCESSING here; the
+    // extracted-text/page fields are persisted now since they're already
+    // final regardless of what evidence analysis does next.
     await tx.candidateDocument.update({
       where: { id: document.id },
       data: {
-        status: "COMPLETED",
         failureReason: null,
         extractedText: parsed.text,
         extractedPageTexts: parsed.pageTexts ?? undefined,
@@ -154,4 +171,28 @@ export async function runDocumentProcessingPipeline(
       languages: extraction.languages.length,
     },
   });
+
+  // Requirement Evidence Analysis (Phase 4A) runs in the same job,
+  // immediately after Resume Intelligence — one call per candidate, not a
+  // separate queue/job type (architecture doc's existing per-document job
+  // model). A failure here throws, same as a Resume Intelligence failure —
+  // the whole document goes FAILED_RETRY, and reprocessing re-extracts and
+  // re-analyzes rather than trying to resume partway through. Every
+  // Assessment it creates links to this run (run.id).
+  try {
+    await runRequirementEvidenceAnalysis(document, data, parsed.text, deps.gateway, run.id);
+  } catch (err) {
+    await failProcessingRun(run.id);
+    throw err; // retryable — caller marks FAILED_RETRY
+  }
+
+  // The one and only COMPLETED write (Decision 5) — reached only once both
+  // Resume Intelligence and Requirement Evidence Analysis have succeeded.
+  // completeProcessingRun atomically marks this run COMPLETED and promotes
+  // it to CandidateDocument.currentProcessingRunId in one transaction. If
+  // either step above throws, this line never runs, and worker/src/index.ts's
+  // catch sets FAILED_RETRY instead — the document is never left reading as
+  // COMPLETED when part of the pipeline didn't finish, and
+  // currentProcessingRunId never points at a run that didn't fully succeed.
+  await completeProcessingRun(run.id, document.id);
 }
