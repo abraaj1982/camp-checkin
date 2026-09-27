@@ -10,6 +10,12 @@ import {
 } from "@recruitment-platform/queue";
 import { runDocumentProcessingPipeline } from "./pipeline.js";
 import { runIdentityResolutionPipeline } from "./identity-resolution.js";
+import { runScheduledPurgeScan } from "./candidate-purge.js";
+
+// Phase 8 — PII Retention/Purge. Not an application-triggered job like the
+// two above — pg-boss.schedule() runs it on a cron, the first time-based
+// (rather than event-triggered) job in this system.
+const SCHEDULED_PURGE_SCAN_JOB = "scheduled-purge-scan";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("Missing required environment variable: DATABASE_URL");
@@ -61,6 +67,7 @@ async function runWorker(storage: ObjectStorage, gateway: AiGateway) {
   await boss.start();
   await boss.createQueue(PROCESS_CANDIDATE_DOCUMENT_JOB);
   await boss.createQueue(RESOLVE_CANDIDATE_IDENTITY_JOB);
+  await boss.createQueue(SCHEDULED_PURGE_SCAN_JOB);
 
   const queue = new PgBossCandidateDocumentQueue(databaseUrl!);
 
@@ -104,6 +111,16 @@ async function runWorker(storage: ObjectStorage, gateway: AiGateway) {
       await runIdentityResolutionPipeline(job.data, { storage, queue });
     },
   );
+
+  // Phase 8 — PII Retention/Purge. Daily at 02:00 Asia/Muscat. Manual
+  // purge (apps/api/src/modules/candidate-purge/routes.ts) and this
+  // scheduled scan both call the exact same runScheduledPurgeScan/
+  // executeCandidatePurge implementation in candidate-purge.ts — never two
+  // purge implementations.
+  await boss.schedule(SCHEDULED_PURGE_SCAN_JOB, "0 2 * * *", {}, { tz: "Asia/Muscat" });
+  await boss.work(SCHEDULED_PURGE_SCAN_JOB, { batchSize: 1 }, async () => {
+    await runScheduledPurgeScan({ storage });
+  });
 
   // eslint-disable-next-line no-console
   console.log("Worker listening for candidate document jobs");

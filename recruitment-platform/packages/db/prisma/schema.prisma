@@ -169,6 +169,15 @@ model RecruitmentProject {
   creator        User          @relation("ProjectCreator", fields: [createdBy], references: [id])
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+  // Phase 8 — PII Retention/Purge. Days after this project first enters a
+  // terminal status (COMPLETED/ARCHIVED) before its candidate relationships
+  // become retention-eligible. NULL uses the system default
+  // (DEFAULT_RETENTION_DAYS, worker/src/candidate-purge.ts) — never treated
+  // as "0 days"/immediately eligible. The terminal-entry timestamp itself
+  // is NOT read from `updatedAt` (which changes on unrelated edits) — it is
+  // derived from the existing, immutable AuditLog "PROJECT_STATUS_CHANGED"
+  // trail (apps/api/src/modules/projects/routes.ts), never a new field.
+  retentionDays  Int?
 
   members        ProjectMember[]
   requirements   JobRequirement[]

@@ -14,6 +14,7 @@
     "@fastify/multipart": "^8.3.0",
     "@fastify/session": "^10.9.0",
     "@recruitment-platform/ai-gateway": "*",
+    "@recruitment-platform/candidate-retention": "*",
     "@recruitment-platform/db": "*",
     "@recruitment-platform/document-parsing": "*",
     "@recruitment-platform/queue": "*",

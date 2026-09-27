@@ -14,6 +14,7 @@ import { registerCandidateRoutes } from "./modules/candidates/routes.js";
 import { registerAssessmentRoutes } from "./modules/assessments/routes.js";
 import { registerStagedUploadRoutes } from "./modules/staged-uploads/routes.js";
 import { registerCandidateMatchReviewRoutes } from "./modules/candidate-match-reviews/routes.js";
+import { registerCandidatePurgeRoutes } from "./modules/candidate-purge/routes.js";
 
 export interface BuildAppOptions {
   sessionSecret: string;
@@ -59,6 +60,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   await registerAssessmentRoutes(app);
   await registerStagedUploadRoutes(app, options.queue);
   await registerCandidateMatchReviewRoutes(app, options.storage, options.queue);
+  await registerCandidatePurgeRoutes(app, options.storage);
 
   return app;
 }

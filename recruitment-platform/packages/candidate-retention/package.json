@@ -1,0 +1,19 @@
+{
+  "name": "@recruitment-platform/candidate-retention",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@recruitment-platform/db": "*",
+    "@recruitment-platform/storage": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.2"
+  }
+}
