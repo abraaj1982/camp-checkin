@@ -1,6 +1,7 @@
 import { prisma, recordAudit, type CandidateDocument } from "@recruitment-platform/db";
 import { AiGateway, AiValidationError } from "@recruitment-platform/ai-gateway";
 import type { ProcessCandidateDocumentJobData } from "@recruitment-platform/queue";
+import { assertProcessingRunStillRunning } from "./processing-run.js";
 
 /**
  * Career/Consistency Analysis (master instruction Section 16) — runs
@@ -95,6 +96,10 @@ export async function runCareerConsistencyAnalysis(
   // not persisted anywhere (explicit decision, deferred). It has already
   // been validated as part of the AI response schema.
   await prisma.$transaction(async (tx) => {
+    // Phase 10 — ownership guard, first statement: throws and rolls back
+    // everything below if this run is no longer RUNNING.
+    await assertProcessingRunStillRunning(tx, processingRunId);
+
     // Atomicity: either every finding from this call is persisted, or none
     // are — a failed/partial write must never leave a misleading subset of
     // findings on the candidate. No finding is ever deleted or updated by a

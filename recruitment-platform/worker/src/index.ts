@@ -1,4 +1,4 @@
-import { prisma } from "@recruitment-platform/db";
+import { prisma, recordAudit } from "@recruitment-platform/db";
 import { AiGateway, ClaudeProvider, type AIProvider } from "@recruitment-platform/ai-gateway";
 import { S3ObjectStorage, LocalObjectStorage, type ObjectStorage } from "@recruitment-platform/storage";
 import {
@@ -11,6 +11,7 @@ import {
 import { runDocumentProcessingPipeline } from "./pipeline.js";
 import { runIdentityResolutionPipeline } from "./identity-resolution.js";
 import { runScheduledPurgeScan } from "./candidate-purge.js";
+import { ProcessingRunNoLongerActiveError } from "./processing-run.js";
 
 // Phase 8 — PII Retention/Purge. Not an application-triggered job like the
 // two above — pg-boss.schedule() runs it on a cron, the first time-based
@@ -87,6 +88,23 @@ async function runWorker(storage: ObjectStorage, gateway: AiGateway) {
         // pipeline itself; this only handles the retryable-failure case.
         await runDocumentProcessingPipeline(job.data, { storage, gateway });
       } catch (err) {
+        // Phase 10 — a stale/reclaimed run must become harmless: it must
+        // NOT flip the document to FAILED_RETRY (that would be exactly the
+        // "late-arriving worker changes current state" outcome the whole
+        // ownership mechanism exists to prevent — whatever superseded this
+        // run is already responsible for the document's status). Recorded
+        // for operational visibility only, then treated as a clean no-op —
+        // never retried, never re-queued from here.
+        if (err instanceof ProcessingRunNoLongerActiveError) {
+          await recordAudit({
+            actorId: null,
+            action: "PROCESSING_RUN_STALE_WRITE_ABORTED",
+            entityType: "ProcessingRun",
+            entityId: err.processingRunId,
+            after: { candidateDocumentId },
+          });
+          return;
+        }
         // One candidate's failure never blocks or fails the batch (Section
         // 41) — recorded on its own document row; the worker keeps consuming.
         await prisma.candidateDocument.update({

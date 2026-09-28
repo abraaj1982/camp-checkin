@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "@recruitment-platform/db";
-import { AiGateway, AiValidationError } from "@recruitment-platform/ai-gateway";
+import { AiGateway, AiValidationError, type AIProvider, type AiRunRequest, type AiRunResult } from "@recruitment-platform/ai-gateway";
 import { LocalObjectStorage, buildCandidateDocumentKey } from "@recruitment-platform/storage";
 import { runDocumentProcessingPipeline } from "../pipeline.js";
 import { buildTestDocx, buildTestPdf } from "./fixtures.js";
@@ -386,5 +386,56 @@ describe("runDocumentProcessingPipeline", () => {
     expect(findings[0].sourceDocumentId).toBe(document.id);
     expect(findings[0].sourcePage).toBeNull();
     expect(findings[0].evidenceText).toBeNull();
+  });
+
+  it("Phase 10 — a run reclaimed mid-flight (between its AI call and its write transaction) writes nothing and never becomes current", async () => {
+    await seedAiModelConfig("RESUME_INTELLIGENCE");
+    await seedAiModelConfig("CAREER_CONSISTENCY_ANALYSIS");
+    const pdf = await buildTestPdf(
+      "Jane Doe. HR Manager at Acme Corp since 2018. Led grievance handling. BA, State University.",
+    );
+    const { candidate, document } = await seedCandidateWithDocument(pdf, "pdf");
+
+    // Simulates a reclaim job ending this document's ProcessingRun WHILE
+    // the Resume Intelligence call is still "in flight" — the exact race
+    // traced in Phase 10A: the run is legitimately RUNNING when the AI
+    // call starts, but no longer owns the document by the time the
+    // pipeline reaches its write transaction. A bespoke AIProvider (not
+    // FakeAIProvider, whose function-response values aren't awaited)
+    // performs and AWAITS the reclaim update before returning, so the
+    // reclaim is guaranteed to have committed before the pipeline's
+    // write transaction runs.
+    class ReclaimDuringCallProvider implements AIProvider {
+      readonly name = "fake";
+      async run(request: AiRunRequest): Promise<AiRunResult> {
+        if (request.taskType === "RESUME_INTELLIGENCE") {
+          await prisma.processingRun.updateMany({
+            where: { candidateDocumentId: document.id, status: "RUNNING" },
+            data: { status: "FAILED", completedAt: new Date() },
+          });
+          return { rawText: JSON.stringify(RESUME_INTELLIGENCE_HAPPY_PATH) };
+        }
+        return { rawText: JSON.stringify(CAREER_CONSISTENCY_HAPPY_PATH) };
+      }
+    }
+    const gateway = new AiGateway({ fake: new ReclaimDuringCallProvider() });
+
+    await expect(
+      runDocumentProcessingPipeline(
+        { candidateDocumentId: document.id, candidateId: candidate.id, projectId: "unused" },
+        { storage, gateway },
+      ),
+    ).rejects.toThrow("no longer RUNNING");
+
+    // Nothing from the reclaimed run's write transaction persisted.
+    const experiences = await prisma.candidateExperience.findMany({ where: { candidateId: candidate.id } });
+    expect(experiences).toHaveLength(0);
+    const updatedDoc = await prisma.candidateDocument.findUniqueOrThrow({ where: { id: document.id } });
+    expect(updatedDoc.currentProcessingRunId).toBeNull();
+    // Status is whatever it was before this call (this test calls the
+    // pipeline directly, bypassing worker/src/index.ts's own PROCESSING
+    // write) — the point being verified is what it is NOT: never flipped
+    // to FAILED_RETRY or COMPLETED by the reclaimed run itself.
+    expect(updatedDoc.status).toBe("QUEUED");
   });
 });

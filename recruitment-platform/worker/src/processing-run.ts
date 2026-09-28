@@ -14,21 +14,39 @@ import { prisma, type ProcessingRun } from "@recruitment-platform/db";
  * ProcessingRunAlreadyActiveError) if a RUNNING run already exists for the
  * document, rather than marking it FAILED. See that function's docs for
  * the exact three ways a RUNNING run is allowed to become FAILED.
+ *
+ * Phase 10 — Ownership enforcement (10A.1/10A.2, approved). The
+ * authoritative ownership condition: a run may perform an authoritative
+ * write only while, evaluated atomically at write time,
+ * `ProcessingRun.id = <this run> AND ProcessingRun.status = 'RUNNING'`
+ * still holds. Once a run is reclaimed, fails, or completes, that
+ * condition can never become true again for it (terminal states are never
+ * re-opened), so any later write attempted "as" that run is structurally
+ * unable to succeed. This is enforced via guarded, count-checked
+ * updates — never a standalone pre-check followed by a separate write,
+ * which would leave a TOCTOU window between the check and the write.
  */
 
-/**
- * Thrown by startProcessingRun() when a ProcessingRun for this document is
- * already RUNNING. The caller (worker/src/pipeline.ts, via
- * worker/src/index.ts's job handler) treats this like any other thrown
- * pipeline error: the document is marked FAILED_RETRY and the job ends.
- * Nothing about the existing RUNNING run is touched — it is left exactly
- * as it was, for whichever of the three paths in this module's docs
- * eventually resolves it.
- */
 export class ProcessingRunAlreadyActiveError extends Error {
   constructor(public readonly candidateDocumentId: string) {
     super(`A ProcessingRun is already RUNNING for CandidateDocument ${candidateDocumentId}`);
     this.name = "ProcessingRunAlreadyActiveError";
+  }
+}
+
+/**
+ * Thrown whenever a write attempted "as" a given ProcessingRun discovers,
+ * atomically, that the run is no longer RUNNING — reclaimed, superseded,
+ * or otherwise no longer the owner of its CandidateDocument. Callers must
+ * treat this as a clean no-op (Phase 10A.2, approved): never call
+ * failProcessingRun again for it, never touch CandidateDocument.status,
+ * never retry — the run that superseded this one (or the reclaim that
+ * ended it) is already responsible for the document's current state.
+ */
+export class ProcessingRunNoLongerActiveError extends Error {
+  constructor(public readonly processingRunId: string) {
+    super(`ProcessingRun ${processingRunId} is no longer RUNNING — write aborted`);
+    this.name = "ProcessingRunNoLongerActiveError";
   }
 }
 
@@ -47,23 +65,14 @@ export class ProcessingRunAlreadyActiveError extends Error {
  *      run id (worker/src/pipeline.ts's catch blocks) — the run reporting
  *      its own outcome, never a different run reporting it for it.
  *   2. An explicit retry/recovery operation that a human or operator
- *      triggers deliberately (not implemented by this module — the
- *      existing HR "retry a FAILED_RETRY document" route only starts a new
- *      run once the CandidateDocument itself is already off PROCESSING;
- *      it does not touch a RUNNING ProcessingRun row at all).
- *   3. A future, explicit stale-run cleanup mechanism (not built yet,
- *      deliberately) — e.g. an operator action or a heartbeat/timeout
- *      system, if one is designed and approved later. Until then, a
- *      ProcessingRun that gets stuck at RUNNING (worker crash, OOM, kill
- *      -9) stays RUNNING, and every subsequent attempt to process this
- *      same document refuses via this error, rather than guessing.
- *
- * This intentionally trades liveness for correctness: without a
- * heartbeat/timeout (explicitly deferred, per instruction) there is no
- * reliable way to tell "crashed 3 days ago" apart from "genuinely still
- * executing right now," so this function does not try — it never silently
- * decides a RUNNING run is stale. currentProcessingRunId is unaffected
- * either way: it is changed only by completeProcessingRun(), never here.
+ *      triggers deliberately — the existing HR "retry a FAILED_RETRY
+ *      document" route only starts a new run once the CandidateDocument
+ *      itself is already off PROCESSING; it does not touch a RUNNING
+ *      ProcessingRun row at all.
+ *   3. The Phase 10 stale-run reclaim mechanism — a scheduled scan that
+ *      transitions a RUNNING run whose startedAt exceeds a configured
+ *      threshold to FAILED, using the same guarded transition as every
+ *      other path (never a different write shape).
  *
  * Race-safety of the refusal itself: the RUNNING check and the
  * attempt-number claim both run inside one interactive transaction, and
@@ -99,37 +108,95 @@ export async function startProcessingRun(candidateDocumentId: string): Promise<P
 }
 
 /**
- * Marks a run FAILED. Deliberately does NOT touch
- * CandidateDocument.currentProcessingRunId — a failed run must never
- * become (or replace) the current run; the pointer is left exactly as it
- * was, whether that's a previous successful run or null.
+ * Atomically transitions a run to FAILED, but ONLY if it is still
+ * RUNNING — `updateMany` with `status: "RUNNING"` in the WHERE clause is
+ * the whole guard, in one statement, no separate pre-check. Returns
+ * whether THIS call performed the transition: `true` means the run was
+ * genuinely RUNNING and is now FAILED (the normal case — the run
+ * reporting its own outcome, or a reclaim ending a stale one); `false`
+ * means it was already terminal (already reclaimed, already failed by
+ * someone else, or — for completeProcessingRun's own guard — already
+ * completed) and this call changed nothing. Never touches
+ * CandidateDocument — callers that also need to update the document must
+ * do so themselves, informed by this return value.
  */
-export async function failProcessingRun(processingRunId: string): Promise<void> {
-  await prisma.processingRun.update({
-    where: { id: processingRunId },
+export async function failProcessingRun(processingRunId: string): Promise<boolean> {
+  const { count } = await prisma.processingRun.updateMany({
+    where: { id: processingRunId, status: "RUNNING" },
     data: { status: "FAILED", completedAt: new Date() },
   });
+  return count === 1;
 }
 
 /**
  * Marks a run COMPLETED and promotes it to the document's current run, in
  * one transaction — the exact atomicity the design requires: a reader can
  * never observe a run marked COMPLETED whose document doesn't yet (or
- * simultaneously) point at it as current, and vice versa. If this
- * transaction fails for any reason, neither write applies — the previous
- * currentProcessingRunId (or null) stands, and the run stays RUNNING,
- * which a later retry's startProcessingRun will clean up.
+ * simultaneously) point at it as current, and vice versa.
+ *
+ * Phase 10 ownership guard: the FIRST statement in the transaction is a
+ * guarded `updateMany(... WHERE status = 'RUNNING')` on the run itself —
+ * same-table, no cross-table EXISTS needed. If it affects zero rows (the
+ * run was already reclaimed/failed/completed by something else), this
+ * function throws ProcessingRunNoLongerActiveError and the transaction
+ * rolls back — the CandidateDocument update is never reached, so a
+ * reclaimed run can never promote itself to "current" after the fact.
+ * If it succeeds, Postgres holds that row's lock for the remainder of
+ * this (short, post-AI-call) transaction, so nothing else can contend for
+ * ownership of this run between the guard and the CandidateDocument
+ * write — no separate FOR UPDATE lock is needed to achieve this; it falls
+ * out of the guarded UPDATE itself.
  */
 export async function completeProcessingRun(processingRunId: string, candidateDocumentId: string): Promise<void> {
   const completedAt = new Date();
-  await prisma.$transaction([
-    prisma.processingRun.update({
-      where: { id: processingRunId },
+  await prisma.$transaction(async (tx) => {
+    const { count } = await tx.processingRun.updateMany({
+      where: { id: processingRunId, status: "RUNNING" },
       data: { status: "COMPLETED", completedAt },
-    }),
-    prisma.candidateDocument.update({
+    });
+    if (count === 0) {
+      throw new ProcessingRunNoLongerActiveError(processingRunId);
+    }
+    await tx.candidateDocument.update({
       where: { id: candidateDocumentId },
       data: { currentProcessingRunId: processingRunId, status: "COMPLETED" },
-    }),
-  ]);
+    });
+  });
+}
+
+/**
+ * The ownership guard used inside every multi-statement, post-AI-call
+ * transaction that writes Evidence/Assessment/CandidateConsistencyFinding
+ * or candidate-profile rows (Phase 10A.1 write map). Must be the FIRST
+ * statement of the caller's `prisma.$transaction(async (tx) => ...)`
+ * callback, passed that same `tx`. Performs a same-table, no-op-value
+ * guarded update (`status: "RUNNING" -> "RUNNING"`) purely to atomically
+ * re-affirm ownership and take Postgres's row lock on this run for the
+ * rest of the transaction — every write that follows is therefore
+ * protected without a transaction-long `SELECT ... FOR UPDATE` and
+ * without a separate pre-check that could go stale before the real write
+ * happens. Throws ProcessingRunNoLongerActiveError (which rolls back
+ * everything already done in this transaction, including this call
+ * itself) if the run is no longer RUNNING.
+ *
+ * Safe to hold this lock for the remainder of these specific
+ * transactions because none of them span an AI Gateway call — every
+ * `gateway.runTask()` in this codebase is awaited BEFORE its caller's
+ * `$transaction` block opens, so the transactions this guard protects are
+ * always short (parse-result/profile/evidence writes only), never the
+ * multi-hour worst case an AI call could take. A transaction-long lock
+ * would be unsafe for exactly that reason if it were ever wrapped around
+ * an AI call — it must never be.
+ */
+export async function assertProcessingRunStillRunning(
+  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+  processingRunId: string,
+): Promise<void> {
+  const { count } = await tx.processingRun.updateMany({
+    where: { id: processingRunId, status: "RUNNING" },
+    data: { status: "RUNNING" },
+  });
+  if (count === 0) {
+    throw new ProcessingRunNoLongerActiveError(processingRunId);
+  }
 }

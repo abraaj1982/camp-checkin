@@ -2,6 +2,7 @@ import { prisma, recordAudit, type CandidateDocument } from "@recruitment-platfo
 import { AiGateway, AiValidationError } from "@recruitment-platform/ai-gateway";
 import { computeAssessmentStatus } from "@recruitment-platform/shared-types";
 import type { ProcessCandidateDocumentJobData } from "@recruitment-platform/queue";
+import { assertProcessingRunStillRunning } from "./processing-run.js";
 
 /**
  * Requirement Evidence Analysis (Phase 4A) — runs immediately after Resume
@@ -108,6 +109,12 @@ export async function runRequirementEvidenceAnalysis(
   });
 
   await prisma.$transaction(async (tx) => {
+    // Phase 10 — ownership guard, first statement: Evidence has no
+    // processingRunId column at all (Phase 10A.1 finding), so it can only
+    // be protected at the transaction boundary, not per-row. Throws and
+    // rolls back everything below if this run is no longer RUNNING.
+    await assertProcessingRunStillRunning(tx, processingRunId);
+
     // No Assessment or Evidence is ever deleted here (Phase 4A retry
     // design) — each execution of this function runs under its own
     // ProcessingRun, and every Assessment created below links to it via

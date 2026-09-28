@@ -6,7 +6,30 @@ import type { ProcessCandidateDocumentJobData } from "@recruitment-platform/queu
 import { parseDocument } from "./parsing.js";
 import { runRequirementEvidenceAnalysis } from "./requirement-evidence-analysis.js";
 import { runCareerConsistencyAnalysis } from "./career-consistency-analysis.js";
-import { startProcessingRun, failProcessingRun, completeProcessingRun } from "./processing-run.js";
+import {
+  startProcessingRun,
+  failProcessingRun,
+  completeProcessingRun,
+  assertProcessingRunStillRunning,
+  ProcessingRunNoLongerActiveError,
+} from "./processing-run.js";
+
+/**
+ * Phase 10 — reports this run's own failure via the guarded
+ * failProcessingRun(), then decides which error to throw: the original
+ * pipeline error (normal case — this run was still RUNNING and is now
+ * legitimately FAILED by its own hand) or ProcessingRunNoLongerActiveError
+ * (stale case — something else, e.g. reclaim, already ended this run
+ * first; the original error is discarded because it no longer means
+ * anything the document's current owner should act on).
+ */
+async function failThisRunOrAbandon(processingRunId: string, originalErr: unknown): Promise<never> {
+  const transitioned = await failProcessingRun(processingRunId);
+  if (!transitioned) {
+    throw new ProcessingRunNoLongerActiveError(processingRunId);
+  }
+  throw originalErr;
+}
 
 /**
  * Document/CV processing pipeline (architecture doc, Section: Document
@@ -38,17 +61,31 @@ export async function runDocumentProcessingPipeline(
   const parsed = await parseDocument(originalBytes, fileType);
 
   if (needsOcr(parsed.text)) {
-    await prisma.candidateDocument.update({
-      where: { id: document.id },
-      data: {
-        status: "FAILED_NEEDS_OCR",
-        failureReason: "Extracted text too short — document appears to be scanned/image-only.",
-        extractedText: parsed.text,
-        extractedPageTexts: parsed.pageTexts ?? undefined,
-        parsedAt: new Date(),
-      },
+    // Phase 10 — the run's own FAILED transition is the guard: only if it
+    // still owns the document (guarded updateMany affects a row) does the
+    // CandidateDocument write happen, inside the same transaction, so a
+    // reclaimed run's OCR finding can never land after the fact.
+    const transitioned = await prisma.$transaction(async (tx) => {
+      const { count } = await tx.processingRun.updateMany({
+        where: { id: run.id, status: "RUNNING" },
+        data: { status: "FAILED", completedAt: new Date() },
+      });
+      if (count === 0) return false;
+      await tx.candidateDocument.update({
+        where: { id: document.id },
+        data: {
+          status: "FAILED_NEEDS_OCR",
+          failureReason: "Extracted text too short — document appears to be scanned/image-only.",
+          extractedText: parsed.text,
+          extractedPageTexts: parsed.pageTexts ?? undefined,
+          parsedAt: new Date(),
+        },
+      });
+      return true;
     });
-    await failProcessingRun(run.id);
+    if (!transitioned) {
+      throw new ProcessingRunNoLongerActiveError(run.id);
+    }
     await recordAudit({
       actorId: null,
       action: "CANDIDATE_DOCUMENT_NEEDS_OCR",
@@ -59,34 +96,45 @@ export async function runDocumentProcessingPipeline(
     return; // terminal, not a retryable failure — never throw for this case
   }
 
-  let extraction;
-  try {
-    extraction = await deps.gateway.runTask({
-      taskType: "RESUME_INTELLIGENCE",
-      systemPrompt:
-        "Extract a normalized candidate profile from this resume/CV text: work experience entries " +
-        "(employer, title, start/end dates, documented responsibilities, and a functional-area tag " +
-        "per entry such as 'Employee Relations' or 'Payroll'), education, skills, certifications, and " +
-        "languages. Only extract what is explicitly documented in the text — never infer a " +
-        "responsibility, date, or credential that is not stated. Use null for dates that are not given.",
-      userPrompt: parsed.text,
-      inputRef: `candidateDocument:${document.id}`,
-    });
-  } catch (err) {
-    await failProcessingRun(run.id);
-    if (err instanceof AiValidationError) {
-      await recordAudit({
-        actorId: null,
-        action: "CANDIDATE_DOCUMENT_AI_EXTRACTION_FAILED",
-        entityType: "CandidateDocument",
-        entityId: document.id,
-        after: { taskType: err.taskType },
+  const extraction = await (async () => {
+    try {
+      return await deps.gateway.runTask({
+        taskType: "RESUME_INTELLIGENCE",
+        systemPrompt:
+          "Extract a normalized candidate profile from this resume/CV text: work experience entries " +
+          "(employer, title, start/end dates, documented responsibilities, and a functional-area tag " +
+          "per entry such as 'Employee Relations' or 'Payroll'), education, skills, certifications, and " +
+          "languages. Only extract what is explicitly documented in the text — never infer a " +
+          "responsibility, date, or credential that is not stated. Use null for dates that are not given.",
+        userPrompt: parsed.text,
+        inputRef: `candidateDocument:${document.id}`,
       });
+    } catch (err) {
+      if (err instanceof AiValidationError) {
+        await recordAudit({
+          actorId: null,
+          action: "CANDIDATE_DOCUMENT_AI_EXTRACTION_FAILED",
+          entityType: "CandidateDocument",
+          entityId: document.id,
+          after: { taskType: err.taskType },
+        });
+      }
+      await failThisRunOrAbandon(run.id, err); // retryable (normal case) — caller marks FAILED_RETRY; or abandoned harmlessly if already reclaimed
+      throw err; // unreachable — failThisRunOrAbandon always throws — satisfies control-flow typing
     }
-    throw err; // retryable — caller marks FAILED_RETRY
-  }
+  })();
 
   await prisma.$transaction(async (tx) => {
+    // Phase 10 — ownership guard, first statement: re-affirms this run is
+    // still RUNNING and holds its row lock for the rest of this (short,
+    // post-AI-call) transaction, so nothing below — including the
+    // candidate-profile deletes/recreates, which are scoped by
+    // candidateId, not documentId or processingRunId (Phase 10A.1 finding)
+    // — can ever be committed by a run that's been reclaimed out from
+    // under it. A guard failure throws here, rolling back everything in
+    // this transaction, including the deletes below.
+    await assertProcessingRunStillRunning(tx, run.id);
+
     await tx.candidateExperience.deleteMany({ where: { candidateId: data.candidateId, documentId: document.id } });
     await tx.candidateEducation.deleteMany({ where: { candidateId: data.candidateId } });
     await tx.candidateSkill.deleteMany({ where: { candidateId: data.candidateId } });
@@ -182,8 +230,8 @@ export async function runDocumentProcessingPipeline(
   try {
     await runCareerConsistencyAnalysis(document, data, parsed.text, deps.gateway, run.id);
   } catch (err) {
-    await failProcessingRun(run.id);
-    throw err; // retryable — caller marks FAILED_RETRY
+    if (err instanceof ProcessingRunNoLongerActiveError) throw err; // already the right signal — propagate as-is, do not re-fail
+    await failThisRunOrAbandon(run.id, err); // retryable (normal case) — caller marks FAILED_RETRY; or abandoned harmlessly if already reclaimed
   }
 
   // Requirement Evidence Analysis (Phase 4A) runs in the same job,
@@ -196,8 +244,8 @@ export async function runDocumentProcessingPipeline(
   try {
     await runRequirementEvidenceAnalysis(document, data, parsed.text, deps.gateway, run.id);
   } catch (err) {
-    await failProcessingRun(run.id);
-    throw err; // retryable — caller marks FAILED_RETRY
+    if (err instanceof ProcessingRunNoLongerActiveError) throw err; // already the right signal — propagate as-is, do not re-fail
+    await failThisRunOrAbandon(run.id, err); // retryable (normal case) — caller marks FAILED_RETRY; or abandoned harmlessly if already reclaimed
   }
 
   // The one and only COMPLETED write (Decision 5) — reached only once both
