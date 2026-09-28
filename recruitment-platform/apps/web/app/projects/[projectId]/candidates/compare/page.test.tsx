@@ -242,4 +242,106 @@ describe("CandidateComparisonPage", () => {
     await waitFor(() => expect(screen.getByText("5 years Employee Relations")).toBeInTheDocument());
     expect(screen.queryByText(/\d+\s*(of|\/)\s*\d+/)).toBeNull();
   });
+
+  describe("Phase 9 — Evidence Coverage", () => {
+    const COVERAGE_CANDIDATES = [
+      {
+        candidateId: "cand-1",
+        anonymizedLabel: "Candidate #001",
+        hasCurrentRun: true,
+        isProcessing: false,
+        isFailed: false,
+        evidenceCoverage: {
+          coveragePercentage: 100,
+          status: "COMPLETE",
+          scoredWeight: 100,
+          totalWeight: 100,
+          mandatoryGapCount: 0,
+          lowConfidenceCoveredCount: 0,
+          perRequirement: [{ requirementId: "req-1", covered: true, contested: false, mandatoryGap: false, lowConfidenceAssessment: false }],
+        },
+      },
+      {
+        candidateId: "cand-2",
+        anonymizedLabel: "Candidate #002",
+        hasCurrentRun: true,
+        isProcessing: false,
+        isFailed: false,
+        evidenceCoverage: {
+          coveragePercentage: 0,
+          status: "COMPLETE",
+          scoredWeight: 100,
+          totalWeight: 100,
+          mandatoryGapCount: 1,
+          lowConfidenceCoveredCount: 0,
+          perRequirement: [{ requirementId: "req-1", covered: false, contested: false, mandatoryGap: true, lowConfidenceAssessment: false }],
+        },
+      },
+    ];
+
+    it("renders 'Evidence Coverage: X%', never 'Score' or 'X/100'", async () => {
+      mockCompareResponse({ candidates: COVERAGE_CANDIDATES });
+      render(<CandidateComparisonPage />);
+      await waitFor(() => expect(screen.getByText(/Evidence Coverage: 100%/)).toBeInTheDocument());
+      expect(screen.getByText(/Evidence Coverage: 0%/)).toBeInTheDocument();
+      const bodyText = document.body.textContent ?? "";
+      expect(bodyText).not.toMatch(/score\s*:/i);
+      expect(bodyText).not.toMatch(/\b100\/100\b/);
+    });
+
+    it("shows the fixed non-suitability disclaimer whenever coverage is present", async () => {
+      mockCompareResponse({ candidates: COVERAGE_CANDIDATES });
+      render(<CandidateComparisonPage />);
+      await waitFor(() =>
+        expect(
+          screen.getByText(/Evidence Coverage reflects weighted evidence against approved requirements/),
+        ).toBeInTheDocument(),
+      );
+      expect(screen.getByText(/not a suitability, quality, or hiring recommendation/)).toBeInTheDocument();
+    });
+
+    it("shows Mandatory Gap count and per-requirement flag, without hiding or zeroing anything", async () => {
+      mockCompareResponse({ candidates: COVERAGE_CANDIDATES });
+      render(<CandidateComparisonPage />);
+      await waitFor(() => expect(screen.getByText(/Mandatory Gaps: 1/)).toBeInTheDocument());
+      expect(screen.getByText(/^· Mandatory Gap$/)).toBeInTheDocument(); // per-requirement badge under candidate 2, distinct from the "Mandatory Gaps: 1" count
+    });
+
+    it("never renders a rank, 'best match', or 'recommended candidate' label, even with coverage present", async () => {
+      mockCompareResponse({ candidates: COVERAGE_CANDIDATES });
+      render(<CandidateComparisonPage />);
+      await waitFor(() => expect(screen.getByText(/Evidence Coverage: 100%/)).toBeInTheDocument());
+      const bodyText = (document.body.textContent ?? "").toLowerCase();
+      for (const forbidden of ["rank", "best match", "recommended candidate", "top candidate", "winner"]) {
+        expect(bodyText).not.toContain(forbidden);
+      }
+    });
+
+    it("shows no coverage line for a candidate with no current run (never displays 0% for an unprocessed candidate)", async () => {
+      mockCompareResponse({
+        candidates: [
+          { ...COVERAGE_CANDIDATES[0] },
+          { candidateId: "cand-2", anonymizedLabel: "Candidate #002", hasCurrentRun: false, isProcessing: false, isFailed: false, evidenceCoverage: null },
+        ],
+      });
+      render(<CandidateComparisonPage />);
+      await waitFor(() => expect(screen.getByText(/Evidence Coverage: 100%/)).toBeInTheDocument());
+      expect(screen.queryByText(/Evidence Coverage: 0%/)).toBeNull();
+    });
+
+    it("shows a Low Confidence review flag without changing the coverage percentage shown", async () => {
+      mockCompareResponse({
+        candidates: [
+          {
+            ...COVERAGE_CANDIDATES[0],
+            evidenceCoverage: { ...COVERAGE_CANDIDATES[0].evidenceCoverage, lowConfidenceCoveredCount: 1 },
+          },
+          COVERAGE_CANDIDATES[1],
+        ],
+      });
+      render(<CandidateComparisonPage />);
+      await waitFor(() => expect(screen.getByText(/Evidence Coverage: 100%/)).toBeInTheDocument());
+      expect(screen.getByText(/Low Confidence: 1/)).toBeInTheDocument();
+    });
+  });
 });

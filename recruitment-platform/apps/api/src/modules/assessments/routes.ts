@@ -1,6 +1,11 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "@recruitment-platform/db";
 import { redactEvidenceForBlindMode } from "@recruitment-platform/ai-gateway";
+import {
+  computeCandidateCoverage,
+  type CoverageEvidenceItem,
+  type CoverageRequirementInput,
+} from "@recruitment-platform/shared-types";
 import { requireProjectAccess } from "../projects/authorization.js";
 
 /**
@@ -215,11 +220,17 @@ export async function registerAssessmentRoutes(app: FastifyInstance): Promise<vo
  * CandidateConsistencyFinding rows, on every request — no AI call, no
  * persisted snapshot (the pre-existing CandidateComparison model and
  * CANDIDATE_COMPARISON AI task/comparisonText are deliberately NOT used
- * here — left as unused legacy design, not deleted or modified). No score,
- * rank, weighted total, or "stronger/weaker" conclusion is computed
- * anywhere in this route; candidates are always returned in the exact
- * order the caller requested them (selection order), never reordered by
- * any outcome-derived value.
+ * here — left as unused legacy design, not deleted or modified).
+ *
+ * Phase 9 — each candidate now also carries an `evidenceCoverage` object
+ * (packages/shared-types/src/evidence-coverage.ts, Model C, computed here
+ * from the same Assessment/Evidence rows, no extra query). This is
+ * explicitly NOT a score: no numeric value is ever assigned to
+ * EvidenceStrength, EvidenceConfidence never affects it, and no rank or
+ * "best/recommended candidate" is ever computed. Candidates are still
+ * always returned in the exact order the caller requested them (selection
+ * order) — coverage is displayed per candidate, never used to reorder,
+ * sort, or filter the response.
  */
 function registerCandidateComparisonRoute(app: FastifyInstance): void {
   app.post(
@@ -369,6 +380,44 @@ function registerCandidateComparisonRoute(app: FastifyInstance): void {
         consistencyFindingsByCandidate[finding.candidateId].push(mapFinding(finding, employerOrder));
       }
 
+      // Phase 9 — Evidence Coverage, per candidate. Built from the same
+      // `assessments` rows already fetched above — no extra DB round trip.
+      const assessmentsByCandidateId = new Map<string, typeof assessments>();
+      for (const candidateId of candidateIds) assessmentsByCandidateId.set(candidateId, []);
+      for (const assessment of assessments) assessmentsByCandidateId.get(assessment.candidateId)?.push(assessment);
+
+      const evidenceCoverageByCandidateId = new Map<string, ReturnType<typeof computeCandidateCoverage> | null>();
+      for (const candidateId of candidateIds) {
+        const hasCurrentRun = (currentRunIdsByCandidateId.get(candidateId) ?? []).length > 0;
+        if (!hasCurrentRun) {
+          // No completed processing run yet — coverage is not computable,
+          // and must never be shown as 0% (that would misrepresent "not
+          // yet processed" as "no evidence found").
+          evidenceCoverageByCandidateId.set(candidateId, null);
+          continue;
+        }
+        const requirementInputs: CoverageRequirementInput[] = (assessmentsByCandidateId.get(candidateId) ?? []).map(
+          (assessment): CoverageRequirementInput => ({
+            requirementId: assessment.requirementId,
+            mandatory: assessment.requirement.mandatory,
+            // The weight in effect when THIS assessment was made — the
+            // pinned, immutable JobRequirementVersion's own
+            // hrApprovedWeight, never the requirement's current weight
+            // (which may have changed since). null (no version pinned)
+            // excludes this requirement from the coverage calculation.
+            weight: assessment.requirementVersion ? Number(assessment.requirementVersion.hrApprovedWeight) : null,
+            evidence: assessment.evidenceLinks.map(
+              (link): CoverageEvidenceItem => ({
+                role: link.role as CoverageEvidenceItem["role"],
+                strength: link.evidence.evidenceStrength as CoverageEvidenceItem["strength"],
+                confidence: link.evidence.confidence as CoverageEvidenceItem["confidence"],
+              }),
+            ),
+          }),
+        );
+        evidenceCoverageByCandidateId.set(candidateId, computeCandidateCoverage(requirementInputs));
+      }
+
       // Per-candidate processing state — computed independently for each
       // candidate, identical precedence rules to the single-candidate
       // viewer (Phase 5B/5C): (1) current results always shown regardless
@@ -390,6 +439,7 @@ function registerCandidateComparisonRoute(app: FastifyInstance): void {
           hasCurrentRun,
           isProcessing,
           isFailed,
+          evidenceCoverage: evidenceCoverageByCandidateId.get(candidateId) ?? null,
         };
       });
 

@@ -10,10 +10,17 @@ import { apiFetch, ApiError } from "../../../../../lib/api";
  * read-only, evidence-first: renders exactly what
  * POST /projects/:projectId/candidates/compare returns, in the exact
  * candidate order the API sends (selection order) — never re-sorted by
- * status/strength/finding-count/any other outcome-derived value. No
- * aggregate count, score, rank, or recommendation is computed or
- * displayed anywhere on this page.
+ * status/strength/finding-count/any other outcome-derived value. No rank
+ * or recommendation is computed or displayed anywhere on this page.
+ *
+ * Phase 9 — each candidate also carries `evidenceCoverage`. This is
+ * displayed as "Evidence Coverage: X%", never "Score" and never "X/100" —
+ * see packages/shared-types/src/evidence-coverage.ts for the definition.
+ * It is never used to reorder or auto-sort the candidate columns.
  */
+
+const COVERAGE_DISCLAIMER =
+  "Evidence Coverage reflects weighted evidence against approved requirements — not a suitability, quality, or hiring recommendation.";
 
 interface EvidenceItem {
   role: "SUPPORTING" | "CONSIDERED_REJECTED";
@@ -26,12 +33,31 @@ interface EvidenceItem {
   source: string | null;
 }
 
+interface RequirementCoverageResult {
+  requirementId: string;
+  covered: boolean;
+  contested: boolean;
+  mandatoryGap: boolean;
+  lowConfidenceAssessment: boolean;
+}
+
+interface EvidenceCoverage {
+  coveragePercentage: number;
+  status: "COMPLETE" | "INCOMPLETE";
+  scoredWeight: number;
+  totalWeight: number;
+  mandatoryGapCount: number;
+  lowConfidenceCoveredCount: number;
+  perRequirement: RequirementCoverageResult[];
+}
+
 interface CandidateSummary {
   candidateId: string;
   anonymizedLabel: string;
   hasCurrentRun: boolean;
   isProcessing: boolean;
   isFailed: boolean;
+  evidenceCoverage: EvidenceCoverage | null;
 }
 
 interface RequirementRow {
@@ -138,9 +164,31 @@ export default function CandidateComparisonPage() {
                   {!c.isProcessing && !c.isFailed && !c.hasCurrentRun && <span role="status">No results yet</span>}
                   {!c.isProcessing && c.hasCurrentRun && <span>Results current</span>}
                 </div>
+                {c.evidenceCoverage && (
+                  <div style={{ fontSize: 13, marginTop: 4 }}>
+                    <span>
+                      Evidence Coverage: {Math.round(c.evidenceCoverage.coveragePercentage)}%
+                      {c.evidenceCoverage.status === "INCOMPLETE" &&
+                        ` (based on ${c.evidenceCoverage.scoredWeight} of ${c.evidenceCoverage.totalWeight} weighted)`}
+                    </span>
+                    {c.evidenceCoverage.mandatoryGapCount > 0 && (
+                      <span style={{ color: "#742a2a", marginLeft: 6 }}>
+                        · Mandatory Gaps: {c.evidenceCoverage.mandatoryGapCount}
+                      </span>
+                    )}
+                    {c.evidenceCoverage.lowConfidenceCoveredCount > 0 && (
+                      <span style={{ color: "#8a5a00", marginLeft: 6 }}>
+                        · Low Confidence: {c.evidenceCoverage.lowConfidenceCoveredCount}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
+          {data.candidates.some((c) => c.evidenceCoverage) && (
+            <p style={{ fontSize: 12, color: "#888", marginTop: -8, marginBottom: 16 }}>{COVERAGE_DISCLAIMER}</p>
+          )}
 
           <h2>Requirements &amp; Evidence</h2>
           {data.requirementRows.length === 0 ? (
@@ -162,6 +210,9 @@ export default function CandidateComparisonPage() {
                   <div />
                   {data.candidates.map((c, i) => {
                     const result = row.resultsByCandidate[c.candidateId];
+                    const requirementCoverage = c.evidenceCoverage?.perRequirement.find(
+                      (r) => r.requirementId === row.requirementId,
+                    );
                     return (
                       <div
                         key={c.candidateId}
@@ -172,6 +223,22 @@ export default function CandidateComparisonPage() {
                         ) : (
                           <>
                             <p style={{ margin: "0 0 4px", fontWeight: 600 }}>{result.status.replaceAll("_", " ")}</p>
+                            {requirementCoverage && (
+                              <p style={{ margin: "0 0 6px", fontSize: 12 }}>
+                                <span style={{ color: requirementCoverage.covered ? "#276749" : "#555" }}>
+                                  {requirementCoverage.covered ? "Covered" : "Not Covered"}
+                                </span>
+                                {requirementCoverage.mandatoryGap && (
+                                  <span style={{ color: "#742a2a", marginLeft: 6 }}>· Mandatory Gap</span>
+                                )}
+                                {requirementCoverage.contested && (
+                                  <span style={{ color: "#c05621", marginLeft: 6 }}>· Contradictory Evidence — Review Required</span>
+                                )}
+                                {requirementCoverage.lowConfidenceAssessment && (
+                                  <span style={{ color: "#8a5a00", marginLeft: 6 }}>· Low Confidence — Review Evidence</span>
+                                )}
+                              </p>
+                            )}
                             {result.evidence.map((e, ei) => (
                               <div key={ei} style={{ border: "1px solid #eee", borderRadius: 4, padding: 8, marginBottom: 6 }}>
                                 <p style={{ margin: 0, fontSize: 12, color: "#555" }}>

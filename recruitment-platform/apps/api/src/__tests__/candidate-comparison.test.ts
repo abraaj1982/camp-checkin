@@ -7,7 +7,10 @@ import { createTestStorage, buildTestApp, createUser, loginAs, resetDatabase } f
  * Phase 5 completion — Candidate Comparison
  * (POST /projects/:projectId/candidates/compare). Deterministic,
  * read-only, evidence-first: no AI call, no CandidateComparison
- * persistence, no score/rank/recommendation anywhere in the response.
+ * persistence, no rank/recommendation anywhere in the response. Phase 9
+ * adds a per-candidate `evidenceCoverage` object (see
+ * packages/shared-types/src/evidence-coverage.ts) — never a score, never
+ * a rank; candidate order remains exactly the caller-requested order.
  */
 describe("POST /projects/:projectId/candidates/compare", () => {
   let app: FastifyInstance;
@@ -223,7 +226,9 @@ describe("POST /projects/:projectId/candidates/compare", () => {
     expect(Object.keys(body).sort()).toEqual(["candidates", "consistencyFindingsByCandidate", "requirementRows"].sort());
     expect(body.candidates).toHaveLength(2);
     for (const c of body.candidates) {
-      expect(Object.keys(c).sort()).toEqual(["anonymizedLabel", "candidateId", "hasCurrentRun", "isFailed", "isProcessing"].sort());
+      expect(Object.keys(c).sort()).toEqual(
+        ["anonymizedLabel", "candidateId", "evidenceCoverage", "hasCurrentRun", "isFailed", "isProcessing"].sort(),
+      );
       expect(typeof c.hasCurrentRun).toBe("boolean");
     }
     expect(body.candidates.find((c: { candidateId: string }) => c.candidateId === a.candidate.id).hasCurrentRun).toBe(true);
@@ -237,6 +242,8 @@ describe("POST /projects/:projectId/candidates/compare", () => {
     expect(res.body).not.toContain("sourceDocumentId");
     expect(res.body).not.toContain("aiInteractionId");
     expect(res.body).not.toContain(runA.id);
+    expect(res.body).not.toContain('"rank"');
+    expect(res.body.toLowerCase()).not.toContain("\"score\"");
   });
 
   it("10. redacts evidence text and rationale for every candidate", async () => {
@@ -450,5 +457,231 @@ describe("POST /projects/:projectId/candidates/compare", () => {
     const a = await seedCandidate(project, user, "Candidate #001");
     const res = await compare(cookie, project.id, [a.candidate.id, a.candidate.id]);
     expect(res.statusCode).toBe(400); // de-duplicated down to 1, below the minimum of 2
+  });
+
+  describe("Phase 9 — Evidence Coverage", () => {
+    it("a candidate with no current run gets evidenceCoverage: null, never 0%", async () => {
+      const { user, project, cookie } = await seedProject();
+      const a = await seedCandidate(project, user, "Candidate #001");
+      const b = await seedCandidate(project, user, "Candidate #002");
+      const { requirement, version } = await seedRequirement(project, user);
+      const runA = await completeRun(a.document);
+      await createAssessment(a.candidate, project, requirement, version, runA, a.document);
+
+      const res = await compare(cookie, project.id, [a.candidate.id, b.candidate.id]);
+      const body = res.json();
+      const candA = body.candidates.find((c: { candidateId: string }) => c.candidateId === a.candidate.id);
+      const candB = body.candidates.find((c: { candidateId: string }) => c.candidateId === b.candidate.id);
+      expect(candA.evidenceCoverage.coveragePercentage).toBe(100);
+      expect(candA.evidenceCoverage.status).toBe("COMPLETE");
+      expect(candB.evidenceCoverage).toBeNull();
+    });
+
+    it("STRONG evidence on a single 100%-weighted requirement yields 100% coverage; a current run with zero assessments yields 0%/INCOMPLETE, not null", async () => {
+      const { user, project, cookie } = await seedProject();
+      const a = await seedCandidate(project, user, "Candidate #001");
+      const b = await seedCandidate(project, user, "Candidate #002");
+      const { requirement, version } = await seedRequirement(project, user);
+      const runA = await completeRun(a.document);
+      await completeRun(b.document); // b has a current run but no Assessment for the requirement
+      await createAssessment(a.candidate, project, requirement, version, runA, a.document);
+
+      const res = await compare(cookie, project.id, [a.candidate.id, b.candidate.id]);
+      const body = res.json();
+      const candA = body.candidates.find((c: { candidateId: string }) => c.candidateId === a.candidate.id);
+      const candB = body.candidates.find((c: { candidateId: string }) => c.candidateId === b.candidate.id);
+      expect(candA.evidenceCoverage.coveragePercentage).toBe(100);
+      expect(candB.evidenceCoverage.coveragePercentage).toBe(0);
+      expect(candB.evidenceCoverage.status).toBe("INCOMPLETE");
+      expect(candB.evidenceCoverage.scoredWeight).toBe(0);
+    });
+
+    it("PARTIAL/WEAK/NOT_FOUND evidence never contributes coverage", async () => {
+      const { user, project, cookie } = await seedProject();
+      const a = await seedCandidate(project, user, "Candidate #001");
+      const b = await seedCandidate(project, user, "Candidate #002");
+      const { requirement, version } = await seedRequirement(project, user);
+      const runA = await completeRun(a.document);
+      const evidence = await prisma.evidence.create({
+        data: {
+          requirementId: requirement.id,
+          candidateId: a.candidate.id,
+          projectId: project.id,
+          evidenceType: "DIRECT",
+          evidenceStrength: "PARTIAL",
+          confidence: "HIGH",
+        },
+      });
+      await prisma.assessment.create({
+        data: {
+          candidateId: a.candidate.id,
+          projectId: project.id,
+          requirementId: requirement.id,
+          requirementVersionId: version.id,
+          processingRunId: runA.id,
+          aiAssessmentSummary: "partial",
+          status: "REVIEW_REQUIRED",
+          evidenceLinks: { create: [{ evidenceId: evidence.id, role: "SUPPORTING" }] },
+        },
+      });
+
+      const res = await compare(cookie, project.id, [a.candidate.id, b.candidate.id]);
+      const candA = res.json().candidates.find((c: { candidateId: string }) => c.candidateId === a.candidate.id);
+      expect(candA.evidenceCoverage.coveragePercentage).toBe(0);
+      expect(candA.evidenceCoverage.perRequirement[0].covered).toBe(false);
+    });
+
+    it("mandatory requirement not covered produces a MandatoryGap flag with no numeric penalty beyond its own weight", async () => {
+      const { user, project, cookie } = await seedProject();
+      const a = await seedCandidate(project, user, "Candidate #001");
+      const b = await seedCandidate(project, user, "Candidate #002");
+      const { requirement, version } = await seedRequirement(project, user); // mandatory: true, weight 100
+      const runA = await completeRun(a.document);
+      const evidence = await prisma.evidence.create({
+        data: {
+          requirementId: requirement.id,
+          candidateId: a.candidate.id,
+          projectId: project.id,
+          evidenceType: "DIRECT",
+          evidenceStrength: "NOT_FOUND",
+          confidence: "HIGH",
+        },
+      });
+      await prisma.assessment.create({
+        data: {
+          candidateId: a.candidate.id,
+          projectId: project.id,
+          requirementId: requirement.id,
+          requirementVersionId: version.id,
+          processingRunId: runA.id,
+          aiAssessmentSummary: "not found",
+          status: "MANDATORY_GAP",
+          evidenceLinks: { create: [{ evidenceId: evidence.id, role: "SUPPORTING" }] },
+        },
+      });
+
+      const res = await compare(cookie, project.id, [a.candidate.id, b.candidate.id]);
+      const candA = res.json().candidates.find((c: { candidateId: string }) => c.candidateId === a.candidate.id);
+      expect(candA.evidenceCoverage.mandatoryGapCount).toBe(1);
+      expect(candA.evidenceCoverage.perRequirement[0].mandatoryGap).toBe(true);
+      expect(candA.evidenceCoverage.coveragePercentage).toBe(0); // no artificial extra penalty, just the requirement's own weight uncovered
+    });
+
+    it("CONTRADICTORY evidence forces not-covered even alongside STRONG supporting evidence, and is flagged contested", async () => {
+      const { user, project, cookie } = await seedProject();
+      const a = await seedCandidate(project, user, "Candidate #001");
+      const b = await seedCandidate(project, user, "Candidate #002");
+      const { requirement, version } = await seedRequirement(project, user);
+      const runA = await completeRun(a.document);
+      const strong = await prisma.evidence.create({
+        data: {
+          requirementId: requirement.id, candidateId: a.candidate.id, projectId: project.id,
+          evidenceType: "DIRECT", evidenceStrength: "STRONG", confidence: "HIGH",
+        },
+      });
+      const contradictory = await prisma.evidence.create({
+        data: {
+          requirementId: requirement.id, candidateId: a.candidate.id, projectId: project.id,
+          evidenceType: "DIRECT", evidenceStrength: "CONTRADICTORY", confidence: "HIGH",
+        },
+      });
+      await prisma.assessment.create({
+        data: {
+          candidateId: a.candidate.id, projectId: project.id, requirementId: requirement.id,
+          requirementVersionId: version.id, processingRunId: runA.id,
+          aiAssessmentSummary: "contradiction", status: "REVIEW_REQUIRED",
+          evidenceLinks: {
+            create: [
+              { evidenceId: strong.id, role: "SUPPORTING" },
+              { evidenceId: contradictory.id, role: "SUPPORTING" },
+            ],
+          },
+        },
+      });
+
+      const res = await compare(cookie, project.id, [a.candidate.id, b.candidate.id]);
+      const candA = res.json().candidates.find((c: { candidateId: string }) => c.candidateId === a.candidate.id);
+      expect(candA.evidenceCoverage.coveragePercentage).toBe(0);
+      expect(candA.evidenceCoverage.perRequirement[0].contested).toBe(true);
+      expect(candA.evidenceCoverage.perRequirement[0].covered).toBe(false);
+    });
+
+    it("LOW confidence never changes coverage but sets lowConfidenceCoveredCount", async () => {
+      const { user, project, cookie } = await seedProject();
+      const a = await seedCandidate(project, user, "Candidate #001");
+      const b = await seedCandidate(project, user, "Candidate #002");
+      const { requirement, version } = await seedRequirement(project, user);
+      const runA = await completeRun(a.document);
+      const evidence = await prisma.evidence.create({
+        data: {
+          requirementId: requirement.id, candidateId: a.candidate.id, projectId: project.id,
+          evidenceType: "DIRECT", evidenceStrength: "STRONG", confidence: "LOW",
+        },
+      });
+      await prisma.assessment.create({
+        data: {
+          candidateId: a.candidate.id, projectId: project.id, requirementId: requirement.id,
+          requirementVersionId: version.id, processingRunId: runA.id,
+          aiAssessmentSummary: "low confidence", status: "STRONG_EVIDENCE",
+          evidenceLinks: { create: [{ evidenceId: evidence.id, role: "SUPPORTING" }] },
+        },
+      });
+
+      const res = await compare(cookie, project.id, [a.candidate.id, b.candidate.id]);
+      const candA = res.json().candidates.find((c: { candidateId: string }) => c.candidateId === a.candidate.id);
+      expect(candA.evidenceCoverage.coveragePercentage).toBe(100); // unaffected by confidence
+      expect(candA.evidenceCoverage.lowConfidenceCoveredCount).toBe(1);
+      expect(candA.evidenceCoverage.perRequirement[0].lowConfidenceAssessment).toBe(true);
+    });
+
+    it("only the candidate's current processing run's assessment counts toward coverage (retry/multi-run behavior)", async () => {
+      const { user, project, cookie } = await seedProject();
+      const a = await seedCandidate(project, user, "Candidate #001");
+      const b = await seedCandidate(project, user, "Candidate #002");
+      const { requirement, version } = await seedRequirement(project, user);
+
+      // First (failed/superseded) run: NOT_FOUND — must NOT count.
+      const staleRun = await prisma.processingRun.create({
+        data: { candidateDocumentId: a.document.id, attemptNumber: 1, status: "FAILED", completedAt: new Date() },
+      });
+      const staleEvidence = await prisma.evidence.create({
+        data: {
+          requirementId: requirement.id, candidateId: a.candidate.id, projectId: project.id,
+          evidenceType: "DIRECT", evidenceStrength: "NOT_FOUND", confidence: "HIGH",
+        },
+      });
+      await prisma.assessment.create({
+        data: {
+          candidateId: a.candidate.id, projectId: project.id, requirementId: requirement.id,
+          requirementVersionId: version.id, processingRunId: staleRun.id,
+          aiAssessmentSummary: "stale", status: "MANDATORY_GAP",
+          evidenceLinks: { create: [{ evidenceId: staleEvidence.id, role: "SUPPORTING" }] },
+        },
+      });
+
+      // Second (current, successful) run: STRONG — this is the one that should count.
+      const currentRun = await completeRun(a.document, 2);
+      await createAssessment(a.candidate, project, requirement, version, currentRun, a.document);
+
+      const res = await compare(cookie, project.id, [a.candidate.id, b.candidate.id]);
+      const candA = res.json().candidates.find((c: { candidateId: string }) => c.candidateId === a.candidate.id);
+      expect(candA.evidenceCoverage.coveragePercentage).toBe(100); // only the current run's STRONG evidence counted
+      expect(candA.evidenceCoverage.perRequirement).toHaveLength(1); // the stale run's assessment did not add a second entry
+    });
+
+    it("returns candidates in caller-selected order regardless of coverage, and never includes a rank field", async () => {
+      const { user, project, cookie } = await seedProject();
+      const a = await seedCandidate(project, user, "Candidate #001");
+      const b = await seedCandidate(project, user, "Candidate #002");
+      const { requirement, version } = await seedRequirement(project, user);
+      const runB = await completeRun(b.document);
+      // Only b has strong (100%) coverage; a has none — ordering must still be request order.
+      await createAssessment(b.candidate, project, requirement, version, runB, b.document, { status: "STRONG_EVIDENCE" });
+
+      const res = await compare(cookie, project.id, [a.candidate.id, b.candidate.id]);
+      const body = res.json();
+      expect(body.candidates.map((c: { candidateId: string }) => c.candidateId)).toEqual([a.candidate.id, b.candidate.id]);
+      expect(res.body).not.toContain('"rank"');
+    });
   });
 });
