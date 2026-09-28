@@ -11,6 +11,7 @@ import {
   failProcessingRun,
   completeProcessingRun,
   assertProcessingRunStillRunning,
+  startHeartbeat,
   ProcessingRunNoLongerActiveError,
 } from "./processing-run.js";
 
@@ -56,6 +57,26 @@ export async function runDocumentProcessingPipeline(
   // error: worker/src/index.ts's catch marks the document FAILED_RETRY.
   const run = await startProcessingRun(document.id);
 
+  // Phase 10D — heartbeat runs for the run's entire lifetime, independent
+  // of parsing/AI-call/checkpoint boundaries (never checkpoint-only — see
+  // startHeartbeat()'s doc comment). Stopped in the finally block below on
+  // every exit path (success, OCR terminal return, any thrown error,
+  // including ProcessingRunNoLongerActiveError) so it never leaks past
+  // this function's lifetime.
+  const heartbeat = startHeartbeat(run.id);
+  try {
+    await runPipelineSteps(document, data, run, deps);
+  } finally {
+    heartbeat.stop();
+  }
+}
+
+async function runPipelineSteps(
+  document: Awaited<ReturnType<typeof prisma.candidateDocument.findUniqueOrThrow>>,
+  data: ProcessCandidateDocumentJobData,
+  run: { id: string },
+  deps: { storage: ObjectStorage; gateway: AiGateway },
+): Promise<void> {
   const originalBytes = await deps.storage.getObject(document.storageKey);
   const fileType = document.fileType === "pdf" ? "pdf" : "docx";
   const parsed = await parseDocument(originalBytes, fileType);

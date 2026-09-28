@@ -69,10 +69,11 @@ export class ProcessingRunNoLongerActiveError extends Error {
  *      document" route only starts a new run once the CandidateDocument
  *      itself is already off PROCESSING; it does not touch a RUNNING
  *      ProcessingRun row at all.
- *   3. The Phase 10 stale-run reclaim mechanism — a scheduled scan that
- *      transitions a RUNNING run whose startedAt exceeds a configured
- *      threshold to FAILED, using the same guarded transition as every
- *      other path (never a different write shape).
+ *   3. The Phase 10D stale-run reclaim mechanism (reclaimProcessingRun,
+ *      below) — a scheduled scan that transitions a RUNNING run whose
+ *      heartbeatAt has fallen behind STALE_THRESHOLD_MS to FAILED, using
+ *      the same guarded transition as every other path (never a different
+ *      write shape).
  *
  * Race-safety of the refusal itself: the RUNNING check and the
  * attempt-number claim both run inside one interactive transaction, and
@@ -101,8 +102,22 @@ export async function startProcessingRun(candidateDocumentId: string): Promise<P
       throw new ProcessingRunAlreadyActiveError(candidateDocumentId);
     }
 
+    // Phase 10D — heartbeatAt is set here, at creation, to the same moment
+    // as startedAt — never left null. This is the chosen NULL-safety
+    // strategy: a fresh run's "age since last heartbeat" is 0 the instant
+    // it's created, so findStaleProcessingRunIds()'s plain
+    // `heartbeatAt < cutoff` comparison can never mistake a just-started
+    // run for stale, with no separate NULL-handling branch and no second,
+    // independent staleness signal (e.g. falling back to startedAt) —
+    // heartbeatAt is the only field reclaim ever reads.
+    const now = new Date();
     return tx.processingRun.create({
-      data: { candidateDocumentId, attemptNumber: updated.processingAttemptCounter, status: "RUNNING" },
+      data: {
+        candidateDocumentId,
+        attemptNumber: updated.processingAttemptCounter,
+        status: "RUNNING",
+        heartbeatAt: now,
+      },
     });
   });
 }
@@ -199,4 +214,155 @@ export async function assertProcessingRunStillRunning(
   if (count === 0) {
     throw new ProcessingRunNoLongerActiveError(processingRunId);
   }
+}
+
+/**
+ * Phase 10D — ProcessingRun heartbeat & stale reclaim.
+ *
+ * The heartbeat answers "is the worker/run still alive?" — it is
+ * deliberately NOT a whole-run duration limit; a legitimately long-running
+ * run (e.g. a slow but healthy AI call) keeps refreshing heartbeatAt
+ * indefinitely and is never reclaimed. Reclaim answers a different
+ * question ("has this run stopped proving it's alive?"), using the same
+ * heartbeatAt field as its sole signal — one mechanism, not two.
+ */
+export const HEARTBEAT_INTERVAL_MS = 30_000;
+export const STALE_THRESHOLD_MS = 3 * 60_000;
+
+/**
+ * Guarded heartbeat write — same idiom as every other Phase 10 write:
+ * `WHERE id = ? AND status = 'RUNNING'`. Never resurrects or modifies a
+ * terminal run (a FAILED/COMPLETED row simply doesn't match the WHERE
+ * clause, so this is a no-op, not an error). Returns whether the run is
+ * still owned by this heartbeat; `false` tells the caller (startHeartbeat)
+ * to stop ticking — Phase 10B's existing ownership guards are what
+ * actually neutralize any of this worker's subsequent writes, not this
+ * function.
+ */
+export async function updateHeartbeat(processingRunId: string): Promise<boolean> {
+  const { count } = await prisma.processingRun.updateMany({
+    where: { id: processingRunId, status: "RUNNING" },
+    data: { heartbeatAt: new Date() },
+  });
+  return count === 1;
+}
+
+export interface HeartbeatHandle {
+  stop(): void;
+}
+
+/**
+ * Starts a heartbeat for `processingRunId`, ticking every `intervalMs`
+ * (default HEARTBEAT_INTERVAL_MS). Deliberately a single independent
+ * timer for the run's entire lifetime — NOT tied to AI-call or
+ * pipeline-stage boundaries, so a single long-running stage never starves
+ * it (a checkpoint-only heartbeat would falsely go stale mid-stage; see
+ * Phase 10C.1/10C.2). Caller MUST call `.stop()` in a `finally` block
+ * covering every exit path (success, OCR terminal, ordinary failure,
+ * ProcessingRunNoLongerActiveError, any other thrown error) to avoid a
+ * timer leak — this function does not know when the pipeline is done.
+ *
+ * A heartbeat DB write failure (e.g. a transient outage) is caught and
+ * logged, never thrown — it must not fail the ProcessingRun; the next
+ * tick simply tries again. Uses plain `setInterval`/`clearInterval` (no
+ * new dependency), so it's directly testable with fake timers.
+ */
+export function startHeartbeat(processingRunId: string, intervalMs: number = HEARTBEAT_INTERVAL_MS): HeartbeatHandle {
+  let stopped = false;
+  const timer = setInterval(() => {
+    if (stopped) return;
+    updateHeartbeat(processingRunId)
+      .then((stillOwned) => {
+        if (!stillOwned && !stopped) {
+          // No longer RUNNING (reclaimed, failed, or completed by
+          // something else) — stop ticking. Deliberately does nothing
+          // else here: Phase 10B's guards are what make any of this
+          // worker's remaining writes harmless, not this timer.
+          stopped = true;
+          clearInterval(timer);
+        }
+      })
+      .catch((err) => {
+        // eslint-disable-next-line no-console
+        console.warn("[processing-run] heartbeat write failed; will retry next tick", {
+          processingRunId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+  }, intervalMs);
+  // Never let this timer alone keep the Node process alive.
+  timer.unref?.();
+  return {
+    stop() {
+      stopped = true;
+      clearInterval(timer);
+    },
+  };
+}
+
+/** Finds RUNNING runs whose heartbeatAt has fallen behind `cutoff` — candidates for reclaim. heartbeatAt is never null for a RUNNING run (see startProcessingRun), so no NULL-handling branch is needed. */
+export async function findStaleProcessingRunIds(
+  cutoff: Date,
+  limit = 100,
+): Promise<{ id: string; candidateDocumentId: string }[]> {
+  return prisma.processingRun.findMany({
+    where: { status: "RUNNING", heartbeatAt: { lt: cutoff } },
+    select: { id: true, candidateDocumentId: true },
+    take: limit,
+  });
+}
+
+/**
+ * Reclaims one stale run: ProcessingRun RUNNING -> FAILED AND
+ * CandidateDocument -> FAILED_RETRY, atomically, in one transaction, with
+ * the ProcessingRun guard as the first statement (same ownership
+ * philosophy as completeProcessingRun/the OCR branch in pipeline.ts).
+ *
+ * The guard re-checks `heartbeatAt < cutoff` (the SAME cutoff the scan
+ * that selected this run used), not just `status = RUNNING` — closing the
+ * scan-to-reclaim race where the owning worker successfully heartbeats
+ * between the scan and this call. If the run proved liveness in that
+ * window, this guard no longer matches it (count === 0) and reclaim is
+ * correctly refused, leaving the run RUNNING and the document untouched.
+ *
+ * Safe under concurrent reclaimers targeting the same run: only the
+ * transaction that wins the guarded `updateMany` (count === 1) proceeds
+ * to touch CandidateDocument; a losing concurrent attempt sees count ===
+ * 0, returns false, and never writes CandidateDocument at all — so no
+ * partial state (ProcessingRun FAILED while CandidateDocument still reads
+ * PROCESSING) can ever result from this operation. No automatic requeue —
+ * the document is left exactly where the existing manual retry route
+ * already knows how to pick it up from.
+ */
+export async function reclaimProcessingRun(
+  processingRunId: string,
+  candidateDocumentId: string,
+  cutoff: Date,
+): Promise<boolean> {
+  return prisma.$transaction(async (tx) => {
+    const { count } = await tx.processingRun.updateMany({
+      where: { id: processingRunId, status: "RUNNING", heartbeatAt: { lt: cutoff } },
+      data: { status: "FAILED", completedAt: new Date() },
+    });
+    if (count === 0) return false; // already reclaimed/failed/completed, or heartbeated fresh since the scan — harmless no-op
+    await tx.candidateDocument.update({
+      where: { id: candidateDocumentId },
+      data: {
+        status: "FAILED_RETRY",
+        failureReason: "Processing run reclaimed: no heartbeat received within the stale threshold.",
+      },
+    });
+    return true;
+  });
+}
+
+/** The scheduled reclaim scan: finds stale runs and reclaims each independently, using one cutoff computed once for the whole scan so a reclaim never targets a run against a later (recomputed) cutoff than the one that selected it. */
+export async function runReclaimScan(limit = 100): Promise<{ scanned: number; reclaimed: number }> {
+  const cutoff = new Date(Date.now() - STALE_THRESHOLD_MS);
+  const stale = await findStaleProcessingRunIds(cutoff, limit);
+  let reclaimed = 0;
+  for (const run of stale) {
+    if (await reclaimProcessingRun(run.id, run.candidateDocumentId, cutoff)) reclaimed += 1;
+  }
+  return { scanned: stale.length, reclaimed };
 }

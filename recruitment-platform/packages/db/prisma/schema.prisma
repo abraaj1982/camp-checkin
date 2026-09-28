@@ -594,6 +594,14 @@ model ProcessingRun {
   startedAt           DateTime            @default(now())
   completedAt         DateTime?
   createdAt           DateTime            @default(now())
+  // Phase 10D — liveness signal for stale-run reclaim, distinct from
+  // startedAt/completedAt. Always set at creation (worker/src/processing-run.ts
+  // startProcessingRun), never left null while RUNNING, so a freshly-created
+  // run can never be mistaken for stale before its first real heartbeat tick —
+  // see startHeartbeat()'s doc comment for the full reasoning. Refreshed every
+  // HEARTBEAT_INTERVAL_MS by the owning worker; a run whose heartbeatAt falls
+  // behind STALE_THRESHOLD_MS is eligible for reclaim (RUNNING -> FAILED).
+  heartbeatAt         DateTime?
 
   assessments         Assessment[]
   consistencyFindings CandidateConsistencyFinding[]

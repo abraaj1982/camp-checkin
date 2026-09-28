@@ -1,11 +1,12 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { prisma } from "@recruitment-platform/db";
 import { AiGateway, AiValidationError, type AIProvider, type AiRunRequest, type AiRunResult } from "@recruitment-platform/ai-gateway";
 import { LocalObjectStorage, buildCandidateDocumentKey } from "@recruitment-platform/storage";
 import { runDocumentProcessingPipeline } from "../pipeline.js";
+import * as processingRunModule from "../processing-run.js";
 import { buildTestDocx, buildTestPdf } from "./fixtures.js";
 import { FakeAIProvider, createUser, resetDatabase, seedAiModelConfig } from "./test-utils.js";
 
@@ -437,5 +438,152 @@ describe("runDocumentProcessingPipeline", () => {
     // write) — the point being verified is what it is NOT: never flipped
     // to FAILED_RETRY or COMPLETED by the reclaimed run itself.
     expect(updatedDoc.status).toBe("QUEUED");
+  });
+
+  describe("Phase 10D — heartbeat lifecycle", () => {
+    // Spying directly on startHeartbeat proves start/stop calls precisely
+    // and avoids mixing vi.useFakeTimers() with the pipeline's real,
+    // multi-step Prisma I/O (which does not tolerate fake timers well —
+    // confirmed empirically: wrapping the full pipeline call in fake
+    // timers caused it to silently stop completing its own awaits).
+    function spyOnStartHeartbeat() {
+      return vi.spyOn(processingRunModule, "startHeartbeat");
+    }
+    let stopSpy: ReturnType<typeof vi.fn>;
+    let startHeartbeatSpy: ReturnType<typeof spyOnStartHeartbeat>;
+
+    beforeEach(() => {
+      stopSpy = vi.fn();
+      startHeartbeatSpy = vi.spyOn(processingRunModule, "startHeartbeat").mockReturnValue({ stop: stopSpy });
+    });
+
+    afterEach(() => {
+      startHeartbeatSpy.mockRestore();
+    });
+
+    it("(1) heartbeat starts after startProcessingRun successfully establishes ownership", async () => {
+      await seedAiModelConfig("RESUME_INTELLIGENCE");
+      await seedAiModelConfig("CAREER_CONSISTENCY_ANALYSIS");
+      const pdf = await buildTestPdf(
+        "Jane Doe. HR Manager at Acme Corp since 2018. Led grievance handling and disciplinary " +
+          "investigations across multiple regions. BA in Human Resources, State University. " +
+          "Certified SHRM-CP. Fluent in English.",
+      );
+      const { candidate, document } = await seedCandidateWithDocument(pdf, "pdf");
+      const gateway = new AiGateway({
+        fake: new FakeAIProvider({
+          RESUME_INTELLIGENCE: RESUME_INTELLIGENCE_HAPPY_PATH,
+          CAREER_CONSISTENCY_ANALYSIS: CAREER_CONSISTENCY_HAPPY_PATH,
+        }),
+      });
+
+      await runDocumentProcessingPipeline(
+        { candidateDocumentId: document.id, candidateId: candidate.id, projectId: "unused" },
+        { storage, gateway },
+      );
+
+      expect(startHeartbeatSpy).toHaveBeenCalledTimes(1);
+      const updatedDoc = await prisma.candidateDocument.findUniqueOrThrow({ where: { id: document.id } });
+      expect(startHeartbeatSpy.mock.calls[0][0]).toBe(updatedDoc.currentProcessingRunId); // started with the correct run id
+    });
+
+    it("(2) heartbeat stops on successful completion", async () => {
+      await seedAiModelConfig("RESUME_INTELLIGENCE");
+      await seedAiModelConfig("CAREER_CONSISTENCY_ANALYSIS");
+      const pdf = await buildTestPdf(
+        "Jane Doe. HR Manager at Acme Corp since 2018. Led grievance handling and disciplinary " +
+          "investigations across multiple regions. BA in Human Resources, State University. " +
+          "Certified SHRM-CP. Fluent in English.",
+      );
+      const { candidate, document } = await seedCandidateWithDocument(pdf, "pdf");
+      const gateway = new AiGateway({
+        fake: new FakeAIProvider({
+          RESUME_INTELLIGENCE: RESUME_INTELLIGENCE_HAPPY_PATH,
+          CAREER_CONSISTENCY_ANALYSIS: CAREER_CONSISTENCY_HAPPY_PATH,
+        }),
+      });
+
+      await runDocumentProcessingPipeline(
+        { candidateDocumentId: document.id, candidateId: candidate.id, projectId: "unused" },
+        { storage, gateway },
+      );
+
+      expect(stopSpy).toHaveBeenCalledTimes(1);
+      const updatedDoc = await prisma.candidateDocument.findUniqueOrThrow({ where: { id: document.id } });
+      expect(updatedDoc.status).toBe("COMPLETED");
+    });
+
+    it("(4) heartbeat stops on the OCR terminal path", async () => {
+      const scannedPdf = await buildTestPdf(" ");
+      const { candidate, document } = await seedCandidateWithDocument(scannedPdf, "pdf");
+      const gateway = new AiGateway({ fake: new FakeAIProvider({}) });
+
+      await runDocumentProcessingPipeline(
+        { candidateDocumentId: document.id, candidateId: candidate.id, projectId: "unused" },
+        { storage, gateway },
+      );
+
+      expect(stopSpy).toHaveBeenCalledTimes(1);
+      const updatedDoc = await prisma.candidateDocument.findUniqueOrThrow({ where: { id: document.id } });
+      expect(updatedDoc.status).toBe("FAILED_NEEDS_OCR");
+    });
+
+    it("(3) heartbeat stops on ordinary processing failure", async () => {
+      await seedAiModelConfig("RESUME_INTELLIGENCE");
+      const pdf = await buildTestPdf(
+        "Jane Doe. HR Manager at Acme Corp since 2018. Led grievance handling and disciplinary " +
+          "investigations across multiple regions. BA in Human Resources, State University. " +
+          "Certified SHRM-CP. Fluent in English.",
+      );
+      const { candidate, document } = await seedCandidateWithDocument(pdf, "pdf");
+      const badGateway = new AiGateway({
+        fake: new FakeAIProvider({ RESUME_INTELLIGENCE: () => ({ invalid: "shape" }) }),
+      });
+
+      await expect(
+        runDocumentProcessingPipeline(
+          { candidateDocumentId: document.id, candidateId: candidate.id, projectId: "unused" },
+          { storage, gateway: badGateway },
+        ),
+      ).rejects.toBeInstanceOf(AiValidationError);
+
+      expect(stopSpy).toHaveBeenCalledTimes(1);
+      const run = await prisma.processingRun.findFirstOrThrow({ where: { candidateDocumentId: document.id } });
+      expect(run.status).toBe("FAILED");
+    });
+
+    it("(5) heartbeat stops after ProcessingRunNoLongerActiveError (reclaimed mid-flight)", async () => {
+      await seedAiModelConfig("RESUME_INTELLIGENCE");
+      const pdf = await buildTestPdf(
+        "Jane Doe. HR Manager at Acme Corp since 2018. Led grievance handling and disciplinary " +
+          "investigations across multiple regions. BA in Human Resources, State University. " +
+          "Certified SHRM-CP. Fluent in English.",
+      );
+      const { candidate, document } = await seedCandidateWithDocument(pdf, "pdf");
+
+      class ReclaimDuringCallProvider implements AIProvider {
+        readonly name = "fake";
+        async run(request: AiRunRequest): Promise<AiRunResult> {
+          if (request.taskType === "RESUME_INTELLIGENCE") {
+            await prisma.processingRun.updateMany({
+              where: { candidateDocumentId: document.id, status: "RUNNING" },
+              data: { status: "FAILED", completedAt: new Date() },
+            });
+            return { rawText: JSON.stringify(RESUME_INTELLIGENCE_HAPPY_PATH) };
+          }
+          return { rawText: JSON.stringify(CAREER_CONSISTENCY_HAPPY_PATH) };
+        }
+      }
+      const gateway = new AiGateway({ fake: new ReclaimDuringCallProvider() });
+
+      await expect(
+        runDocumentProcessingPipeline(
+          { candidateDocumentId: document.id, candidateId: candidate.id, projectId: "unused" },
+          { storage, gateway },
+        ),
+      ).rejects.toThrow("no longer RUNNING");
+
+      expect(stopSpy).toHaveBeenCalledTimes(1);
+    });
   });
 });

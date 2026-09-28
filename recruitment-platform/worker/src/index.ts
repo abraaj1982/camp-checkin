@@ -11,12 +11,16 @@ import {
 import { runDocumentProcessingPipeline } from "./pipeline.js";
 import { runIdentityResolutionPipeline } from "./identity-resolution.js";
 import { runScheduledPurgeScan } from "./candidate-purge.js";
-import { ProcessingRunNoLongerActiveError } from "./processing-run.js";
+import { ProcessingRunNoLongerActiveError, ProcessingRunAlreadyActiveError, runReclaimScan } from "./processing-run.js";
 
 // Phase 8 — PII Retention/Purge. Not an application-triggered job like the
 // two above — pg-boss.schedule() runs it on a cron, the first time-based
 // (rather than event-triggered) job in this system.
 const SCHEDULED_PURGE_SCAN_JOB = "scheduled-purge-scan";
+// Phase 10D — ProcessingRun stale reclaim. Runs every minute — more
+// frequent than STALE_THRESHOLD_MS (3 minutes) so detection latency stays
+// close to that bound (worst case roughly threshold + this interval).
+const RECLAIM_STALE_PROCESSING_RUNS_JOB = "reclaim-stale-processing-runs";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("Missing required environment variable: DATABASE_URL");
@@ -69,6 +73,7 @@ async function runWorker(storage: ObjectStorage, gateway: AiGateway) {
   await boss.createQueue(PROCESS_CANDIDATE_DOCUMENT_JOB);
   await boss.createQueue(RESOLVE_CANDIDATE_IDENTITY_JOB);
   await boss.createQueue(SCHEDULED_PURGE_SCAN_JOB);
+  await boss.createQueue(RECLAIM_STALE_PROCESSING_RUNS_JOB);
 
   const queue = new PgBossCandidateDocumentQueue(databaseUrl!);
 
@@ -88,6 +93,20 @@ async function runWorker(storage: ObjectStorage, gateway: AiGateway) {
         // pipeline itself; this only handles the retryable-failure case.
         await runDocumentProcessingPipeline(job.data, { storage, gateway });
       } catch (err) {
+        // Phase 10D — benign duplicate delivery (e.g. pg-boss's own
+        // retryLimit/expiration dispatching a second attempt while the
+        // first is still genuinely alive, per Phase 10C's finding — pg-boss
+        // expiry is left unchanged this phase). No ProcessingRun was ever
+        // created for this refused attempt, so there is nothing to clean
+        // up: not a failure, not retried further, not re-enqueued, and not
+        // worth a business AuditLog row — a lightweight log is sufficient.
+        if (err instanceof ProcessingRunAlreadyActiveError) {
+          // eslint-disable-next-line no-console
+          console.warn("[worker] duplicate delivery: a ProcessingRun is already RUNNING for this document", {
+            candidateDocumentId,
+          });
+          return;
+        }
         // Phase 10 — a stale/reclaimed run must become harmless: it must
         // NOT flip the document to FAILED_RETRY (that would be exactly the
         // "late-arriving worker changes current state" outcome the whole
@@ -138,6 +157,16 @@ async function runWorker(storage: ObjectStorage, gateway: AiGateway) {
   await boss.schedule(SCHEDULED_PURGE_SCAN_JOB, "0 2 * * *", {}, { tz: "Asia/Muscat" });
   await boss.work(SCHEDULED_PURGE_SCAN_JOB, { batchSize: 1 }, async () => {
     await runScheduledPurgeScan({ storage });
+  });
+
+  // Phase 10D — stale ProcessingRun reclaim. Every minute (see the
+  // constant's own comment above for why); no automatic requeue — reclaim
+  // only transitions ProcessingRun -> FAILED and CandidateDocument ->
+  // FAILED_RETRY, atomically; the existing manual retry route remains the
+  // sole path back into processing.
+  await boss.schedule(RECLAIM_STALE_PROCESSING_RUNS_JOB, "* * * * *", {}, {});
+  await boss.work(RECLAIM_STALE_PROCESSING_RUNS_JOB, { batchSize: 1 }, async () => {
+    await runReclaimScan();
   });
 
   // eslint-disable-next-line no-console
