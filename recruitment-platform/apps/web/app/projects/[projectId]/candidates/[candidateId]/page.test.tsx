@@ -63,6 +63,7 @@ function mockResponses({
 const baseAssessment = (overrides: Partial<Record<string, unknown>> = {}) => ({
   id: "assessment-1",
   status: "STRONG_EVIDENCE",
+  isAuthoritative: true,
   requirement: {
     id: "req-1",
     description: "5 years Employee Relations",

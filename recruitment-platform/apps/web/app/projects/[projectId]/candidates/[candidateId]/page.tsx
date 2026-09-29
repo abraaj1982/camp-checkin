@@ -44,6 +44,10 @@ interface AssessmentItem {
   };
   requirementVersion: { id: string; versionNumber: number; evidenceCriteriaSnapshot: unknown } | null;
   evidence: EvidenceItem[];
+  // Phase 12 (C3) — profile/publication-authority indicator only (never an
+  // evidence-quality signal): whether this Assessment's ProcessingRun is
+  // the candidate's current Phase 11 authoritative one.
+  isAuthoritative: boolean;
 }
 
 interface AssessmentsResponse {
@@ -59,6 +63,7 @@ interface ConsistencyFinding {
   evidenceText: string | null;
   confidence: string;
   source: string | null;
+  isAuthoritative: boolean;
 }
 
 interface ConsistencyResponse {
@@ -90,6 +95,9 @@ interface DecisionOverride {
   assessmentId: string;
   overridden: boolean;
   hrNote: string | null;
+  // Phase 12 (C3) — durable provenance: null means this decision predates
+  // this field (genuinely unknown), never inferred from current state.
+  wasAuthoritativeAtDecision: boolean | null;
 }
 
 interface Decision {
@@ -142,7 +150,12 @@ function AssessmentCard({ assessment }: { assessment: AssessmentItem }) {
             {assessment.requirement.hrApprovedWeight !== null && ` · Weight: ${assessment.requirement.hrApprovedWeight}`}
           </p>
         </div>
-        <StatusBadge status={assessment.status} />
+        <div style={{ textAlign: "right" }}>
+          <StatusBadge status={assessment.status} />
+          <p style={{ margin: "4px 0 0", fontSize: 11, color: assessment.isAuthoritative ? "#276749" : "#8a5a00" }}>
+            {assessment.isAuthoritative ? "Current profile" : "Other current document"}
+          </p>
+        </div>
       </div>
 
       {criteria && criteria.length > 0 && (
@@ -273,6 +286,7 @@ function DecisionsPanel({
                 {currentAssessments.map((a) => (
                   <option key={a.id} value={a.id}>
                     {a.requirement.description} — {a.status.replaceAll("_", " ")}
+                    {a.isAuthoritative ? "" : " (other current document)"}
                   </option>
                 ))}
               </select>
@@ -311,6 +325,8 @@ function DecisionsPanel({
             {d.override && (
               <p style={{ margin: 0, fontSize: 12, color: "#888" }}>
                 {d.override.overridden ? "Overrides an AI assessment gap." : "Agrees with the AI assessment."}
+                {d.override.wasAuthoritativeAtDecision === false && " · Cited a non-authoritative document."}
+                {d.override.wasAuthoritativeAtDecision === null && " · Authority not recorded (predates this feature)."}
               </p>
             )}
             <p style={{ margin: "4px 0 0", fontSize: 11, color: "#888" }}>{new Date(d.decidedAt).toLocaleString()}</p>
@@ -326,6 +342,11 @@ function FindingCard({ finding }: { finding: ConsistencyFinding }) {
     <div style={{ border: "1px solid #ddd", borderRadius: 6, padding: 12, marginBottom: 8 }}>
       <p style={{ margin: 0, fontWeight: 600 }}>
         {finding.findingType.replaceAll("_", " ")} — <span style={{ fontWeight: 400 }}>{finding.severity.replaceAll("_", " ")}</span>
+        <span
+          style={{ marginLeft: 8, fontSize: 11, fontWeight: 400, color: finding.isAuthoritative ? "#276749" : "#8a5a00" }}
+        >
+          {finding.isAuthoritative ? "Current profile" : "Other current document"}
+        </span>
       </p>
       <p style={{ margin: "8px 0" }}>{finding.description}</p>
       {finding.evidenceText && <p style={{ margin: "8px 0", color: "#555" }}>&ldquo;{finding.evidenceText}&rdquo;</p>}

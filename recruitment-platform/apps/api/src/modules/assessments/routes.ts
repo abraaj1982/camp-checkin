@@ -48,6 +48,24 @@ export async function resolveCurrentRunIds(candidateId: string, projectId: strin
     .filter((id): id is string => id !== null);
 }
 
+/**
+ * Assessment/Evidence Authority (C3, Post-Phase-11 decision). Derived at
+ * read time only — never stored on Assessment/Evidence/
+ * CandidateConsistencyFinding/Candidate — by comparing a row's
+ * processingRunId against Candidate.currentProfileProcessingRunId (Phase
+ * 11's own marker, unmodified by this change). A profile/publication-
+ * authority indicator only (Decision 6): it says nothing about
+ * EvidenceStrength, Assessment status, or mandatory-gap outcome, all of
+ * which remain exactly as computed by the worker.
+ */
+async function resolveAuthoritativeRunIds(candidateIds: string[]): Promise<Map<string, string | null>> {
+  const candidates = await prisma.candidate.findMany({
+    where: { id: { in: candidateIds } },
+    select: { id: true, currentProfileProcessingRunId: true },
+  });
+  return new Map(candidates.map((c) => [c.id, c.currentProfileProcessingRunId]));
+}
+
 async function buildEmployerOrder(candidateId: string): Promise<string[]> {
   const experiences = await prisma.candidateExperience.findMany({
     where: { candidateId },
@@ -93,10 +111,11 @@ type ConsistencyFindingRow = {
   evidenceText: string | null;
   confidence: string;
   sourceDocumentId: string | null;
+  processingRunId: string;
 };
 
-/** Shared by the single-candidate consistency-findings endpoint and Candidate Comparison. */
-function mapFinding(finding: ConsistencyFindingRow, employerOrder: string[]) {
+/** Shared by the single-candidate consistency-findings endpoint and Candidate Comparison. isAuthoritative is derived by the caller (resolveAuthoritativeRunIds) — never recomputed here from stored state. */
+function mapFinding(finding: ConsistencyFindingRow, employerOrder: string[], isAuthoritative: boolean) {
   return {
     findingType: finding.findingType,
     severity: finding.severity,
@@ -105,6 +124,7 @@ function mapFinding(finding: ConsistencyFindingRow, employerOrder: string[]) {
     evidenceText: finding.evidenceText ? redactEvidenceForBlindMode(finding.evidenceText, employerOrder) : finding.evidenceText,
     confidence: finding.confidence,
     source: finding.sourceDocumentId ? "Source Document" : null,
+    isAuthoritative,
   };
 }
 
@@ -133,6 +153,8 @@ export async function registerAssessmentRoutes(app: FastifyInstance): Promise<vo
       }
 
       const employerOrder = await buildEmployerOrder(candidateId);
+      const authoritativeRunIdByCandidateId = await resolveAuthoritativeRunIds([candidateId]);
+      const authoritativeRunId = authoritativeRunIdByCandidateId.get(candidateId) ?? null;
 
       const assessments = await prisma.assessment.findMany({
         where: { candidateId, projectId: project.id, processingRunId: { in: currentRunIds } },
@@ -169,6 +191,7 @@ export async function registerAssessmentRoutes(app: FastifyInstance): Promise<vo
               }
             : null,
           evidence: assessment.evidenceLinks.map((link) => mapEvidence(link, employerOrder)),
+          isAuthoritative: assessment.processingRunId === authoritativeRunId,
         })),
       };
     },
@@ -193,6 +216,8 @@ export async function registerAssessmentRoutes(app: FastifyInstance): Promise<vo
       }
 
       const employerOrder = await buildEmployerOrder(candidateId);
+      const authoritativeRunIdByCandidateId = await resolveAuthoritativeRunIds([candidateId]);
+      const authoritativeRunId = authoritativeRunIdByCandidateId.get(candidateId) ?? null;
 
       // CandidateConsistencyFinding.processingRunId (Phase 5A follow-up)
       // completes the same traceability model Assessment already has —
@@ -206,7 +231,9 @@ export async function registerAssessmentRoutes(app: FastifyInstance): Promise<vo
 
       return {
         candidate: { id: candidateId, anonymizedLabel: link.anonymizedLabel },
-        findings: findings.map((finding) => mapFinding(finding, employerOrder)),
+        findings: findings.map((finding) =>
+          mapFinding(finding, employerOrder, finding.processingRunId === authoritativeRunId),
+        ),
       };
     },
   );
@@ -289,6 +316,7 @@ function registerCandidateComparisonRoute(app: FastifyInstance): void {
         );
       }
       const allCurrentRunIds = [...currentRunIdsByCandidateId.values()].flat();
+      const authoritativeRunIdByCandidateId = await resolveAuthoritativeRunIds(candidateIds);
 
       const employerOrderByCandidateId = new Map<string, string[]>();
       for (const candidateId of candidateIds) {
@@ -338,7 +366,18 @@ function registerCandidateComparisonRoute(app: FastifyInstance): void {
           mandatory: boolean;
           category: string;
           hrApprovedWeight: string | null;
-          resultsByCandidate: Record<string, unknown>;
+          // Phase 12 (C3) — an ARRAY per candidate, not a single nullable
+          // value. Under the hybrid/union model (Phase 4A's own
+          // resolveCurrentRunIds, unchanged), a candidate can legitimately
+          // have more than one Assessment for the same
+          // (requirementId, requirementVersionId) when more than one of
+          // their documents has its own current run — e.g. one
+          // authoritative (Phase 11) and one not. Previously this was a
+          // single object silently overwritten by whichever row the DB
+          // returned last; every result is now preserved, each tagged
+          // with its own isAuthoritative derived flag, and none is
+          // arbitrarily dropped or merged.
+          resultsByCandidate: Record<string, unknown[]>;
         }
       >();
 
@@ -353,15 +392,17 @@ function registerCandidateComparisonRoute(app: FastifyInstance): void {
             mandatory: assessment.requirement.mandatory,
             category: assessment.requirement.category,
             hrApprovedWeight: assessment.requirement.hrApprovedWeight ? String(assessment.requirement.hrApprovedWeight) : null,
-            resultsByCandidate: Object.fromEntries(candidateIds.map((id) => [id, null])),
+            resultsByCandidate: Object.fromEntries(candidateIds.map((id) => [id, []])),
           });
         }
         const row = rows.get(key)!;
         const employerOrder = employerOrderByCandidateId.get(assessment.candidateId) ?? [];
-        row.resultsByCandidate[assessment.candidateId] = {
+        const authoritativeRunId = authoritativeRunIdByCandidateId.get(assessment.candidateId) ?? null;
+        row.resultsByCandidate[assessment.candidateId].push({
           status: assessment.status,
           evidence: assessment.evidenceLinks.map((link) => mapEvidence(link, employerOrder)),
-        };
+          isAuthoritative: assessment.processingRunId === authoritativeRunId,
+        });
       }
 
       // Deterministic row order: by requirement description, then version
@@ -377,7 +418,10 @@ function registerCandidateComparisonRoute(app: FastifyInstance): void {
       );
       for (const finding of findings) {
         const employerOrder = employerOrderByCandidateId.get(finding.candidateId) ?? [];
-        consistencyFindingsByCandidate[finding.candidateId].push(mapFinding(finding, employerOrder));
+        const authoritativeRunId = authoritativeRunIdByCandidateId.get(finding.candidateId) ?? null;
+        consistencyFindingsByCandidate[finding.candidateId].push(
+          mapFinding(finding, employerOrder, finding.processingRunId === authoritativeRunId),
+        );
       }
 
       // Phase 9 — Evidence Coverage, per candidate. Built from the same
@@ -430,7 +474,7 @@ function registerCandidateComparisonRoute(app: FastifyInstance): void {
         const isProcessing = docs.some((d) => d.status === "QUEUED" || d.status === "PROCESSING");
         const hasCurrentRun = (currentRunIdsByCandidateId.get(candidateId) ?? []).length > 0;
         const hasResults =
-          requirementRows.some((row) => row.resultsByCandidate[candidateId] !== null) ||
+          requirementRows.some((row) => row.resultsByCandidate[candidateId].length > 0) ||
           consistencyFindingsByCandidate[candidateId].length > 0;
         const isFailed = !hasResults && !isProcessing && !hasCurrentRun && docs.some((d) => d.status === "FAILED_RETRY");
         return {

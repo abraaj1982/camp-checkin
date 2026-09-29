@@ -215,7 +215,16 @@ describe("HR decisions (Phase 6)", () => {
     });
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(body.override).toEqual({ assessmentId: assessment.id, overridden: true, hrNote: "HR disagrees with the gap finding." });
+    // wasAuthoritativeAtDecision is false here because seedDocumentAndRun/
+    // completeRun bypass the real worker pipeline and never populate
+    // Candidate.currentProfileProcessingRunId (Phase 11's marker) — this
+    // is correct, not a bug: the fixture never published a profile.
+    expect(body.override).toEqual({
+      assessmentId: assessment.id,
+      overridden: true,
+      hrNote: "HR disagrees with the gap finding.",
+      wasAuthoritativeAtDecision: false,
+    });
 
     const stored = await prisma.hrOverride.findUnique({ where: { decisionId: body.id } });
     expect(stored?.overridden).toBe(true);
@@ -223,6 +232,77 @@ describe("HR decisions (Phase 6)", () => {
     // The underlying Assessment row itself is never touched.
     const unchanged = await prisma.assessment.findUnique({ where: { id: assessment.id } });
     expect(unchanged?.status).toBe("MANDATORY_GAP");
+  });
+
+  it("Phase 12 (C3): records wasAuthoritativeAtDecision=true when citing the candidate's published-authoritative Assessment", async () => {
+    const { user, project, cookie } = await seedProject();
+    const candidate = await seedLinkedCandidate(project);
+    const { document, run } = await seedDocumentAndRun(project, user, candidate);
+    const assessment = await seedRequirementAndAssessment(project, user, candidate, run, "MANDATORY_GAP");
+
+    // Publish the profile authority (Phase 11's marker) — mirrors what the
+    // real worker pipeline's tryPublishCandidateProfile CAS would set.
+    await prisma.candidate.update({
+      where: { id: candidate.id },
+      data: {
+        currentProfileDocumentId: document.id,
+        currentProfileUploadedAt: document.uploadedAt,
+        currentProfileProcessingRunId: run.id,
+        currentProfileAttemptNumber: run.attemptNumber,
+      },
+    });
+
+    const res = await post(cookie, project.id, candidate.id, {
+      decision: "SHORTLIST",
+      assessmentId: assessment.id,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().override.wasAuthoritativeAtDecision).toBe(true);
+
+    const stored = await prisma.hrOverride.findUnique({ where: { decisionId: res.json().id } });
+    expect(stored?.wasAuthoritativeAtDecision).toBe(true);
+  });
+
+  it("Phase 12 (C3): still accepts citing a non-authoritative Assessment, recording wasAuthoritativeAtDecision=false (HR may cite superseded evidence)", async () => {
+    const { user, project, cookie } = await seedProject();
+    const candidate = await seedLinkedCandidate(project);
+    const { document, run } = await seedDocumentAndRun(project, user, candidate);
+    const assessment = await seedRequirementAndAssessment(project, user, candidate, run, "MANDATORY_GAP");
+
+    // A DIFFERENT document/run is published as authoritative — this
+    // candidate's own current-run assessment remains fully citable (Phase
+    // 12 C3 never narrows HR Decision validation), but is not authoritative.
+    const otherDocument = await prisma.candidateDocument.create({
+      data: {
+        candidateId: candidate.id,
+        projectId: project.id,
+        fileType: "pdf",
+        storageKey: `s3://bucket/${candidate.id}-other.pdf`,
+        originalFilename: "other-resume.pdf",
+        uploadedBy: user.id,
+        uploadedAt: new Date(document.uploadedAt.getTime() + 1000),
+      },
+    });
+    const otherRun = await prisma.processingRun.create({
+      data: { candidateDocumentId: otherDocument.id, attemptNumber: 1, status: "COMPLETED", completedAt: new Date() },
+    });
+    await prisma.candidate.update({
+      where: { id: candidate.id },
+      data: {
+        currentProfileDocumentId: otherDocument.id,
+        currentProfileUploadedAt: otherDocument.uploadedAt,
+        currentProfileProcessingRunId: otherRun.id,
+        currentProfileAttemptNumber: otherRun.attemptNumber,
+      },
+    });
+
+    const res = await post(cookie, project.id, candidate.id, {
+      decision: "SHORTLIST",
+      assessmentId: assessment.id,
+    });
+    // Still accepted — C3 never rejects a citation merely for being non-authoritative.
+    expect(res.statusCode).toBe(200);
+    expect(res.json().override.wasAuthoritativeAtDecision).toBe(false);
   });
 
   it("rejects an override referencing an assessment from a superseded (non-current) run", async () => {

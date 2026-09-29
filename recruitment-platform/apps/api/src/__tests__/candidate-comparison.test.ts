@@ -266,8 +266,8 @@ describe("POST /projects/:projectId/candidates/compare", () => {
     const res = await compare(cookie, project.id, [a.candidate.id, b.candidate.id]);
     const body = res.json();
     const row = body.requirementRows[0];
-    const resultA = row.resultsByCandidate[a.candidate.id];
-    const resultB = row.resultsByCandidate[b.candidate.id];
+    const resultA = row.resultsByCandidate[a.candidate.id][0];
+    const resultB = row.resultsByCandidate[b.candidate.id][0];
 
     expect(resultA.evidence[0].evidenceText).not.toContain("Acme Corp");
     expect(resultA.evidence[0].evidenceText).not.toContain("jane@example.com");
@@ -299,10 +299,10 @@ describe("POST /projects/:projectId/candidates/compare", () => {
     const row = res.json().requirementRows[0];
     // Both tokenize to "Company A" independently — this proves per-candidate
     // scoping (not a shared/global mapping), per the approved decision.
-    expect(row.resultsByCandidate[a.candidate.id].evidence[0].evidenceText).toContain("Company A");
-    expect(row.resultsByCandidate[b.candidate.id].evidence[0].evidenceText).toContain("Company A");
-    expect(row.resultsByCandidate[a.candidate.id].evidence[0].evidenceText).not.toContain("Globex");
-    expect(row.resultsByCandidate[b.candidate.id].evidence[0].evidenceText).not.toContain("Acme");
+    expect(row.resultsByCandidate[a.candidate.id][0].evidence[0].evidenceText).toContain("Company A");
+    expect(row.resultsByCandidate[b.candidate.id][0].evidence[0].evidenceText).toContain("Company A");
+    expect(row.resultsByCandidate[a.candidate.id][0].evidence[0].evidenceText).not.toContain("Globex");
+    expect(row.resultsByCandidate[b.candidate.id][0].evidence[0].evidenceText).not.toContain("Acme");
   });
 
   it("12. different RequirementVersions for the same requirement produce separate rows", async () => {
@@ -338,10 +338,10 @@ describe("POST /projects/:projectId/candidates/compare", () => {
     // Each row only has a result for the candidate actually assessed against that version.
     const v1Row = rowsForRequirement.find((r: { versionNumber: number }) => r.versionNumber === 1);
     const v2Row = rowsForRequirement.find((r: { versionNumber: number }) => r.versionNumber === 2);
-    expect(v1Row.resultsByCandidate[a.candidate.id]).not.toBeNull();
-    expect(v1Row.resultsByCandidate[b.candidate.id]).toBeNull();
-    expect(v2Row.resultsByCandidate[b.candidate.id]).not.toBeNull();
-    expect(v2Row.resultsByCandidate[a.candidate.id]).toBeNull();
+    expect(v1Row.resultsByCandidate[a.candidate.id]).toHaveLength(1);
+    expect(v1Row.resultsByCandidate[b.candidate.id]).toHaveLength(0);
+    expect(v2Row.resultsByCandidate[b.candidate.id]).toHaveLength(1);
+    expect(v2Row.resultsByCandidate[a.candidate.id]).toHaveLength(0);
   });
 
   it("13. same requirement + same version aligns candidates in one row", async () => {
@@ -358,8 +358,8 @@ describe("POST /projects/:projectId/candidates/compare", () => {
     const body = res.json();
     expect(body.requirementRows).toHaveLength(1);
     const row = body.requirementRows[0];
-    expect(row.resultsByCandidate[a.candidate.id].status).toBe("STRONG_EVIDENCE");
-    expect(row.resultsByCandidate[b.candidate.id].status).toBe("MANDATORY_GAP");
+    expect(row.resultsByCandidate[a.candidate.id][0].status).toBe("STRONG_EVIDENCE");
+    expect(row.resultsByCandidate[b.candidate.id][0].status).toBe("MANDATORY_GAP");
   });
 
   it("14. missing candidate evidence returns null safely, and missing findings return an empty array", async () => {
@@ -372,7 +372,7 @@ describe("POST /projects/:projectId/candidates/compare", () => {
 
     const res = await compare(cookie, project.id, [a.candidate.id, b.candidate.id]);
     const body = res.json();
-    expect(body.requirementRows[0].resultsByCandidate[b.candidate.id]).toBeNull();
+    expect(body.requirementRows[0].resultsByCandidate[b.candidate.id]).toEqual([]);
     expect(body.consistencyFindingsByCandidate[a.candidate.id]).toEqual([]);
     expect(body.consistencyFindingsByCandidate[b.candidate.id]).toEqual([]);
   });
@@ -394,7 +394,7 @@ describe("POST /projects/:projectId/candidates/compare", () => {
     expect(candA.hasCurrentRun).toBe(true);
     expect(candB.isFailed).toBe(true);
     expect(candB.hasCurrentRun).toBe(false);
-    expect(body.requirementRows[0].resultsByCandidate[a.candidate.id]).not.toBeNull();
+    expect(body.requirementRows[0].resultsByCandidate[a.candidate.id]).toHaveLength(1);
   });
 
   it("16. preserves source/page traceability per candidate", async () => {
@@ -409,9 +409,9 @@ describe("POST /projects/:projectId/candidates/compare", () => {
 
     const res = await compare(cookie, project.id, [a.candidate.id, b.candidate.id]);
     const row = res.json().requirementRows[0];
-    expect(row.resultsByCandidate[a.candidate.id].evidence[0].sourcePage).toBe(2);
-    expect(row.resultsByCandidate[a.candidate.id].evidence[0].source).toBe("Source Document");
-    expect(row.resultsByCandidate[b.candidate.id].evidence[0].sourcePage).toBe(2);
+    expect(row.resultsByCandidate[a.candidate.id][0].evidence[0].sourcePage).toBe(2);
+    expect(row.resultsByCandidate[a.candidate.id][0].evidence[0].source).toBe("Source Document");
+    expect(row.resultsByCandidate[b.candidate.id][0].evidence[0].sourcePage).toBe(2);
   });
 
   it("17. never invokes an AI provider (no AiModelConfiguration lookup for a comparison task; no AiInteraction rows created by this request)", async () => {
@@ -682,6 +682,105 @@ describe("POST /projects/:projectId/candidates/compare", () => {
       const body = res.json();
       expect(body.candidates.map((c: { candidateId: string }) => c.candidateId)).toEqual([a.candidate.id, b.candidate.id]);
       expect(res.body).not.toContain('"rank"');
+    });
+  });
+
+  describe("Phase 12 (C3) — Assessment/Evidence Authority", () => {
+    /** Directly sets Candidate.currentProfileProcessingRunId etc. (Phase 11's marker) — these fixtures predate and bypass the real worker pipeline/CAS, mirroring the existing completeRun() helper's own approach. */
+    async function publishProfile(
+      candidate: { id: string },
+      document: { id: string; uploadedAt: Date },
+      run: { id: string; attemptNumber: number },
+    ) {
+      await prisma.candidate.update({
+        where: { id: candidate.id },
+        data: {
+          currentProfileDocumentId: document.id,
+          currentProfileUploadedAt: document.uploadedAt,
+          currentProfileProcessingRunId: run.id,
+          currentProfileAttemptNumber: run.attemptNumber,
+        },
+      });
+    }
+
+    it("preserves multiple current-run Assessment rows for the same candidate/requirement — never silently collapsed", async () => {
+      const { user, project, cookie } = await seedProject();
+      const a = await seedCandidate(project, user, "Candidate #001");
+      const { requirement, version } = await seedRequirement(project, user);
+
+      // A second document for the same candidate — its own independent,
+      // successfully-completed run (Phase 10A.3's proven-reachable
+      // concurrent-document scenario, modeled here without the worker).
+      const secondDocument = await prisma.candidateDocument.create({
+        data: {
+          candidateId: a.candidate.id,
+          projectId: project.id,
+          fileType: "pdf",
+          storageKey: `s3://bucket/${a.candidate.id}-second.pdf`,
+          originalFilename: "second-resume.pdf",
+          uploadedBy: user.id,
+        },
+      });
+
+      const runOne = await completeRun(a.document, 1);
+      const runTwo = await completeRun(secondDocument, 1);
+      await createAssessment(a.candidate, project, requirement, version, runOne, a.document, { status: "STRONG_EVIDENCE" });
+      await createAssessment(a.candidate, project, requirement, version, runTwo, secondDocument, { status: "MANDATORY_GAP" });
+      await publishProfile(a.candidate, secondDocument, runTwo); // runTwo's document is authoritative
+
+      // compare() requires 2-5 distinct candidates — a second seeded
+      // candidate satisfies that constraint; only `a`'s results matter here.
+      const b = await seedCandidate(project, user, "Candidate #002");
+      const res = await compare(cookie, project.id, [a.candidate.id, b.candidate.id]);
+      const body = res.json();
+      const row = body.requirementRows.find((r: { requirementId: string }) => r.requirementId === requirement.id);
+      const resultsForA = row.resultsByCandidate[a.candidate.id];
+
+      expect(resultsForA).toHaveLength(2); // BOTH rows preserved, not arbitrarily collapsed to one
+      const statuses = resultsForA.map((r: { status: string }) => r.status).sort();
+      expect(statuses).toEqual(["MANDATORY_GAP", "STRONG_EVIDENCE"]);
+
+      const authoritativeFlags = resultsForA.map((r: { isAuthoritative: boolean }) => r.isAuthoritative);
+      expect(authoritativeFlags.filter(Boolean)).toHaveLength(1); // exactly one authoritative among the two
+      const authoritativeResult = resultsForA.find((r: { isAuthoritative: boolean }) => r.isAuthoritative);
+      expect(authoritativeResult.status).toBe("MANDATORY_GAP"); // runTwo's document was published as authoritative
+    });
+
+    it("marks a single-document candidate's Assessment as isAuthoritative once the profile has been published", async () => {
+      const { user, project, cookie } = await seedProject();
+      const a = await seedCandidate(project, user, "Candidate #001");
+      const b = await seedCandidate(project, user, "Candidate #002");
+      const { requirement, version } = await seedRequirement(project, user);
+      const runA = await completeRun(a.document);
+      const runB = await completeRun(b.document);
+      await createAssessment(a.candidate, project, requirement, version, runA, a.document);
+      await createAssessment(b.candidate, project, requirement, version, runB, b.document);
+      await publishProfile(a.candidate, a.document, runA);
+      // b's profile was never published (Candidate.currentProfileProcessingRunId stays null) — its Assessment must be isAuthoritative: false.
+
+      const res = await compare(cookie, project.id, [a.candidate.id, b.candidate.id]);
+      const row = res.json().requirementRows[0];
+      expect(row.resultsByCandidate[a.candidate.id][0].isAuthoritative).toBe(true);
+      expect(row.resultsByCandidate[b.candidate.id][0].isAuthoritative).toBe(false);
+    });
+
+    it("never exposes a raw processingRunId or documentId anywhere in the comparison response", async () => {
+      const { user, project, cookie } = await seedProject();
+      const a = await seedCandidate(project, user, "Candidate #001");
+      const b = await seedCandidate(project, user, "Candidate #002");
+      const { requirement, version } = await seedRequirement(project, user);
+      const runA = await completeRun(a.document);
+      const runB = await completeRun(b.document);
+      await createAssessment(a.candidate, project, requirement, version, runA, a.document);
+      await createFinding(a.candidate, project, runA);
+      await createAssessment(b.candidate, project, requirement, version, runB, b.document);
+      await publishProfile(a.candidate, a.document, runA);
+
+      const res = await compare(cookie, project.id, [a.candidate.id, b.candidate.id]);
+      expect(res.body).not.toContain(runA.id);
+      expect(res.body).not.toContain(runB.id);
+      expect(res.body).not.toContain(a.document.id);
+      expect(res.body).not.toContain(b.document.id);
     });
   });
 });

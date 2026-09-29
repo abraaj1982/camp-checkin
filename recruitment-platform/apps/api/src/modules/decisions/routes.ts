@@ -30,13 +30,23 @@ import { recordAudit } from "../../lib/audit.js";
 type DecisionType = "SHORTLIST" | "HOLD" | "REJECT" | "INTERVIEW";
 
 function mapOverride(
-  override: { assessmentId: string; overridden: boolean; hrNote: string | null } | null,
+  override: {
+    assessmentId: string;
+    overridden: boolean;
+    hrNote: string | null;
+    wasAuthoritativeAtDecision: boolean | null;
+  } | null,
 ) {
   if (!override) return null;
   return {
     assessmentId: override.assessmentId,
     overridden: override.overridden,
     hrNote: override.hrNote,
+    // Phase 12 (C3) — durable provenance: was this citation to the
+    // candidate's then-authoritative processing run (Phase 11)? Computed
+    // once, at decision time, never recomputed later. null means this
+    // decision predates the field — genuinely unknown, not false.
+    wasAuthoritativeAtDecision: override.wasAuthoritativeAtDecision,
   };
 }
 
@@ -63,11 +73,13 @@ export async function registerDecisionRoutes(app: FastifyInstance): Promise<void
       });
       if (!link) return reply.code(404).send({ error: "candidate_not_found" });
 
-      let overrideAssessment: { id: string; status: string } | null = null;
+      let overrideAssessment: { id: string; status: string; processingRunId: string } | null = null;
       if (body.assessmentId) {
-        // The override picker only ever offers the candidate's CURRENT-run
-        // assessments (Decision 3) — re-checked here, server-side, rather
-        // than trusted from the client: an assessment belonging to this
+        // The override picker offers ANY of the candidate's CURRENT-run
+        // assessments (Decision 3 / Phase 12 C3 — HR may explicitly cite
+        // non-authoritative evidence, never narrowed to only the Phase 11
+        // authoritative run) — re-checked here, server-side, rather than
+        // trusted from the client: an assessment belonging to this
         // candidate/project but from a superseded (non-current) run is
         // rejected, exactly like a wrong-candidate or wrong-project one.
         const currentRunIds = await resolveCurrentRunIds(candidateId, project.id);
@@ -81,7 +93,7 @@ export async function registerDecisionRoutes(app: FastifyInstance): Promise<void
                   projectId: project.id,
                   processingRunId: { in: currentRunIds },
                 },
-                select: { id: true, status: true },
+                select: { id: true, status: true, processingRunId: true },
               });
         if (!assessment) return reply.code(404).send({ error: "assessment_not_found" });
         overrideAssessment = assessment;
@@ -98,11 +110,30 @@ export async function registerDecisionRoutes(app: FastifyInstance): Promise<void
         select: { id: true, decision: true, notes: true, decidedAt: true },
       });
 
-      let override: { assessmentId: string; overridden: boolean; hrNote: string | null } | null = null;
+      let override: {
+        assessmentId: string;
+        overridden: boolean;
+        hrNote: string | null;
+        wasAuthoritativeAtDecision: boolean | null;
+      } | null = null;
       if (overrideAssessment) {
         const overridden =
           (overrideAssessment.status === "MANDATORY_GAP" || overrideAssessment.status === "REVIEW_REQUIRED") &&
           (body.decision === "SHORTLIST" || body.decision === "INTERVIEW");
+
+        // Phase 12 (C3) — computed once, here, at the exact moment of
+        // decision, from Candidate.currentProfileProcessingRunId (Phase
+        // 11's own marker, read fresh, never cached from earlier in this
+        // request). Always explicitly true or false for a decision made
+        // from this point forward — never left to infer later, since the
+        // candidate-level marker is overwritten in place and carries no
+        // history of its own (Phase 10A.7/10A.8).
+        const candidateRecord = await prisma.candidate.findUnique({
+          where: { id: candidateId },
+          select: { currentProfileProcessingRunId: true },
+        });
+        const wasAuthoritativeAtDecision =
+          overrideAssessment.processingRunId === (candidateRecord?.currentProfileProcessingRunId ?? null);
 
         override = await prisma.hrOverride.create({
           data: {
@@ -110,8 +141,9 @@ export async function registerDecisionRoutes(app: FastifyInstance): Promise<void
             assessmentId: overrideAssessment.id,
             overridden,
             hrNote: body.notes,
+            wasAuthoritativeAtDecision,
           },
-          select: { assessmentId: true, overridden: true, hrNote: true },
+          select: { assessmentId: true, overridden: true, hrNote: true, wasAuthoritativeAtDecision: true },
         });
       }
 
@@ -158,7 +190,9 @@ export async function registerDecisionRoutes(app: FastifyInstance): Promise<void
           notes: true,
           decidedAt: true,
           decider: { select: { name: true } },
-          override: { select: { assessmentId: true, overridden: true, hrNote: true } },
+          override: {
+            select: { assessmentId: true, overridden: true, hrNote: true, wasAuthoritativeAtDecision: true },
+          },
         },
       });
 

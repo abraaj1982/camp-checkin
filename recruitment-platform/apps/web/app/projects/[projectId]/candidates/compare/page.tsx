@@ -33,6 +33,18 @@ interface EvidenceItem {
   source: string | null;
 }
 
+// Phase 12 (C3) — a profile/publication-authority indicator only (never an
+// evidence-quality signal): whether this result's ProcessingRun is the
+// candidate's current Phase 11 authoritative one. A candidate can have
+// more than one current-run result per requirement (the hybrid model —
+// non-authoritative/superseded evidence stays visible, never hidden or
+// silently dropped); each is labeled independently.
+interface AssessmentResult {
+  status: string;
+  evidence: EvidenceItem[];
+  isAuthoritative: boolean;
+}
+
 interface RequirementCoverageResult {
   requirementId: string;
   covered: boolean;
@@ -68,7 +80,9 @@ interface RequirementRow {
   mandatory: boolean;
   category: string;
   hrApprovedWeight: string | null;
-  resultsByCandidate: Record<string, { status: string; evidence: EvidenceItem[] } | null>;
+  // Phase 12 (C3) — an array per candidate, not a single value: more than
+  // one current-run result can legitimately exist (see AssessmentResult).
+  resultsByCandidate: Record<string, AssessmentResult[]>;
 }
 
 interface ConsistencyFinding {
@@ -79,6 +93,7 @@ interface ConsistencyFinding {
   evidenceText: string | null;
   confidence: string;
   source: string | null;
+  isAuthoritative: boolean;
 }
 
 interface CompareResponse {
@@ -209,7 +224,7 @@ export default function CandidateComparisonPage() {
                 <div style={{ display: "grid", gridTemplateColumns: `200px repeat(${data.candidates.length}, 1fr)`, gap: 8 }}>
                   <div />
                   {data.candidates.map((c, i) => {
-                    const result = row.resultsByCandidate[c.candidateId];
+                    const results = row.resultsByCandidate[c.candidateId] ?? [];
                     const requirementCoverage = c.evidenceCoverage?.perRequirement.find(
                       (r) => r.requirementId === row.requirementId,
                     );
@@ -218,38 +233,53 @@ export default function CandidateComparisonPage() {
                         key={c.candidateId}
                         style={{ borderLeft: `3px solid ${COLUMN_ACCENTS[i % COLUMN_ACCENTS.length]}`, paddingLeft: 8 }}
                       >
-                        {!result ? (
+                        {results.length === 0 ? (
                           <p style={{ fontSize: 13, color: "#888" }}>No assessment for this version.</p>
                         ) : (
-                          <>
-                            <p style={{ margin: "0 0 4px", fontWeight: 600 }}>{result.status.replaceAll("_", " ")}</p>
-                            {requirementCoverage && (
-                              <p style={{ margin: "0 0 6px", fontSize: 12 }}>
-                                <span style={{ color: requirementCoverage.covered ? "#276749" : "#555" }}>
-                                  {requirementCoverage.covered ? "Covered" : "Not Covered"}
+                          results.map((result, ri) => (
+                            <div key={ri} style={{ marginBottom: results.length > 1 ? 10 : 0 }}>
+                              <p style={{ margin: "0 0 4px", fontWeight: 600 }}>
+                                {result.status.replaceAll("_", " ")}
+                                {/* Phase 12 (C3) — profile/publication-authority indicator only; never an evidence-quality signal (EvidenceStrength/status are unaffected). */}
+                                <span
+                                  style={{
+                                    marginLeft: 8,
+                                    fontSize: 11,
+                                    fontWeight: 400,
+                                    color: result.isAuthoritative ? "#276749" : "#8a5a00",
+                                  }}
+                                >
+                                  {result.isAuthoritative ? "Current profile" : "Other current document"}
                                 </span>
-                                {requirementCoverage.mandatoryGap && (
-                                  <span style={{ color: "#742a2a", marginLeft: 6 }}>· Mandatory Gap</span>
-                                )}
-                                {requirementCoverage.contested && (
-                                  <span style={{ color: "#c05621", marginLeft: 6 }}>· Contradictory Evidence — Review Required</span>
-                                )}
-                                {requirementCoverage.lowConfidenceAssessment && (
-                                  <span style={{ color: "#8a5a00", marginLeft: 6 }}>· Low Confidence — Review Evidence</span>
-                                )}
                               </p>
-                            )}
-                            {result.evidence.map((e, ei) => (
-                              <div key={ei} style={{ border: "1px solid #eee", borderRadius: 4, padding: 8, marginBottom: 6 }}>
-                                <p style={{ margin: 0, fontSize: 12, color: "#555" }}>
-                                  {e.role.replaceAll("_", " ")} · {e.evidenceStrength} · {e.confidence}
+                              {requirementCoverage && (
+                                <p style={{ margin: "0 0 6px", fontSize: 12 }}>
+                                  <span style={{ color: requirementCoverage.covered ? "#276749" : "#555" }}>
+                                    {requirementCoverage.covered ? "Covered" : "Not Covered"}
+                                  </span>
+                                  {requirementCoverage.mandatoryGap && (
+                                    <span style={{ color: "#742a2a", marginLeft: 6 }}>· Mandatory Gap</span>
+                                  )}
+                                  {requirementCoverage.contested && (
+                                    <span style={{ color: "#c05621", marginLeft: 6 }}>· Contradictory Evidence — Review Required</span>
+                                  )}
+                                  {requirementCoverage.lowConfidenceAssessment && (
+                                    <span style={{ color: "#8a5a00", marginLeft: 6 }}>· Low Confidence — Review Evidence</span>
+                                  )}
                                 </p>
-                                {e.evidenceText && <p style={{ margin: "4px 0", fontSize: 13 }}>&ldquo;{e.evidenceText}&rdquo;</p>}
-                                {e.rationale && <p style={{ margin: "4px 0", fontSize: 13, color: "#555" }}>{e.rationale}</p>}
-                                <p style={{ margin: 0, fontSize: 11, color: "#888" }}>{sourceLabel(e.source, e.sourcePage)}</p>
-                              </div>
-                            ))}
-                          </>
+                              )}
+                              {result.evidence.map((e, ei) => (
+                                <div key={ei} style={{ border: "1px solid #eee", borderRadius: 4, padding: 8, marginBottom: 6 }}>
+                                  <p style={{ margin: 0, fontSize: 12, color: "#555" }}>
+                                    {e.role.replaceAll("_", " ")} · {e.evidenceStrength} · {e.confidence}
+                                  </p>
+                                  {e.evidenceText && <p style={{ margin: "4px 0", fontSize: 13 }}>&ldquo;{e.evidenceText}&rdquo;</p>}
+                                  {e.rationale && <p style={{ margin: "4px 0", fontSize: 13, color: "#555" }}>{e.rationale}</p>}
+                                  <p style={{ margin: 0, fontSize: 11, color: "#888" }}>{sourceLabel(e.source, e.sourcePage)}</p>
+                                </div>
+                              ))}
+                            </div>
+                          ))
                         )}
                       </div>
                     );
@@ -272,6 +302,11 @@ export default function CandidateComparisonPage() {
                       <div key={fi} style={{ border: "1px solid #ddd", borderRadius: 4, padding: 8, marginBottom: 6 }}>
                         <p style={{ margin: 0, fontWeight: 600, fontSize: 13 }}>
                           {f.findingType.replaceAll("_", " ")} — <span style={{ fontWeight: 400 }}>{f.severity.replaceAll("_", " ")}</span>
+                          <span
+                            style={{ marginLeft: 8, fontSize: 11, fontWeight: 400, color: f.isAuthoritative ? "#276749" : "#8a5a00" }}
+                          >
+                            {f.isAuthoritative ? "Current profile" : "Other current document"}
+                          </span>
                         </p>
                         <p style={{ margin: "4px 0", fontSize: 13 }}>{f.description}</p>
                         {f.evidenceText && <p style={{ margin: "4px 0", fontSize: 13, color: "#555" }}>&ldquo;{f.evidenceText}&rdquo;</p>}

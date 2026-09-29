@@ -39,36 +39,42 @@ const REQUIREMENT_ROW = {
   category: "FUNCTIONAL_EXPERIENCE",
   hrApprovedWeight: "100",
   resultsByCandidate: {
-    "cand-1": {
-      status: "STRONG_EVIDENCE",
-      evidence: [
-        {
-          role: "SUPPORTING",
-          rationale: "On-point.",
-          evidenceStrength: "STRONG",
-          confidence: "HIGH",
-          evidenceType: "DIRECT",
-          sourcePage: 2,
-          evidenceText: "Led grievance handling.",
-          source: "Source Document",
-        },
-      ],
-    },
-    "cand-2": {
-      status: "MANDATORY_GAP",
-      evidence: [
-        {
-          role: "CONSIDERED_REJECTED",
-          rationale: null,
-          evidenceStrength: "NOT_FOUND",
-          confidence: "HIGH",
-          evidenceType: "MISSING",
-          sourcePage: null,
-          evidenceText: null,
-          source: null,
-        },
-      ],
-    },
+    "cand-1": [
+      {
+        status: "STRONG_EVIDENCE",
+        isAuthoritative: true,
+        evidence: [
+          {
+            role: "SUPPORTING",
+            rationale: "On-point.",
+            evidenceStrength: "STRONG",
+            confidence: "HIGH",
+            evidenceType: "DIRECT",
+            sourcePage: 2,
+            evidenceText: "Led grievance handling.",
+            source: "Source Document",
+          },
+        ],
+      },
+    ],
+    "cand-2": [
+      {
+        status: "MANDATORY_GAP",
+        isAuthoritative: true,
+        evidence: [
+          {
+            role: "CONSIDERED_REJECTED",
+            rationale: null,
+            evidenceStrength: "NOT_FOUND",
+            confidence: "HIGH",
+            evidenceType: "MISSING",
+            sourcePage: null,
+            evidenceText: null,
+            source: null,
+          },
+        ],
+      },
+    ],
   },
 };
 
@@ -120,7 +126,7 @@ describe("CandidateComparisonPage", () => {
           ...REQUIREMENT_ROW,
           requirementVersionId: "v2",
           versionNumber: 2,
-          resultsByCandidate: { "cand-1": null, "cand-2": REQUIREMENT_ROW.resultsByCandidate["cand-2"] },
+          resultsByCandidate: { "cand-1": [], "cand-2": REQUIREMENT_ROW.resultsByCandidate["cand-2"] },
         },
       ],
     });
@@ -144,10 +150,13 @@ describe("CandidateComparisonPage", () => {
           ...REQUIREMENT_ROW,
           resultsByCandidate: {
             ...REQUIREMENT_ROW.resultsByCandidate,
-            "cand-1": {
-              status: "STRONG_EVIDENCE",
-              evidence: [{ ...REQUIREMENT_ROW.resultsByCandidate["cand-1"].evidence[0], evidenceText: "Worked at Company A." }],
-            },
+            "cand-1": [
+              {
+                status: "STRONG_EVIDENCE",
+                isAuthoritative: true,
+                evidence: [{ ...REQUIREMENT_ROW.resultsByCandidate["cand-1"][0].evidence[0], evidenceText: "Worked at Company A." }],
+              },
+            ],
           },
         },
       ],
@@ -168,6 +177,7 @@ describe("CandidateComparisonPage", () => {
             evidenceText: null,
             confidence: "MEDIUM",
             source: null,
+            isAuthoritative: true,
           },
         ],
         "cand-2": [],

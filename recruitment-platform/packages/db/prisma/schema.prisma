@@ -900,6 +900,16 @@ model HrOverride {
   overridden      Boolean
   hrNote          String?
   createdAt       DateTime   @default(now())
+  // Assessment/Evidence Authority (C3, Post-Phase-11 decision) — durable
+  // provenance for HR Decision citations. Computed once, at write time,
+  // by comparing this override's Assessment.processingRunId against
+  // Candidate.currentProfileProcessingRunId at that moment — never
+  // recomputed or reconstructed later, since the candidate-level marker
+  // is overwritten in place and carries no history of its own. true/false
+  // for every row created from this point forward; null means "predates
+  // this field — genuinely unknown," never backfilled or inferred from
+  // current state.
+  wasAuthoritativeAtDecision Boolean?
 }
 
 // Every AI Gateway call, regardless of provider, for audit + debugging.
