@@ -366,3 +366,72 @@ export async function runReclaimScan(limit = 100): Promise<{ scanned: number; re
   }
   return { scanned: stale.length, reclaimed };
 }
+
+/**
+ * Phase 10A/11 — Candidate Profile Publication Authority.
+ *
+ * Guards whether THIS run is allowed to replace the candidate's
+ * consolidated profile (CandidateExperience/Education/Skill/Certification/
+ * Language) — a distinct question from ProcessingRun ownership
+ * (assertProcessingRunStillRunning, above): a run can legitimately still
+ * own itself while NOT being authoritative for the candidate-wide profile
+ * (Phase 10A.5 Section 4). Must be called as the first write inside the
+ * SAME transaction as the profile deletes/creates that follow it, and
+ * BEFORE any of them — a CAS failure here must leave every profile table
+ * and Candidate.currentProfile* field completely untouched (Phase 10A.7
+ * Section 7 / Phase 10A.8 Section 7).
+ *
+ * Authority ordering (Phase 10A.5-10A.10, approved, Policy C ratified):
+ *   1. no prior publication (currentProfileDocumentId IS NULL) -> always wins
+ *   2. a strictly newer CandidateDocument.uploadedAt -> always wins,
+ *      regardless of attemptNumber or arrival/commit order
+ *   3. equal uploadedAt, different document (realistic under batch upload,
+ *      Phase 10A.8 Section 6 — millisecond precision) -> deterministic
+ *      tie-break on CandidateDocument.id (no business meaning, purely a
+ *      total-order tie-breaker)
+ *   4. the SAME document, a strictly greater attemptNumber (Policy C,
+ *      ratified) -> a later successful retry of the currently-authoritative
+ *      document may refresh the profile; ProcessingRun.attemptNumber is
+ *      unique per document (@@unique([candidateDocumentId, attemptNumber])),
+ *      so no tie-break is ever needed for this branch.
+ *
+ * All four Candidate.currentProfile* fields are read from THIS run's own,
+ * already-immutable identity (its own document's id/uploadedAt, its own
+ * id, its own attemptNumber) and written together in one guarded
+ * updateMany's SET clause — never independently, never re-derived from
+ * unrelated live state — so the invariant "currentProfileAttemptNumber ==
+ * attemptNumber of the ProcessingRun referenced by
+ * currentProfileProcessingRunId" (and the equivalent for
+ * currentProfileUploadedAt/currentProfileDocumentId) holds by construction:
+ * a single UPDATE statement cannot partially apply its SET clause.
+ */
+export async function tryPublishCandidateProfile(
+  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+  params: {
+    candidateId: string;
+    newDocumentId: string;
+    newUploadedAt: Date;
+    newRunId: string;
+    newAttemptNumber: number;
+  },
+): Promise<boolean> {
+  const { candidateId, newDocumentId, newUploadedAt, newRunId, newAttemptNumber } = params;
+  const { count } = await tx.candidate.updateMany({
+    where: {
+      id: candidateId,
+      OR: [
+        { currentProfileDocumentId: null },
+        { currentProfileUploadedAt: { lt: newUploadedAt } },
+        { currentProfileUploadedAt: newUploadedAt, currentProfileDocumentId: { lt: newDocumentId } },
+        { currentProfileDocumentId: newDocumentId, currentProfileAttemptNumber: { lt: newAttemptNumber } },
+      ],
+    },
+    data: {
+      currentProfileDocumentId: newDocumentId,
+      currentProfileUploadedAt: newUploadedAt,
+      currentProfileProcessingRunId: newRunId,
+      currentProfileAttemptNumber: newAttemptNumber,
+    },
+  });
+  return count === 1;
+}

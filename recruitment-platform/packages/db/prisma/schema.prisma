@@ -372,6 +372,22 @@ model Candidate {
   normalizedEmail String?
   normalizedPhone String?
 
+  // Phase 10A/11 — Candidate Profile Publication Authority. Guards which
+  // CandidateDocument's extraction currently constitutes the consolidated
+  // profile (CandidateExperience/Education/Skill/Certification/Language),
+  // closing the cross-document and same-document-retry races proven in
+  // Phase 10A.3-10A.9. All four fields describe one publishing ProcessingRun
+  // and are written together, in one guarded statement, never independently
+  // (see worker/src/pipeline.ts's publication CAS). NULL means no
+  // publication has occurred yet under this mechanism (safe default for
+  // existing rows — no backfill needed, Phase 10A.10 Decision).
+  currentProfileDocumentId      String?
+  currentProfileDocument        CandidateDocument? @relation("CurrentProfileDocument", fields: [currentProfileDocumentId], references: [id], onDelete: SetNull)
+  currentProfileUploadedAt      DateTime?
+  currentProfileProcessingRunId String?
+  currentProfileProcessingRun   ProcessingRun?     @relation("CurrentProfileRun", fields: [currentProfileProcessingRunId], references: [id], onDelete: SetNull)
+  currentProfileAttemptNumber   Int?
+
   documents      CandidateDocument[]
   projectLinks   CandidateProjectLink[]
   experiences    CandidateExperience[]
@@ -460,6 +476,7 @@ model CandidateDocument {
   consistencyFindings CandidateConsistencyFinding[]
   batch               CandidateUploadBatch?         @relation(fields: [batchId], references: [id], onDelete: SetNull)
   processingRuns      ProcessingRun[]               @relation("DocumentProcessingRuns")
+  currentForCandidateProfile Candidate[]             @relation("CurrentProfileDocument")
 }
 
 // Phase 7 — Candidate Deduplication / Reuse across Projects.
@@ -606,6 +623,7 @@ model ProcessingRun {
   assessments         Assessment[]
   consistencyFindings CandidateConsistencyFinding[]
   currentForDocuments CandidateDocument[] @relation("CurrentProcessingRun")
+  currentForCandidateProfile Candidate[] @relation("CurrentProfileRun")
 
   @@unique([candidateDocumentId, attemptNumber])
 }

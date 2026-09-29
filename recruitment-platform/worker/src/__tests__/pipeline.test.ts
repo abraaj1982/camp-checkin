@@ -586,4 +586,117 @@ describe("runDocumentProcessingPipeline", () => {
       expect(stopSpy).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe("Phase 10A/11 — Candidate Profile Publication Authority integration", () => {
+    it("first successful pipeline run publishes the candidate profile marker", async () => {
+      await seedAiModelConfig("RESUME_INTELLIGENCE");
+      await seedAiModelConfig("CAREER_CONSISTENCY_ANALYSIS");
+      const pdf = await buildTestPdf(
+        "Jane Doe. HR Manager at Acme Corp since 2018. Led grievance handling and disciplinary " +
+          "investigations across multiple regions. BA in Human Resources, State University. " +
+          "Certified SHRM-CP. Fluent in English.",
+      );
+      const { candidate, document } = await seedCandidateWithDocument(pdf, "pdf");
+      const gateway = new AiGateway({
+        fake: new FakeAIProvider({
+          RESUME_INTELLIGENCE: RESUME_INTELLIGENCE_HAPPY_PATH,
+          CAREER_CONSISTENCY_ANALYSIS: CAREER_CONSISTENCY_HAPPY_PATH,
+        }),
+      });
+
+      await runDocumentProcessingPipeline(
+        { candidateDocumentId: document.id, candidateId: candidate.id, projectId: "unused" },
+        { storage, gateway },
+      );
+
+      const updatedCandidate = await prisma.candidate.findUniqueOrThrow({ where: { id: candidate.id } });
+      expect(updatedCandidate.currentProfileDocumentId).toBe(document.id);
+      expect(updatedCandidate.currentProfileAttemptNumber).toBe(1);
+      expect(updatedCandidate.currentProfileProcessingRunId).not.toBeNull();
+
+      const experiences = await prisma.candidateExperience.findMany({ where: { candidateId: candidate.id } });
+      expect(experiences).toHaveLength(1);
+    });
+
+    it("a second document for the same candidate, processed after an already-authoritative newer document, does not overwrite the profile", async () => {
+      await seedAiModelConfig("RESUME_INTELLIGENCE");
+      await seedAiModelConfig("CAREER_CONSISTENCY_ANALYSIS");
+      const user = await createUser(`hr-${Math.random().toString(36).slice(2)}@example.com`);
+      const project = await prisma.recruitmentProject.create({ data: { title: "HR Manager", createdBy: user.id } });
+      const candidate = await prisma.candidate.create({ data: { fullName: "resume" } });
+
+      const pdfOlder = await buildTestPdf("Jane Doe. HR Manager at Acme Corp since 2018. Older CV version.");
+      const olderDocument = await prisma.candidateDocument.create({
+        data: {
+          candidateId: candidate.id,
+          projectId: project.id,
+          fileType: "pdf",
+          storageKey: "pending",
+          originalFilename: "resume-older.pdf",
+          status: "QUEUED",
+          uploadedBy: user.id,
+          uploadedAt: new Date("2026-01-01T09:00:00Z"),
+        },
+      });
+      const olderKey = buildCandidateDocumentKey({
+        projectId: project.id,
+        candidateId: candidate.id,
+        documentId: olderDocument.id,
+        fileExtension: "pdf",
+      });
+      await storage.putObject({ key: olderKey, body: pdfOlder, contentType: "application/pdf" });
+      await prisma.candidateDocument.update({ where: { id: olderDocument.id }, data: { storageKey: olderKey } });
+
+      const pdfNewer = await buildTestPdf("Jane Doe. HR Manager at Acme Corp since 2018. Newer CV version.");
+      const newerDocument = await prisma.candidateDocument.create({
+        data: {
+          candidateId: candidate.id,
+          projectId: project.id,
+          fileType: "pdf",
+          storageKey: "pending",
+          originalFilename: "resume-newer.pdf",
+          status: "QUEUED",
+          uploadedBy: user.id,
+          uploadedAt: new Date("2026-01-01T10:00:00Z"),
+        },
+      });
+      const newerKey = buildCandidateDocumentKey({
+        projectId: project.id,
+        candidateId: candidate.id,
+        documentId: newerDocument.id,
+        fileExtension: "pdf",
+      });
+      await storage.putObject({ key: newerKey, body: pdfNewer, contentType: "application/pdf" });
+      await prisma.candidateDocument.update({ where: { id: newerDocument.id }, data: { storageKey: newerKey } });
+
+      const gateway = new AiGateway({
+        fake: new FakeAIProvider({
+          RESUME_INTELLIGENCE: RESUME_INTELLIGENCE_HAPPY_PATH,
+          CAREER_CONSISTENCY_ANALYSIS: CAREER_CONSISTENCY_HAPPY_PATH,
+        }),
+      });
+
+      // Newer document processed (and published) first.
+      await runDocumentProcessingPipeline(
+        { candidateDocumentId: newerDocument.id, candidateId: candidate.id, projectId: project.id },
+        { storage, gateway },
+      );
+      const afterNewer = await prisma.candidate.findUniqueOrThrow({ where: { id: candidate.id } });
+      expect(afterNewer.currentProfileDocumentId).toBe(newerDocument.id);
+
+      // Older document processed afterward — its own ProcessingRun completes
+      // successfully, but it must NOT overwrite the already-authoritative
+      // newer document's profile.
+      await runDocumentProcessingPipeline(
+        { candidateDocumentId: olderDocument.id, candidateId: candidate.id, projectId: project.id },
+        { storage, gateway },
+      );
+
+      const afterOlder = await prisma.candidate.findUniqueOrThrow({ where: { id: candidate.id } });
+      expect(afterOlder.currentProfileDocumentId).toBe(newerDocument.id); // unchanged
+
+      const olderUpdatedDoc = await prisma.candidateDocument.findUniqueOrThrow({ where: { id: olderDocument.id } });
+      expect(olderUpdatedDoc.status).toBe("COMPLETED"); // its own ProcessingRun still succeeds
+    });
+  });
 });

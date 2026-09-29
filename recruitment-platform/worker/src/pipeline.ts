@@ -12,6 +12,7 @@ import {
   completeProcessingRun,
   assertProcessingRunStillRunning,
   startHeartbeat,
+  tryPublishCandidateProfile,
   ProcessingRunNoLongerActiveError,
 } from "./processing-run.js";
 
@@ -74,7 +75,7 @@ export async function runDocumentProcessingPipeline(
 async function runPipelineSteps(
   document: Awaited<ReturnType<typeof prisma.candidateDocument.findUniqueOrThrow>>,
   data: ProcessCandidateDocumentJobData,
-  run: { id: string },
+  run: { id: string; attemptNumber: number },
   deps: { storage: ObjectStorage; gateway: AiGateway },
 ): Promise<void> {
   const originalBytes = await deps.storage.getObject(document.storageKey);
@@ -156,62 +157,86 @@ async function runPipelineSteps(
     // this transaction, including the deletes below.
     await assertProcessingRunStillRunning(tx, run.id);
 
-    await tx.candidateExperience.deleteMany({ where: { candidateId: data.candidateId, documentId: document.id } });
-    await tx.candidateEducation.deleteMany({ where: { candidateId: data.candidateId } });
-    await tx.candidateSkill.deleteMany({ where: { candidateId: data.candidateId } });
-    await tx.candidateCertification.deleteMany({ where: { candidateId: data.candidateId } });
-    await tx.candidateLanguage.deleteMany({ where: { candidateId: data.candidateId } });
+    // Phase 10A/11 — Candidate Profile Publication Authority. A run that
+    // still legitimately owns itself (the guard above passed) may
+    // nonetheless not be authoritative for the CANDIDATE-wide consolidated
+    // profile (Phase 10A.5 Section 4 — the two are distinct questions).
+    // Must run before any of the destructive/replacing profile-table
+    // writes below; a CAS failure here means this run's extraction is
+    // superseded by a newer document or a later retry of the same
+    // document, and the profile tables are left completely untouched —
+    // this run still proceeds to its own CandidateDocument write and,
+    // later, completeProcessingRun (Phase 10A.7 Section 7).
+    const isAuthoritative = await tryPublishCandidateProfile(tx, {
+      candidateId: data.candidateId,
+      newDocumentId: document.id,
+      newUploadedAt: document.uploadedAt,
+      newRunId: run.id,
+      newAttemptNumber: run.attemptNumber,
+    });
 
-    for (const exp of extraction.experiences) {
-      await tx.candidateExperience.create({
-        data: {
-          candidateId: data.candidateId,
-          documentId: document.id,
-          employer: exp.employer,
-          title: exp.title,
-          startDate: exp.startDate ? new Date(exp.startDate) : null,
-          endDate: exp.endDate ? new Date(exp.endDate) : null,
-          isCurrent: exp.isCurrent,
-          responsibilities: exp.responsibilities,
-          functionalAreaTags: exp.functionalAreaTags,
-          extractedConfidence: exp.extractedConfidence,
-        },
-      });
-    }
-    for (const edu of extraction.education) {
-      await tx.candidateEducation.create({
-        data: {
-          candidateId: data.candidateId,
-          institution: edu.institution,
-          degree: edu.degree,
-          field: edu.field,
-          startDate: edu.startDate ? new Date(edu.startDate) : null,
-          endDate: edu.endDate ? new Date(edu.endDate) : null,
-        },
-      });
-    }
-    for (const skill of extraction.skills) {
-      await tx.candidateSkill.create({
-        data: { candidateId: data.candidateId, skillName: skill.skillName, category: skill.category },
-      });
-    }
-    for (const cert of extraction.certifications) {
-      await tx.candidateCertification.create({
-        data: {
-          candidateId: data.candidateId,
-          name: cert.name,
-          issuer: cert.issuer,
-          dateObtained: cert.dateObtained ? new Date(cert.dateObtained) : null,
-        },
-      });
-    }
-    for (const lang of extraction.languages) {
-      await tx.candidateLanguage.create({
-        data: { candidateId: data.candidateId, language: lang.language, proficiency: lang.proficiency },
-      });
+    if (isAuthoritative) {
+      await tx.candidateExperience.deleteMany({ where: { candidateId: data.candidateId, documentId: document.id } });
+      await tx.candidateEducation.deleteMany({ where: { candidateId: data.candidateId } });
+      await tx.candidateSkill.deleteMany({ where: { candidateId: data.candidateId } });
+      await tx.candidateCertification.deleteMany({ where: { candidateId: data.candidateId } });
+      await tx.candidateLanguage.deleteMany({ where: { candidateId: data.candidateId } });
+
+      for (const exp of extraction.experiences) {
+        await tx.candidateExperience.create({
+          data: {
+            candidateId: data.candidateId,
+            documentId: document.id,
+            employer: exp.employer,
+            title: exp.title,
+            startDate: exp.startDate ? new Date(exp.startDate) : null,
+            endDate: exp.endDate ? new Date(exp.endDate) : null,
+            isCurrent: exp.isCurrent,
+            responsibilities: exp.responsibilities,
+            functionalAreaTags: exp.functionalAreaTags,
+            extractedConfidence: exp.extractedConfidence,
+          },
+        });
+      }
+      for (const edu of extraction.education) {
+        await tx.candidateEducation.create({
+          data: {
+            candidateId: data.candidateId,
+            institution: edu.institution,
+            degree: edu.degree,
+            field: edu.field,
+            startDate: edu.startDate ? new Date(edu.startDate) : null,
+            endDate: edu.endDate ? new Date(edu.endDate) : null,
+          },
+        });
+      }
+      for (const skill of extraction.skills) {
+        await tx.candidateSkill.create({
+          data: { candidateId: data.candidateId, skillName: skill.skillName, category: skill.category },
+        });
+      }
+      for (const cert of extraction.certifications) {
+        await tx.candidateCertification.create({
+          data: {
+            candidateId: data.candidateId,
+            name: cert.name,
+            issuer: cert.issuer,
+            dateObtained: cert.dateObtained ? new Date(cert.dateObtained) : null,
+          },
+        });
+      }
+      for (const lang of extraction.languages) {
+        await tx.candidateLanguage.create({
+          data: { candidateId: data.candidateId, language: lang.language, proficiency: lang.proficiency },
+        });
+      }
     }
 
-    // NOT the terminal COMPLETED write (Decision 5, Phase 4A review) — this
+    // Document-scoped, not profile-scoped — always correct for THIS
+    // document regardless of candidate-level publication authority, so it
+    // proceeds unconditionally even when isAuthoritative is false (Phase
+    // 10A.10 implementation clarification). NOT the terminal COMPLETED
+    // write (Decision 5, Phase 4A review) — this
     // pipeline now has two AI steps (Resume Intelligence, then Requirement
     // Evidence Analysis below); COMPLETED must mean "every step succeeded,"
     // not just "extraction succeeded." Status stays PROCESSING here; the
