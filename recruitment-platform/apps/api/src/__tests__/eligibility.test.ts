@@ -5,10 +5,12 @@ import { resetDatabase, createUser } from "./test-utils.js";
 
 /**
  * Gate 2 — dedicated tests for the additive Score Evidence Eligibility
- * helper (ratified decision paper, Items 1-26 + Final Synthesis). Tests
- * ONLY the predicate `resolveEligibleAssessments` implements:
+ * helper (ratified decision paper, Items 1-26 + Final Synthesis; Item 16
+ * resolved via Option B). Tests ONLY the predicate
+ * `resolveEligibleAssessments` implements:
  *
- *   assessment.processingRunId === candidate.currentProfileProcessingRunId
+ *   assessment.processingRunId === CandidateProjectAuthority.currentProcessingRunId
+ *   for the Assessment's own (candidateId, projectId)
  *
  * scoped by the caller-supplied candidateId/projectId. Deliberately does
  * not assert on ProcessingRun.status, EvidenceStrength, AssessmentStatus,
@@ -40,6 +42,17 @@ describe("resolveEligibleAssessments (Score Evidence Eligibility)", () => {
   async function seedCandidate() {
     return prisma.candidate.create({
       data: { fullName: "Test Candidate", email: "test@example.com" },
+    });
+  }
+
+  // Item 16 (Option B) — the authoritative run for a (candidateId,
+  // projectId) pair now lives on CandidateProjectAuthority, not
+  // Candidate.currentProfile*. Mirrors the real runtime lifecycle's
+  // "row exists before publication" shape: create the row, then set its
+  // currentProcessingRunId as a separate step (publication).
+  async function seedAuthority(candidateId: string, projectId: string, currentProcessingRunId: string | null = null) {
+    return prisma.candidateProjectAuthority.create({
+      data: { candidateId, projectId, currentProcessingRunId },
     });
   }
 
@@ -103,10 +116,7 @@ describe("resolveEligibleAssessments (Score Evidence Eligibility)", () => {
     const requirement = await seedRequirement(project.id);
     const { run } = await seedDocumentAndRun(candidate.id, project.id, user.id);
 
-    await prisma.candidate.update({
-      where: { id: candidate.id },
-      data: { currentProfileProcessingRunId: run.id },
-    });
+    await seedAuthority(candidate.id, project.id, run.id);
 
     const assessment = await seedAssessment({
       candidateId: candidate.id,
@@ -128,10 +138,7 @@ describe("resolveEligibleAssessments (Score Evidence Eligibility)", () => {
     const { run: authoritativeRun } = await seedDocumentAndRun(candidate.id, project.id, user.id);
     const { run: otherRun } = await seedDocumentAndRun(candidate.id, project.id, user.id);
 
-    await prisma.candidate.update({
-      where: { id: candidate.id },
-      data: { currentProfileProcessingRunId: authoritativeRun.id },
-    });
+    await seedAuthority(candidate.id, project.id, authoritativeRun.id);
 
     // Assessment belongs to a run other than the authoritative one.
     await seedAssessment({
@@ -146,13 +153,16 @@ describe("resolveEligibleAssessments (Score Evidence Eligibility)", () => {
     expect(result).toEqual([]);
   });
 
-  it("3. returns [] when the candidate has no published profile (currentProfileProcessingRunId is NULL)", async () => {
+  it("3. returns [] when the authority row exists but has no published run yet (currentProcessingRunId is NULL)", async () => {
     const { user, project } = await seedProject();
     const candidate = await seedCandidate();
     const requirement = await seedRequirement(project.id);
     const { run } = await seedDocumentAndRun(candidate.id, project.id, user.id);
 
-    // currentProfileProcessingRunId left NULL (never published).
+    // Authority row exists (as it always does, per the runtime lifecycle —
+    // created alongside CandidateProjectLink) but currentProcessingRunId
+    // is left NULL (never published).
+    await seedAuthority(candidate.id, project.id, null);
     await seedAssessment({
       candidateId: candidate.id,
       projectId: project.id,
@@ -170,10 +180,7 @@ describe("resolveEligibleAssessments (Score Evidence Eligibility)", () => {
     const candidate = await seedCandidate();
     const { run } = await seedDocumentAndRun(candidate.id, project.id, user.id);
 
-    await prisma.candidate.update({
-      where: { id: candidate.id },
-      data: { currentProfileProcessingRunId: run.id },
-    });
+    await seedAuthority(candidate.id, project.id, run.id);
 
     // No Assessment created for this run at all.
     const result = await resolveEligibleAssessments(prisma, candidate.id, project.id);
@@ -181,29 +188,39 @@ describe("resolveEligibleAssessments (Score Evidence Eligibility)", () => {
     expect(result).toEqual([]);
   });
 
-  it("5. excludes an otherwise-matching Assessment scoped to a different projectId (query scoping only)", async () => {
+  it("5. project-scoped authority: the same candidate's two projects each have independent authority, and an Assessment is only eligible under its own project (Item 16, Option B)", async () => {
     const { user, project: projectA } = await seedProject();
-    const { project: projectB } = await seedProject();
+    const { user: userB, project: projectB } = await seedProject();
     const candidate = await seedCandidate();
-    const requirement = await seedRequirement(projectA.id);
-    const { run } = await seedDocumentAndRun(candidate.id, projectA.id, user.id);
+    const requirementA = await seedRequirement(projectA.id);
+    const { run: runA } = await seedDocumentAndRun(candidate.id, projectA.id, user.id);
+    const { run: runB } = await seedDocumentAndRun(candidate.id, projectB.id, userB.id);
 
-    await prisma.candidate.update({
-      where: { id: candidate.id },
-      data: { currentProfileProcessingRunId: run.id },
-    });
+    // Independent CandidateProjectAuthority rows for the SAME candidate —
+    // Project A's authoritative run and Project B's authoritative run are
+    // different, unrelated runs. This is the exact scenario the candidate-
+    // global Candidate.currentProfileProcessingRunId could never represent
+    // correctly (it can only ever point to one run for the whole candidate).
+    await seedAuthority(candidate.id, projectA.id, runA.id);
+    await seedAuthority(candidate.id, projectB.id, runB.id);
 
-    await seedAssessment({
+    const assessmentA = await seedAssessment({
       candidateId: candidate.id,
       projectId: projectA.id,
-      requirementId: requirement.id,
-      processingRunId: run.id,
+      requirementId: requirementA.id,
+      processingRunId: runA.id,
     });
 
-    // Query with projectB's id — the matching Assessment belongs to projectA.
-    const result = await resolveEligibleAssessments(prisma, candidate.id, projectB.id);
+    // Eligible under its own project.
+    const resultA = await resolveEligibleAssessments(prisma, candidate.id, projectA.id);
+    expect(resultA).toHaveLength(1);
+    expect(resultA[0].id).toBe(assessmentA.id);
 
-    expect(result).toEqual([]);
+    // Querying the SAME candidate under the OTHER project must not see
+    // Project A's Assessment, even though both authority rows are
+    // simultaneously non-NULL and belong to the same candidate.
+    const resultB = await resolveEligibleAssessments(prisma, candidate.id, projectB.id);
+    expect(resultB).toEqual([]);
   });
 
   it("6. predicate fidelity — eligibility is unaffected by AssessmentStatus, and no additional condition is applied", async () => {
@@ -212,10 +229,7 @@ describe("resolveEligibleAssessments (Score Evidence Eligibility)", () => {
     const requirement = await seedRequirement(project.id);
     const { run } = await seedDocumentAndRun(candidate.id, project.id, user.id);
 
-    await prisma.candidate.update({
-      where: { id: candidate.id },
-      data: { currentProfileProcessingRunId: run.id },
-    });
+    await seedAuthority(candidate.id, project.id, run.id);
 
     // An Assessment with MANDATORY_GAP status and zero linked evidence —
     // per Items 12/25, neither AssessmentStatus nor evidence presence is
