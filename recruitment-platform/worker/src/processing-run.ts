@@ -435,3 +435,51 @@ export async function tryPublishCandidateProfile(
   });
   return count === 1;
 }
+
+/**
+ * Item 16 (Option B) — Project-Scoped Candidate Profile Authority. Exact
+ * re-scoping of tryPublishCandidateProfile's own CAS (same four branches,
+ * same NULL-initial-state/uploadedAt/documentId-tie-break/attemptNumber-
+ * tie-break ordering — no new policy), keyed by (candidateId, projectId)
+ * instead of candidateId alone, because Assessment/Evidence/
+ * CandidateConsistencyFinding are project-scoped while
+ * Candidate.currentProfile* is candidate-global and gates a different,
+ * unrelated concern (the candidate-wide consolidated profile tables —
+ * unchanged, untouched by this function). The CandidateProjectAuthority
+ * row for this (candidateId, projectId) must already exist (created
+ * alongside its CandidateProjectLink — see worker/src/identity-resolution.ts
+ * and apps/api's candidate-match-reviews routes) — this function only ever
+ * updates an existing row, never upserts one.
+ */
+export async function tryPublishCandidateProjectAuthority(
+  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+  params: {
+    candidateId: string;
+    projectId: string;
+    newDocumentId: string;
+    newUploadedAt: Date;
+    newRunId: string;
+    newAttemptNumber: number;
+  },
+): Promise<boolean> {
+  const { candidateId, projectId, newDocumentId, newUploadedAt, newRunId, newAttemptNumber } = params;
+  const { count } = await tx.candidateProjectAuthority.updateMany({
+    where: {
+      candidateId,
+      projectId,
+      OR: [
+        { currentDocumentId: null },
+        { currentUploadedAt: { lt: newUploadedAt } },
+        { currentUploadedAt: newUploadedAt, currentDocumentId: { lt: newDocumentId } },
+        { currentDocumentId: newDocumentId, currentAttemptNumber: { lt: newAttemptNumber } },
+      ],
+    },
+    data: {
+      currentDocumentId: newDocumentId,
+      currentUploadedAt: newUploadedAt,
+      currentProcessingRunId: newRunId,
+      currentAttemptNumber: newAttemptNumber,
+    },
+  });
+  return count === 1;
+}

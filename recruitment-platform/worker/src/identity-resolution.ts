@@ -127,6 +127,13 @@ async function promoteWithNewCandidate(
         anonymizedLabel: `Candidate #${String(linkCount + 1).padStart(3, "0")}`,
       },
     });
+    // Item 16 (Option B) — created in the same transaction as the link
+    // above, always, so a CandidateProjectAuthority row exists before any
+    // document for this (candidateId, projectId) can ever be processed;
+    // authority fields start NULL (no publication has occurred yet).
+    await tx.candidateProjectAuthority.create({
+      data: { candidateId: candidate.id, projectId: stagedUpload.projectId },
+    });
 
     const document = await tx.candidateDocument.create({
       data: {

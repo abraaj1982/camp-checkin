@@ -13,6 +13,7 @@ import {
   assertProcessingRunStillRunning,
   startHeartbeat,
   tryPublishCandidateProfile,
+  tryPublishCandidateProjectAuthority,
   ProcessingRunNoLongerActiveError,
 } from "./processing-run.js";
 
@@ -174,6 +175,25 @@ async function runPipelineSteps(
       newRunId: run.id,
       newAttemptNumber: run.attemptNumber,
     });
+
+    // Item 16 (Option B) — Project-Scoped Candidate Profile Authority.
+    // Independent of, and alongside, the candidate-global CAS above — see
+    // tryPublishCandidateProjectAuthority's own doc comment. Only runs when
+    // this document has a projectId (always true for every current
+    // production write path; the field is nullable only because the
+    // schema predates per-upload project scoping) — a document with no
+    // project has no CandidateProjectLink/CandidateProjectAuthority to
+    // advance either. Does not alter or depend on isAuthoritative above.
+    if (document.projectId) {
+      await tryPublishCandidateProjectAuthority(tx, {
+        candidateId: data.candidateId,
+        projectId: document.projectId,
+        newDocumentId: document.id,
+        newUploadedAt: document.uploadedAt,
+        newRunId: run.id,
+        newAttemptNumber: run.attemptNumber,
+      });
+    }
 
     if (isAuthoritative) {
       await tx.candidateExperience.deleteMany({ where: { candidateId: data.candidateId, documentId: document.id } });

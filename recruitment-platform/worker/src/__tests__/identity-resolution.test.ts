@@ -143,6 +143,14 @@ describe("runIdentityResolutionPipeline", () => {
     const link = await prisma.candidateProjectLink.findFirstOrThrow({ where: { projectId: project.id } });
     expect(link.anonymizedLabel).toBe("Candidate #001");
 
+    // Item 16 (Option B) — CandidateProjectLink -> CandidateProjectAuthority,
+    // created in the same transaction, authority fields starting NULL.
+    const authority = await prisma.candidateProjectAuthority.findUniqueOrThrow({
+      where: { candidateId_projectId: { candidateId: link.candidateId, projectId: project.id } },
+    });
+    expect(authority.currentDocumentId).toBeNull();
+    expect(authority.currentProcessingRunId).toBeNull();
+
     expect(queue.enqueued).toHaveLength(1);
     expect(queue.enqueued[0].candidateDocumentId).toBe(document.id);
   });

@@ -141,6 +141,12 @@ export async function registerCandidateMatchReviewRoutes(
                   anonymizedLabel: `Candidate #${String(linkCount + 1).padStart(3, "0")}`,
                 },
               });
+              // Item 16 (Option B) — only when a NEW link is created; an
+              // already-existing link already has its authority row from
+              // whenever it was first created, and must not get a second one.
+              await tx.candidateProjectAuthority.create({
+                data: { candidateId, projectId: review.projectId },
+              });
             }
 
             // matchSignal-gated identity enrichment (Phase 7A CRITICAL
@@ -180,6 +186,10 @@ export async function registerCandidateMatchReviewRoutes(
                 projectId: review.projectId,
                 anonymizedLabel: `Candidate #${String(linkCount + 1).padStart(3, "0")}`,
               },
+            });
+            // Item 16 (Option B) — new candidate, so this link is always new.
+            await tx.candidateProjectAuthority.create({
+              data: { candidateId, projectId: review.projectId },
             });
           }
 

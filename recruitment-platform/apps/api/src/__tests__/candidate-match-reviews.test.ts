@@ -187,6 +187,9 @@ describe("Candidate Match Review resolution (Phase 7, admin-only)", () => {
     await prisma.candidateProjectLink.create({
       data: { candidateId: candidate.id, projectId: project.id, anonymizedLabel: "Candidate #007" },
     });
+    // Pre-existing authority row (as if created when the link above was
+    // originally made) — Item 16 (Option B) must NOT create a second one.
+    await prisma.candidateProjectAuthority.create({ data: { candidateId: candidate.id, projectId: project.id } });
     const review = await prisma.candidateMatchReview.create({
       data: { stagedUploadId: stagedUpload.id, projectId: project.id, matchSignal: "EMAIL", emailMatchedCandidateId: candidate.id },
     });
@@ -196,6 +199,9 @@ describe("Candidate Match Review resolution (Phase 7, admin-only)", () => {
     const links = await prisma.candidateProjectLink.findMany({ where: { candidateId: candidate.id, projectId: project.id } });
     expect(links).toHaveLength(1);
     expect(links[0].anonymizedLabel).toBe("Candidate #007"); // reused, not replaced
+
+    const authorities = await prisma.candidateProjectAuthority.findMany({ where: { candidateId: candidate.id, projectId: project.id } });
+    expect(authorities).toHaveLength(1); // not duplicated when the link already existed
   });
 
   it("creates a new CandidateProjectLink when the matched candidate is not yet linked to this project", async () => {
@@ -209,6 +215,13 @@ describe("Candidate Match Review resolution (Phase 7, admin-only)", () => {
 
     const links = await prisma.candidateProjectLink.findMany({ where: { candidateId: candidate.id, projectId: project.id } });
     expect(links).toHaveLength(1);
+
+    // Item 16 (Option B) — a NEW link gets a paired authority row, same transaction.
+    const authority = await prisma.candidateProjectAuthority.findUniqueOrThrow({
+      where: { candidateId_projectId: { candidateId: candidate.id, projectId: project.id } },
+    });
+    expect(authority.currentDocumentId).toBeNull();
+    expect(authority.currentProcessingRunId).toBeNull();
   });
 
   it("CREATE_NEW: preserves both originally-matched candidates untouched, and creates a genuinely new Candidate using deriveFullNameFromFilename", async () => {
@@ -245,6 +258,12 @@ describe("Candidate Match Review resolution (Phase 7, admin-only)", () => {
     expect(finalReview.emailMatchedCandidateId).toBe(candidateA.id);
     expect(finalReview.phoneMatchedCandidateId).toBe(candidateB.id);
     expect(finalReview.status).toBe("CREATE_NEW");
+
+    // Item 16 (Option B) — new candidate's link always gets a paired authority row.
+    const authority = await prisma.candidateProjectAuthority.findUniqueOrThrow({
+      where: { candidateId_projectId: { candidateId: newCandidateId, projectId: project.id } },
+    });
+    expect(authority.currentDocumentId).toBeNull();
   });
 
   it("concurrent resolution attempts: exactly one succeeds, no duplicate Candidate/CandidateDocument", async () => {
