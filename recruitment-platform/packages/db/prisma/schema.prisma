@@ -182,6 +182,7 @@ model RecruitmentProject {
   members        ProjectMember[]
   requirements   JobRequirement[]
   candidateLinks CandidateProjectLink[]
+  candidateProjectAuthorities CandidateProjectAuthority[]
   comparisons    CandidateComparison[]
   uploadBatches  CandidateUploadBatch[]
   stagedUploads  StagedUpload[]
@@ -390,6 +391,7 @@ model Candidate {
 
   documents      CandidateDocument[]
   projectLinks   CandidateProjectLink[]
+  projectAuthorities CandidateProjectAuthority[]
   experiences    CandidateExperience[]
   education      CandidateEducation[]
   skills         CandidateSkill[]
@@ -417,6 +419,34 @@ model CandidateProjectLink {
   anonymizedLabel  String
   status           String             @default("ACTIVE")
   createdAt        DateTime           @default(now())
+
+  @@unique([candidateId, projectId])
+}
+
+// Item 16 (Option B) — Project-Scoped Candidate Profile Authority. Mirrors
+// Phase 11's Candidate.currentProfile* CAS exactly, re-scoped to
+// (candidateId, projectId) instead of candidateId alone, because
+// Assessment/Evidence/CandidateConsistencyFinding are project-scoped while
+// Candidate.currentProfile* is candidate-global (see Candidate.currentProfile*
+// comment above — that marker remains unchanged and keeps gating the
+// candidate-wide consolidated profile tables; it is not replaced by this
+// model). One row per (candidateId, projectId), created alongside the
+// corresponding CandidateProjectLink (never lazily) so publication can
+// always use a guarded updateMany rather than an upsert. NULL authority
+// fields mean "linked to this project, nothing published yet" — not an
+// error state.
+model CandidateProjectAuthority {
+  id                     String             @id @default(uuid())
+  candidateId            String
+  candidate              Candidate          @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  projectId              String
+  project                RecruitmentProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  currentDocumentId      String?
+  currentDocument        CandidateDocument? @relation("CurrentProjectAuthorityDocument", fields: [currentDocumentId], references: [id], onDelete: SetNull)
+  currentUploadedAt      DateTime?
+  currentProcessingRunId String?
+  currentProcessingRun   ProcessingRun?     @relation("CurrentProjectAuthorityRun", fields: [currentProcessingRunId], references: [id], onDelete: SetNull)
+  currentAttemptNumber   Int?
 
   @@unique([candidateId, projectId])
 }
@@ -477,6 +507,7 @@ model CandidateDocument {
   batch               CandidateUploadBatch?         @relation(fields: [batchId], references: [id], onDelete: SetNull)
   processingRuns      ProcessingRun[]               @relation("DocumentProcessingRuns")
   currentForCandidateProfile Candidate[]             @relation("CurrentProfileDocument")
+  currentForProjectAuthority CandidateProjectAuthority[] @relation("CurrentProjectAuthorityDocument")
 }
 
 // Phase 7 — Candidate Deduplication / Reuse across Projects.
@@ -624,6 +655,7 @@ model ProcessingRun {
   consistencyFindings CandidateConsistencyFinding[]
   currentForDocuments CandidateDocument[] @relation("CurrentProcessingRun")
   currentForCandidateProfile Candidate[] @relation("CurrentProfileRun")
+  currentForProjectAuthority CandidateProjectAuthority[] @relation("CurrentProjectAuthorityRun")
 
   @@unique([candidateDocumentId, attemptNumber])
 }
