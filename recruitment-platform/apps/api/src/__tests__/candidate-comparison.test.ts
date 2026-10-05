@@ -227,9 +227,13 @@ describe("POST /projects/:projectId/candidates/compare", () => {
     expect(body.candidates).toHaveLength(2);
     for (const c of body.candidates) {
       expect(Object.keys(c).sort()).toEqual(
-        ["anonymizedLabel", "candidateId", "evidenceCoverage", "hasCurrentRun", "isFailed", "isProcessing"].sort(),
+        ["anonymizedLabel", "candidateId", "evidenceCoverage", "hasCurrentRun", "isFailed", "isProcessing", "score"].sort(),
       );
       expect(typeof c.hasCurrentRun).toBe("boolean");
+      // V1 scoring field present but always typed/non-collapsed — see the
+      // dedicated "V1 Candidate Scoring" describe block below for full
+      // coverage of its computable/blocked shapes.
+      expect(typeof c.score.computable).toBe("boolean");
     }
     expect(body.candidates.find((c: { candidateId: string }) => c.candidateId === a.candidate.id).hasCurrentRun).toBe(true);
     expect(body.candidates.find((c: { candidateId: string }) => c.candidateId === b.candidate.id).hasCurrentRun).toBe(false);
@@ -243,7 +247,9 @@ describe("POST /projects/:projectId/candidates/compare", () => {
     expect(res.body).not.toContain("aiInteractionId");
     expect(res.body).not.toContain(runA.id);
     expect(res.body).not.toContain('"rank"');
-    expect(res.body.toLowerCase()).not.toContain("\"score\"");
+    // perRequirement must never be exposed on the comparison score field
+    // (approved adjustment: top-level figures only).
+    expect(body.candidates.every((c: { score: Record<string, unknown> }) => !("perRequirement" in c.score))).toBe(true);
   });
 
   it("10. redacts evidence text and rationale for every candidate", async () => {
@@ -862,6 +868,141 @@ describe("POST /projects/:projectId/candidates/compare", () => {
       const resAAgain = await compare(cookieA, projectA.id, [candidate.id, fillerA.candidate.id]);
       const rowAAgain = resAAgain.json().requirementRows.find((r: { requirementId: string }) => r.requirementId === requirementA.id);
       expect(rowAAgain.resultsByCandidate[candidate.id][0].isAuthoritative).toBe(true);
+    });
+  });
+
+  describe("V1 Candidate Scoring (display-only, approved integration)", () => {
+    async function publishAuthority(
+      candidate: { id: string },
+      project: { id: string },
+      document: { id: string; uploadedAt: Date },
+      run: { id: string; attemptNumber: number },
+    ) {
+      await prisma.candidateProjectAuthority.upsert({
+        where: { candidateId_projectId: { candidateId: candidate.id, projectId: project.id } },
+        create: {
+          candidateId: candidate.id,
+          projectId: project.id,
+          currentDocumentId: document.id,
+          currentUploadedAt: document.uploadedAt,
+          currentProcessingRunId: run.id,
+          currentAttemptNumber: run.attemptNumber,
+        },
+        update: {
+          currentDocumentId: document.id,
+          currentUploadedAt: document.uploadedAt,
+          currentProcessingRunId: run.id,
+          currentAttemptNumber: run.attemptNumber,
+        },
+      });
+    }
+
+    it("a candidate with eligible STRONG evidence against the only (100%-weighted) requirement gets a computable score of 100, alongside an unchanged evidenceCoverage", async () => {
+      const { user, project, cookie } = await seedProject();
+      const a = await seedCandidate(project, user, "Candidate #001");
+      const b = await seedCandidate(project, user, "Candidate #002");
+      const { requirement, version } = await seedRequirement(project, user);
+      const runA = await completeRun(a.document);
+      await createAssessment(a.candidate, project, requirement, version, runA, a.document, { status: "STRONG_EVIDENCE" });
+      await publishAuthority(a.candidate, project, a.document, runA);
+
+      const res = await compare(cookie, project.id, [a.candidate.id, b.candidate.id]);
+      const body = res.json();
+      const candA = body.candidates.find((c: { candidateId: string }) => c.candidateId === a.candidate.id);
+      expect(candA.score).toEqual({ computable: true, score: 100, numerator: 100, denominator: 100 });
+      // Coverage is a separate, untouched concept — both present, never merged.
+      expect(candA.evidenceCoverage.coveragePercentage).toBe(100);
+    });
+
+    it("a live, never-approved requirement blocks the score as LIVE_REQUIREMENT_NOT_YET_APPROVED, with the offending requirementIds — never collapsed to null or 0", async () => {
+      const { user, project, cookie } = await seedProject();
+      const a = await seedCandidate(project, user, "Candidate #001");
+      const b = await seedCandidate(project, user, "Candidate #002");
+      // Never approved: status DRAFT, currentVersionNumber 0, no JobRequirementVersion row.
+      const neverApproved = await prisma.jobRequirement.create({
+        data: {
+          projectId: project.id,
+          category: "FUNCTIONAL_EXPERIENCE",
+          description: "Unapproved requirement",
+          mandatory: false,
+          status: "DRAFT",
+          currentVersionNumber: 0,
+        },
+      });
+
+      const res = await compare(cookie, project.id, [a.candidate.id, b.candidate.id]);
+      const body = res.json();
+      const candA = body.candidates.find((c: { candidateId: string }) => c.candidateId === a.candidate.id);
+      expect(candA.score).toEqual({
+        computable: false,
+        reason: "LIVE_REQUIREMENT_NOT_YET_APPROVED",
+        requirementIds: [neverApproved.id],
+      });
+    });
+
+    it("a PII-purged candidate's score is blocked as PII_PURGED, never computed or defaulted", async () => {
+      const { user, project, cookie } = await seedProject();
+      const a = await seedCandidate(project, user, "Candidate #001");
+      const b = await seedCandidate(project, user, "Candidate #002");
+      await seedRequirement(project, user);
+      await prisma.candidate.update({ where: { id: a.candidate.id }, data: { piiPurgedAt: new Date() } });
+
+      const res = await compare(cookie, project.id, [a.candidate.id, b.candidate.id]);
+      const body = res.json();
+      const candA = body.candidates.find((c: { candidateId: string }) => c.candidateId === a.candidate.id);
+      expect(candA.score).toEqual({ computable: false, reason: "PII_PURGED" });
+    });
+
+    it("score never affects candidate ordering: requested order [A, B, C] with deliberately different scores (0, 100, 50) stays [A, B, C]", async () => {
+      const { user, project, cookie } = await seedProject();
+      const a = await seedCandidate(project, user, "Candidate #001");
+      const b = await seedCandidate(project, user, "Candidate #002");
+      const c = await seedCandidate(project, user, "Candidate #003");
+      const { requirement, version } = await seedRequirement(project, user);
+
+      const runA = await completeRun(a.document);
+      const runB = await completeRun(b.document);
+      const runC = await completeRun(c.document);
+      // createAssessment() always attaches STRONG evidence — for a genuine
+      // NOT_ESTABLISHED/score-0 case, create the evidence/assessment
+      // directly with NOT_FOUND strength instead (same pattern as the
+      // existing "mandatory requirement not covered" Evidence Coverage test
+      // above).
+      const notFoundEvidence = await prisma.evidence.create({
+        data: {
+          requirementId: requirement.id, candidateId: a.candidate.id, projectId: project.id,
+          evidenceType: "DIRECT", evidenceStrength: "NOT_FOUND", confidence: "HIGH",
+        },
+      });
+      await prisma.assessment.create({
+        data: {
+          candidateId: a.candidate.id, projectId: project.id, requirementId: requirement.id,
+          requirementVersionId: version.id, processingRunId: runA.id,
+          aiAssessmentSummary: "not found", status: "MANDATORY_GAP",
+          evidenceLinks: { create: [{ evidenceId: notFoundEvidence.id, role: "SUPPORTING" }] },
+        },
+      }); // NOT_FOUND -> NOT_ESTABLISHED -> score 0
+      await createAssessment(b.candidate, project, requirement, version, runB, b.document, { status: "STRONG_EVIDENCE" }); // STRONG -> score 100
+      await publishAuthority(a.candidate, project, a.document, runA);
+      await publishAuthority(b.candidate, project, b.document, runB);
+      await publishAuthority(c.candidate, project, c.document, runC); // no Assessment -> UNASSESSED -> score 0
+
+      const res = await compare(cookie, project.id, [a.candidate.id, b.candidate.id, c.candidate.id]);
+      const body = res.json();
+      expect(body.candidates.map((cand: { candidateId: string }) => cand.candidateId)).toEqual([
+        a.candidate.id,
+        b.candidate.id,
+        c.candidate.id,
+      ]);
+      const candA = body.candidates.find((cand: { candidateId: string }) => cand.candidateId === a.candidate.id);
+      const candB = body.candidates.find((cand: { candidateId: string }) => cand.candidateId === b.candidate.id);
+      const candC = body.candidates.find((cand: { candidateId: string }) => cand.candidateId === c.candidate.id);
+      expect(candA.score.score).toBe(0);
+      expect(candB.score.score).toBe(100);
+      expect(candC.score.score).toBe(0);
+      // Highest score (B) is in the middle of the response, proving order
+      // is request order, not score-ascending/descending.
+      expect(body.candidates[1].candidateId).toBe(b.candidate.id);
     });
   });
 });

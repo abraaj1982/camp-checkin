@@ -25,9 +25,25 @@ vi.mock("../../../../../lib/api", () => ({
   },
 }));
 
+const NOT_COMPUTABLE_SCORE = { computable: false as const, reason: "PII_PURGED" as const };
+
 const CANDIDATES = [
-  { candidateId: "cand-1", anonymizedLabel: "Candidate #001", hasCurrentRun: true, isProcessing: false, isFailed: false },
-  { candidateId: "cand-2", anonymizedLabel: "Candidate #002", hasCurrentRun: true, isProcessing: false, isFailed: false },
+  {
+    candidateId: "cand-1",
+    anonymizedLabel: "Candidate #001",
+    hasCurrentRun: true,
+    isProcessing: false,
+    isFailed: false,
+    score: { computable: true, score: 100, numerator: 100, denominator: 100 },
+  },
+  {
+    candidateId: "cand-2",
+    anonymizedLabel: "Candidate #002",
+    hasCurrentRun: true,
+    isProcessing: false,
+    isFailed: false,
+    score: { computable: true, score: 0, numerator: 0, denominator: 100 },
+  },
 ];
 
 const REQUIREMENT_ROW = {
@@ -192,8 +208,8 @@ describe("CandidateComparisonPage", () => {
   it("shows independent processing states per candidate — one candidate processing does not affect another's results", async () => {
     mockCompareResponse({
       candidates: [
-        { candidateId: "cand-1", anonymizedLabel: "Candidate #001", hasCurrentRun: false, isProcessing: true, isFailed: false },
-        { candidateId: "cand-2", anonymizedLabel: "Candidate #002", hasCurrentRun: true, isProcessing: false, isFailed: false },
+        { candidateId: "cand-1", anonymizedLabel: "Candidate #001", hasCurrentRun: false, isProcessing: true, isFailed: false, score: NOT_COMPUTABLE_SCORE },
+        { candidateId: "cand-2", anonymizedLabel: "Candidate #002", hasCurrentRun: true, isProcessing: false, isFailed: false, score: NOT_COMPUTABLE_SCORE },
       ],
     });
     render(<CandidateComparisonPage />);
@@ -207,8 +223,8 @@ describe("CandidateComparisonPage", () => {
   it("shows a failed state for one candidate without affecting another", async () => {
     mockCompareResponse({
       candidates: [
-        { candidateId: "cand-1", anonymizedLabel: "Candidate #001", hasCurrentRun: false, isProcessing: false, isFailed: true },
-        { candidateId: "cand-2", anonymizedLabel: "Candidate #002", hasCurrentRun: true, isProcessing: false, isFailed: false },
+        { candidateId: "cand-1", anonymizedLabel: "Candidate #001", hasCurrentRun: false, isProcessing: false, isFailed: true, score: NOT_COMPUTABLE_SCORE },
+        { candidateId: "cand-2", anonymizedLabel: "Candidate #002", hasCurrentRun: true, isProcessing: false, isFailed: false, score: NOT_COMPUTABLE_SCORE },
       ],
     });
     render(<CandidateComparisonPage />);
@@ -235,15 +251,22 @@ describe("CandidateComparisonPage", () => {
     await waitFor(() => expect(screen.getByText(/could not be completed/i)).toBeInTheDocument());
   });
 
-  it("never renders a score, ranking, or recommendation anywhere", async () => {
+  it("never renders a ranking or recommendation anywhere (V1 Score is display-only and is covered separately below)", async () => {
     mockCompareResponse();
     render(<CandidateComparisonPage />);
     await waitFor(() => expect(screen.getByText("5 years Employee Relations")).toBeInTheDocument());
 
     const bodyText = (document.body.textContent ?? "").toLowerCase();
-    for (const forbidden of ["score", "rank", "recommend", "suitab", "hire", "winner", "best candidate", "overall match"]) {
+    // "recommendation"/"suitability" legitimately appear inside both
+    // disclaimers' standard "not a suitability, ... or hiring
+    // recommendation" framing (approved V1 Score integration) — checked
+    // for precisely elsewhere (the dedicated disclaimer tests), not as a
+    // bare substring ban here.
+    for (const forbidden of ["rank", "hire", "winner", "best candidate", "overall match"]) {
       expect(bodyText).not.toContain(forbidden);
     }
+    expect(bodyText).not.toMatch(/\brecommend(ed|s)?\b/); // no affirmative recommendation verb/label
+    expect(bodyText).not.toMatch(/\bsuitable\b/); // no affirmative suitability verdict
   });
 
   it("never renders an aggregate count of requirements met (no score-like summary)", async () => {
@@ -270,6 +293,7 @@ describe("CandidateComparisonPage", () => {
           lowConfidenceCoveredCount: 0,
           perRequirement: [{ requirementId: "req-1", covered: true, contested: false, mandatoryGap: false, lowConfidenceAssessment: false }],
         },
+        score: { computable: true, score: 100, numerator: 100, denominator: 100 },
       },
       {
         candidateId: "cand-2",
@@ -286,16 +310,19 @@ describe("CandidateComparisonPage", () => {
           lowConfidenceCoveredCount: 0,
           perRequirement: [{ requirementId: "req-1", covered: false, contested: false, mandatoryGap: true, lowConfidenceAssessment: false }],
         },
+        score: { computable: true, score: 0, numerator: 0, denominator: 100 },
       },
     ];
 
-    it("renders 'Evidence Coverage: X%', never 'Score' or 'X/100'", async () => {
+    it("renders 'Evidence Coverage: X%', never relabeled as a bare 'Score:' or 'X/100' (V1 Score, where present, is always its own separate 'V1 Score:' line)", async () => {
       mockCompareResponse({ candidates: COVERAGE_CANDIDATES });
       render(<CandidateComparisonPage />);
       await waitFor(() => expect(screen.getByText(/Evidence Coverage: 100%/)).toBeInTheDocument());
       expect(screen.getByText(/Evidence Coverage: 0%/)).toBeInTheDocument();
       const bodyText = document.body.textContent ?? "";
-      expect(bodyText).not.toMatch(/score\s*:/i);
+      // Coverage itself is never rendered under a bare "Score:" label — only
+      // the distinct, separately-disclaimed "V1 Score:" line uses that word.
+      expect(bodyText).not.toMatch(/(?<!V1 )score\s*:/i);
       expect(bodyText).not.toMatch(/\b100\/100\b/);
     });
 
@@ -307,7 +334,9 @@ describe("CandidateComparisonPage", () => {
           screen.getByText(/Evidence Coverage reflects weighted evidence against approved requirements/),
         ).toBeInTheDocument(),
       );
-      expect(screen.getByText(/not a suitability, quality, or hiring recommendation/)).toBeInTheDocument();
+      // Both the Coverage and V1 Score disclaimers share this trailing
+      // clause (approved framing for both) — getAllByText, not getByText.
+      expect(screen.getAllByText(/not a suitability, quality, or hiring recommendation/).length).toBe(2);
     });
 
     it("shows Mandatory Gap count and per-requirement flag, without hiding or zeroing anything", async () => {
@@ -331,7 +360,7 @@ describe("CandidateComparisonPage", () => {
       mockCompareResponse({
         candidates: [
           { ...COVERAGE_CANDIDATES[0] },
-          { candidateId: "cand-2", anonymizedLabel: "Candidate #002", hasCurrentRun: false, isProcessing: false, isFailed: false, evidenceCoverage: null },
+          { candidateId: "cand-2", anonymizedLabel: "Candidate #002", hasCurrentRun: false, isProcessing: false, isFailed: false, evidenceCoverage: null, score: NOT_COMPUTABLE_SCORE },
         ],
       });
       render(<CandidateComparisonPage />);
@@ -352,6 +381,64 @@ describe("CandidateComparisonPage", () => {
       render(<CandidateComparisonPage />);
       await waitFor(() => expect(screen.getByText(/Evidence Coverage: 100%/)).toBeInTheDocument());
       expect(screen.getByText(/Low Confidence: 1/)).toBeInTheDocument();
+    });
+  });
+
+  describe("V1 Candidate Scoring (display-only, approved integration)", () => {
+    it("renders a computable score as 'V1 Score: X%', separate from Evidence Coverage", async () => {
+      mockCompareResponse();
+      render(<CandidateComparisonPage />);
+      await waitFor(() => expect(screen.getByText("V1 Score: 100%")).toBeInTheDocument());
+      expect(screen.getByText("V1 Score: 0%")).toBeInTheDocument();
+    });
+
+    it("renders a LIVE_REQUIREMENT_NOT_YET_APPROVED block as its own named state, not 0% or blank", async () => {
+      mockCompareResponse({
+        candidates: [
+          {
+            ...CANDIDATES[0],
+            score: { computable: false, reason: "LIVE_REQUIREMENT_NOT_YET_APPROVED", requirementIds: ["req-x", "req-y"] },
+          },
+          CANDIDATES[1],
+        ],
+      });
+      render(<CandidateComparisonPage />);
+      await waitFor(() =>
+        expect(screen.getByText(/V1 Score: Not computable — 2 live requirement\(s\) not yet approved/)).toBeInTheDocument(),
+      );
+      expect(screen.queryByText("V1 Score: 0%")).not.toBeNull(); // candidate 2's unrelated computable 0% is unaffected
+    });
+
+    it("renders a PII_PURGED block as its own named state, never 0% or blank", async () => {
+      mockCompareResponse({
+        candidates: [{ ...CANDIDATES[0], score: NOT_COMPUTABLE_SCORE }, CANDIDATES[1]],
+      });
+      render(<CandidateComparisonPage />);
+      await waitFor(() =>
+        expect(screen.getByText("V1 Score: Not available (candidate data purged)")).toBeInTheDocument(),
+      );
+    });
+
+    it("shows the fixed non-suitability disclaimer whenever the comparison renders", async () => {
+      mockCompareResponse();
+      render(<CandidateComparisonPage />);
+      await waitFor(() => expect(screen.getByText(/V1 Score reflects weighted evaluation state/)).toBeInTheDocument());
+      expect(screen.getByText(/not a suitability, quality, or hiring recommendation/)).toBeInTheDocument();
+    });
+
+    it("never reorders candidates by score: requested order [cand-1, cand-2, cand-3] with scores (0, 100, 50) stays in that order", async () => {
+      mockCompareResponse({
+        candidates: [
+          { candidateId: "cand-1", anonymizedLabel: "Candidate #001", hasCurrentRun: true, isProcessing: false, isFailed: false, score: { computable: true, score: 0, numerator: 0, denominator: 100 } },
+          { candidateId: "cand-2", anonymizedLabel: "Candidate #002", hasCurrentRun: true, isProcessing: false, isFailed: false, score: { computable: true, score: 100, numerator: 100, denominator: 100 } },
+          { candidateId: "cand-3", anonymizedLabel: "Candidate #003", hasCurrentRun: true, isProcessing: false, isFailed: false, score: { computable: true, score: 50, numerator: 50, denominator: 100 } },
+        ],
+        requirementRows: [],
+      });
+      render(<CandidateComparisonPage />);
+      await waitFor(() => expect(screen.getByText("Candidate #001")).toBeInTheDocument());
+      const labels = screen.getAllByText(/Candidate #00[123]/);
+      expect(labels.map((el) => el.textContent)).toEqual(["Candidate #001", "Candidate #002", "Candidate #003"]);
     });
   });
 });

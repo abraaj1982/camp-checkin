@@ -5,8 +5,11 @@ import {
   computeCandidateCoverage,
   type CoverageEvidenceItem,
   type CoverageRequirementInput,
+  type CandidateScoreResult,
+  type CandidateScoreBlocked,
 } from "@recruitment-platform/shared-types";
 import { requireProjectAccess } from "../projects/authorization.js";
+import { computeLiveCandidateScore, type ComputeLiveCandidateScoreResult } from "./scoring.js";
 
 /**
  * Phase 5A — Secure read APIs surfacing Requirement Evidence Analysis
@@ -263,6 +266,30 @@ export async function registerAssessmentRoutes(app: FastifyInstance): Promise<vo
  * order) — coverage is displayed per candidate, never used to reorder,
  * sort, or filter the response.
  */
+/**
+ * V1 Candidate Comparison scoring field (display-only — see
+ * apps/api/src/modules/assessments/scoring.ts and
+ * packages/shared-types/src/scoring.ts, both frozen/unmodified at commit
+ * d0e5a564b6563ddceae1ea9ebc45478b44e9d399). Reuses the shared
+ * CandidateScoreResult/CandidateScoreBlocked types rather than redeclaring a
+ * duplicate union, but intentionally omits `perRequirement`: the Comparison
+ * UI does not render a per-requirement score breakdown, only the top-line
+ * figures. A non-computable result (LIVE_REQUIREMENT_NOT_YET_APPROVED or
+ * PII_PURGED) is passed through exactly as returned — never collapsed to
+ * `null` or `0`. This field never affects `candidates` array order, which
+ * remains exactly the caller's requested (de-duplicated) order.
+ */
+type ComparisonScoreField =
+  | Pick<CandidateScoreResult, "computable" | "score" | "numerator" | "denominator">
+  | CandidateScoreBlocked
+  | { computable: false; reason: "PII_PURGED" };
+
+function toComparisonScoreField(result: ComputeLiveCandidateScoreResult): ComparisonScoreField {
+  if (!result.computable) return result;
+  const { computable, score, numerator, denominator } = result;
+  return { computable, score, numerator, denominator };
+}
+
 function registerCandidateComparisonRoute(app: FastifyInstance): void {
   app.post(
     "/projects/:projectId/candidates/compare",
@@ -321,6 +348,22 @@ function registerCandidateComparisonRoute(app: FastifyInstance): void {
       }
       const allCurrentRunIds = [...currentRunIdsByCandidateId.values()].flat();
       const authoritativeRunIdByCandidateId = await resolveAuthoritativeRunIds(candidateIds, project.id);
+
+      // V1 Live Candidate Scoring (display-only). Bounded Promise.all over
+      // the 2-5 requested candidates — computeLiveCandidateScore is called
+      // as-is (frozen, unmodified) and independently re-queries per
+      // candidate (including the project's live requirement set, already
+      // identical across candidates in this request). This duplicates some
+      // of the batched reads above; accepted per explicit authorization
+      // rather than refactoring the frozen scoring/eligibility modules.
+      const scoresByCandidateId = new Map(
+        await Promise.all(
+          candidateIds.map(
+            async (candidateId) =>
+              [candidateId, toComparisonScoreField(await computeLiveCandidateScore(prisma, candidateId, project.id))] as const,
+          ),
+        ),
+      );
 
       const employerOrderByCandidateId = new Map<string, string[]>();
       for (const candidateId of candidateIds) {
@@ -488,6 +531,7 @@ function registerCandidateComparisonRoute(app: FastifyInstance): void {
           isProcessing,
           isFailed,
           evidenceCoverage: evidenceCoverageByCandidateId.get(candidateId) ?? null,
+          score: scoresByCandidateId.get(candidateId)!,
         };
       });
 

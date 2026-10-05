@@ -17,10 +17,27 @@ import { apiFetch, ApiError } from "../../../../../lib/api";
  * displayed as "Evidence Coverage: X%", never "Score" and never "X/100" —
  * see packages/shared-types/src/evidence-coverage.ts for the definition.
  * It is never used to reorder or auto-sort the candidate columns.
+ *
+ * V1 Scoring integration — each candidate also carries `score` (see
+ * apps/api/src/modules/assessments/scoring.ts /
+ * packages/shared-types/src/scoring.ts, frozen at commit
+ * d0e5a564b6563ddceae1ea9ebc45478b44e9d399). This is a SEPARATE concept
+ * from Evidence Coverage — never combined, never replacing it — and is
+ * display-only here too: it never reorders, ranks, or filters the
+ * candidate columns, and a blocked/non-computable result
+ * (LIVE_REQUIREMENT_NOT_YET_APPROVED / PII_PURGED) is rendered as its own
+ * distinct, named state, never as 0% or a blank. apps/web has no
+ * dependency on @recruitment-platform/shared-types (consistent with every
+ * other field on this page being a locally mirrored interface rather than
+ * a cross-package import), so `ComparisonScore` below is a local type
+ * mirroring the API's trimmed field, not a duplicate scoring union.
  */
 
 const COVERAGE_DISCLAIMER =
   "Evidence Coverage reflects weighted evidence against approved requirements — not a suitability, quality, or hiring recommendation.";
+
+const SCORE_DISCLAIMER =
+  "V1 Score reflects weighted evaluation state against approved, pinned requirement weights — not a suitability, quality, or hiring recommendation.";
 
 interface EvidenceItem {
   role: "SUPPORTING" | "CONSIDERED_REJECTED";
@@ -63,6 +80,11 @@ interface EvidenceCoverage {
   perRequirement: RequirementCoverageResult[];
 }
 
+type ComparisonScore =
+  | { computable: true; score: number; numerator: number; denominator: number }
+  | { computable: false; reason: "LIVE_REQUIREMENT_NOT_YET_APPROVED"; requirementIds: string[] }
+  | { computable: false; reason: "PII_PURGED" };
+
 interface CandidateSummary {
   candidateId: string;
   anonymizedLabel: string;
@@ -70,6 +92,7 @@ interface CandidateSummary {
   isProcessing: boolean;
   isFailed: boolean;
   evidenceCoverage: EvidenceCoverage | null;
+  score: ComparisonScore;
 }
 
 interface RequirementRow {
@@ -198,12 +221,24 @@ export default function CandidateComparisonPage() {
                     )}
                   </div>
                 )}
+                <div style={{ fontSize: 13, marginTop: 4 }}>
+                  {c.score.computable ? (
+                    <span>V1 Score: {Math.round(c.score.score)}%</span>
+                  ) : c.score.reason === "LIVE_REQUIREMENT_NOT_YET_APPROVED" ? (
+                    <span style={{ color: "#8a5a00" }}>
+                      V1 Score: Not computable — {c.score.requirementIds.length} live requirement(s) not yet approved
+                    </span>
+                  ) : (
+                    <span style={{ color: "#555" }}>V1 Score: Not available (candidate data purged)</span>
+                  )}
+                </div>
               </div>
             ))}
           </div>
           {data.candidates.some((c) => c.evidenceCoverage) && (
             <p style={{ fontSize: 12, color: "#888", marginTop: -8, marginBottom: 16 }}>{COVERAGE_DISCLAIMER}</p>
           )}
+          <p style={{ fontSize: 12, color: "#888", marginTop: -8, marginBottom: 16 }}>{SCORE_DISCLAIMER}</p>
 
           <h2>Requirements &amp; Evidence</h2>
           {data.requirementRows.length === 0 ? (
