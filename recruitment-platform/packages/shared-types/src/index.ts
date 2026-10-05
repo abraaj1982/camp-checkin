@@ -7,3 +7,4 @@ export * from "./file-validation.js";
 export * from "./assessment-status.js";
 export * from "./candidate-identity.js";
 export * from "./evidence-coverage.js";
+export * from "./scoring.js";
