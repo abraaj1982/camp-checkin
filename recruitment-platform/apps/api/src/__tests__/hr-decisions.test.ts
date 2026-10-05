@@ -216,9 +216,9 @@ describe("HR decisions (Phase 6)", () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     // wasAuthoritativeAtDecision is false here because seedDocumentAndRun/
-    // completeRun bypass the real worker pipeline and never populate
-    // Candidate.currentProfileProcessingRunId (Phase 11's marker) — this
-    // is correct, not a bug: the fixture never published a profile.
+    // completeRun bypass the real worker pipeline and never create a
+    // CandidateProjectAuthority row for this (candidateId, projectId) —
+    // this is correct, not a bug: the fixture never published authority.
     expect(body.override).toEqual({
       assessmentId: assessment.id,
       overridden: true,
@@ -240,15 +240,17 @@ describe("HR decisions (Phase 6)", () => {
     const { document, run } = await seedDocumentAndRun(project, user, candidate);
     const assessment = await seedRequirementAndAssessment(project, user, candidate, run, "MANDATORY_GAP");
 
-    // Publish the profile authority (Phase 11's marker) — mirrors what the
-    // real worker pipeline's tryPublishCandidateProfile CAS would set.
-    await prisma.candidate.update({
-      where: { id: candidate.id },
+    // Publish the project-scoped authority (Item 16, Option B) — mirrors
+    // what the real worker pipeline's tryPublishCandidateProjectAuthority
+    // CAS would set.
+    await prisma.candidateProjectAuthority.create({
       data: {
-        currentProfileDocumentId: document.id,
-        currentProfileUploadedAt: document.uploadedAt,
-        currentProfileProcessingRunId: run.id,
-        currentProfileAttemptNumber: run.attemptNumber,
+        candidateId: candidate.id,
+        projectId: project.id,
+        currentDocumentId: document.id,
+        currentUploadedAt: document.uploadedAt,
+        currentProcessingRunId: run.id,
+        currentAttemptNumber: run.attemptNumber,
       },
     });
 
@@ -286,13 +288,14 @@ describe("HR decisions (Phase 6)", () => {
     const otherRun = await prisma.processingRun.create({
       data: { candidateDocumentId: otherDocument.id, attemptNumber: 1, status: "COMPLETED", completedAt: new Date() },
     });
-    await prisma.candidate.update({
-      where: { id: candidate.id },
+    await prisma.candidateProjectAuthority.create({
       data: {
-        currentProfileDocumentId: otherDocument.id,
-        currentProfileUploadedAt: otherDocument.uploadedAt,
-        currentProfileProcessingRunId: otherRun.id,
-        currentProfileAttemptNumber: otherRun.attemptNumber,
+        candidateId: candidate.id,
+        projectId: project.id,
+        currentDocumentId: otherDocument.id,
+        currentUploadedAt: otherDocument.uploadedAt,
+        currentProcessingRunId: otherRun.id,
+        currentAttemptNumber: otherRun.attemptNumber,
       },
     });
 
@@ -303,6 +306,47 @@ describe("HR decisions (Phase 6)", () => {
     // Still accepted — C3 never rejects a citation merely for being non-authoritative.
     expect(res.statusCode).toBe(200);
     expect(res.json().override.wasAuthoritativeAtDecision).toBe(false);
+  });
+
+  it("project-scoped: wasAuthoritativeAtDecision for a Project A decision reflects Project A's own authority, regardless of Project B's authority (Item 16, Option B)", async () => {
+    const { user: userA, project: projectA, cookie: cookieA } = await seedProject("Project A");
+    const { user: userB, project: projectB } = await seedProject("Project B");
+
+    // One candidate, linked to BOTH projects, with independent documents/
+    // runs/assessments/authority in each.
+    const candidate = await prisma.candidate.create({ data: { fullName: "Multi Project Candidate" } });
+    await prisma.candidateProjectLink.create({
+      data: { candidateId: candidate.id, projectId: projectA.id, anonymizedLabel: "Candidate #001" },
+    });
+    await prisma.candidateProjectLink.create({
+      data: { candidateId: candidate.id, projectId: projectB.id, anonymizedLabel: "Candidate #001" },
+    });
+
+    const { run: runA } = await seedDocumentAndRun(projectA, userA, candidate);
+    const assessmentA = await seedRequirementAndAssessment(projectA, userA, candidate, runA, "MANDATORY_GAP");
+    await prisma.candidateProjectAuthority.create({
+      data: { candidateId: candidate.id, projectId: projectA.id, currentProcessingRunId: runA.id },
+    });
+
+    // Project B's authority points at a DIFFERENT, unrelated run — if the
+    // computation were still candidate-global, this would overwrite or
+    // conflict with Project A's own authority for the same candidate.
+    const { run: runB } = await seedDocumentAndRun(projectB, userB, candidate);
+    await prisma.candidateProjectAuthority.create({
+      data: { candidateId: candidate.id, projectId: projectB.id, currentProcessingRunId: runB.id },
+    });
+
+    const res = await post(cookieA, projectA.id, candidate.id, {
+      decision: "SHORTLIST",
+      assessmentId: assessmentA.id,
+    });
+
+    expect(res.statusCode).toBe(200);
+    // assessmentA.processingRunId === runA.id === Project A's own authority.
+    expect(res.json().override.wasAuthoritativeAtDecision).toBe(true);
+
+    const stored = await prisma.hrOverride.findUnique({ where: { decisionId: res.json().id } });
+    expect(stored?.wasAuthoritativeAtDecision).toBe(true);
   });
 
   it("rejects an override referencing an assessment from a superseded (non-current) run", async () => {

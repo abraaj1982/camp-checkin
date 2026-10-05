@@ -122,18 +122,18 @@ export async function registerDecisionRoutes(app: FastifyInstance): Promise<void
           (body.decision === "SHORTLIST" || body.decision === "INTERVIEW");
 
         // Phase 12 (C3) — computed once, here, at the exact moment of
-        // decision, from Candidate.currentProfileProcessingRunId (Phase
-        // 11's own marker, read fresh, never cached from earlier in this
-        // request). Always explicitly true or false for a decision made
-        // from this point forward — never left to infer later, since the
-        // candidate-level marker is overwritten in place and carries no
-        // history of its own (Phase 10A.7/10A.8).
-        const candidateRecord = await prisma.candidate.findUnique({
-          where: { id: candidateId },
-          select: { currentProfileProcessingRunId: true },
+        // decision, from CandidateProjectAuthority.currentProcessingRunId
+        // (Item 16, Option B — project-scoped authority, read fresh, never
+        // cached from earlier in this request). Always explicitly true or
+        // false for a decision made from this point forward — never left
+        // to infer later, since the authority row is overwritten in place
+        // and carries no history of its own (Phase 10A.7/10A.8, re-scoped).
+        const authorityRecord = await prisma.candidateProjectAuthority.findUnique({
+          where: { candidateId_projectId: { candidateId, projectId: project.id } },
+          select: { currentProcessingRunId: true },
         });
         const wasAuthoritativeAtDecision =
-          overrideAssessment.processingRunId === (candidateRecord?.currentProfileProcessingRunId ?? null);
+          overrideAssessment.processingRunId === (authorityRecord?.currentProcessingRunId ?? null);
 
         override = await prisma.hrOverride.create({
           data: {
