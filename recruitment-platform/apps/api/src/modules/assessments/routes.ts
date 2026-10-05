@@ -49,21 +49,25 @@ export async function resolveCurrentRunIds(candidateId: string, projectId: strin
 }
 
 /**
- * Assessment/Evidence Authority (C3, Post-Phase-11 decision). Derived at
- * read time only — never stored on Assessment/Evidence/
- * CandidateConsistencyFinding/Candidate — by comparing a row's
- * processingRunId against Candidate.currentProfileProcessingRunId (Phase
- * 11's own marker, unmodified by this change). A profile/publication-
+ * Assessment/Evidence Authority (C3, Post-Phase-11 decision; Item 16
+ * resolved via Option B). Derived at read time only — never stored on
+ * Assessment/Evidence/CandidateConsistencyFinding/CandidateProjectAuthority
+ * — by comparing a row's processingRunId against
+ * CandidateProjectAuthority.currentProcessingRunId for the row's own
+ * (candidateId, projectId). Candidate.currentProfileProcessingRunId
+ * (Phase 11) is NOT used here — it remains exclusively the candidate-wide
+ * consolidated profile authority, a separate concern from this
+ * project-scoped Assessment/Evidence authority. A profile/publication-
  * authority indicator only (Decision 6): it says nothing about
  * EvidenceStrength, Assessment status, or mandatory-gap outcome, all of
  * which remain exactly as computed by the worker.
  */
-async function resolveAuthoritativeRunIds(candidateIds: string[]): Promise<Map<string, string | null>> {
-  const candidates = await prisma.candidate.findMany({
-    where: { id: { in: candidateIds } },
-    select: { id: true, currentProfileProcessingRunId: true },
+async function resolveAuthoritativeRunIds(candidateIds: string[], projectId: string): Promise<Map<string, string | null>> {
+  const authorities = await prisma.candidateProjectAuthority.findMany({
+    where: { candidateId: { in: candidateIds }, projectId },
+    select: { candidateId: true, currentProcessingRunId: true },
   });
-  return new Map(candidates.map((c) => [c.id, c.currentProfileProcessingRunId]));
+  return new Map(authorities.map((a) => [a.candidateId, a.currentProcessingRunId]));
 }
 
 async function buildEmployerOrder(candidateId: string): Promise<string[]> {
@@ -153,7 +157,7 @@ export async function registerAssessmentRoutes(app: FastifyInstance): Promise<vo
       }
 
       const employerOrder = await buildEmployerOrder(candidateId);
-      const authoritativeRunIdByCandidateId = await resolveAuthoritativeRunIds([candidateId]);
+      const authoritativeRunIdByCandidateId = await resolveAuthoritativeRunIds([candidateId], project.id);
       const authoritativeRunId = authoritativeRunIdByCandidateId.get(candidateId) ?? null;
 
       const assessments = await prisma.assessment.findMany({
@@ -216,7 +220,7 @@ export async function registerAssessmentRoutes(app: FastifyInstance): Promise<vo
       }
 
       const employerOrder = await buildEmployerOrder(candidateId);
-      const authoritativeRunIdByCandidateId = await resolveAuthoritativeRunIds([candidateId]);
+      const authoritativeRunIdByCandidateId = await resolveAuthoritativeRunIds([candidateId], project.id);
       const authoritativeRunId = authoritativeRunIdByCandidateId.get(candidateId) ?? null;
 
       // CandidateConsistencyFinding.processingRunId (Phase 5A follow-up)
@@ -316,7 +320,7 @@ function registerCandidateComparisonRoute(app: FastifyInstance): void {
         );
       }
       const allCurrentRunIds = [...currentRunIdsByCandidateId.values()].flat();
-      const authoritativeRunIdByCandidateId = await resolveAuthoritativeRunIds(candidateIds);
+      const authoritativeRunIdByCandidateId = await resolveAuthoritativeRunIds(candidateIds, project.id);
 
       const employerOrderByCandidateId = new Map<string, string[]>();
       for (const candidateId of candidateIds) {

@@ -686,19 +686,39 @@ describe("POST /projects/:projectId/candidates/compare", () => {
   });
 
   describe("Phase 12 (C3) — Assessment/Evidence Authority", () => {
-    /** Directly sets Candidate.currentProfileProcessingRunId etc. (Phase 11's marker) — these fixtures predate and bypass the real worker pipeline/CAS, mirroring the existing completeRun() helper's own approach. */
+    /**
+     * Directly sets CandidateProjectAuthority.currentProcessingRunId etc.
+     * (Item 16, Option B) for the given (candidateId, projectId) — these
+     * fixtures predate and bypass the real worker pipeline/CAS, mirroring
+     * the existing completeRun() helper's own approach. Candidate.
+     * currentProfileProcessingRunId (Phase 11) is deliberately NOT touched
+     * here — it is a separate, candidate-wide concern this test suite does
+     * not exercise. Uses upsert because seedCandidate() (this file's own
+     * fixture) does not create a CandidateProjectAuthority row — the real
+     * production creation sites (identity-resolution.ts, candidate-match-
+     * reviews routes.ts) are not exercised by these fixtures either.
+     */
     async function publishProfile(
       candidate: { id: string },
+      project: { id: string },
       document: { id: string; uploadedAt: Date },
       run: { id: string; attemptNumber: number },
     ) {
-      await prisma.candidate.update({
-        where: { id: candidate.id },
-        data: {
-          currentProfileDocumentId: document.id,
-          currentProfileUploadedAt: document.uploadedAt,
-          currentProfileProcessingRunId: run.id,
-          currentProfileAttemptNumber: run.attemptNumber,
+      await prisma.candidateProjectAuthority.upsert({
+        where: { candidateId_projectId: { candidateId: candidate.id, projectId: project.id } },
+        create: {
+          candidateId: candidate.id,
+          projectId: project.id,
+          currentDocumentId: document.id,
+          currentUploadedAt: document.uploadedAt,
+          currentProcessingRunId: run.id,
+          currentAttemptNumber: run.attemptNumber,
+        },
+        update: {
+          currentDocumentId: document.id,
+          currentUploadedAt: document.uploadedAt,
+          currentProcessingRunId: run.id,
+          currentAttemptNumber: run.attemptNumber,
         },
       });
     }
@@ -726,7 +746,7 @@ describe("POST /projects/:projectId/candidates/compare", () => {
       const runTwo = await completeRun(secondDocument, 1);
       await createAssessment(a.candidate, project, requirement, version, runOne, a.document, { status: "STRONG_EVIDENCE" });
       await createAssessment(a.candidate, project, requirement, version, runTwo, secondDocument, { status: "MANDATORY_GAP" });
-      await publishProfile(a.candidate, secondDocument, runTwo); // runTwo's document is authoritative
+      await publishProfile(a.candidate, project, secondDocument, runTwo); // runTwo's document is authoritative
 
       // compare() requires 2-5 distinct candidates — a second seeded
       // candidate satisfies that constraint; only `a`'s results matter here.
@@ -755,8 +775,8 @@ describe("POST /projects/:projectId/candidates/compare", () => {
       const runB = await completeRun(b.document);
       await createAssessment(a.candidate, project, requirement, version, runA, a.document);
       await createAssessment(b.candidate, project, requirement, version, runB, b.document);
-      await publishProfile(a.candidate, a.document, runA);
-      // b's profile was never published (Candidate.currentProfileProcessingRunId stays null) — its Assessment must be isAuthoritative: false.
+      await publishProfile(a.candidate, project, a.document, runA);
+      // b has no CandidateProjectAuthority row at all (never published) — its Assessment must be isAuthoritative: false.
 
       const res = await compare(cookie, project.id, [a.candidate.id, b.candidate.id]);
       const row = res.json().requirementRows[0];
@@ -774,13 +794,74 @@ describe("POST /projects/:projectId/candidates/compare", () => {
       await createAssessment(a.candidate, project, requirement, version, runA, a.document);
       await createFinding(a.candidate, project, runA);
       await createAssessment(b.candidate, project, requirement, version, runB, b.document);
-      await publishProfile(a.candidate, a.document, runA);
+      await publishProfile(a.candidate, project, a.document, runA);
 
       const res = await compare(cookie, project.id, [a.candidate.id, b.candidate.id]);
       expect(res.body).not.toContain(runA.id);
       expect(res.body).not.toContain(runB.id);
       expect(res.body).not.toContain(a.document.id);
       expect(res.body).not.toContain(b.document.id);
+    });
+
+    it("project-scoped authority: the same candidate linked to two projects has independent isAuthoritative per project (Item 16, Option B)", async () => {
+      const { user: userA, project: projectA, cookie: cookieA } = await seedProject("Project A");
+      const { user: userB, project: projectB, cookie: cookieB } = await seedProject("Project B");
+
+      // One Candidate, linked to BOTH projects, with independent documents/
+      // runs/assessments/authority in each — the exact scenario a
+      // candidate-global authority pointer could never represent correctly.
+      const candidate = await prisma.candidate.create({ data: { fullName: "Multi Project Candidate" } });
+      await prisma.candidateProjectLink.create({
+        data: { candidateId: candidate.id, projectId: projectA.id, anonymizedLabel: "Candidate #001" },
+      });
+      await prisma.candidateProjectLink.create({
+        data: { candidateId: candidate.id, projectId: projectB.id, anonymizedLabel: "Candidate #001" },
+      });
+
+      const docA = await prisma.candidateDocument.create({
+        data: {
+          candidateId: candidate.id, projectId: projectA.id, fileType: "pdf",
+          storageKey: `s3://bucket/${candidate.id}-a.pdf`, originalFilename: "a-resume.pdf", uploadedBy: userA.id,
+        },
+      });
+      const docB = await prisma.candidateDocument.create({
+        data: {
+          candidateId: candidate.id, projectId: projectB.id, fileType: "pdf",
+          storageKey: `s3://bucket/${candidate.id}-b.pdf`, originalFilename: "b-resume.pdf", uploadedBy: userB.id,
+        },
+      });
+
+      const { requirement: requirementA, version: versionA } = await seedRequirement(projectA, userA);
+      const { requirement: requirementB, version: versionB } = await seedRequirement(projectB, userB);
+      const runA = await completeRun(docA);
+      const runB = await completeRun(docB);
+      await createAssessment(candidate, projectA, requirementA, versionA, runA, docA);
+      await createAssessment(candidate, projectB, requirementB, versionB, runB, docB);
+
+      // Independent authority per project — Project A's authoritative run
+      // and Project B's authoritative run are unrelated.
+      await publishProfile(candidate, projectA, docA, runA);
+      await publishProfile(candidate, projectB, docB, runB);
+
+      // compare() needs 2-5 distinct candidates per request — a filler
+      // candidate per project satisfies that without affecting the
+      // candidate under test.
+      const fillerA = await seedCandidate(projectA, userA, "Candidate #002");
+      const fillerB = await seedCandidate(projectB, userB, "Candidate #002");
+
+      const resA = await compare(cookieA, projectA.id, [candidate.id, fillerA.candidate.id]);
+      const rowA = resA.json().requirementRows.find((r: { requirementId: string }) => r.requirementId === requirementA.id);
+      expect(rowA.resultsByCandidate[candidate.id][0].isAuthoritative).toBe(true);
+
+      const resB = await compare(cookieB, projectB.id, [candidate.id, fillerB.candidate.id]);
+      const rowB = resB.json().requirementRows.find((r: { requirementId: string }) => r.requirementId === requirementB.id);
+      expect(rowB.resultsByCandidate[candidate.id][0].isAuthoritative).toBe(true);
+
+      // Re-querying Project A again confirms Project B's later authority
+      // publication never affected Project A's own result.
+      const resAAgain = await compare(cookieA, projectA.id, [candidate.id, fillerA.candidate.id]);
+      const rowAAgain = resAAgain.json().requirementRows.find((r: { requirementId: string }) => r.requirementId === requirementA.id);
+      expect(rowAAgain.resultsByCandidate[candidate.id][0].isAuthoritative).toBe(true);
     });
   });
 });

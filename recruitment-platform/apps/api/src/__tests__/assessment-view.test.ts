@@ -337,6 +337,96 @@ describe("candidate assessment/evidence and career consistency read APIs (Phase 
       });
       expect(res.statusCode).toBe(404);
     });
+
+    describe("isAuthoritative (Item 16, Option B — CandidateProjectAuthority)", () => {
+      it("is false when no CandidateProjectAuthority row exists for this (candidateId, projectId)", async () => {
+        const { project, cookie, candidate, document, user } = await seedProjectWithCandidate();
+        await seedCompletedRunWithAssessment(document, project, user);
+
+        const res = await app.inject({
+          method: "GET",
+          url: `/projects/${project.id}/candidates/${candidate.id}/assessments`,
+          headers: { cookie },
+        });
+        expect(res.json().assessments[0].isAuthoritative).toBe(false);
+      });
+
+      it("is true once CandidateProjectAuthority.currentProcessingRunId matches the Assessment's own processingRunId", async () => {
+        const { project, cookie, candidate, document, user } = await seedProjectWithCandidate();
+        const { run } = await seedCompletedRunWithAssessment(document, project, user);
+        await prisma.candidateProjectAuthority.create({
+          data: {
+            candidateId: candidate.id,
+            projectId: project.id,
+            currentDocumentId: document.id,
+            currentUploadedAt: document.uploadedAt,
+            currentProcessingRunId: run.id,
+            currentAttemptNumber: run.attemptNumber,
+          },
+        });
+
+        const res = await app.inject({
+          method: "GET",
+          url: `/projects/${project.id}/candidates/${candidate.id}/assessments`,
+          headers: { cookie },
+        });
+        expect(res.json().assessments[0].isAuthoritative).toBe(true);
+      });
+
+      it("project-scoped: the same candidate linked to a second project with its own authority never affects this project's isAuthoritative", async () => {
+        const { project, cookie, candidate, document, user } = await seedProjectWithCandidate({ projectTitle: "Project A" });
+        const { run } = await seedCompletedRunWithAssessment(document, project, user);
+        await prisma.candidateProjectAuthority.create({
+          data: {
+            candidateId: candidate.id,
+            projectId: project.id,
+            currentDocumentId: document.id,
+            currentUploadedAt: document.uploadedAt,
+            currentProcessingRunId: run.id,
+            currentAttemptNumber: run.attemptNumber,
+          },
+        });
+
+        // The SAME candidate, linked to a second project, with its own
+        // independent (later) document/run/authority — a candidate-global
+        // authority pointer would have let this overwrite Project A's.
+        const projectB = await prisma.recruitmentProject.create({ data: { title: "Project B", createdBy: user.id } });
+        await prisma.candidateProjectLink.create({
+          data: { candidateId: candidate.id, projectId: projectB.id, anonymizedLabel: "Candidate #001" },
+        });
+        const documentB = await prisma.candidateDocument.create({
+          data: {
+            candidateId: candidate.id,
+            projectId: projectB.id,
+            fileType: "pdf",
+            storageKey: `s3://bucket/${candidate.id}-b.pdf`,
+            originalFilename: "b-resume.pdf",
+            uploadedBy: user.id,
+            uploadedAt: new Date(Date.now() + 60_000), // strictly later than Project A's document
+          },
+        });
+        const runB = await prisma.processingRun.create({
+          data: { candidateDocumentId: documentB.id, attemptNumber: 1, status: "COMPLETED", completedAt: new Date() },
+        });
+        await prisma.candidateProjectAuthority.create({
+          data: {
+            candidateId: candidate.id,
+            projectId: projectB.id,
+            currentDocumentId: documentB.id,
+            currentUploadedAt: documentB.uploadedAt,
+            currentProcessingRunId: runB.id,
+            currentAttemptNumber: runB.attemptNumber,
+          },
+        });
+
+        const res = await app.inject({
+          method: "GET",
+          url: `/projects/${project.id}/candidates/${candidate.id}/assessments`,
+          headers: { cookie },
+        });
+        expect(res.json().assessments[0].isAuthoritative).toBe(true); // unaffected by Project B's later authority
+      });
+    });
   });
 
   describe("GET /projects/:projectId/candidates/:candidateId/consistency-findings", () => {
