@@ -80,59 +80,66 @@ async function runWorker(storage: ObjectStorage, gateway: AiGateway) {
   await boss.work<ProcessCandidateDocumentJobData>(
     PROCESS_CANDIDATE_DOCUMENT_JOB,
     { batchSize: 5 }, // bounded concurrency (architecture doc: Batch Processing Architecture)
-    async ([job]) => {
-      const { candidateDocumentId } = job.data;
+    // pg-boss's WorkHandler always delivers the full fetched batch as an
+    // array (up to batchSize), whatever batchSize is set to — every element
+    // must be processed here, not just the first, or the remainder is
+    // silently marked completed without ever running (UAT-001-PGBOSS-BATCH-JOB-LOSS).
+    async (jobs) => {
+      for (const job of jobs) {
+        const { candidateDocumentId } = job.data;
 
-      await prisma.candidateDocument.update({
-        where: { id: candidateDocumentId },
-        data: { status: "PROCESSING" },
-      });
-
-      try {
-        // Terminal states (COMPLETED, FAILED_NEEDS_OCR) are set inside the
-        // pipeline itself; this only handles the retryable-failure case.
-        await runDocumentProcessingPipeline(job.data, { storage, gateway });
-      } catch (err) {
-        // Phase 10D — benign duplicate delivery (e.g. pg-boss's own
-        // retryLimit/expiration dispatching a second attempt while the
-        // first is still genuinely alive, per Phase 10C's finding — pg-boss
-        // expiry is left unchanged this phase). No ProcessingRun was ever
-        // created for this refused attempt, so there is nothing to clean
-        // up: not a failure, not retried further, not re-enqueued, and not
-        // worth a business AuditLog row — a lightweight log is sufficient.
-        if (err instanceof ProcessingRunAlreadyActiveError) {
-          // eslint-disable-next-line no-console
-          console.warn("[worker] duplicate delivery: a ProcessingRun is already RUNNING for this document", {
-            candidateDocumentId,
-          });
-          return;
-        }
-        // Phase 10 — a stale/reclaimed run must become harmless: it must
-        // NOT flip the document to FAILED_RETRY (that would be exactly the
-        // "late-arriving worker changes current state" outcome the whole
-        // ownership mechanism exists to prevent — whatever superseded this
-        // run is already responsible for the document's status). Recorded
-        // for operational visibility only, then treated as a clean no-op —
-        // never retried, never re-queued from here.
-        if (err instanceof ProcessingRunNoLongerActiveError) {
-          await recordAudit({
-            actorId: null,
-            action: "PROCESSING_RUN_STALE_WRITE_ABORTED",
-            entityType: "ProcessingRun",
-            entityId: err.processingRunId,
-            after: { candidateDocumentId },
-          });
-          return;
-        }
-        // One candidate's failure never blocks or fails the batch (Section
-        // 41) — recorded on its own document row; the worker keeps consuming.
         await prisma.candidateDocument.update({
           where: { id: candidateDocumentId },
-          data: {
-            status: "FAILED_RETRY",
-            failureReason: err instanceof Error ? err.message : "Unknown processing error",
-          },
+          data: { status: "PROCESSING" },
         });
+
+        try {
+          // Terminal states (COMPLETED, FAILED_NEEDS_OCR) are set inside the
+          // pipeline itself; this only handles the retryable-failure case.
+          await runDocumentProcessingPipeline(job.data, { storage, gateway });
+        } catch (err) {
+          // Phase 10D — benign duplicate delivery (e.g. pg-boss's own
+          // retryLimit/expiration dispatching a second attempt while the
+          // first is still genuinely alive, per Phase 10C's finding — pg-boss
+          // expiry is left unchanged this phase). No ProcessingRun was ever
+          // created for this refused attempt, so there is nothing to clean
+          // up: not a failure, not retried further, not re-enqueued, and not
+          // worth a business AuditLog row — a lightweight log is sufficient.
+          if (err instanceof ProcessingRunAlreadyActiveError) {
+            // eslint-disable-next-line no-console
+            console.warn("[worker] duplicate delivery: a ProcessingRun is already RUNNING for this document", {
+              candidateDocumentId,
+            });
+            continue;
+          }
+          // Phase 10 — a stale/reclaimed run must become harmless: it must
+          // NOT flip the document to FAILED_RETRY (that would be exactly the
+          // "late-arriving worker changes current state" outcome the whole
+          // ownership mechanism exists to prevent — whatever superseded this
+          // run is already responsible for the document's status). Recorded
+          // for operational visibility only, then treated as a clean no-op —
+          // never retried, never re-queued from here.
+          if (err instanceof ProcessingRunNoLongerActiveError) {
+            await recordAudit({
+              actorId: null,
+              action: "PROCESSING_RUN_STALE_WRITE_ABORTED",
+              entityType: "ProcessingRun",
+              entityId: err.processingRunId,
+              after: { candidateDocumentId },
+            });
+            continue;
+          }
+          // One candidate's failure never blocks or fails the batch (Section
+          // 41) — recorded on its own document row; the worker keeps consuming
+          // the rest of this same batch via the loop, then the next batch.
+          await prisma.candidateDocument.update({
+            where: { id: candidateDocumentId },
+            data: {
+              status: "FAILED_RETRY",
+              failureReason: err instanceof Error ? err.message : "Unknown processing error",
+            },
+          });
+        }
       }
     },
   );
@@ -144,8 +151,13 @@ async function runWorker(storage: ObjectStorage, gateway: AiGateway) {
   await boss.work<ResolveCandidateIdentityJobData>(
     RESOLVE_CANDIDATE_IDENTITY_JOB,
     { batchSize: 5 },
-    async ([job]) => {
-      await runIdentityResolutionPipeline(job.data, { storage, queue });
+    // See the PROCESS_CANDIDATE_DOCUMENT_JOB handler above: every element of
+    // the delivered batch must be processed, not just the first
+    // (UAT-001-PGBOSS-BATCH-JOB-LOSS).
+    async (jobs) => {
+      for (const job of jobs) {
+        await runIdentityResolutionPipeline(job.data, { storage, queue });
+      }
     },
   );
 
