@@ -4,6 +4,10 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { apiFetch, ApiError } from "../../../../../lib/api";
+import { EvidenceCard as SharedEvidenceCard } from "../../../../components/EvidenceCard";
+import { Disclaimer, COVERAGE_DISCLAIMER_TEXT, SCORE_DISCLAIMER_TEXT } from "../../../../components/Disclaimer";
+import { EmptyState } from "../../../../components/EmptyState";
+import { colors, spacing, typeScale } from "../../../../design-tokens";
 
 /**
  * Phase 5 completion — Candidate Comparison viewer. Deterministic,
@@ -32,12 +36,6 @@ import { apiFetch, ApiError } from "../../../../../lib/api";
  * a cross-package import), so `ComparisonScore` below is a local type
  * mirroring the API's trimmed field, not a duplicate scoring union.
  */
-
-const COVERAGE_DISCLAIMER =
-  "Evidence Coverage reflects weighted evidence against approved requirements — not a suitability, quality, or hiring recommendation.";
-
-const SCORE_DISCLAIMER =
-  "V1 Score reflects weighted evaluation state against approved, pinned requirement weights — not a suitability, quality, or hiring recommendation.";
 
 interface EvidenceItem {
   role: "SUPPORTING" | "CONSIDERED_REJECTED";
@@ -180,25 +178,25 @@ export default function CandidateComparisonPage() {
   }, [projectId, searchParams.toString()]);
 
   return (
-    <main style={{ padding: 32, maxWidth: 1200 }}>
-      <p><Link href={`/projects/${projectId}/candidates`}>← Back to candidates</Link></p>
-      <h1>Compare Candidates</h1>
+    <main style={{ padding: spacing.xxl, maxWidth: 1200, fontFamily: "system-ui, sans-serif" }}>
+      <p><Link href={`/projects/${projectId}/candidates`} style={{ color: colors.brand700 }}>← Back to candidates</Link></p>
+      <h1 style={typeScale.pageTitle}>Compare Candidates</h1>
 
       {loading && <p>Loading…</p>}
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
+      {error && <p style={{ color: colors.danger700 }}>{error}</p>}
 
       {data && (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: `200px repeat(${data.candidates.length}, 1fr)`, gap: 8, marginBottom: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: `200px repeat(${data.candidates.length}, 1fr)`, gap: spacing.sm, marginBottom: spacing.lg }}>
             <div />
             {/* Candidates always render in the exact order the API returned
                 them — selection order — never sorted by status or outcome. */}
             {data.candidates.map((c, i) => (
-              <div key={c.candidateId} style={{ borderTop: `4px solid ${COLUMN_ACCENTS[i % COLUMN_ACCENTS.length]}`, paddingTop: 8 }}>
+              <div key={c.candidateId} style={{ borderTop: `4px solid ${COLUMN_ACCENTS[i % COLUMN_ACCENTS.length]}`, paddingTop: spacing.sm }}>
                 <strong>{c.anonymizedLabel}</strong>
-                <div style={{ fontSize: 12, color: "#555" }}>
+                <div style={{ fontSize: 12, color: colors.ink600 }}>
                   {c.isProcessing && <span role="status">Processing…</span>}
-                  {!c.isProcessing && c.isFailed && <span role="status" style={{ color: "crimson" }}>Processing failed</span>}
+                  {!c.isProcessing && c.isFailed && <span role="status" style={{ color: colors.danger700 }}>Processing failed</span>}
                   {!c.isProcessing && !c.isFailed && !c.hasCurrentRun && <span role="status">No results yet</span>}
                   {!c.isProcessing && c.hasCurrentRun && <span>Results current</span>}
                 </div>
@@ -210,12 +208,12 @@ export default function CandidateComparisonPage() {
                         ` (based on ${c.evidenceCoverage.scoredWeight} of ${c.evidenceCoverage.totalWeight} weighted)`}
                     </span>
                     {c.evidenceCoverage.mandatoryGapCount > 0 && (
-                      <span style={{ color: "#742a2a", marginLeft: 6 }}>
+                      <span style={{ color: colors.danger700, marginLeft: 6 }}>
                         · Mandatory Gaps: {c.evidenceCoverage.mandatoryGapCount}
                       </span>
                     )}
                     {c.evidenceCoverage.lowConfidenceCoveredCount > 0 && (
-                      <span style={{ color: "#8a5a00", marginLeft: 6 }}>
+                      <span style={{ color: colors.caution700, marginLeft: 6 }}>
                         · Low Confidence: {c.evidenceCoverage.lowConfidenceCoveredCount}
                       </span>
                     )}
@@ -225,38 +223,36 @@ export default function CandidateComparisonPage() {
                   {c.score.computable ? (
                     <span>V1 Score: {Math.round(c.score.score)}%</span>
                   ) : c.score.reason === "LIVE_REQUIREMENT_NOT_YET_APPROVED" ? (
-                    <span style={{ color: "#8a5a00" }}>
+                    <span style={{ color: colors.caution700 }}>
                       V1 Score: Not computable — {c.score.requirementIds.length} live requirement(s) not yet approved
                     </span>
                   ) : (
-                    <span style={{ color: "#555" }}>V1 Score: Not available (candidate data purged)</span>
+                    <span style={{ color: colors.ink600 }}>V1 Score: Not available (candidate data purged)</span>
                   )}
                 </div>
               </div>
             ))}
           </div>
-          {data.candidates.some((c) => c.evidenceCoverage) && (
-            <p style={{ fontSize: 12, color: "#888", marginTop: -8, marginBottom: 16 }}>{COVERAGE_DISCLAIMER}</p>
-          )}
-          <p style={{ fontSize: 12, color: "#888", marginTop: -8, marginBottom: 16 }}>{SCORE_DISCLAIMER}</p>
+          {data.candidates.some((c) => c.evidenceCoverage) && <Disclaimer text={COVERAGE_DISCLAIMER_TEXT} />}
+          <Disclaimer text={SCORE_DISCLAIMER_TEXT} />
 
-          <h2>Requirements &amp; Evidence</h2>
+          <h2 style={typeScale.sectionTitle}>Requirements &amp; Evidence</h2>
           {data.requirementRows.length === 0 ? (
-            <p style={{ color: "#888" }}>No requirement assessments to compare yet.</p>
+            <EmptyState>No requirement assessments to compare yet.</EmptyState>
           ) : (
             data.requirementRows.map((row) => (
-              <section key={`${row.requirementId}:${row.requirementVersionId ?? "none"}`} style={{ marginBottom: 24 }}>
+              <section key={`${row.requirementId}:${row.requirementVersionId ?? "none"}`} style={{ marginBottom: spacing.xl }}>
                 <h3 style={{ marginBottom: 2 }}>
                   {row.description}
                   {row.versionNumber !== null && (
-                    <span style={{ fontWeight: 400, fontSize: 13, color: "#888" }}> (version {row.versionNumber})</span>
+                    <span style={{ fontWeight: 400, fontSize: 13, color: colors.ink400 }}> (version {row.versionNumber})</span>
                   )}
                 </h3>
-                <p style={{ margin: "0 0 8px", fontSize: 13, color: "#555" }}>
+                <p style={{ margin: "0 0 8px", fontSize: 13, color: colors.ink600 }}>
                   {row.mandatory ? "Mandatory" : "Optional"} · {row.category}
                   {row.hrApprovedWeight !== null && ` · Weight: ${row.hrApprovedWeight}`}
                 </p>
-                <div style={{ display: "grid", gridTemplateColumns: `200px repeat(${data.candidates.length}, 1fr)`, gap: 8 }}>
+                <div style={{ display: "grid", gridTemplateColumns: `200px repeat(${data.candidates.length}, 1fr)`, gap: spacing.sm }}>
                   <div />
                   {data.candidates.map((c, i) => {
                     const results = row.resultsByCandidate[c.candidateId] ?? [];
@@ -266,10 +262,10 @@ export default function CandidateComparisonPage() {
                     return (
                       <div
                         key={c.candidateId}
-                        style={{ borderLeft: `3px solid ${COLUMN_ACCENTS[i % COLUMN_ACCENTS.length]}`, paddingLeft: 8 }}
+                        style={{ borderLeft: `3px solid ${COLUMN_ACCENTS[i % COLUMN_ACCENTS.length]}`, paddingLeft: spacing.sm }}
                       >
                         {results.length === 0 ? (
-                          <p style={{ fontSize: 13, color: "#888" }}>No assessment for this version.</p>
+                          <EmptyState>No assessment for this version.</EmptyState>
                         ) : (
                           results.map((result, ri) => (
                             <div key={ri} style={{ marginBottom: results.length > 1 ? 10 : 0 }}>
@@ -281,37 +277,31 @@ export default function CandidateComparisonPage() {
                                     marginLeft: 8,
                                     fontSize: 11,
                                     fontWeight: 400,
-                                    color: result.isAuthoritative ? "#276749" : "#8a5a00",
+                                    color: result.isAuthoritative ? colors.success700 : colors.caution700,
                                   }}
                                 >
+                                  <span aria-hidden="true">{result.isAuthoritative ? "●" : "○"}</span>{" "}
                                   {result.isAuthoritative ? "Current profile" : "Other current document"}
                                 </span>
                               </p>
                               {requirementCoverage && (
                                 <p style={{ margin: "0 0 6px", fontSize: 12 }}>
-                                  <span style={{ color: requirementCoverage.covered ? "#276749" : "#555" }}>
+                                  <span style={{ color: requirementCoverage.covered ? colors.success700 : colors.ink600 }}>
                                     {requirementCoverage.covered ? "Covered" : "Not Covered"}
                                   </span>
                                   {requirementCoverage.mandatoryGap && (
-                                    <span style={{ color: "#742a2a", marginLeft: 6 }}>· Mandatory Gap</span>
+                                    <span style={{ color: colors.danger700, marginLeft: 6 }}>· Mandatory Gap</span>
                                   )}
                                   {requirementCoverage.contested && (
-                                    <span style={{ color: "#c05621", marginLeft: 6 }}>· Contradictory Evidence — Review Required</span>
+                                    <span style={{ color: colors.danger700, marginLeft: 6 }}>· Contradictory Evidence — Review Required</span>
                                   )}
                                   {requirementCoverage.lowConfidenceAssessment && (
-                                    <span style={{ color: "#8a5a00", marginLeft: 6 }}>· Low Confidence — Review Evidence</span>
+                                    <span style={{ color: colors.caution700, marginLeft: 6 }}>· Low Confidence — Review Evidence</span>
                                   )}
                                 </p>
                               )}
                               {result.evidence.map((e, ei) => (
-                                <div key={ei} style={{ border: "1px solid #eee", borderRadius: 4, padding: 8, marginBottom: 6 }}>
-                                  <p style={{ margin: 0, fontSize: 12, color: "#555" }}>
-                                    {e.role.replaceAll("_", " ")} · {e.evidenceStrength} · {e.confidence}
-                                  </p>
-                                  {e.evidenceText && <p style={{ margin: "4px 0", fontSize: 13 }}>&ldquo;{e.evidenceText}&rdquo;</p>}
-                                  {e.rationale && <p style={{ margin: "4px 0", fontSize: 13, color: "#555" }}>{e.rationale}</p>}
-                                  <p style={{ margin: 0, fontSize: 11, color: "#888" }}>{sourceLabel(e.source, e.sourcePage)}</p>
-                                </div>
+                                <SharedEvidenceCard key={ei} item={e} showRole />
                               ))}
                             </div>
                           ))
@@ -324,28 +314,28 @@ export default function CandidateComparisonPage() {
             ))
           )}
 
-          <h2>Career Consistency</h2>
-          <div style={{ display: "grid", gridTemplateColumns: `repeat(${data.candidates.length}, 1fr)`, gap: 8 }}>
+          <h2 style={typeScale.sectionTitle}>Career Consistency</h2>
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${data.candidates.length}, 1fr)`, gap: spacing.sm }}>
             {data.candidates.map((c, i) => {
               const findings = data.consistencyFindingsByCandidate[c.candidateId] ?? [];
               return (
-                <div key={c.candidateId} style={{ borderLeft: `3px solid ${COLUMN_ACCENTS[i % COLUMN_ACCENTS.length]}`, paddingLeft: 8 }}>
+                <div key={c.candidateId} style={{ borderLeft: `3px solid ${COLUMN_ACCENTS[i % COLUMN_ACCENTS.length]}`, paddingLeft: spacing.sm }}>
                   {findings.length === 0 ? (
-                    <p style={{ fontSize: 13, color: "#888" }}>No findings.</p>
+                    <EmptyState>No findings.</EmptyState>
                   ) : (
                     findings.map((f, fi) => (
-                      <div key={fi} style={{ border: "1px solid #ddd", borderRadius: 4, padding: 8, marginBottom: 6 }}>
+                      <div key={fi} style={{ border: `1px solid ${colors.border}`, borderRadius: 4, padding: spacing.sm, marginBottom: 6 }}>
                         <p style={{ margin: 0, fontWeight: 600, fontSize: 13 }}>
                           {f.findingType.replaceAll("_", " ")} — <span style={{ fontWeight: 400 }}>{f.severity.replaceAll("_", " ")}</span>
                           <span
-                            style={{ marginLeft: 8, fontSize: 11, fontWeight: 400, color: f.isAuthoritative ? "#276749" : "#8a5a00" }}
+                            style={{ marginLeft: 8, fontSize: 11, fontWeight: 400, color: f.isAuthoritative ? colors.success700 : colors.caution700 }}
                           >
                             {f.isAuthoritative ? "Current profile" : "Other current document"}
                           </span>
                         </p>
                         <p style={{ margin: "4px 0", fontSize: 13 }}>{f.description}</p>
-                        {f.evidenceText && <p style={{ margin: "4px 0", fontSize: 13, color: "#555" }}>&ldquo;{f.evidenceText}&rdquo;</p>}
-                        <p style={{ margin: 0, fontSize: 11, color: "#888" }}>
+                        {f.evidenceText && <p style={{ margin: "4px 0", fontSize: 13, color: colors.ink600 }}>&ldquo;{f.evidenceText}&rdquo;</p>}
+                        <p style={{ margin: 0, fontSize: 11, color: colors.ink400 }}>
                           Confidence: {f.confidence} · {sourceLabel(f.source, f.sourcePage)}
                         </p>
                       </div>

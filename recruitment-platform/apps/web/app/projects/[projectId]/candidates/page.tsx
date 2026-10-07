@@ -4,6 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { apiFetch, ApiError } from "../../../../lib/api";
+import { Table, TableHeadRow, HeaderCell, Row, Cell } from "../../../components/DataTable";
+import { Card } from "../../../components/Card";
+import { EmptyState } from "../../../components/EmptyState";
+import { colors, spacing, typeScale } from "../../../design-tokens";
 
 interface CandidateDocument {
   id: string;
@@ -119,32 +123,34 @@ export default function CandidatesPage() {
   }, {});
 
   return (
-    <main style={{ padding: 32, maxWidth: 900 }}>
-      <p><Link href={`/projects/${projectId}`}>← Project overview</Link></p>
-      <h1>Candidates</h1>
+    <main style={{ padding: spacing.xxl, maxWidth: 900, fontFamily: "system-ui, sans-serif" }}>
+      <p><Link href={`/projects/${projectId}`} style={{ color: colors.brand700 }}>← Project overview</Link></p>
+      <h1 style={typeScale.pageTitle}>Candidates</h1>
 
-      <form onSubmit={handleUpload} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16 }}>
-        <input ref={fileInputRef} type="file" accept=".pdf,.docx" multiple />
-        <button type="submit" disabled={uploading}>
-          {uploading ? "Uploading…" : "Upload CVs"}
-        </button>
-      </form>
+      <Card style={{ marginBottom: spacing.lg }}>
+        <form onSubmit={handleUpload} style={{ display: "flex", gap: spacing.sm, alignItems: "center" }}>
+          <input ref={fileInputRef} type="file" accept=".pdf,.docx" multiple />
+          <button type="submit" disabled={uploading}>
+            {uploading ? "Uploading…" : "Upload CVs"}
+          </button>
+        </form>
+      </Card>
       {uploadResult && (
-        <p style={{ color: uploadResult.rejected.length > 0 ? "#a15c00" : "#2a7a2a" }}>
+        <p style={{ color: uploadResult.rejected.length > 0 ? colors.caution700 : colors.success700 }}>
           Staged {uploadResult.staged} for processing.{" "}
           {uploadResult.rejected.length > 0 &&
             `Rejected: ${uploadResult.rejected.map((r) => `${r.filename} (${r.error})`).join(", ")}`}
         </p>
       )}
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
+      {error && <p style={{ color: colors.danger700 }}>{error}</p>}
 
-      <p style={{ color: "#555" }}>
+      <p style={{ color: colors.ink600 }}>
         {Object.entries(counts)
           .map(([status, count]) => `${STATUS_LABEL[status as CandidateDocument["status"]]}: ${count}`)
           .join(" · ") || "No candidates yet."}
       </p>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: spacing.sm, marginBottom: spacing.sm }}>
         <Link
           href={`/projects/${projectId}/candidates/compare?candidateIds=${selectedCandidateIds.join(",")}`}
           aria-disabled={selectedCandidateIds.length < MIN_COMPARE}
@@ -160,49 +166,55 @@ export default function CandidatesPage() {
             Compare Selected ({selectedCandidateIds.length})
           </button>
         </Link>
-        <span style={{ fontSize: 13, color: "#888" }}>Select {MIN_COMPARE}–{MAX_COMPARE} candidates to compare.</span>
+        <span style={{ fontSize: 13, color: colors.ink400 }}>Select {MIN_COMPARE}–{MAX_COMPARE} candidates to compare.</span>
       </div>
 
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <thead>
-          <tr style={{ textAlign: "left", borderBottom: "2px solid #ddd" }}>
-            <th style={{ padding: 8 }}></th>
-            <th style={{ padding: 8 }}>Candidate</th>
-            <th style={{ padding: 8 }}>File</th>
-            <th style={{ padding: 8 }}>Status</th>
-            <th style={{ padding: 8 }}>Reason</th>
-            <th style={{ padding: 8 }}></th>
-          </tr>
-        </thead>
-        <tbody>
-          {links.flatMap((l) =>
-            l.documents.map((d) => (
-              <tr key={d.id} style={{ borderBottom: "1px solid #eee" }}>
-                <td style={{ padding: 8 }}>
-                  <input
-                    type="checkbox"
-                    checked={selectedCandidateIds.includes(l.candidateId)}
-                    disabled={!selectedCandidateIds.includes(l.candidateId) && selectedCandidateIds.length >= MAX_COMPARE}
-                    onChange={() => toggleSelected(l.candidateId)}
-                    aria-label={`Select ${l.anonymizedLabel} for comparison`}
-                  />
-                </td>
-                <td style={{ padding: 8 }}>
-                  <Link href={`/projects/${projectId}/candidates/${l.candidateId}`}>{l.anonymizedLabel}</Link>
-                </td>
-                <td style={{ padding: 8 }}>{d.originalFilename}</td>
-                <td style={{ padding: 8 }}>{STATUS_LABEL[d.status]}</td>
-                <td style={{ padding: 8, color: "#a00" }}>{d.failureReason ?? ""}</td>
-                <td style={{ padding: 8 }}>
-                  {d.status === "FAILED_RETRY" && (
-                    <button onClick={() => retry(l.candidateId, d.id)}>Retry</button>
-                  )}
-                </td>
-              </tr>
-            )),
-          )}
-        </tbody>
-      </table>
+      {links.length === 0 ? (
+        <EmptyState>No candidates yet.</EmptyState>
+      ) : (
+        <Table>
+          <thead>
+            <TableHeadRow>
+              <HeaderCell></HeaderCell>
+              <HeaderCell>Candidate</HeaderCell>
+              <HeaderCell>File</HeaderCell>
+              <HeaderCell>Status</HeaderCell>
+              <HeaderCell>Reason</HeaderCell>
+              <HeaderCell></HeaderCell>
+            </TableHeadRow>
+          </thead>
+          <tbody>
+            {links.flatMap((l) =>
+              l.documents.map((d) => (
+                <Row key={d.id}>
+                  <Cell>
+                    <input
+                      type="checkbox"
+                      checked={selectedCandidateIds.includes(l.candidateId)}
+                      disabled={!selectedCandidateIds.includes(l.candidateId) && selectedCandidateIds.length >= MAX_COMPARE}
+                      onChange={() => toggleSelected(l.candidateId)}
+                      aria-label={`Select ${l.anonymizedLabel} for comparison`}
+                    />
+                  </Cell>
+                  <Cell>
+                    <Link href={`/projects/${projectId}/candidates/${l.candidateId}`} style={{ color: colors.brand700 }}>
+                      {l.anonymizedLabel}
+                    </Link>
+                  </Cell>
+                  <Cell>{d.originalFilename}</Cell>
+                  <Cell>{STATUS_LABEL[d.status]}</Cell>
+                  <Cell style={{ color: colors.danger700 }}>{d.failureReason ?? ""}</Cell>
+                  <Cell>
+                    {d.status === "FAILED_RETRY" && (
+                      <button onClick={() => retry(l.candidateId, d.id)}>Retry</button>
+                    )}
+                  </Cell>
+                </Row>
+              )),
+            )}
+          </tbody>
+        </Table>
+      )}
     </main>
   );
 }

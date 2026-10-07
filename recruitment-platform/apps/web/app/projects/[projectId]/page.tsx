@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { apiFetch } from "../../../lib/api";
-import { StatusBadge } from "../status-badge";
+import { StatusBadge } from "../../components/StatusBadge";
+import { colors, spacing, typeScale } from "../../design-tokens";
 
 interface Member {
   userId: string;
@@ -73,48 +74,48 @@ export default function ProjectOverviewPage() {
     }
   }
 
-  if (error) return <main style={{ padding: 32 }}><p style={{ color: "crimson" }}>{error}</p></main>;
-  if (!project) return <main style={{ padding: 32 }}><p>Loading…</p></main>;
+  if (error) return <main style={{ padding: spacing.xxl }}><p style={{ color: colors.danger700 }}>{error}</p></main>;
+  if (!project) return <main style={{ padding: spacing.xxl }}><p>Loading…</p></main>;
 
   return (
-    <main style={{ padding: 32, maxWidth: 800 }}>
-      <p><Link href="/projects">← All projects</Link></p>
+    <main style={{ padding: spacing.xxl, maxWidth: 800, fontFamily: "system-ui, sans-serif" }}>
+      <p><Link href="/projects" style={{ color: colors.brand700 }}>← All projects</Link></p>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <h1>{project.title}</h1>
+        <h1 style={typeScale.pageTitle}>{project.title}</h1>
         <StatusBadge status={project.status} />
       </div>
 
       <dl style={{ display: "grid", gridTemplateColumns: "160px 1fr", rowGap: 6 }}>
-        <dt style={{ color: "#666" }}>Department</dt>
+        <dt style={{ color: colors.ink600 }}>Department</dt>
         <dd>{project.department ?? "—"}</dd>
-        <dt style={{ color: "#666" }}>Business unit</dt>
+        <dt style={{ color: colors.ink600 }}>Business unit</dt>
         <dd>{project.businessUnit ?? "—"}</dd>
-        <dt style={{ color: "#666" }}>Location</dt>
+        <dt style={{ color: colors.ink600 }}>Location</dt>
         <dd>{project.location ?? "—"}</dd>
-        <dt style={{ color: "#666" }}>Hiring manager</dt>
+        <dt style={{ color: colors.ink600 }}>Hiring manager</dt>
         <dd>{project.hiringManager ?? "—"}</dd>
-        <dt style={{ color: "#666" }}>Vacancies</dt>
+        <dt style={{ color: colors.ink600 }}>Vacancies</dt>
         <dd>{project.vacancies}</dd>
-        <dt style={{ color: "#666" }}>Employment type</dt>
+        <dt style={{ color: colors.ink600 }}>Employment type</dt>
         <dd>{project.employmentType ?? "—"}</dd>
-        <dt style={{ color: "#666" }}>Created</dt>
+        <dt style={{ color: colors.ink600 }}>Created</dt>
         <dd>{new Date(project.createdAt).toLocaleString()}</dd>
-        <dt style={{ color: "#666" }}>Last updated</dt>
+        <dt style={{ color: colors.ink600 }}>Last updated</dt>
         <dd>{new Date(project.updatedAt).toLocaleString()}</dd>
       </dl>
       {project.description && <p>{project.description}</p>}
 
-      <h2>Status</h2>
-      <div style={{ display: "flex", gap: 8 }}>
+      <h2 style={typeScale.sectionTitle}>Status</h2>
+      <div style={{ display: "flex", gap: spacing.sm }}>
         {(NEXT_STATUS[project.status] ?? []).map((s) => (
           <button key={s} onClick={() => changeStatus(s)}>
             Move to {s.replaceAll("_", " ")}
           </button>
         ))}
-        {(NEXT_STATUS[project.status] ?? []).length === 0 && <span style={{ color: "#666" }}>No further transitions.</span>}
+        {(NEXT_STATUS[project.status] ?? []).length === 0 && <span style={{ color: colors.ink600 }}>No further transitions.</span>}
       </div>
 
-      <h2>Assigned HR users</h2>
+      <h2 style={typeScale.sectionTitle}>Assigned HR users</h2>
       <ul>
         {project.members.map((m) => (
           <li key={m.userId}>
@@ -152,14 +153,14 @@ export default function ProjectOverviewPage() {
         <button type="submit">Assign</button>
       </form>
 
-      <h2>Job Requirements</h2>
+      <h2 style={typeScale.sectionTitle}>Job Requirements</h2>
       <p>
-        <Link href={`/projects/${projectId}/requirements`}>Open requirements & weighting review →</Link>
+        <Link href={`/projects/${projectId}/requirements`} style={{ color: colors.brand700 }}>Open requirements & weighting review →</Link>
       </p>
 
-      <h2>Candidates</h2>
+      <h2 style={typeScale.sectionTitle}>Candidates</h2>
       <p>
-        <Link href={`/projects/${projectId}/candidates`}>Upload CVs & view processing status →</Link>
+        <Link href={`/projects/${projectId}/candidates`} style={{ color: colors.brand700 }}>Upload CVs & view processing status →</Link>
       </p>
     </main>
   );

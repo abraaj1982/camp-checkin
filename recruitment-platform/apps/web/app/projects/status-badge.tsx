@@ -1,15 +1,5 @@
-export function StatusBadge({ status }: { status: string }) {
-  return (
-    <span
-      style={{
-        padding: "2px 8px",
-        borderRadius: 4,
-        fontSize: 12,
-        background: "#eee",
-        color: "#333",
-      }}
-    >
-      {status.replaceAll("_", " ")}
-    </span>
-  );
-}
+// UI Batch 1 — moved to app/components/StatusBadge.tsx (shared design-system
+// primitive). Re-exported here so every existing import path
+// ("./status-badge" / "../status-badge" / "../../../status-badge") keeps
+// working unchanged — no call site needed to move.
+export { StatusBadge } from "../components/StatusBadge";

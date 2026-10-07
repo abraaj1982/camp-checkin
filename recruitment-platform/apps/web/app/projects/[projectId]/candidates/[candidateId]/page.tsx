@@ -4,7 +4,14 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { apiFetch, ApiError } from "../../../../../lib/api";
-import { StatusBadge } from "../../../status-badge";
+import { StatusBadge } from "../../../../components/StatusBadge";
+import { EvidenceCard as SharedEvidenceCard } from "../../../../components/EvidenceCard";
+import { EmptyState } from "../../../../components/EmptyState";
+import { ProcessingState } from "../../../../components/ProcessingState";
+import { FailedState } from "../../../../components/FailedState";
+import { Card } from "../../../../components/Card";
+import { Disclaimer, DECISION_INDEPENDENCE_TEXT } from "../../../../components/Disclaimer";
+import { colors, radii, spacing, typeScale } from "../../../../design-tokens";
 
 /**
  * Phase 5B — read-only Evidence Viewer / Career Consistency Viewer.
@@ -118,20 +125,6 @@ function sourceLabel(source: string | null, sourcePage: number | null): string {
   return sourcePage !== null ? `${source}, page ${sourcePage}` : source;
 }
 
-function EvidenceCard({ item }: { item: EvidenceItem }) {
-  return (
-    <div style={{ border: "1px solid #eee", borderRadius: 4, padding: 12, marginTop: 8 }}>
-      <p style={{ margin: 0, fontSize: 13, color: "#555" }}>
-        Strength: <strong>{item.evidenceStrength}</strong> · Confidence: <strong>{item.confidence}</strong> · Type:{" "}
-        {item.evidenceType}
-      </p>
-      {item.evidenceText && <p style={{ margin: "8px 0" }}>&ldquo;{item.evidenceText}&rdquo;</p>}
-      {item.rationale && <p style={{ margin: "8px 0", color: "#555" }}>{item.rationale}</p>}
-      <p style={{ margin: 0, fontSize: 12, color: "#888" }}>{sourceLabel(item.source, item.sourcePage)}</p>
-    </div>
-  );
-}
-
 function AssessmentCard({ assessment }: { assessment: AssessmentItem }) {
   const [criteriaOpen, setCriteriaOpen] = useState(false);
   const supporting = assessment.evidence.filter((e) => e.role === "SUPPORTING");
@@ -141,32 +134,34 @@ function AssessmentCard({ assessment }: { assessment: AssessmentItem }) {
     : null;
 
   return (
-    <section style={{ border: "1px solid #ddd", borderRadius: 6, padding: 16, marginBottom: 16 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+    <section style={{ border: `1px solid ${colors.border}`, borderRadius: radii.md, padding: spacing.lg, marginBottom: spacing.lg }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: spacing.md }}>
         <div>
-          <h3 style={{ margin: 0 }}>{assessment.requirement.description}</h3>
-          <p style={{ margin: "4px 0", fontSize: 13, color: "#555" }}>
+          <h3 style={{ margin: 0, ...typeScale.cardTitle }}>{assessment.requirement.description}</h3>
+          <p style={{ margin: "4px 0", ...typeScale.meta }}>
             {assessment.requirement.mandatory ? "Mandatory" : "Optional"} · {assessment.requirement.category}
             {assessment.requirement.hrApprovedWeight !== null && ` · Weight: ${assessment.requirement.hrApprovedWeight}`}
           </p>
         </div>
         <div style={{ textAlign: "right" }}>
           <StatusBadge status={assessment.status} />
-          <p style={{ margin: "4px 0 0", fontSize: 11, color: assessment.isAuthoritative ? "#276749" : "#8a5a00" }}>
+          <p style={{ margin: "4px 0 0", fontSize: 11, color: assessment.isAuthoritative ? colors.success700 : colors.caution700 }}>
+            {/* Filled dot = current/authoritative, hollow dot = other — never color alone (accessibility). */}
+            <span aria-hidden="true">{assessment.isAuthoritative ? "●" : "○"}</span>{" "}
             {assessment.isAuthoritative ? "Current profile" : "Other current document"}
           </p>
         </div>
       </div>
 
       {criteria && criteria.length > 0 && (
-        <div style={{ marginTop: 8 }}>
+        <div style={{ marginTop: spacing.sm }}>
           <button onClick={() => setCriteriaOpen((v) => !v)} style={{ fontSize: 13 }}>
             {criteriaOpen ? "Hide" : "Show"} Evidence Criteria
           </button>
           {criteriaOpen && (
-            <ul style={{ marginTop: 8 }}>
+            <ul style={{ marginTop: spacing.sm }}>
               {criteria.map((c, i) => (
-                <li key={i} style={{ fontSize: 13, color: "#555" }}>
+                <li key={i} style={typeScale.meta}>
                   {String(c)}
                 </li>
               ))}
@@ -175,20 +170,20 @@ function AssessmentCard({ assessment }: { assessment: AssessmentItem }) {
         </div>
       )}
 
-      <div style={{ marginTop: 12 }}>
+      <div style={{ marginTop: spacing.md }}>
         <h4 style={{ margin: "0 0 4px" }}>Supporting Evidence</h4>
         {supporting.length === 0 ? (
-          <p style={{ fontSize: 13, color: "#888" }}>None.</p>
+          <EmptyState>None.</EmptyState>
         ) : (
-          supporting.map((e, i) => <EvidenceCard key={i} item={e} />)
+          supporting.map((e, i) => <SharedEvidenceCard key={i} item={e} />)
         )}
       </div>
-      <div style={{ marginTop: 12 }}>
+      <div style={{ marginTop: spacing.md }}>
         <h4 style={{ margin: "0 0 4px" }}>Considered Rejected Evidence</h4>
         {rejected.length === 0 ? (
-          <p style={{ fontSize: 13, color: "#888" }}>None.</p>
+          <EmptyState>None.</EmptyState>
         ) : (
-          rejected.map((e, i) => <EvidenceCard key={i} item={e} />)
+          rejected.map((e, i) => <SharedEvidenceCard key={i} item={e} />)
         )}
       </div>
     </section>
@@ -262,10 +257,12 @@ function DecisionsPanel({
   }
 
   return (
-    <section style={{ marginTop: 24 }}>
-      <h2>Decisions</h2>
+    <section style={{ marginTop: spacing.xl }}>
+      <h2 style={typeScale.sectionTitle}>Decisions</h2>
+      <Disclaimer text={DECISION_INDEPENDENCE_TEXT} />
 
-      <form onSubmit={handleSubmit} style={{ border: "1px solid #ddd", borderRadius: 6, padding: 16, marginBottom: 16 }}>
+      <Card style={{ marginBottom: spacing.lg }}>
+      <form onSubmit={handleSubmit}>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
           <label>
             <div style={{ fontSize: 13, marginBottom: 4 }}>Decision</div>
@@ -308,29 +305,30 @@ function DecisionsPanel({
           />
         </label>
       </form>
+      </Card>
 
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
+      {error && <p style={{ color: colors.danger700 }}>{error}</p>}
 
       {loading ? (
         <p>Loading decisions…</p>
       ) : decisions.length === 0 ? (
-        <p style={{ color: "#888" }}>No decisions recorded yet.</p>
+        <EmptyState>No decisions recorded yet.</EmptyState>
       ) : (
         decisions.map((d) => (
-          <div key={d.id} style={{ border: "1px solid #ddd", borderRadius: 6, padding: 12, marginBottom: 8 }}>
+          <Card key={d.id} style={{ marginBottom: spacing.sm, padding: spacing.md }}>
             <p style={{ margin: 0, fontWeight: 600 }}>
-              {d.decision} <span style={{ fontWeight: 400, fontSize: 12, color: "#888" }}>by {d.decidedByName}</span>
+              {d.decision} <span style={{ fontWeight: 400, fontSize: 12, color: colors.ink400 }}>by {d.decidedByName}</span>
             </p>
             {d.notes && <p style={{ margin: "8px 0" }}>{d.notes}</p>}
             {d.override && (
-              <p style={{ margin: 0, fontSize: 12, color: "#888" }}>
+              <p style={{ margin: 0, fontSize: 12, color: colors.ink400 }}>
                 {d.override.overridden ? "Overrides an AI assessment gap." : "Agrees with the AI assessment."}
                 {d.override.wasAuthoritativeAtDecision === false && " · Cited a non-authoritative document."}
                 {d.override.wasAuthoritativeAtDecision === null && " · Authority not recorded (predates this feature)."}
               </p>
             )}
-            <p style={{ margin: "4px 0 0", fontSize: 11, color: "#888" }}>{new Date(d.decidedAt).toLocaleString()}</p>
-          </div>
+            <p style={{ margin: "4px 0 0", fontSize: 11, color: colors.ink400 }}>{new Date(d.decidedAt).toLocaleString()}</p>
+          </Card>
         ))
       )}
     </section>
@@ -339,21 +337,21 @@ function DecisionsPanel({
 
 function FindingCard({ finding }: { finding: ConsistencyFinding }) {
   return (
-    <div style={{ border: "1px solid #ddd", borderRadius: 6, padding: 12, marginBottom: 8 }}>
+    <Card style={{ marginBottom: spacing.sm, padding: spacing.md }}>
       <p style={{ margin: 0, fontWeight: 600 }}>
         {finding.findingType.replaceAll("_", " ")} — <span style={{ fontWeight: 400 }}>{finding.severity.replaceAll("_", " ")}</span>
         <span
-          style={{ marginLeft: 8, fontSize: 11, fontWeight: 400, color: finding.isAuthoritative ? "#276749" : "#8a5a00" }}
+          style={{ marginLeft: 8, fontSize: 11, fontWeight: 400, color: finding.isAuthoritative ? colors.success700 : colors.caution700 }}
         >
           {finding.isAuthoritative ? "Current profile" : "Other current document"}
         </span>
       </p>
       <p style={{ margin: "8px 0" }}>{finding.description}</p>
-      {finding.evidenceText && <p style={{ margin: "8px 0", color: "#555" }}>&ldquo;{finding.evidenceText}&rdquo;</p>}
-      <p style={{ margin: 0, fontSize: 12, color: "#888" }}>
+      {finding.evidenceText && <p style={{ margin: "8px 0", color: colors.ink600 }}>&ldquo;{finding.evidenceText}&rdquo;</p>}
+      <p style={{ margin: 0, fontSize: 12, color: colors.ink400 }}>
         Confidence: {finding.confidence} · {sourceLabel(finding.source, finding.sourcePage)}
       </p>
-    </div>
+    </Card>
   );
 }
 
@@ -415,7 +413,7 @@ export default function CandidateDetailPage() {
     return (
       <main style={{ padding: 32, maxWidth: 900 }}>
         <p><Link href={`/projects/${projectId}/candidates`}>← Back to candidates</Link></p>
-        <p style={{ color: "crimson" }}>{error ?? "Could not load candidate results."}</p>
+        <p style={{ color: colors.danger700 }}>{error ?? "Could not load candidate results."}</p>
       </main>
     );
   }
@@ -435,39 +433,35 @@ export default function CandidateDetailPage() {
     !hasResults && !isProcessing && !hasCurrentRun && documents.some((d) => d.status === "FAILED_RETRY");
 
   return (
-    <main style={{ padding: 32, maxWidth: 900 }}>
-      <p><Link href={`/projects/${projectId}/candidates`}>← Back to candidates</Link></p>
-      <h1>{assessments.candidate.anonymizedLabel}</h1>
+    <main style={{ padding: spacing.xxl, maxWidth: 900, fontFamily: "system-ui, sans-serif" }}>
+      <p><Link href={`/projects/${projectId}/candidates`} style={{ color: colors.brand700 }}>← Back to candidates</Link></p>
+      <h1 style={typeScale.pageTitle}>{assessments.candidate.anonymizedLabel}</h1>
 
       {isProcessing && (
-        <p style={{ color: "#a15c00" }} role="status">
-          Processing — results will appear once analysis completes.
-        </p>
+        <ProcessingState>Processing — results will appear once analysis completes.</ProcessingState>
       )}
 
       {!hasResults && !isProcessing && isFailed && (
-        <p style={{ color: "crimson" }} role="status">
-          Processing failed. Retry from the candidates list.
-        </p>
+        <FailedState>Processing failed. Retry from the candidates list.</FailedState>
       )}
 
-      {!hasResults && !isProcessing && !isFailed && <p role="status">No results available yet.</p>}
+      {!hasResults && !isProcessing && !isFailed && <EmptyState role="status">No results available yet.</EmptyState>}
 
       {hasResults && (
         <>
-          <section style={{ marginTop: 24 }}>
-            <h2>Requirements &amp; Evidence</h2>
+          <section style={{ marginTop: spacing.xl }}>
+            <h2 style={typeScale.sectionTitle}>Requirements &amp; Evidence</h2>
             {assessments.assessments.length === 0 ? (
-              <p style={{ color: "#888" }}>No requirement assessments yet.</p>
+              <EmptyState>No requirement assessments yet.</EmptyState>
             ) : (
               assessments.assessments.map((a, i) => <AssessmentCard key={i} assessment={a} />)
             )}
           </section>
 
-          <section style={{ marginTop: 24 }}>
-            <h2>Career Consistency</h2>
+          <section style={{ marginTop: spacing.xl }}>
+            <h2 style={typeScale.sectionTitle}>Career Consistency</h2>
             {findings.findings.length === 0 ? (
-              <p style={{ color: "#888" }}>No consistency findings.</p>
+              <EmptyState>No consistency findings.</EmptyState>
             ) : (
               findings.findings.map((f, i) => <FindingCard key={i} finding={f} />)
             )}

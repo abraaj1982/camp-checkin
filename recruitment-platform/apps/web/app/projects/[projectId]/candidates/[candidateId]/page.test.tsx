@@ -331,15 +331,21 @@ describe("CandidateDetailPage", () => {
     expect(bodyText).not.toContain("aiInteractionId");
   });
 
-  it("never renders a score, ranking, or recommendation anywhere", async () => {
+  it("never renders a ranking or recommendation anywhere; a mention of 'score' is permitted only inside the fixed decision-independence disclaimer", async () => {
     mockResponses({ assessments: [baseAssessment()], findings: [] });
     render(<CandidateDetailPage />);
     await waitFor(() => expect(screen.getByText("5 years Employee Relations")).toBeInTheDocument());
 
     const bodyText = (document.body.textContent ?? "").toLowerCase();
-    for (const forbidden of ["score", "rank", "recommend", "suitab", "hire", "reject candidate", "overall match"]) {
+    for (const forbidden of ["rank", "suitab", "hire", "reject candidate", "overall match"]) {
       expect(bodyText).not.toContain(forbidden);
     }
+    expect(bodyText).not.toMatch(/\brecommend(ed|s)?\b/); // no affirmative recommendation verb/label
+    // "score" appears only inside the fixed disclaimer explicitly denying
+    // that the decision uses it — never as an affirmative score/ranking.
+    const scoreOccurrences = bodyText.split("score").length - 1;
+    expect(scoreOccurrences).toBe(1);
+    expect(screen.getByText(/does not use v1 score or evidence coverage as an input/i)).toBeInTheDocument();
   });
 
   describe("Decisions panel (Phase 6)", () => {

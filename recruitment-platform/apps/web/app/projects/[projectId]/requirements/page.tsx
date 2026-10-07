@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { apiFetch, ApiError } from "../../../../lib/api";
+import { Table, TableHeadRow, HeaderCell, Row, Cell } from "../../../components/DataTable";
+import { StatusBadge } from "../../../components/StatusBadge";
+import { colors, spacing, typeScale } from "../../../design-tokens";
 
 interface SemanticConcept {
   concept: string;
@@ -136,14 +139,14 @@ export default function RequirementsPage() {
   }
 
   return (
-    <main style={{ padding: 32, maxWidth: 1000 }}>
-      <p><Link href={`/projects/${projectId}`}>← Project overview</Link></p>
-      <h1>Job Requirements &amp; Weighting Review</h1>
-      <p style={{ color: "#555" }}>
+    <main style={{ padding: spacing.xxl, maxWidth: 1000, fontFamily: "system-ui, sans-serif" }}>
+      <p><Link href={`/projects/${projectId}`} style={{ color: colors.brand700 }}>← Project overview</Link></p>
+      <h1 style={typeScale.pageTitle}>Job Requirements &amp; Weighting Review</h1>
+      <p style={{ color: colors.ink600 }}>
         What evidence exists, how strong it is, and what HR approved — not a single score.
       </p>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+      <div style={{ display: "flex", gap: spacing.sm, marginBottom: spacing.lg }}>
         <button onClick={runInterpretation} disabled={busy || requirements.length === 0}>
           Ask AI to interpret requirements
         </button>
@@ -153,20 +156,20 @@ export default function RequirementsPage() {
         <NewRequirementForm projectId={projectId} onCreated={load} />
       </div>
 
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
+      {error && <p style={{ color: colors.danger700 }}>{error}</p>}
 
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <Table>
         <thead>
-          <tr style={{ textAlign: "left", borderBottom: "2px solid #ddd" }}>
-            <th style={{ padding: 8 }}>Requirement</th>
-            <th style={{ padding: 8 }}>Category</th>
-            <th style={{ padding: 8 }}>M/P</th>
-            <th style={{ padding: 8 }}>AI Weight</th>
-            <th style={{ padding: 8 }}>HR Weight</th>
-            <th style={{ padding: 8 }}>Diff</th>
-            <th style={{ padding: 8 }}>Status</th>
-            <th style={{ padding: 8 }}></th>
-          </tr>
+          <TableHeadRow>
+            <HeaderCell>Requirement</HeaderCell>
+            <HeaderCell>Category</HeaderCell>
+            <HeaderCell>M/P</HeaderCell>
+            <HeaderCell>AI Weight</HeaderCell>
+            <HeaderCell>HR Weight</HeaderCell>
+            <HeaderCell>Diff</HeaderCell>
+            <HeaderCell>Status</HeaderCell>
+            <HeaderCell></HeaderCell>
+          </TableHeadRow>
         </thead>
         <tbody>
           {requirements.map((r) => {
@@ -175,12 +178,12 @@ export default function RequirementsPage() {
             const diff = ai !== null && hr !== null ? (hr - ai).toFixed(1) : "—";
             return (
               <>
-                <tr key={r.id} style={{ borderBottom: "1px solid #eee", verticalAlign: "top" }}>
-                  <td style={{ padding: 8, maxWidth: 320 }}>{r.description}</td>
-                  <td style={{ padding: 8 }}>{r.customCategoryLabel ?? r.category.replaceAll("_", " ")}</td>
-                  <td style={{ padding: 8 }}>{r.mandatory ? "Mandatory" : "Preferred"}</td>
-                  <td style={{ padding: 8 }}>{ai ?? "—"}</td>
-                  <td style={{ padding: 8 }}>
+                <Row key={r.id} style={{ verticalAlign: "top" }}>
+                  <Cell style={{ maxWidth: 320 }}>{r.description}</Cell>
+                  <Cell>{r.customCategoryLabel ?? r.category.replaceAll("_", " ")}</Cell>
+                  <Cell>{r.mandatory ? "Mandatory" : "Preferred"}</Cell>
+                  <Cell>{ai ?? "—"}</Cell>
+                  <Cell>
                     <input
                       type="number"
                       min={0}
@@ -192,20 +195,22 @@ export default function RequirementsPage() {
                         if (value !== hr) setWeight(r.id, value);
                       }}
                     />
-                  </td>
-                  <td style={{ padding: 8 }}>{diff}</td>
-                  <td style={{ padding: 8 }}>{r.status.replaceAll("_", " ")}</td>
-                  <td style={{ padding: 8 }}>
+                  </Cell>
+                  <Cell>{diff}</Cell>
+                  <Cell>
+                    <StatusBadge status={r.status} />
+                  </Cell>
+                  <Cell>
                     {r.aiInterpretationSummary && (
                       <button onClick={() => setWhyOpenId(whyOpenId === r.id ? null : r.id)}>
                         Why this weight?
                       </button>
                     )}
-                  </td>
-                </tr>
+                  </Cell>
+                </Row>
                 {whyOpenId === r.id && (
                   <tr key={`${r.id}-why`}>
-                    <td colSpan={8} style={{ padding: 12, background: "#fafafa" }}>
+                    <td colSpan={8} style={{ padding: spacing.md, background: colors.surfaceSubtle }}>
                       <p><strong>AI interpretation:</strong> {r.aiInterpretationSummary}</p>
                       {r.hrNotes && <p><strong>Weighting rationale:</strong> {r.hrNotes}</p>}
                       {r.criteria.length > 0 && (
@@ -237,12 +242,12 @@ export default function RequirementsPage() {
             );
           })}
         </tbody>
-      </table>
+      </Table>
 
-      <p style={{ marginTop: 16 }}>
+      <p style={{ marginTop: spacing.lg }}>
         <strong>Total: {total.toFixed(1)}%</strong>{" "}
         {Math.abs(total - 100) > 0.01 && requirements.length > 0 && (
-          <span style={{ color: "crimson" }}>— must equal 100% to approve</span>
+          <span style={{ color: colors.danger700 }}>— must equal 100% to approve</span>
         )}
       </p>
 

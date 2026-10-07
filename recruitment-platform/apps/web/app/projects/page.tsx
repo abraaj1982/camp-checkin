@@ -3,7 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { apiFetch } from "../../lib/api";
-import { StatusBadge } from "./status-badge";
+import { StatusBadge } from "../components/StatusBadge";
+import { Card } from "../components/Card";
+import { Table, TableHeadRow, HeaderCell, Row, Cell } from "../components/DataTable";
+import { EmptyState } from "../components/EmptyState";
+import { colors, radii, spacing, typeScale } from "../design-tokens";
 
 interface Project {
   id: string;
@@ -39,9 +43,9 @@ export default function ProjectsPage() {
   }, []);
 
   return (
-    <main style={{ padding: 32, maxWidth: 960 }}>
+    <main style={{ padding: spacing.xxl, maxWidth: 960, fontFamily: "system-ui, sans-serif" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1>Recruitment Projects</h1>
+        <h1 style={typeScale.pageTitle}>Recruitment Projects</h1>
         <button onClick={() => setShowCreate((v) => !v)}>
           {showCreate ? "Cancel" : "+ New Project"}
         </button>
@@ -56,36 +60,40 @@ export default function ProjectsPage() {
         />
       )}
 
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
+      {error && <p style={{ color: colors.danger700 }}>{error}</p>}
       {loading ? (
         <p>Loading…</p>
       ) : projects.length === 0 ? (
-        <p style={{ color: "#666" }}>No projects yet.</p>
+        <EmptyState>No projects yet.</EmptyState>
       ) : (
-        <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 16 }}>
-          <thead>
-            <tr style={{ textAlign: "left", borderBottom: "2px solid #ddd" }}>
-              <th style={{ padding: 8 }}>Position</th>
-              <th style={{ padding: 8 }}>Department</th>
-              <th style={{ padding: 8 }}>Status</th>
-              <th style={{ padding: 8 }}>Created</th>
-            </tr>
-          </thead>
-          <tbody>
-            {projects.map((p) => (
-              <tr key={p.id} style={{ borderBottom: "1px solid #eee" }}>
-                <td style={{ padding: 8 }}>
-                  <Link href={`/projects/${p.id}`}>{p.title}</Link>
-                </td>
-                <td style={{ padding: 8 }}>{p.department ?? "—"}</td>
-                <td style={{ padding: 8 }}>
-                  <StatusBadge status={p.status} />
-                </td>
-                <td style={{ padding: 8 }}>{new Date(p.createdAt).toLocaleDateString()}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div style={{ marginTop: spacing.lg }}>
+          <Table>
+            <thead>
+              <TableHeadRow>
+                <HeaderCell>Position</HeaderCell>
+                <HeaderCell>Department</HeaderCell>
+                <HeaderCell>Status</HeaderCell>
+                <HeaderCell>Created</HeaderCell>
+              </TableHeadRow>
+            </thead>
+            <tbody>
+              {projects.map((p) => (
+                <Row key={p.id}>
+                  <Cell>
+                    <Link href={`/projects/${p.id}`} style={{ color: colors.brand700 }}>
+                      {p.title}
+                    </Link>
+                  </Cell>
+                  <Cell>{p.department ?? "—"}</Cell>
+                  <Cell>
+                    <StatusBadge status={p.status} />
+                  </Cell>
+                  <Cell>{new Date(p.createdAt).toLocaleDateString()}</Cell>
+                </Row>
+              ))}
+            </tbody>
+          </Table>
+        </div>
       )}
     </main>
   );
@@ -130,18 +138,8 @@ function CreateProjectForm({ onCreated }: { onCreated: () => void }) {
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      style={{
-        border: "1px solid #ddd",
-        borderRadius: 6,
-        padding: 16,
-        marginTop: 16,
-        display: "grid",
-        gap: 10,
-        maxWidth: 480,
-      }}
-    >
+    <Card style={{ marginTop: spacing.lg, maxWidth: 480 }}>
+      <form onSubmit={handleSubmit} style={{ display: "grid", gap: 10 }}>
       <label>
         Position title *
         <input required value={title} onChange={(e) => setTitle(e.target.value)} style={{ display: "block", width: "100%" }} />
@@ -180,10 +178,11 @@ function CreateProjectForm({ onCreated }: { onCreated: () => void }) {
         Description
         <textarea value={description} onChange={(e) => setDescription(e.target.value)} style={{ display: "block", width: "100%" }} />
       </label>
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
+      {error && <p style={{ color: colors.danger700 }}>{error}</p>}
       <button type="submit" disabled={submitting}>
         {submitting ? "Creating…" : "Create project"}
       </button>
-    </form>
+      </form>
+    </Card>
   );
 }
