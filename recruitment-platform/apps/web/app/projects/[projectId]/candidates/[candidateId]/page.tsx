@@ -11,7 +11,7 @@ import { ProcessingState } from "../../../../components/ProcessingState";
 import { FailedState } from "../../../../components/FailedState";
 import { Card } from "../../../../components/Card";
 import { MetricCard } from "../../../../components/MetricCard";
-import { Disclaimer, DECISION_INDEPENDENCE_TEXT } from "../../../../components/Disclaimer";
+import { Disclaimer, DECISION_INDEPENDENCE_TEXT, DECISION_GOVERNANCE_NOTE_TEXT } from "../../../../components/Disclaimer";
 import { colors, radii, spacing, typeScale } from "../../../../design-tokens";
 
 /**
@@ -260,9 +260,17 @@ function DecisionsPanel({
   return (
     <section style={{ marginTop: spacing.xl }}>
       <h2 style={typeScale.sectionTitle}>Decisions</h2>
+      <p style={{ ...typeScale.meta, marginTop: -4 }}>
+        Records an HR decision for this candidate within this project. This panel does not repeat the candidate
+        profile shown above — it only captures HR's own choice and reasoning.
+      </p>
       <Disclaimer text={DECISION_INDEPENDENCE_TEXT} />
+      <p style={{ ...typeScale.meta, marginTop: -spacing.sm, marginBottom: spacing.lg }}>
+        {DECISION_GOVERNANCE_NOTE_TEXT}
+      </p>
 
       <Card style={{ marginBottom: spacing.lg }}>
+      <h3 style={{ margin: "0 0 12px", ...typeScale.cardTitle }}>Record a decision</h3>
       <form onSubmit={handleSubmit}>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
           <label>
@@ -303,13 +311,19 @@ function DecisionsPanel({
             rows={2}
             style={{ width: "100%" }}
             placeholder="Why this decision?"
+            aria-label="Notes (optional)"
           />
         </label>
       </form>
       </Card>
 
-      {error && <p style={{ color: colors.danger700 }}>{error}</p>}
+      {error && (
+        <p role="alert" style={{ color: colors.danger700 }}>
+          {error}
+        </p>
+      )}
 
+      <h3 style={{ margin: "0 0 8px", ...typeScale.cardTitle }}>Recorded HR decisions</h3>
       {loading ? (
         <p>Loading decisions…</p>
       ) : decisions.length === 0 ? (
@@ -317,7 +331,10 @@ function DecisionsPanel({
       ) : (
         decisions.map((d) => (
           <Card key={d.id} style={{ marginBottom: spacing.sm, padding: spacing.md }}>
-            <p style={{ margin: 0, fontWeight: 600 }}>
+            <p style={{ margin: 0, fontSize: 11, fontWeight: 600, letterSpacing: 0.4, color: colors.ink400 }}>
+              RECORDED HR DECISION
+            </p>
+            <p style={{ margin: "4px 0 0", fontWeight: 600 }}>
               {d.decision} <span style={{ fontWeight: 400, fontSize: 12, color: colors.ink400 }}>by {d.decidedByName}</span>
             </p>
             {d.notes && <p style={{ margin: "8px 0" }}>{d.notes}</p>}

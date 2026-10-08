@@ -13,6 +13,8 @@ export const SCORE_DISCLAIMER_TEXT =
   "V1 Score reflects weighted evaluation state against approved, pinned requirement weights — not a suitability, quality, or hiring recommendation.";
 export const DECISION_INDEPENDENCE_TEXT =
   "This decision is made by HR and does not use V1 Score or Evidence Coverage as an input.";
+export const DECISION_GOVERNANCE_NOTE_TEXT =
+  "This records an HR decision based on the available review information.";
 
 export function Disclaimer({ text }: { text: string }) {
   return (
