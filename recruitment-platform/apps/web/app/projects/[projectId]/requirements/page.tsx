@@ -6,6 +6,7 @@ import { apiFetch, ApiError } from "../../../../lib/api";
 import { Table, TableHeadRow, HeaderCell, Row, Cell } from "../../../components/DataTable";
 import { StatusBadge } from "../../../components/StatusBadge";
 import { EmptyState } from "../../../components/EmptyState";
+import { Card } from "../../../components/Card";
 import { colors, spacing, typeScale } from "../../../design-tokens";
 
 interface SemanticConcept {
@@ -149,12 +150,11 @@ export default function RequirementsPage() {
 
   return (
     <main style={{ maxWidth: 1000 }}>
-      <h2 style={typeScale.sectionTitle}>Requirements</h2>
-      <p style={typeScale.meta}>
+      <p style={{ ...typeScale.meta, marginTop: 0 }}>
         What the requirement says, what HR approved, and whether that approval is current — not a single score.
       </p>
 
-      <div style={{ display: "flex", gap: spacing.sm, marginBottom: spacing.lg }}>
+      <div style={{ display: "flex", gap: spacing.sm, flexWrap: "wrap", marginBottom: spacing.lg }}>
         <button onClick={runInterpretation} disabled={busy || list.length === 0}>
           Ask AI to interpret requirements
         </button>
@@ -177,6 +177,7 @@ export default function RequirementsPage() {
       )}
 
       {!loading && list.length > 0 && (
+      <Card style={{ padding: 0, overflowX: "auto" }}>
       <Table>
         <thead>
           <TableHeadRow>
@@ -275,6 +276,7 @@ export default function RequirementsPage() {
           })}
         </tbody>
       </Table>
+      </Card>
       )}
 
       {!loading && list.length > 0 && (

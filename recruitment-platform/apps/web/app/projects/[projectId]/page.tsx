@@ -135,7 +135,7 @@ export default function ProjectOverviewPage() {
     }
   }
 
-  if (error) return <main style={{ maxWidth: 900 }}><p style={{ color: colors.danger700 }}>{error}</p></main>;
+  if (error) return <main style={{ maxWidth: 900 }}><p role="alert" style={{ color: colors.danger700 }}>{error}</p></main>;
   if (!project) return <main style={{ maxWidth: 900 }}><p>Loading…</p></main>;
 
   // --- Requirements readiness (same predicate as RequirementGateBanner:

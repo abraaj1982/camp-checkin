@@ -61,7 +61,7 @@ export default function ProjectWorkspaceLayout({ children }: { children: ReactNo
   return (
     <div style={{ padding: spacing.xxl, fontFamily: "system-ui, sans-serif" }}>
       <p><Link href="/projects" style={{ color: colors.brand700 }}>← All projects</Link></p>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: spacing.sm }}>
         <h1 style={typeScale.pageTitle}>{project?.title ?? "…"}</h1>
         {project && <StatusBadge status={project.status} />}
       </div>

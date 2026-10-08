@@ -196,11 +196,23 @@ export default function CandidateComparisonPage() {
         requirements. This view explains evidence and assessment status — it does not make a hiring decision.
       </p>
       {loading && <p>Loading…</p>}
-      {error && <p style={{ color: colors.danger700 }}>{error}</p>}
+      {error && (
+        <p role="alert" style={{ color: colors.danger700 }}>
+          {error}
+        </p>
+      )}
 
       {data && (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: `200px repeat(${data.candidates.length}, 1fr)`, gap: spacing.sm, marginBottom: spacing.lg }}>
+          <div style={{ overflowX: "auto" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: `200px repeat(${data.candidates.length}, minmax(180px, 1fr))`,
+              gap: spacing.sm,
+              marginBottom: spacing.lg,
+            }}
+          >
             <div />
             {/* Candidates always render in the exact order the API returned
                 them — selection order — never sorted by status or outcome. */}
@@ -246,6 +258,7 @@ export default function CandidateComparisonPage() {
               </Card>
             ))}
           </div>
+          </div>
           <p style={{ ...typeScale.tiny, marginTop: -spacing.sm, marginBottom: spacing.sm }}>
             V1 Score: decision-support score based on the approved project requirements and eligible assessment
             evidence.
@@ -269,7 +282,14 @@ export default function CandidateComparisonPage() {
                   {row.mandatory ? "Mandatory" : "Optional"} · {row.category}
                   {row.hrApprovedWeight !== null && ` · Weight: ${row.hrApprovedWeight}`}
                 </p>
-                <div style={{ display: "grid", gridTemplateColumns: `200px repeat(${data.candidates.length}, 1fr)`, gap: spacing.sm }}>
+                <div style={{ overflowX: "auto" }}>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: `200px repeat(${data.candidates.length}, minmax(180px, 1fr))`,
+                    gap: spacing.sm,
+                  }}
+                >
                   <div />
                   {data.candidates.map((c, i) => {
                     const results = row.resultsByCandidate[c.candidateId] ?? [];
@@ -327,12 +347,14 @@ export default function CandidateComparisonPage() {
                     );
                   })}
                 </div>
+                </div>
               </section>
             ))
           )}
 
           <h2 style={typeScale.sectionTitle}>Career Consistency</h2>
-          <div style={{ display: "grid", gridTemplateColumns: `repeat(${data.candidates.length}, 1fr)`, gap: spacing.sm }}>
+          <div style={{ overflowX: "auto" }}>
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${data.candidates.length}, minmax(180px, 1fr))`, gap: spacing.sm }}>
             {data.candidates.map((c, i) => {
               const findings = data.consistencyFindingsByCandidate[c.candidateId] ?? [];
               return (
@@ -361,6 +383,7 @@ export default function CandidateComparisonPage() {
                 </div>
               );
             })}
+          </div>
           </div>
         </>
       )}

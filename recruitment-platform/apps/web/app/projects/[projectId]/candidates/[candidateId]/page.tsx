@@ -431,7 +431,7 @@ export default function CandidateDetailPage() {
     return (
       <main style={{ maxWidth: 900 }}>
         <p><Link href={`/projects/${projectId}/candidates`}>← Back to candidates</Link></p>
-        <p style={{ color: colors.danger700 }}>{error ?? "Could not load candidate results."}</p>
+        <p role="alert" style={{ color: colors.danger700 }}>{error ?? "Could not load candidate results."}</p>
       </main>
     );
   }

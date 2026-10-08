@@ -16,7 +16,15 @@ export interface TabItem {
 
 export function Tabs({ items }: { items: TabItem[] }) {
   return (
-    <nav style={{ display: "flex", gap: spacing.lg, borderBottom: `1px solid ${colors.border}`, marginBottom: spacing.lg }}>
+    <nav
+      style={{
+        display: "flex",
+        gap: spacing.lg,
+        flexWrap: "wrap",
+        borderBottom: `1px solid ${colors.border}`,
+        marginBottom: spacing.lg,
+      }}
+    >
       {items.map((item) => (
         <Link
           key={item.href}

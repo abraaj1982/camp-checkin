@@ -146,7 +146,7 @@ export default function CandidatesPage() {
   if (error) {
     return (
       <main style={{ maxWidth: 900 }}>
-        <p style={{ color: colors.danger700 }}>{error}</p>
+        <p role="alert" style={{ color: colors.danger700 }}>{error}</p>
         <button onClick={() => load()}>Retry</button>
       </main>
     );
@@ -187,7 +187,7 @@ export default function CandidatesPage() {
 
       {/* A. Upload action */}
       <Card style={{ marginBottom: spacing.lg }}>
-        <form onSubmit={handleUpload} style={{ display: "flex", gap: spacing.sm, alignItems: "center" }}>
+        <form onSubmit={handleUpload} style={{ display: "flex", gap: spacing.sm, alignItems: "center", flexWrap: "wrap" }}>
           <input ref={fileInputRef} type="file" accept=".pdf,.docx" multiple />
           <button type="submit" disabled={uploading}>
             {uploading ? "Uploading…" : "Upload CVs"}
@@ -224,7 +224,7 @@ export default function CandidatesPage() {
       )}
 
       {/* H. Comparison action */}
-      <div style={{ display: "flex", alignItems: "center", gap: spacing.sm, marginBottom: spacing.sm }}>
+      <div style={{ display: "flex", alignItems: "center", gap: spacing.sm, flexWrap: "wrap", marginBottom: spacing.sm }}>
         <Link
           href={`/projects/${projectId}/candidates/compare?candidateIds=${selectedCandidateIds.join(",")}`}
           aria-disabled={selectedCandidateIds.length < MIN_COMPARE}
@@ -253,6 +253,7 @@ export default function CandidatesPage() {
       ) : links.length === 0 ? (
         <EmptyState>No candidates have been added yet. Upload CVs above to get started.</EmptyState>
       ) : (
+        <div style={{ overflowX: "auto" }}>
         <Table>
           <thead>
             <TableHeadRow>
@@ -318,7 +319,11 @@ export default function CandidatesPage() {
                   </Cell>
                   <Cell>{lastUpdate ? new Date(lastUpdate).toLocaleDateString() : "—"}</Cell>
                   <Cell>
-                    <Link href={`/projects/${projectId}/candidates/${l.candidateId}`} style={{ color: colors.brand700 }}>
+                    <Link
+                      href={`/projects/${projectId}/candidates/${l.candidateId}`}
+                      style={{ color: colors.brand700 }}
+                      aria-label={`Open ${l.anonymizedLabel}`}
+                    >
                       Open →
                     </Link>
                   </Cell>
@@ -327,6 +332,7 @@ export default function CandidatesPage() {
             })}
           </tbody>
         </Table>
+        </div>
       )}
     </main>
   );
