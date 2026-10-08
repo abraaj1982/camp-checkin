@@ -10,6 +10,7 @@ import { EmptyState } from "../../../../components/EmptyState";
 import { ProcessingState } from "../../../../components/ProcessingState";
 import { FailedState } from "../../../../components/FailedState";
 import { Card } from "../../../../components/Card";
+import { MetricCard } from "../../../../components/MetricCard";
 import { Disclaimer, DECISION_INDEPENDENCE_TEXT } from "../../../../components/Disclaimer";
 import { colors, radii, spacing, typeScale } from "../../../../design-tokens";
 
@@ -432,10 +433,40 @@ export default function CandidateDetailPage() {
   const isFailed =
     !hasResults && !isProcessing && !hasCurrentRun && documents.some((d) => d.status === "FAILED_RETRY");
 
+  // Same candidate-level rollup convention as the Candidates workspace table
+  // (UI Batch 4) — a synthetic, client-computed key distinct from any raw
+  // document/assessment status, used only for this header badge.
+  const overallStatus = isProcessing ? "PROCESSING" : hasResults || hasCurrentRun ? "READY" : "FAILED";
+
+  const completedCount = documents.filter((d) => d.status === "COMPLETED").length;
+  const processingCount = documents.filter((d) => d.status === "QUEUED" || d.status === "PROCESSING").length;
+
+  const mandatoryGapCount = assessments.assessments.filter(
+    (a) => a.requirement.mandatory && a.status === "MANDATORY_GAP",
+  ).length;
+
   return (
     <main style={{ maxWidth: 900 }}>
       <p><Link href={`/projects/${projectId}/candidates`} style={{ color: colors.brand700 }}>← Back to candidates</Link></p>
-      <h1 style={typeScale.pageTitle}>{assessments.candidate.anonymizedLabel}</h1>
+      <div style={{ display: "flex", alignItems: "center", gap: spacing.sm }}>
+        <h1 style={{ ...typeScale.pageTitle, margin: 0 }}>{assessments.candidate.anonymizedLabel}</h1>
+        <StatusBadge status={overallStatus} />
+      </div>
+
+      {documents.length > 0 && (
+        <div style={{ display: "flex", gap: spacing.md, flexWrap: "wrap", marginTop: spacing.md }}>
+          <MetricCard label="Documents" value={documents.length} />
+          <MetricCard label="Completed" value={completedCount} />
+          <MetricCard label="Processing" value={processingCount} />
+        </div>
+      )}
+
+      {hasResults && mandatoryGapCount > 0 && (
+        <p role="status" style={{ ...typeScale.meta, color: colors.caution700, marginTop: spacing.md }}>
+          {mandatoryGapCount} mandatory requirement{mandatoryGapCount === 1 ? "" : "s"} currently show MANDATORY GAP —
+          review the evidence below before deciding.
+        </p>
+      )}
 
       {isProcessing && (
         <ProcessingState>Processing — results will appear once analysis completes.</ProcessingState>
