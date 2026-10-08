@@ -5,7 +5,8 @@ import { useParams } from "next/navigation";
 import { apiFetch, ApiError } from "../../../../lib/api";
 import { Table, TableHeadRow, HeaderCell, Row, Cell } from "../../../components/DataTable";
 import { StatusBadge } from "../../../components/StatusBadge";
-import { colors, spacing } from "../../../design-tokens";
+import { EmptyState } from "../../../components/EmptyState";
+import { colors, spacing, typeScale } from "../../../design-tokens";
 
 interface SemanticConcept {
   concept: string;
@@ -28,6 +29,12 @@ interface Requirement {
   aiSuggestedWeight: string | null;
   hrApprovedWeight: string | null;
   status: string;
+  // Pinned-weight version counter (Phase 2 requirement versioning) — 0 means
+  // this requirement has never been through an HR approval, which is the
+  // same gate RequirementGateBanner checks project-wide. Read as-is, never
+  // recomputed; a CHANGED requirement (currentVersionNumber > 0, edited
+  // since) still has a valid prior approved version and is NOT in this state.
+  currentVersionNumber: number;
   semanticConcepts: SemanticConcept[];
   criteria: Criterion[];
 }
@@ -52,7 +59,7 @@ const CATEGORIES = [
 // not a single score.
 export default function RequirementsPage() {
   const { projectId } = useParams<{ projectId: string }>();
-  const [requirements, setRequirements] = useState<Requirement[]>([]);
+  const [requirements, setRequirements] = useState<Requirement[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [whyOpenId, setWhyOpenId] = useState<string | null>(null);
@@ -72,7 +79,7 @@ export default function RequirementsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
-  const total = requirements.reduce(
+  const total = (requirements ?? []).reduce(
     (sum, r) => sum + Number(r.hrApprovedWeight ?? r.aiSuggestedWeight ?? 0),
     0,
   );
@@ -137,24 +144,39 @@ export default function RequirementsPage() {
     }
   }
 
+  const loading = requirements === null && !error;
+  const list = requirements ?? [];
+
   return (
     <main style={{ maxWidth: 1000 }}>
-      <p style={{ color: colors.ink600 }}>
-        What evidence exists, how strong it is, and what HR approved — not a single score.
+      <h2 style={typeScale.sectionTitle}>Requirements</h2>
+      <p style={typeScale.meta}>
+        What the requirement says, what HR approved, and whether that approval is current — not a single score.
       </p>
 
       <div style={{ display: "flex", gap: spacing.sm, marginBottom: spacing.lg }}>
-        <button onClick={runInterpretation} disabled={busy || requirements.length === 0}>
+        <button onClick={runInterpretation} disabled={busy || list.length === 0}>
           Ask AI to interpret requirements
         </button>
-        <button onClick={runWeighting} disabled={busy || requirements.length === 0}>
+        <button onClick={runWeighting} disabled={busy || list.length === 0}>
           Get AI weighting recommendation
         </button>
         <NewRequirementForm projectId={projectId} onCreated={load} />
       </div>
 
-      {error && <p style={{ color: colors.danger700 }}>{error}</p>}
+      {error && (
+        <p role="alert" style={{ color: colors.danger700 }}>
+          {error}
+        </p>
+      )}
 
+      {loading && <p>Loading requirements…</p>}
+
+      {!loading && list.length === 0 && !error && (
+        <EmptyState>No requirements configured for this project yet.</EmptyState>
+      )}
+
+      {!loading && list.length > 0 && (
       <Table>
         <thead>
           <TableHeadRow>
@@ -169,10 +191,15 @@ export default function RequirementsPage() {
           </TableHeadRow>
         </thead>
         <tbody>
-          {requirements.map((r) => {
+          {list.map((r) => {
             const ai = r.aiSuggestedWeight ? Number(r.aiSuggestedWeight) : null;
             const hr = r.hrApprovedWeight ? Number(r.hrApprovedWeight) : null;
             const diff = ai !== null && hr !== null ? (hr - ai).toFixed(1) : "—";
+            // Same gate RequirementGateBanner checks project-wide — a live
+            // requirement that has never been through HR approval. A CHANGED
+            // requirement (currentVersionNumber > 0) still has a valid prior
+            // approved version and is intentionally excluded from this note.
+            const neverApproved = r.currentVersionNumber === 0;
             return (
               <>
                 <Row key={r.id} style={{ verticalAlign: "top" }}>
@@ -196,10 +223,18 @@ export default function RequirementsPage() {
                   <Cell>{diff}</Cell>
                   <Cell>
                     <StatusBadge status={r.status} />
+                    {neverApproved && (
+                      <p style={{ margin: "4px 0 0", fontSize: 11, color: colors.caution700 }}>
+                        Not yet approved
+                      </p>
+                    )}
                   </Cell>
                   <Cell>
                     {r.aiInterpretationSummary && (
-                      <button onClick={() => setWhyOpenId(whyOpenId === r.id ? null : r.id)}>
+                      <button
+                        onClick={() => setWhyOpenId(whyOpenId === r.id ? null : r.id)}
+                        aria-expanded={whyOpenId === r.id}
+                      >
                         Why this weight?
                       </button>
                     )}
@@ -240,15 +275,18 @@ export default function RequirementsPage() {
           })}
         </tbody>
       </Table>
+      )}
 
+      {!loading && list.length > 0 && (
       <p style={{ marginTop: spacing.lg }}>
-        <strong>Total: {total.toFixed(1)}%</strong>{" "}
-        {Math.abs(total - 100) > 0.01 && requirements.length > 0 && (
+        <strong>Total approved weight: {total.toFixed(1)}%</strong>{" "}
+        {Math.abs(total - 100) > 0.01 && (
           <span style={{ color: colors.danger700 }}>— must equal 100% to approve</span>
         )}
       </p>
+      )}
 
-      <button onClick={approve} disabled={busy || requirements.length === 0}>
+      <button onClick={approve} disabled={busy || list.length === 0}>
         Approve requirement set
       </button>
     </main>
