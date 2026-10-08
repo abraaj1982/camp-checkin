@@ -394,7 +394,7 @@ export default function CandidateDetailPage() {
 
   if (loading) {
     return (
-      <main style={{ padding: 32, maxWidth: 900 }}>
+      <main style={{ maxWidth: 900 }}>
         <p>Loading…</p>
       </main>
     );
@@ -402,7 +402,7 @@ export default function CandidateDetailPage() {
 
   if (notFound) {
     return (
-      <main style={{ padding: 32, maxWidth: 900 }}>
+      <main style={{ maxWidth: 900 }}>
         <p><Link href={`/projects/${projectId}/candidates`}>← Back to candidates</Link></p>
         <p>Candidate not found in this project.</p>
       </main>
@@ -411,7 +411,7 @@ export default function CandidateDetailPage() {
 
   if (error || !assessments || !findings) {
     return (
-      <main style={{ padding: 32, maxWidth: 900 }}>
+      <main style={{ maxWidth: 900 }}>
         <p><Link href={`/projects/${projectId}/candidates`}>← Back to candidates</Link></p>
         <p style={{ color: colors.danger700 }}>{error ?? "Could not load candidate results."}</p>
       </main>
@@ -433,7 +433,7 @@ export default function CandidateDetailPage() {
     !hasResults && !isProcessing && !hasCurrentRun && documents.some((d) => d.status === "FAILED_RETRY");
 
   return (
-    <main style={{ padding: spacing.xxl, maxWidth: 900, fontFamily: "system-ui, sans-serif" }}>
+    <main style={{ maxWidth: 900 }}>
       <p><Link href={`/projects/${projectId}/candidates`} style={{ color: colors.brand700 }}>← Back to candidates</Link></p>
       <h1 style={typeScale.pageTitle}>{assessments.candidate.anonymizedLabel}</h1>
 

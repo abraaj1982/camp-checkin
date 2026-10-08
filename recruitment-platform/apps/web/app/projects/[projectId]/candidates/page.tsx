@@ -7,7 +7,7 @@ import { apiFetch, ApiError } from "../../../../lib/api";
 import { Table, TableHeadRow, HeaderCell, Row, Cell } from "../../../components/DataTable";
 import { Card } from "../../../components/Card";
 import { EmptyState } from "../../../components/EmptyState";
-import { colors, spacing, typeScale } from "../../../design-tokens";
+import { colors, spacing } from "../../../design-tokens";
 
 interface CandidateDocument {
   id: string;
@@ -123,10 +123,7 @@ export default function CandidatesPage() {
   }, {});
 
   return (
-    <main style={{ padding: spacing.xxl, maxWidth: 900, fontFamily: "system-ui, sans-serif" }}>
-      <p><Link href={`/projects/${projectId}`} style={{ color: colors.brand700 }}>← Project overview</Link></p>
-      <h1 style={typeScale.pageTitle}>Candidates</h1>
-
+    <main style={{ maxWidth: 900 }}>
       <Card style={{ marginBottom: spacing.lg }}>
         <form onSubmit={handleUpload} style={{ display: "flex", gap: spacing.sm, alignItems: "center" }}>
           <input ref={fileInputRef} type="file" accept=".pdf,.docx" multiple />

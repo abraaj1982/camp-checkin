@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { apiFetch, ApiError } from "../../../../../lib/api";
 import { EvidenceCard as SharedEvidenceCard } from "../../../../components/EvidenceCard";
@@ -178,10 +177,7 @@ export default function CandidateComparisonPage() {
   }, [projectId, searchParams.toString()]);
 
   return (
-    <main style={{ padding: spacing.xxl, maxWidth: 1200, fontFamily: "system-ui, sans-serif" }}>
-      <p><Link href={`/projects/${projectId}/candidates`} style={{ color: colors.brand700 }}>← Back to candidates</Link></p>
-      <h1 style={typeScale.pageTitle}>Compare Candidates</h1>
-
+    <main style={{ maxWidth: 1200 }}>
       {loading && <p>Loading…</p>}
       {error && <p style={{ color: colors.danger700 }}>{error}</p>}
 

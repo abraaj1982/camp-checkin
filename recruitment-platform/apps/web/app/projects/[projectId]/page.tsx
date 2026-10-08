@@ -1,10 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { apiFetch } from "../../../lib/api";
-import { StatusBadge } from "../../components/StatusBadge";
 import { colors, spacing, typeScale } from "../../design-tokens";
 
 interface Member {
@@ -74,17 +72,11 @@ export default function ProjectOverviewPage() {
     }
   }
 
-  if (error) return <main style={{ padding: spacing.xxl }}><p style={{ color: colors.danger700 }}>{error}</p></main>;
-  if (!project) return <main style={{ padding: spacing.xxl }}><p>Loading…</p></main>;
+  if (error) return <main style={{ maxWidth: 800 }}><p style={{ color: colors.danger700 }}>{error}</p></main>;
+  if (!project) return <main style={{ maxWidth: 800 }}><p>Loading…</p></main>;
 
   return (
-    <main style={{ padding: spacing.xxl, maxWidth: 800, fontFamily: "system-ui, sans-serif" }}>
-      <p><Link href="/projects" style={{ color: colors.brand700 }}>← All projects</Link></p>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <h1 style={typeScale.pageTitle}>{project.title}</h1>
-        <StatusBadge status={project.status} />
-      </div>
-
+    <main style={{ maxWidth: 800 }}>
       <dl style={{ display: "grid", gridTemplateColumns: "160px 1fr", rowGap: 6 }}>
         <dt style={{ color: colors.ink600 }}>Department</dt>
         <dd>{project.department ?? "—"}</dd>
@@ -152,16 +144,6 @@ export default function ProjectOverviewPage() {
         />
         <button type="submit">Assign</button>
       </form>
-
-      <h2 style={typeScale.sectionTitle}>Job Requirements</h2>
-      <p>
-        <Link href={`/projects/${projectId}/requirements`} style={{ color: colors.brand700 }}>Open requirements & weighting review →</Link>
-      </p>
-
-      <h2 style={typeScale.sectionTitle}>Candidates</h2>
-      <p>
-        <Link href={`/projects/${projectId}/candidates`} style={{ color: colors.brand700 }}>Upload CVs & view processing status →</Link>
-      </p>
     </main>
   );
 }

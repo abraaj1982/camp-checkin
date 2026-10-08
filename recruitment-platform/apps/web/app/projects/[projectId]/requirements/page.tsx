@@ -1,12 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { apiFetch, ApiError } from "../../../../lib/api";
 import { Table, TableHeadRow, HeaderCell, Row, Cell } from "../../../components/DataTable";
 import { StatusBadge } from "../../../components/StatusBadge";
-import { colors, spacing, typeScale } from "../../../design-tokens";
+import { colors, spacing } from "../../../design-tokens";
 
 interface SemanticConcept {
   concept: string;
@@ -139,9 +138,7 @@ export default function RequirementsPage() {
   }
 
   return (
-    <main style={{ padding: spacing.xxl, maxWidth: 1000, fontFamily: "system-ui, sans-serif" }}>
-      <p><Link href={`/projects/${projectId}`} style={{ color: colors.brand700 }}>← Project overview</Link></p>
-      <h1 style={typeScale.pageTitle}>Job Requirements &amp; Weighting Review</h1>
+    <main style={{ maxWidth: 1000 }}>
       <p style={{ color: colors.ink600 }}>
         What evidence exists, how strong it is, and what HR approved — not a single score.
       </p>
