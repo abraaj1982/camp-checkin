@@ -29,6 +29,14 @@ const VARIANT_BY_STATUS: Record<string, BadgeVariant> = {
   HR_REVIEW: "caution",
   APPROVED: "success",
   CHANGED: "caution",
+  // UI Batch 4 — candidate-level processing rollup (computed client-side
+  // from CandidateDocument statuses, never a raw document/project status
+  // value, so these synthetic keys are deliberately distinct from the
+  // ones above to avoid any ambiguity).
+  READY: "success",
+  PROCESSING: "brand",
+  FAILED: "danger",
+  NEEDS_REVIEW: "caution",
 };
 
 export function StatusBadge({ status }: { status: string }) {

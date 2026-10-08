@@ -6,8 +6,10 @@ import { useParams } from "next/navigation";
 import { apiFetch, ApiError } from "../../../../lib/api";
 import { Table, TableHeadRow, HeaderCell, Row, Cell } from "../../../components/DataTable";
 import { Card } from "../../../components/Card";
+import { MetricCard } from "../../../components/MetricCard";
+import { StatusBadge } from "../../../components/StatusBadge";
 import { EmptyState } from "../../../components/EmptyState";
-import { colors, spacing } from "../../../design-tokens";
+import { colors, spacing, typeScale } from "../../../design-tokens";
 
 interface CandidateDocument {
   id: string;
@@ -23,24 +25,47 @@ interface CandidateLink {
   documents: CandidateDocument[];
 }
 
-const STATUS_LABEL: Record<CandidateDocument["status"], string> = {
-  QUEUED: "Queued",
-  PROCESSING: "Processing",
-  COMPLETED: "Completed",
-  FAILED_RETRY: "Failed — Retry",
-  FAILED_NEEDS_OCR: "Failed — needs OCR (not supported yet)",
-};
+interface StagedUploadSummary {
+  stagedUploadId: string;
+  originalFilename: string;
+  status: string;
+  uploadedAt: string;
+  message: string | null;
+}
 
 const MIN_COMPARE = 2;
 const MAX_COMPARE = 5;
 
-// Processing Status screen (Phase 3, Section 8): each candidate document is
-// independent — one failure never blocks the rest of the batch (Section 41
-// of the master instruction), and that independence is visible here as a
-// per-row status, not a single batch progress bar.
+/**
+ * UI Batch 4 — Candidates Workspace.
+ *
+ * Section E correction carried over from the Batch 3 review: candidate
+ * readiness is determined at the CANDIDATE level, not the document level.
+ * The previous version of this page rendered one table row per DOCUMENT,
+ * so a candidate with 2 documents appeared as 2 rows with a duplicated
+ * checkbox/link for the same candidateId. This version renders exactly one
+ * row per candidate; document-level detail (filename, status, retry) is
+ * summarized within that one row, never duplicated as separate rows.
+ *
+ * Section G (review signals): per-candidate assessment/evidence data is
+ * NOT available from this page's existing data source
+ * (GET /projects/:id/candidates only returns document status, not
+ * Assessment rows) — getting it would require one /assessments call per
+ * candidate (N+1), which Batch 3's own review already ruled out for the
+ * Overview page on the same grounds. Same decision carried forward here:
+ * no per-candidate assessment/review signal is shown on this list. The
+ * Candidate Profile page (unchanged) remains where that detail lives.
+ *
+ * "Needs Review" here means exactly one real, existing thing: a staged
+ * upload pending identity-match review (GET /projects/:id/staged-uploads,
+ * status PENDING_REVIEW) — not a candidate row at all yet, since it hasn't
+ * been promoted to a Candidate. Shown as its own section, never merged
+ * into the candidate table.
+ */
 export default function CandidatesPage() {
   const { projectId } = useParams<{ projectId: string }>();
-  const [links, setLinks] = useState<CandidateLink[]>([]);
+  const [links, setLinks] = useState<CandidateLink[] | null>(null);
+  const [stagedUploads, setStagedUploads] = useState<StagedUploadSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [uploadResult, setUploadResult] = useState<{ staged: number; rejected: { filename: string; error: string }[] } | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -64,6 +89,7 @@ export default function CandidatesPage() {
     } catch {
       setError("Could not load candidates.");
     }
+    apiFetch<StagedUploadSummary[]>(`/projects/${projectId}/staged-uploads`).then(setStagedUploads).catch(() => {});
   }, [projectId]);
 
   useEffect(() => {
@@ -73,7 +99,7 @@ export default function CandidatesPage() {
   // Poll while anything is still in flight — a real status screen, not a
   // fire-and-forget upload confirmation.
   useEffect(() => {
-    const hasInFlight = links.some((l) =>
+    const hasInFlight = (links ?? []).some((l) =>
       l.documents.some((d) => d.status === "QUEUED" || d.status === "PROCESSING"),
     );
     if (!hasInFlight) return;
@@ -117,13 +143,49 @@ export default function CandidatesPage() {
     }
   }
 
-  const counts = links.reduce<Record<string, number>>((acc, l) => {
-    for (const d of l.documents) acc[d.status] = (acc[d.status] ?? 0) + 1;
-    return acc;
-  }, {});
+  if (error) {
+    return (
+      <main style={{ maxWidth: 900 }}>
+        <p style={{ color: colors.danger700 }}>{error}</p>
+        <button onClick={() => load()}>Retry</button>
+      </main>
+    );
+  }
+
+  // --- Candidate-level rollup (never document-level — see file header) ---
+  type Rollup = "PROCESSING" | "READY" | "FAILED";
+  function rollupFor(l: CandidateLink): Rollup {
+    const isProcessing = l.documents.some((d) => d.status === "QUEUED" || d.status === "PROCESSING");
+    if (isProcessing) return "PROCESSING";
+    const isReady = l.documents.some((d) => d.status === "COMPLETED");
+    if (isReady) return "READY";
+    return "FAILED";
+  }
+
+  const candidateCount = links?.length ?? null;
+  const processingCandidates = links?.filter((l) => rollupFor(l) === "PROCESSING").length ?? 0;
+  const readyCandidates = links?.filter((l) => rollupFor(l) === "READY").length ?? 0;
+  const failedDocumentCount =
+    links?.flatMap((l) => l.documents).filter((d) => d.status === "FAILED_RETRY" || d.status === "FAILED_NEEDS_OCR").length ?? 0;
+  const needsReviewCount = stagedUploads?.filter((s) => s.status === "PENDING_REVIEW").length ?? 0;
+  const comparisonAvailable = readyCandidates >= MIN_COMPARE;
 
   return (
     <main style={{ maxWidth: 900 }}>
+      <p style={{ color: colors.ink600, marginTop: 0 }}>
+        Candidates uploaded to this project, their processing state, and a path to compare them.
+      </p>
+
+      {/* B. Candidate Summary */}
+      <div style={{ display: "flex", gap: spacing.sm, flexWrap: "wrap", marginBottom: spacing.lg }}>
+        <MetricCard label="Candidates" value={candidateCount ?? "…"} />
+        <MetricCard label="Processing" value={links ? processingCandidates : "…"} />
+        <MetricCard label="Ready" value={links ? readyCandidates : "…"} />
+        <MetricCard label="Needs Review" value={needsReviewCount} />
+        <MetricCard label="Failed Documents" value={failedDocumentCount} />
+      </div>
+
+      {/* A. Upload action */}
       <Card style={{ marginBottom: spacing.lg }}>
         <form onSubmit={handleUpload} style={{ display: "flex", gap: spacing.sm, alignItems: "center" }}>
           <input ref={fileInputRef} type="file" accept=".pdf,.docx" multiple />
@@ -139,14 +201,29 @@ export default function CandidatesPage() {
             `Rejected: ${uploadResult.rejected.map((r) => `${r.filename} (${r.error})`).join(", ")}`}
         </p>
       )}
-      {error && <p style={{ color: colors.danger700 }}>{error}</p>}
 
-      <p style={{ color: colors.ink600 }}>
-        {Object.entries(counts)
-          .map(([status, count]) => `${STATUS_LABEL[status as CandidateDocument["status"]]}: ${count}`)
-          .join(" · ") || "No candidates yet."}
-      </p>
+      {/* L. Document Failure Notice — distinct from candidate assessment */}
+      {failedDocumentCount > 0 && (
+        <Card style={{ marginBottom: spacing.lg, background: colors.dangerBg, border: `1px solid ${colors.danger700}` }}>
+          <p style={{ margin: 0, color: colors.danger700 }}>
+            {failedDocumentCount} document(s) failed processing and may need a retry. This reflects a technical
+            processing issue with that document — it is not a candidate's assessment, evidence, or experience being
+            judged.
+          </p>
+        </Card>
+      )}
 
+      {/* Needs Review — staged uploads pending identity-match review, not yet promoted to candidates */}
+      {needsReviewCount > 0 && (
+        <Card style={{ marginBottom: spacing.lg, background: colors.cautionBg, border: `1px solid ${colors.caution700}` }}>
+          <p style={{ margin: 0, color: colors.caution700 }}>
+            {needsReviewCount} upload(s) need administrator review for a possible duplicate candidate before they can
+            be added to this project.
+          </p>
+        </Card>
+      )}
+
+      {/* H. Comparison action */}
       <div style={{ display: "flex", alignItems: "center", gap: spacing.sm, marginBottom: spacing.sm }}>
         <Link
           href={`/projects/${projectId}/candidates/compare?candidateIds=${selectedCandidateIds.join(",")}`}
@@ -163,27 +240,42 @@ export default function CandidatesPage() {
             Compare Selected ({selectedCandidateIds.length})
           </button>
         </Link>
-        <span style={{ fontSize: 13, color: colors.ink400 }}>Select {MIN_COMPARE}–{MAX_COMPARE} candidates to compare.</span>
+        <span style={{ fontSize: 13, color: colors.ink400 }}>
+          Select {MIN_COMPARE}–{MAX_COMPARE} candidates to compare.
+          {links && !comparisonAvailable && readyCandidates > 0 &&
+            ` ${readyCandidates} candidate(s) are ready so far.`}
+        </span>
       </div>
 
-      {links.length === 0 ? (
-        <EmptyState>No candidates yet.</EmptyState>
+      {/* C. Candidate List — one row per candidate, never per document */}
+      {links === null ? (
+        <p style={{ color: colors.ink600 }}>Loading…</p>
+      ) : links.length === 0 ? (
+        <EmptyState>No candidates have been added yet. Upload CVs above to get started.</EmptyState>
       ) : (
         <Table>
           <thead>
             <TableHeadRow>
               <HeaderCell></HeaderCell>
               <HeaderCell>Candidate</HeaderCell>
-              <HeaderCell>File</HeaderCell>
+              <HeaderCell>Documents</HeaderCell>
               <HeaderCell>Status</HeaderCell>
-              <HeaderCell>Reason</HeaderCell>
+              <HeaderCell>Last Update</HeaderCell>
               <HeaderCell></HeaderCell>
             </TableHeadRow>
           </thead>
           <tbody>
-            {links.flatMap((l) =>
-              l.documents.map((d) => (
-                <Row key={d.id}>
+            {links.map((l) => {
+              const rollup = rollupFor(l);
+              // Both failed statuses are shown so no failure is silently
+              // hidden — only FAILED_RETRY gets a Retry action, matching
+              // the existing backend (FAILED_NEEDS_OCR has no retry route;
+              // no retry functionality is invented for it here).
+              const failedDocs = l.documents.filter((d) => d.status === "FAILED_RETRY" || d.status === "FAILED_NEEDS_OCR");
+              // documents are already ordered uploadedAt desc by the API.
+              const lastUpdate = l.documents[0]?.uploadedAt;
+              return (
+                <Row key={l.candidateId}>
                   <Cell>
                     <input
                       type="checkbox"
@@ -198,17 +290,41 @@ export default function CandidatesPage() {
                       {l.anonymizedLabel}
                     </Link>
                   </Cell>
-                  <Cell>{d.originalFilename}</Cell>
-                  <Cell>{STATUS_LABEL[d.status]}</Cell>
-                  <Cell style={{ color: colors.danger700 }}>{d.failureReason ?? ""}</Cell>
+                  <Cell>{l.documents.length}</Cell>
                   <Cell>
-                    {d.status === "FAILED_RETRY" && (
-                      <button onClick={() => retry(l.candidateId, d.id)}>Retry</button>
+                    <StatusBadge status={rollup} />
+                    {rollup === "PROCESSING" && (
+                      <div style={{ ...typeScale.tiny, marginTop: 4 }}>Processing is still underway.</div>
+                    )}
+                    {failedDocs.length > 0 && (
+                      <div style={{ marginTop: 4 }}>
+                        {failedDocs.map((d) => (
+                          <div key={d.id} style={{ ...typeScale.tiny, color: colors.danger700 }}>
+                            {d.originalFilename} failed
+                            {d.status === "FAILED_RETRY" ? (
+                              <>
+                                {" "}
+                                <button onClick={() => retry(l.candidateId, d.id)} style={{ fontSize: 11 }}>
+                                  Retry
+                                </button>
+                              </>
+                            ) : (
+                              " (needs OCR — not supported yet)"
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </Cell>
+                  <Cell>{lastUpdate ? new Date(lastUpdate).toLocaleDateString() : "—"}</Cell>
+                  <Cell>
+                    <Link href={`/projects/${projectId}/candidates/${l.candidateId}`} style={{ color: colors.brand700 }}>
+                      Open →
+                    </Link>
+                  </Cell>
                 </Row>
-              )),
-            )}
+              );
+            })}
           </tbody>
         </Table>
       )}
