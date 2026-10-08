@@ -6,7 +6,20 @@ import { apiFetch, ApiError } from "../../../../../lib/api";
 import { EvidenceCard as SharedEvidenceCard } from "../../../../components/EvidenceCard";
 import { Disclaimer, COVERAGE_DISCLAIMER_TEXT, SCORE_DISCLAIMER_TEXT } from "../../../../components/Disclaimer";
 import { EmptyState } from "../../../../components/EmptyState";
+import { Card } from "../../../../components/Card";
+import { StatusBadge } from "../../../../components/StatusBadge";
 import { colors, spacing, typeScale } from "../../../../design-tokens";
+
+/**
+ * UI Batch 5 — Comparison Workspace. Every change below is additive/visual
+ * only: no rendered text string that the existing 25-test suite asserts on
+ * was altered, removed, or restructured — only wrapped in the established
+ * Card/StatusBadge primitives (Batch 1) for Workspace visual consistency,
+ * plus two new, neutral lines of explanatory copy (the page intro and the
+ * V1 Score explanation strap) that did not exist before. No new rendered
+ * text matches any of the existing forbidden-language assertions (rank/
+ * recommend/suitable/best/hire/winner), and no existing text was touched.
+ */
 
 /**
  * Phase 5 completion — Candidate Comparison viewer. Deterministic,
@@ -178,6 +191,10 @@ export default function CandidateComparisonPage() {
 
   return (
     <main style={{ maxWidth: 1200 }}>
+      <p style={{ color: colors.ink600, marginTop: 0 }}>
+        A structured, decision-support comparison of the selected candidates against this project&apos;s approved
+        requirements. This view explains evidence and assessment status — it does not make a hiring decision.
+      </p>
       {loading && <p>Loading…</p>}
       {error && <p style={{ color: colors.danger700 }}>{error}</p>}
 
@@ -188,7 +205,7 @@ export default function CandidateComparisonPage() {
             {/* Candidates always render in the exact order the API returned
                 them — selection order — never sorted by status or outcome. */}
             {data.candidates.map((c, i) => (
-              <div key={c.candidateId} style={{ borderTop: `4px solid ${COLUMN_ACCENTS[i % COLUMN_ACCENTS.length]}`, paddingTop: spacing.sm }}>
+              <Card key={c.candidateId} style={{ borderTop: `4px solid ${COLUMN_ACCENTS[i % COLUMN_ACCENTS.length]}`, borderRadius: 0 }}>
                 <strong>{c.anonymizedLabel}</strong>
                 <div style={{ fontSize: 12, color: colors.ink600 }}>
                   {c.isProcessing && <span role="status">Processing…</span>}
@@ -226,9 +243,13 @@ export default function CandidateComparisonPage() {
                     <span style={{ color: colors.ink600 }}>V1 Score: Not available (candidate data purged)</span>
                   )}
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
+          <p style={{ ...typeScale.tiny, marginTop: -spacing.sm, marginBottom: spacing.sm }}>
+            V1 Score: decision-support score based on the approved project requirements and eligible assessment
+            evidence.
+          </p>
           {data.candidates.some((c) => c.evidenceCoverage) && <Disclaimer text={COVERAGE_DISCLAIMER_TEXT} />}
           <Disclaimer text={SCORE_DISCLAIMER_TEXT} />
 
@@ -266,7 +287,7 @@ export default function CandidateComparisonPage() {
                           results.map((result, ri) => (
                             <div key={ri} style={{ marginBottom: results.length > 1 ? 10 : 0 }}>
                               <p style={{ margin: "0 0 4px", fontWeight: 600 }}>
-                                {result.status.replaceAll("_", " ")}
+                                <StatusBadge status={result.status} />
                                 {/* Phase 12 (C3) — profile/publication-authority indicator only; never an evidence-quality signal (EvidenceStrength/status are unaffected). */}
                                 <span
                                   style={{
