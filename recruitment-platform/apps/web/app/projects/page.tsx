@@ -50,6 +50,9 @@ export default function ProjectsPage() {
           <Link href="/admin/users" style={{ color: colors.brand700, alignSelf: "center" }}>
             + Add HR User
           </Link>
+          <Link href="/admin/candidate-match-reviews" style={{ color: colors.brand700, alignSelf: "center" }}>
+            Candidate Match Reviews
+          </Link>
           <button onClick={() => setShowCreate((v) => !v)}>
             {showCreate ? "Cancel" : "+ New Project"}
           </button>
