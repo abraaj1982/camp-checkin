@@ -44,11 +44,16 @@ export default function ProjectsPage() {
 
   return (
     <main style={{ padding: spacing.xxl, maxWidth: 960, fontFamily: "system-ui, sans-serif" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: spacing.sm }}>
         <h1 style={typeScale.pageTitle}>Recruitment Projects</h1>
-        <button onClick={() => setShowCreate((v) => !v)}>
-          {showCreate ? "Cancel" : "+ New Project"}
-        </button>
+        <div style={{ display: "flex", gap: spacing.sm }}>
+          <Link href="/admin/users" style={{ color: colors.brand700, alignSelf: "center" }}>
+            + Add HR User
+          </Link>
+          <button onClick={() => setShowCreate((v) => !v)}>
+            {showCreate ? "Cancel" : "+ New Project"}
+          </button>
+        </div>
       </div>
 
       {showCreate && (
