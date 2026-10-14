@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { apiFetch } from "../../../lib/api";
+import { apiFetch, ApiError } from "../../../lib/api";
 import { Card } from "../../components/Card";
 import { MetricCard } from "../../components/MetricCard";
 import { EmptyState } from "../../components/EmptyState";
@@ -35,7 +35,7 @@ interface ProjectDetail {
 const NEXT_STATUS: Record<string, string[]> = {
   DRAFT: ["ACTIVE", "ARCHIVED"],
   ACTIVE: ["ON_HOLD", "READY_FOR_CV_UPLOAD", "ARCHIVED"],
-  ON_HOLD: ["ACTIVE", "ARCHIVED"],
+  ON_HOLD: ["ACTIVE", "READY_FOR_CV_UPLOAD", "ARCHIVED"],
   READY_FOR_CV_UPLOAD: ["ON_HOLD", "COMPLETED", "ARCHIVED"],
   COMPLETED: ["ARCHIVED"],
   ARCHIVED: [],
@@ -130,8 +130,12 @@ export default function ProjectOverviewPage() {
         body: JSON.stringify({ status }),
       });
       load();
-    } catch {
-      setError("Could not change status.");
+    } catch (e) {
+      if (e instanceof ApiError && (e.body as { error?: string })?.error === "requirements_not_approved") {
+        setError("Cannot resume to Ready for CV Upload — one or more requirements are no longer approved (edited since the project was put on hold, or weights no longer total 100%).");
+      } else {
+        setError("Could not change status.");
+      }
     }
   }
 

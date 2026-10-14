@@ -69,8 +69,8 @@ export async function registerCandidateRoutes(
       const project = request.project!;
       const identity = request.session.get("identity")!;
 
-      if (project.status === "ARCHIVED") {
-        return reply.code(400).send({ error: "project_archived" });
+      if (project.status !== "READY_FOR_CV_UPLOAD") {
+        return reply.code(400).send({ error: "project_not_ready_for_upload" });
       }
 
       const staged: { stagedUploadId: string; filename: string }[] = [];

@@ -69,6 +69,7 @@ export default function CandidatesPage() {
   const [error, setError] = useState<string | null>(null);
   const [uploadResult, setUploadResult] = useState<{ staged: number; rejected: { filename: string; error: string }[] } | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [projectStatus, setProjectStatus] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Selection is a plain array, never sorted/reordered by any candidate's
   // processing status or assessment outcome — Compare Selected passes this
@@ -90,6 +91,13 @@ export default function CandidatesPage() {
       setError("Could not load candidates.");
     }
     apiFetch<StagedUploadSummary[]>(`/projects/${projectId}/staged-uploads`).then(setStagedUploads).catch(() => {});
+    // Informational only — the server is the real authority on whether an
+    // upload will be accepted (POST /candidates/upload re-checks this
+    // itself). This is just used to disable the control and explain why,
+    // never relied on as the actual gate.
+    apiFetch<{ status: string }>(`/projects/${projectId}`)
+      .then((p) => setProjectStatus(p.status))
+      .catch(() => setProjectStatus(null));
   }, [projectId]);
 
   useEffect(() => {
@@ -126,7 +134,11 @@ export default function CandidatesPage() {
       if (fileInputRef.current) fileInputRef.current.value = "";
       await load();
     } catch (e) {
-      setError(e instanceof ApiError ? `Upload failed (${e.status}).` : "Upload failed.");
+      if (e instanceof ApiError && e.status === 400 && (e.body as { error?: string })?.error === "project_not_ready_for_upload") {
+        setError("This project is not ready for CV uploads. Requirements must be approved first (project status: Ready for CV Upload).");
+      } else {
+        setError(e instanceof ApiError ? `Upload failed (${e.status}).` : "Upload failed.");
+      }
     } finally {
       setUploading(false);
     }
@@ -185,14 +197,29 @@ export default function CandidatesPage() {
         <MetricCard label="Failed Documents" value={failedDocumentCount} />
       </div>
 
-      {/* A. Upload action */}
+      {/* A. Upload action. projectStatus !== "READY_FOR_CV_UPLOAD" only disables
+          the control and explains why — the server (POST .../upload) is the
+          actual authority and re-checks this itself regardless of what the
+          button here allows. */}
       <Card style={{ marginBottom: spacing.lg }}>
         <form onSubmit={handleUpload} style={{ display: "flex", gap: spacing.sm, alignItems: "center", flexWrap: "wrap" }}>
-          <input ref={fileInputRef} type="file" accept=".pdf,.docx" multiple />
-          <button type="submit" disabled={uploading}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.docx"
+            multiple
+            disabled={projectStatus !== null && projectStatus !== "READY_FOR_CV_UPLOAD"}
+          />
+          <button type="submit" disabled={uploading || (projectStatus !== null && projectStatus !== "READY_FOR_CV_UPLOAD")}>
             {uploading ? "Uploading…" : "Upload CVs"}
           </button>
         </form>
+        {projectStatus !== null && projectStatus !== "READY_FOR_CV_UPLOAD" && (
+          <p style={{ ...typeScale.meta, color: colors.caution700, marginTop: spacing.sm, marginBottom: 0 }}>
+            CV upload isn&apos;t available yet — requirements must be reviewed and approved first (project status:
+            Ready for CV Upload).
+          </p>
+        )}
       </Card>
       {uploadResult && (
         <p style={{ color: uploadResult.rejected.length > 0 ? colors.caution700 : colors.success700 }}>

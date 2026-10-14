@@ -70,6 +70,14 @@ describe("candidate CV batch upload and processing status (Phase 3, revised for 
       payload: { title: "HR Manager" },
     });
     projectId = projectRes.json().id;
+
+    // CV Upload Readiness Gate: every test in this file except the
+    // dedicated "upload readiness gate" describe block below is testing
+    // upload mechanics, not project lifecycle — so it needs a project
+    // already in the one state the gate allows. Set directly via Prisma
+    // (not via the real approval route) to keep this file decoupled from
+    // the requirements workflow, which has its own dedicated test suite.
+    await prisma.recruitmentProject.update({ where: { id: projectId }, data: { status: "READY_FOR_CV_UPLOAD" } });
   });
 
   afterEach(async () => {
@@ -408,5 +416,72 @@ describe("candidate CV batch upload and processing status (Phase 3, revised for 
     const auditEntries = await prisma.auditLog.findMany({ where: { entityId: projectId, action: "CANDIDATE_DOCUMENTS_UPLOADED" } });
     expect(auditEntries).toHaveLength(1);
     expect((auditEntries[0].afterJson as { stagedCount: number }).stagedCount).toBe(1);
+  });
+
+  describe("CV upload readiness gate", () => {
+    async function setStatus(status: string) {
+      await prisma.recruitmentProject.update({ where: { id: projectId }, data: { status: status as never } });
+    }
+
+    async function expectRejected() {
+      const res = await multipartRequest(app, `/projects/${projectId}/candidates/upload`, cookie, [
+        { filename: "jane-doe.pdf", content: VALID_PDF_BYTES },
+      ]);
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error).toBe("project_not_ready_for_upload");
+
+      // A rejected upload must leave no trace: no staged upload, no
+      // candidate, no processing job — the gate fires before any of that
+      // is created (candidates/routes.ts checks project.status before
+      // createUploadBatch() is ever called).
+      expect(await prisma.stagedUpload.count({ where: { projectId } })).toBe(0);
+      expect(await prisma.candidate.count()).toBe(0);
+      expect(await prisma.candidateUploadBatch.count({ where: { projectId } })).toBe(0);
+    }
+
+    it("blocks upload when the project is DRAFT", async () => {
+      await setStatus("DRAFT");
+      await expectRejected();
+    });
+
+    it("blocks upload when the project is ACTIVE", async () => {
+      await setStatus("ACTIVE");
+      await expectRejected();
+    });
+
+    it("blocks upload when the project is ON_HOLD", async () => {
+      await setStatus("ON_HOLD");
+      await expectRejected();
+    });
+
+    it("blocks upload when the project is COMPLETED", async () => {
+      await setStatus("COMPLETED");
+      await expectRejected();
+    });
+
+    it("blocks upload when the project is ARCHIVED", async () => {
+      await setStatus("ARCHIVED");
+      await expectRejected();
+    });
+
+    it("allows upload when the project is READY_FOR_CV_UPLOAD", async () => {
+      await setStatus("READY_FOR_CV_UPLOAD"); // already set by beforeEach — explicit here for clarity
+      const res = await multipartRequest(app, `/projects/${projectId}/candidates/upload`, cookie, [
+        { filename: "jane-doe.pdf", content: VALID_PDF_BYTES },
+      ]);
+      expect(res.statusCode).toBe(200);
+      expect(res.json().staged).toHaveLength(1);
+      expect(await prisma.stagedUpload.count({ where: { projectId } })).toBe(1);
+    });
+
+    it("still returns 404 (not the readiness error) for an unrelated HR_USER regardless of project status", async () => {
+      await setStatus("DRAFT");
+      await createUser("gate-outsider@example.com", "HR_USER");
+      const outsiderCookie = await loginAs(app, "gate-outsider@example.com");
+      const res = await multipartRequest(app, `/projects/${projectId}/candidates/upload`, outsiderCookie, [
+        { filename: "jane-doe.pdf", content: VALID_PDF_BYTES },
+      ]);
+      expect(res.statusCode).toBe(404); // requireProjectAccess runs before the readiness check
+    });
   });
 });

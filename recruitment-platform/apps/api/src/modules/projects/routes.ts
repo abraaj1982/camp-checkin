@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "@recruitment-platform/db";
+import { validateWeightTotal } from "@recruitment-platform/shared-types";
 import { requireAuth } from "../auth/rbac.js";
 import { requireProjectAccess, requireProjectManage } from "./authorization.js";
 import { recordAudit } from "../../lib/audit.js";
@@ -7,11 +8,35 @@ import { recordAudit } from "../../lib/audit.js";
 const ALLOWED_STATUS_TRANSITIONS: Record<string, string[]> = {
   DRAFT: ["ACTIVE", "ARCHIVED"],
   ACTIVE: ["ON_HOLD", "READY_FOR_CV_UPLOAD", "ARCHIVED"],
-  ON_HOLD: ["ACTIVE", "ARCHIVED"],
+  ON_HOLD: ["ACTIVE", "READY_FOR_CV_UPLOAD", "ARCHIVED"],
   READY_FOR_CV_UPLOAD: ["ON_HOLD", "COMPLETED", "ARCHIVED"],
   COMPLETED: ["ARCHIVED"],
   ARCHIVED: [],
 };
+
+/**
+ * ON_HOLD -> READY_FOR_CV_UPLOAD resume gate. Deliberately NOT the same as
+ * calling /requirements/approve again (that would re-version every
+ * requirement, bumping currentVersionNumber, even when nothing changed).
+ * Reuses the same shared validateWeightTotal() /approve itself uses — never
+ * a second copy of that math — plus one condition /approve doesn't need:
+ * every non-archived requirement must currently be APPROVED (not CHANGED),
+ * since PATCH .../weight can change hrApprovedWeight on an already-approved
+ * requirement without reverting its status, so "weights total 100 right
+ * now" alone would not prove the requirements are still the ones that were
+ * actually approved before the project was paused.
+ */
+async function requirementsStillApprovedForCvUpload(projectId: string): Promise<boolean> {
+  const requirements = await prisma.jobRequirement.findMany({
+    where: { projectId, status: { not: "ARCHIVED" } },
+  });
+  if (requirements.length === 0) return false;
+  if (requirements.some((r) => r.status !== "APPROVED")) return false;
+  if (requirements.some((r) => r.hrApprovedWeight === null)) return false;
+
+  const weights = requirements.map((r) => ({ requirementId: r.id, weight: Number(r.hrApprovedWeight) }));
+  return validateWeightTotal(weights).valid;
+}
 
 export async function registerProjectRoutes(app: FastifyInstance): Promise<void> {
   // Create — the creator becomes the project's OWNER (ProjectMember), not
@@ -146,6 +171,13 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
         return reply
           .code(400)
           .send({ error: "invalid_status_transition", from: before.status, to: nextStatus, allowed });
+      }
+
+      if (before.status === "ON_HOLD" && nextStatus === "READY_FOR_CV_UPLOAD") {
+        const stillApproved = await requirementsStillApprovedForCvUpload(before.id);
+        if (!stillApproved) {
+          return reply.code(400).send({ error: "requirements_not_approved" });
+        }
       }
 
       const updated = await prisma.recruitmentProject.update({
