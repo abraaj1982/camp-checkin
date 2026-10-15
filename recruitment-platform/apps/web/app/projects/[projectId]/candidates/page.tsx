@@ -70,6 +70,12 @@ export default function CandidatesPage() {
   const [uploadResult, setUploadResult] = useState<{ staged: number; rejected: { filename: string; error: string }[] } | null>(null);
   const [uploading, setUploading] = useState(false);
   const [projectStatus, setProjectStatus] = useState<string | null>(null);
+  // Separate from `error` on purpose: `error` means "this page's own data
+  // failed to load" (the whole-page error view below is appropriate for
+  // that). A rejected upload is routine and expected (e.g. the project
+  // isn't ready yet) — it must not blank the candidate list and upload
+  // form the user was already looking at.
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Selection is a plain array, never sorted/reordered by any candidate's
   // processing status or assessment outcome — Compare Selected passes this
@@ -124,7 +130,8 @@ export default function CandidatesPage() {
     for (const file of Array.from(files)) form.append("files", file);
 
     setUploading(true);
-    setError(null);
+    setUploadError(null);
+    setUploadResult(null);
     try {
       const result = await apiFetch<{ staged: unknown[]; rejected: { filename: string; error: string }[] }>(
         `/projects/${projectId}/candidates/upload`,
@@ -135,9 +142,9 @@ export default function CandidatesPage() {
       await load();
     } catch (e) {
       if (e instanceof ApiError && e.status === 400 && (e.body as { error?: string })?.error === "project_not_ready_for_upload") {
-        setError("This project is not ready for CV uploads. Requirements must be approved first (project status: Ready for CV Upload).");
+        setUploadError("This project is not ready for CV uploads. Requirements must be approved first (project status: Ready for CV Upload).");
       } else {
-        setError(e instanceof ApiError ? `Upload failed (${e.status}).` : "Upload failed.");
+        setUploadError(e instanceof ApiError ? `Upload failed (${e.status}).` : "Upload failed.");
       }
     } finally {
       setUploading(false);
@@ -218,6 +225,11 @@ export default function CandidatesPage() {
           <p style={{ ...typeScale.meta, color: colors.caution700, marginTop: spacing.sm, marginBottom: 0 }}>
             CV upload isn&apos;t available yet — requirements must be reviewed and approved first (project status:
             Ready for CV Upload).
+          </p>
+        )}
+        {uploadError && (
+          <p role="alert" style={{ color: colors.danger700, marginTop: spacing.sm, marginBottom: 0 }}>
+            {uploadError}
           </p>
         )}
       </Card>

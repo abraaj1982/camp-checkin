@@ -100,6 +100,12 @@ export default function ProjectOverviewPage() {
   const [stagedUploads, setStagedUploads] = useState<StagedUploadSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [assignEmail, setAssignEmail] = useState("");
+  // Separate from `error` on purpose: `error` means "the page itself failed
+  // to load" (the whole-page error view below is appropriate for that).
+  // A rejected status change is routine and expected (e.g. resuming before
+  // requirements are re-approved) — it must not blank the Overview page,
+  // just explain why next to the Status section the user was already on.
+  const [statusError, setStatusError] = useState<string | null>(null);
 
   async function load() {
     try {
@@ -124,6 +130,7 @@ export default function ProjectOverviewPage() {
   }, [projectId]);
 
   async function changeStatus(status: string) {
+    setStatusError(null);
     try {
       await apiFetch(`/projects/${projectId}/status`, {
         method: "POST",
@@ -132,9 +139,9 @@ export default function ProjectOverviewPage() {
       load();
     } catch (e) {
       if (e instanceof ApiError && (e.body as { error?: string })?.error === "requirements_not_approved") {
-        setError("Cannot resume to Ready for CV Upload — one or more requirements are no longer approved (edited since the project was put on hold, or weights no longer total 100%).");
+        setStatusError("Cannot resume to Ready for CV Upload — one or more requirements are no longer approved (edited since the project was put on hold, or weights no longer total 100%).");
       } else {
-        setError("Could not change status.");
+        setStatusError("Could not change status.");
       }
     }
   }
@@ -380,6 +387,11 @@ export default function ProjectOverviewPage() {
         ))}
         {(NEXT_STATUS[project.status] ?? []).length === 0 && <span style={{ color: colors.ink600 }}>No further transitions.</span>}
       </div>
+      {statusError && (
+        <p role="alert" style={{ color: colors.danger700, marginTop: spacing.sm }}>
+          {statusError}
+        </p>
+      )}
 
       <h2 style={typeScale.sectionTitle}>Assigned HR users</h2>
       <ul>
