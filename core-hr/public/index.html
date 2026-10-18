@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CORE HR</title>
+<style>
+:root{--bg:#f4f6fb;--card:#fff;--ink:#14213d;--mut:#6b7794;--pri:#1d4ed8;--pri2:#0b2a6f;--ok:#15803d;--bad:#b91c1c;--warn:#b45309;--line:#e3e8f2}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1424;--card:#172036;--ink:#e8edf7;--mut:#93a0bd;--pri:#5b8cff;--pri2:#9db8ff;--line:#26314d}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:"Segoe UI",Tahoma,Arial,sans-serif;line-height:1.5}
+header{background:var(--pri2);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+header h1{margin:0;font-size:18px;letter-spacing:1px}header .sp{flex:1}
+nav{display:flex;gap:4px;padding:8px 16px;overflow-x:auto;background:var(--card);border-bottom:1px solid var(--line)}
+nav button{background:none;border:0;padding:8px 14px;border-radius:8px;color:var(--mut);font:inherit;cursor:pointer;white-space:nowrap}
+nav button.on{background:var(--pri);color:#fff}
+main{max-width:1000px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.kpi b{display:block;font-size:28px;color:var(--pri)}.kpi span{color:var(--mut);font-size:13px}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:8px;text-align:right;border-bottom:1px solid var(--line)}th{color:var(--mut);font-weight:600}
+.tw{overflow-x:auto}
+input,select,textarea{width:100%;padding:9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
+label{display:block;font-size:13px;color:var(--mut);margin:8px 0 3px}
+.btn{background:var(--pri);color:#fff;border:0;padding:9px 16px;border-radius:8px;font:inherit;cursor:pointer}
+.btn.ok{background:var(--ok)}.btn.bad{background:var(--bad)}.btn.ghost{background:none;color:var(--pri);border:1px solid var(--pri)}
+.btn:disabled{opacity:.5}.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0 12px}
+.tag{padding:2px 8px;border-radius:99px;font-size:12px;background:var(--line)}
+.tag.approved{background:#dcfce7;color:var(--ok)}.tag.rejected,.tag.cancelled{background:#fee2e2;color:var(--bad)}.tag.pending_manager,.tag.pending_hr{background:#fef3c7;color:var(--warn)}
+#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:8px;display:none;z-index:9}
+#login{max-width:340px;margin:12vh auto}
+.big{width:100%;padding:16px;font-size:18px}
+.hide{display:none!important}
+</style>
+</head>
+<body>
+<div id="toast"></div>
+
+<div id="login" class="card hide">
+  <h2 style="margin-top:0">CORE HR</h2>
+  <label>اسم المستخدم</label><input id="u" autocomplete="username">
+  <label>كلمة المرور</label><input id="p" type="password" autocomplete="current-password">
+  <p><button class="btn big" id="loginBtn">دخول</button></p>
+</div>
+
+<div id="app" class="hide">
+  <header><h1>CORE HR</h1><span id="who"></span><span class="sp"></span><button class="btn ghost" style="color:#fff;border-color:#fff" id="logout">خروج</button></header>
+  <nav id="nav"></nav>
+  <main id="view"></main>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+let token = sessionStorage.getItem('t'), me = null, lookups = null;
+const ROLE_AR = { admin: 'مدير النظام', hr: 'موارد بشرية', manager: 'مدير', employee: 'موظف' };
+const ST_AR = { pending_manager: 'بانتظار المدير', pending_hr: 'بانتظار الموارد البشرية', approved: 'معتمدة', rejected: 'مرفوضة', cancelled: 'ملغاة' };
+
+// كل النصوص الديناميكية تمر عبر esc لمنع حقن HTML
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function toast(m) { const t = $('#toast'); t.textContent = m; t.style.display = 'block'; setTimeout(() => (t.style.display = 'none'), 3000); }
+
+async function api(method, url, body) {
+  const r = await fetch(url, { method, headers: { 'content-type': 'application/json', ...(token ? { authorization: 'Bearer ' + token } : {}) }, body: body ? JSON.stringify(body) : undefined });
+  const j = await r.json().catch(() => ({}));
+  if (r.status === 401 && token) { logout(); throw new Error(j.error); }
+  if (!r.ok) throw new Error(j.error || 'خطأ');
+  return j;
+}
+const act = (fn) => async (...a) => { try { await fn(...a); } catch (e) { toast(e.message); } };
+
+function logout() { sessionStorage.removeItem('t'); token = null; location.reload(); }
+$('#logout').onclick = logout;
+$('#loginBtn').onclick = act(async () => {
+  const r = await api('POST', '/api/login', { username: $('#u').value, password: $('#p').value });
+  token = r.token; sessionStorage.setItem('t', token); boot();
+});
+$('#p').onkeydown = (e) => e.key === 'Enter' && $('#loginBtn').click();
+
+const TABS = {
+  home: ['الرئيسية', ['admin', 'hr', 'manager', 'employee']],
+  attendance: ['الحضور', ['admin', 'hr', 'manager', 'employee']],
+  leaves: ['الإجازات', ['admin', 'hr', 'manager', 'employee']],
+  inbox: ['الموافقات', ['admin', 'hr', 'manager']],
+  employees: ['الموظفون', ['admin', 'hr', 'manager']],
+  audit: ['سجل التدقيق', ['admin', 'hr']],
+};
+function renderNav(active) {
+  $('#nav').innerHTML = Object.entries(TABS).filter(([, [, r]]) => r.includes(me.role))
+    .map(([k, [n]]) => `<button data-k="${k}" class="${k === active ? 'on' : ''}">${n}</button>`).join('');
+  $('#nav').querySelectorAll('button').forEach((b) => (b.onclick = () => show(b.dataset.k)));
+}
+async function show(k) { renderNav(k); $('#view').innerHTML = ''; await act(views[k])(); }
+
+const fmtT = (iso) => iso ? new Date(iso).toLocaleTimeString('ar-OM', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Muscat' }) : '—';
+const getPos = () => new Promise((res, rej) => navigator.geolocation
+  ? navigator.geolocation.getCurrentPosition((p) => res(p.coords), () => rej(new Error('فعّل خدمة الموقع')), { enableHighAccuracy: true, timeout: 10000 })
+  : rej(new Error('المتصفح لا يدعم تحديد الموقع')));
+
+const views = {
+  async home() {
+    const bal = await api('GET', '/api/leaves/balances');
+    let kp = '';
+    if (me.role !== 'employee') {
+      const d = await api('GET', '/api/dashboard');
+      kp = `<div class="grid">${[['إجمالي الموظفين', d.total_employees], ['حاضرون اليوم', d.present_today], ['متأخرون', d.late_today], ['في إجازة', d.on_leave_today], ['طلبات معلّقة', d.pending_leaves]]
+        .map(([n, v]) => `<div class="card kpi"><b>${v}</b><span>${n}</span></div>`).join('')}</div>`;
+    }
+    $('#view').innerHTML = `${kp}<div class="card"><h3 style="margin-top:0">أرصدة إجازاتي</h3><div class="grid">${bal.map((b) =>
+      `<div class="kpi"><b>${b.remaining}</b><span>${esc(b.name)} (من ${b.entitled})</span></div>`).join('')}</div></div>`;
+  },
+
+  async attendance() {
+    const today = await api('GET', '/api/attendance/today');
+    const rows = await api('GET', '/api/attendance');
+    $('#view').innerHTML = `<div class="card"><h3 style="margin-top:0">اليوم</h3>
+      <p>الحضور: <b>${fmtT(today?.check_in)}</b> · الانصراف: <b>${fmtT(today?.check_out)}</b>${today?.late_minutes ? ` · <span class="tag pending_hr">تأخر ${today.late_minutes} د</span>` : ''}</p>
+      <button class="btn big ${today?.check_in ? 'bad' : 'ok'}" id="punch" ${today?.check_out ? 'disabled' : ''}>${today?.check_in ? 'تسجيل الانصراف' : 'تسجيل الحضور'}</button></div>
+      <div class="card tw"><h3 style="margin-top:0">سجل الشهر</h3><table><tr><th>التاريخ</th><th>الموظف</th><th>حضور</th><th>انصراف</th><th>تأخير</th></tr>${rows.map((r) =>
+      `<tr><td>${esc(r.work_date)}</td><td>${esc(r.full_name)}</td><td>${fmtT(r.check_in)}</td><td>${fmtT(r.check_out)}</td><td>${r.late_minutes || '—'}</td></tr>`).join('')}</table></div>`;
+    $('#punch').onclick = act(async () => {
+      let c = {};
+      if (lookups.locations.length) { const p = await getPos(); c = { lat: p.latitude, lng: p.longitude }; }
+      await api('POST', `/api/attendance/check-${today?.check_in ? 'out' : 'in'}`, c);
+      toast('تم التسجيل'); show('attendance');
+    });
+  },
+
+  async leaves() {
+    const [rows, bal] = await Promise.all([api('GET', '/api/leaves'), api('GET', '/api/leaves/balances')]);
+    $('#view').innerHTML = `<div class="card"><h3 style="margin-top:0">طلب إجازة</h3><div class="row">
+      <div><label>النوع</label><select id="lt">${lookups.leave_types.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></div>
+      <div><label>من</label><input id="sd" type="date"></div><div><label>إلى</label><input id="ed" type="date"></div></div>
+      <label>السبب</label><textarea id="rs" rows="2"></textarea><p><button class="btn" id="sub">إرسال</button></p>
+      <small>${bal.map((b) => `${esc(b.name)}: ${b.remaining}`).join(' · ')}</small></div>
+      <div class="card tw"><table><tr><th>النوع</th><th>الفترة</th><th>الأيام</th><th>الحالة</th><th></th></tr>${rows.map((r) =>
+      `<tr><td>${esc(r.leave_type)}</td><td>${esc(r.start_date)} → ${esc(r.end_date)}</td><td>${r.days}</td><td><span class="tag ${esc(r.status)}">${ST_AR[r.status]}</span></td>
+      <td>${['pending_manager', 'pending_hr'].includes(r.status) ? `<button class="btn ghost" data-c="${r.id}">إلغاء</button>` : ''}</td></tr>`).join('')}</table></div>`;
+    $('#sub').onclick = act(async () => {
+      const r = await api('POST', '/api/leaves', { leave_type_id: +$('#lt').value, start_date: $('#sd').value, end_date: $('#ed').value, reason: $('#rs').value });
+      toast(`تم الإرسال (${r.days} يوم عمل)`); show('leaves');
+    });
+    document.querySelectorAll('[data-c]').forEach((b) => (b.onclick = act(async () => { await api('POST', `/api/leaves/${b.dataset.c}/cancel`); show('leaves'); })));
+  },
+
+  async inbox() {
+    const rows = await api('GET', '/api/leaves?scope=inbox');
+    $('#view').innerHTML = `<div class="card tw"><h3 style="margin-top:0">طلبات بانتظار قرارك</h3>${rows.length ? `<table><tr><th>الموظف</th><th>النوع</th><th>الفترة</th><th>الأيام</th><th>السبب</th><th></th></tr>${rows.map((r) =>
+      `<tr><td>${esc(r.full_name)}</td><td>${esc(r.leave_type)}</td><td>${esc(r.start_date)} → ${esc(r.end_date)}</td><td>${r.days}</td><td>${esc(r.reason)}</td>
+      <td><button class="btn ok" data-a="${r.id}">موافقة</button> <button class="btn bad" data-r="${r.id}">رفض</button></td></tr>`).join('')}</table>` : '<p>لا توجد طلبات.</p>'}</div>`;
+    const decide = (id, approve) => act(async () => { await api('POST', `/api/leaves/${id}/decision`, { approve }); show('inbox'); });
+    document.querySelectorAll('[data-a]').forEach((b) => (b.onclick = decide(b.dataset.a, true)));
+    document.querySelectorAll('[data-r]').forEach((b) => (b.onclick = decide(b.dataset.r, false)));
+  },
+
+  async employees() {
+    const rows = await api('GET', '/api/employees');
+    const canEdit = me.role === 'admin' || me.role === 'hr';
+    const opt = (list, f) => '<option value="">—</option>' + list.map((x) => `<option value="${x.id}">${esc(f(x))}</option>`).join('');
+    $('#view').innerHTML = `${canEdit ? `<div class="card"><h3 style="margin-top:0">موظف جديد</h3><div class="row">
+      <div><label>الرقم الوظيفي</label><input id="n_no"></div><div><label>الاسم</label><input id="n_name"></div>
+      <div><label>المسمى</label><input id="n_job"></div><div><label>تاريخ التعيين</label><input id="n_hd" type="date"></div>
+      <div><label>القسم</label><select id="n_dep">${opt(lookups.departments, (d) => d.name)}</select></div>
+      <div><label>المدير المباشر</label><select id="n_mgr">${opt(rows.filter((e) => e.status === 'active'), (e) => e.full_name)}</select></div>
+      <div><label>اسم المستخدم</label><input id="n_user"></div><div><label>كلمة المرور (8+)</label><input id="n_pw" type="password"></div>
+      <div><label>الدور</label><select id="n_role">${Object.entries(ROLE_AR).filter(([k]) => k !== 'admin' || me.role === 'admin').map(([k, v]) => `<option value="${k}" ${k === 'employee' ? 'selected' : ''}>${v}</option>`).join('')}</select></div></div>
+      <p><button class="btn" id="n_add">إضافة</button></p></div>` : ''}
+      <div class="card tw"><table><tr><th>الرقم</th><th>الاسم</th><th>المسمى</th><th>القسم</th><th>الدور</th><th>الحالة</th><th></th></tr>${rows.map((e) =>
+      `<tr><td>${esc(e.emp_no)}</td><td>${esc(e.full_name)}</td><td>${esc(e.job_title)}</td><td>${esc(e.department)}</td><td>${ROLE_AR[e.role]}</td>
+      <td>${e.status === 'active' ? 'على رأس العمل' : 'منتهية'}</td><td>${canEdit && e.status === 'active' && e.id !== me.id ? `<button class="btn ghost" data-t="${e.id}">إنهاء الخدمة</button>` : ''}</td></tr>`).join('')}</table></div>`;
+    if (canEdit) {
+      $('#n_add').onclick = act(async () => {
+        const v = (id) => $(id).value.trim() || undefined;
+        await api('POST', '/api/employees', { emp_no: v('#n_no'), full_name: v('#n_name'), job_title: v('#n_job'), hire_date: v('#n_hd'),
+          department_id: +$('#n_dep').value || undefined, manager_id: +$('#n_mgr').value || undefined, username: v('#n_user'), password: $('#n_pw').value, role: $('#n_role').value });
+        toast('تمت الإضافة'); show('employees');
+      });
+      document.querySelectorAll('[data-t]').forEach((b) => (b.onclick = act(async () => {
+        if (!confirm('تأكيد إنهاء الخدمة؟ لا يمكن التراجع من الواجهة.')) return;
+        await api('POST', `/api/employees/${b.dataset.t}/terminate`, {}); show('employees');
+      })));
+    }
+  },
+
+  async audit() {
+    const rows = await api('GET', '/api/audit');
+    $('#view').innerHTML = `<div class="card tw"><table><tr><th>الوقت (UTC)</th><th>المنفّذ</th><th>الإجراء</th><th>الكيان</th><th>التفاصيل</th></tr>${rows.map((r) =>
+      `<tr><td>${esc(r.at)}</td><td>${esc(r.actor)}</td><td>${esc(r.action)}</td><td>${esc(r.entity)} #${esc(r.entity_id)}</td><td>${esc(r.detail)}</td></tr>`).join('')}</table></div>`;
+  },
+};
+
+async function boot() {
+  if (!token) { $('#login').classList.remove('hide'); return; }
+  try { me = await api('GET', '/api/me'); lookups = await api('GET', '/api/lookups'); } catch { $('#login').classList.remove('hide'); return; }
+  $('#login').classList.add('hide'); $('#app').classList.remove('hide');
+  $('#who').textContent = `${me.full_name} · ${ROLE_AR[me.role]}`;
+  show('home');
+}
+boot();
+</script>
+</body>
+</html>
