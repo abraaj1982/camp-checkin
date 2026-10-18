@@ -11,7 +11,11 @@ export const config = {
   port: Number(process.env.PORT ?? 4000),
   databaseUrl: required("DATABASE_URL"),
   sessionSecret: required("SESSION_SECRET"),
-  anthropicApiKey: process.env.ANTHROPIC_API_KEY, // required only once auth+db paths are exercised end to end
+  // ANTHROPIC_UAT_API_KEY fallback: Claude Code on the web treats
+  // ANTHROPIC_API_KEY itself as reserved for its own session auth and does
+  // not pass it through to a session's process environment, so a UAT
+  // environment stores the real key under this alternate name instead.
+  anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? process.env.ANTHROPIC_UAT_API_KEY, // required only once auth+db paths are exercised end to end
   objectStorage: {
     endpoint: process.env.OBJECT_STORAGE_ENDPOINT,
     bucket: process.env.OBJECT_STORAGE_BUCKET,
