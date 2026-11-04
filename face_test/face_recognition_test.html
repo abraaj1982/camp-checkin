@@ -117,7 +117,7 @@ video, canvas {
 
   <div class="card">
     <div class="ref-row">
-      <img src="reference_photos/user_selfie.jpg" alt="reference">
+      <img src="https://drive.google.com/uc?export=view&id=1CQJEnl_Y08pIybUOR_ZviitMmf5FSsUj" alt="reference" crossorigin="anonymous">
       <div>
         <strong>صورتك الشخصية</strong>
         <span>الصورة المرجعية المستخدمة بالاختبار</span>
@@ -163,7 +163,7 @@ async function loadModels() {
     await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
     await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
 
-    const refImg = await faceapi.fetchImage('reference_photos/user_selfie.jpg');
+    const refImg = await faceapi.fetchImage('https://drive.google.com/uc?export=view&id=1CQJEnl_Y08pIybUOR_ZviitMmf5FSsUj');
     const refDetection = await faceapi
       .detectSingleFace(refImg, new faceapi.TinyFaceDetectorOptions())
       .withFaceLandmarks()
