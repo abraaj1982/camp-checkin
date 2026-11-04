@@ -117,7 +117,7 @@ video, canvas {
 
   <div class="card">
     <div class="ref-row">
-      <img src="https://drive.google.com/uc?export=view&id=1CQJEnl_Y08pIybUOR_ZviitMmf5FSsUj" alt="reference" crossorigin="anonymous">
+      <img src="https://drive.google.com/thumbnail?id=1CQJEnl_Y08pIybUOR_ZviitMmf5FSsUj&sz=w500" alt="reference" crossorigin="anonymous">
       <div>
         <strong>صورتك الشخصية</strong>
         <span>الصورة المرجعية المستخدمة بالاختبار</span>
@@ -139,7 +139,7 @@ video, canvas {
 </div>
 
 <script>
-const MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights';
+const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
 const statusEl = document.getElementById('status');
 const startBtn = document.getElementById('startBtn');
 const switchBtn = document.getElementById('switchBtn');
@@ -158,12 +158,26 @@ function setStatus(text, cls) {
 }
 
 async function loadModels() {
+  setStatus('⏳ جاري تحميل نماذج التعرف على الوجه...');
   try {
     await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
     await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
     await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+  } catch (err) {
+    setStatus('❌ فشل تحميل نماذج الذكاء الاصطناعي: ' + err.message, 'error');
+    return;
+  }
 
-    const refImg = await faceapi.fetchImage('https://drive.google.com/uc?export=view&id=1CQJEnl_Y08pIybUOR_ZviitMmf5FSsUj');
+  setStatus('⏳ جاري تحميل الصورة المرجعية...');
+  let refImg;
+  try {
+    refImg = await faceapi.fetchImage('https://drive.google.com/thumbnail?id=1CQJEnl_Y08pIybUOR_ZviitMmf5FSsUj&sz=w500');
+  } catch (err) {
+    setStatus('❌ فشل تحميل الصورة المرجعية من Google Drive: ' + err.message, 'error');
+    return;
+  }
+
+  try {
     const refDetection = await faceapi
       .detectSingleFace(refImg, new faceapi.TinyFaceDetectorOptions())
       .withFaceLandmarks()
@@ -180,7 +194,7 @@ async function loadModels() {
     setStatus('✅ النماذج جاهزة — اضغط "تشغيل الكاميرا" للاختبار', 'ready');
     startBtn.disabled = false;
   } catch (err) {
-    setStatus('❌ خطأ بتحميل النماذج: ' + err.message, 'error');
+    setStatus('❌ خطأ بتحليل الصورة المرجعية: ' + err.message, 'error');
   }
 }
 
