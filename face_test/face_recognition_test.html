@@ -117,9 +117,9 @@ video, canvas {
 
   <div class="card">
     <div class="ref-row">
-      <img src="reference_photos/manhal.jpg" alt="reference">
+      <img src="reference_photos/user_selfie.jpg" alt="reference">
       <div>
-        <strong>منهال العبدواني</strong>
+        <strong>صورتك الشخصية</strong>
         <span>الصورة المرجعية المستخدمة بالاختبار</span>
       </div>
     </div>
@@ -163,7 +163,7 @@ async function loadModels() {
     await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
     await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
 
-    const refImg = await faceapi.fetchImage('reference_photos/manhal.jpg');
+    const refImg = await faceapi.fetchImage('reference_photos/user_selfie.jpg');
     const refDetection = await faceapi
       .detectSingleFace(refImg, new faceapi.TinyFaceDetectorOptions())
       .withFaceLandmarks()
@@ -174,7 +174,7 @@ async function loadModels() {
       return;
     }
 
-    const labeled = [new faceapi.LabeledFaceDescriptors('منهال العبدواني', [refDetection.descriptor])];
+    const labeled = [new faceapi.LabeledFaceDescriptors('أنت', [refDetection.descriptor])];
     faceMatcher = new faceapi.FaceMatcher(labeled, 0.55);
 
     setStatus('✅ النماذج جاهزة — اضغط "تشغيل الكاميرا" للاختبار', 'ready');
