@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>اختبار التعرف على الوجه</title>
+<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+<style>
+:root {
+  --sap-blue: #0A6ED4;
+  --sap-green: #107E3E;
+  --sap-orange: #E87722;
+  --sap-red: #C30C13;
+  --sap-gray: #6C757D;
+  --sap-text: #32363A;
+  --sap-bg: #F8F9FA;
+  --sap-border: #D3D3D3;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  background: linear-gradient(135deg, #E8F4FD 0%, #F8F9FA 100%);
+  color: var(--sap-text);
+  min-height: 100vh;
+  padding: 16px;
+}
+.container { max-width: 480px; margin: 0 auto; }
+.topbar {
+  background: linear-gradient(135deg, var(--sap-blue) 0%, #0052A3 100%);
+  color: white;
+  padding: 18px 20px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+.topbar h1 { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+.topbar p { font-size: 12px; opacity: 0.9; }
+.card {
+  background: white;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  border: 1px solid var(--sap-border);
+}
+.ref-row { display: flex; align-items: center; gap: 12px; }
+.ref-row img {
+  width: 56px; height: 56px; border-radius: 8px; object-fit: cover;
+  border: 2px solid var(--sap-blue);
+}
+.ref-row div strong { font-size: 14px; display: block; }
+.ref-row div span { font-size: 11px; color: var(--sap-gray); }
+
+#status {
+  text-align: center;
+  padding: 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  margin-bottom: 12px;
+  background: #FEF0E8;
+  color: var(--sap-orange);
+  font-weight: 600;
+}
+#status.ready { background: #E1F5EB; color: var(--sap-green); }
+#status.error { background: #FADAD4; color: var(--sap-red); }
+
+.video-wrap {
+  position: relative;
+  width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #000;
+  aspect-ratio: 4/3;
+}
+video, canvas {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.btn {
+  width: 100%;
+  padding: 13px;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 12px;
+}
+.btn-primary { background: var(--sap-blue); color: white; }
+.btn-secondary { background: var(--sap-gray); color: white; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+#result {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 6px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 700;
+  display: none;
+}
+#result.match { display: block; background: #E1F5EB; color: var(--sap-green); border: 2px solid var(--sap-green); }
+#result.nomatch { display: block; background: #FADAD4; color: var(--sap-red); border: 2px solid var(--sap-red); }
+.conf { font-size: 11px; font-weight: 400; margin-top: 4px; opacity: 0.85; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="topbar">
+    <h1>🧪 اختبار التعرف على الوجه</h1>
+    <p>Face Recognition Proof of Concept — camp-checkin</p>
+  </div>
+
+  <div class="card">
+    <div class="ref-row">
+      <img src="reference_photos/manhal.jpg" alt="reference">
+      <div>
+        <strong>منهال العبدواني</strong>
+        <span>الصورة المرجعية المستخدمة بالاختبار</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="status">⏳ جاري تحميل نماذج التعرف على الوجه...</div>
+
+  <div class="video-wrap">
+    <video id="video" autoplay muted playsinline></video>
+    <canvas id="overlay"></canvas>
+  </div>
+
+  <button class="btn btn-primary" id="startBtn" disabled>📷 تشغيل الكاميرا</button>
+  <button class="btn btn-secondary" id="switchBtn" style="display:none">🔄 تبديل الكاميرا (أمامية/خلفية)</button>
+
+  <div id="result"></div>
+</div>
+
+<script>
+const MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights';
+const statusEl = document.getElementById('status');
+const startBtn = document.getElementById('startBtn');
+const switchBtn = document.getElementById('switchBtn');
+const video = document.getElementById('video');
+const overlay = document.getElementById('overlay');
+const resultEl = document.getElementById('result');
+
+let faceMatcher = null;
+let currentFacing = 'user';
+let stream = null;
+let loopTimer = null;
+
+function setStatus(text, cls) {
+  statusEl.textContent = text;
+  statusEl.className = cls || '';
+}
+
+async function loadModels() {
+  try {
+    await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+    await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+    await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+
+    const refImg = await faceapi.fetchImage('reference_photos/manhal.jpg');
+    const refDetection = await faceapi
+      .detectSingleFace(refImg, new faceapi.TinyFaceDetectorOptions())
+      .withFaceLandmarks()
+      .withFaceDescriptor();
+
+    if (!refDetection) {
+      setStatus('⚠️ لم يتم العثور على وجه بالصورة المرجعية', 'error');
+      return;
+    }
+
+    const labeled = [new faceapi.LabeledFaceDescriptors('منهال العبدواني', [refDetection.descriptor])];
+    faceMatcher = new faceapi.FaceMatcher(labeled, 0.55);
+
+    setStatus('✅ النماذج جاهزة — اضغط "تشغيل الكاميرا" للاختبار', 'ready');
+    startBtn.disabled = false;
+  } catch (err) {
+    setStatus('❌ خطأ بتحميل النماذج: ' + err.message, 'error');
+  }
+}
+
+async function startCamera() {
+  if (stream) {
+    stream.getTracks().forEach(t => t.stop());
+  }
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: currentFacing }
+    });
+    video.srcObject = stream;
+    switchBtn.style.display = 'block';
+    startBtn.textContent = '⏹️ إيقاف الاختبار';
+  } catch (err) {
+    setStatus('❌ تعذّر الوصول للكاميرا: ' + err.message, 'error');
+  }
+}
+
+video.addEventListener('play', () => {
+  const displaySize = { width: video.clientWidth, height: video.clientHeight };
+  overlay.width = displaySize.width;
+  overlay.height = displaySize.height;
+  faceapi.matchDimensions(overlay, displaySize);
+
+  if (loopTimer) clearInterval(loopTimer);
+  loopTimer = setInterval(async () => {
+    if (!faceMatcher) return;
+    const detections = await faceapi
+      .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
+      .withFaceLandmarks()
+      .withFaceDescriptors();
+
+    const resized = faceapi.resizeResults(detections, displaySize);
+    const ctx = overlay.getContext('2d');
+    ctx.clearRect(0, 0, overlay.width, overlay.height);
+
+    if (resized.length === 0) {
+      resultEl.className = '';
+      resultEl.style.display = 'none';
+      return;
+    }
+
+    resized.forEach(d => {
+      const match = faceMatcher.findBestMatch(d.descriptor);
+      const isMatch = match.label !== 'unknown';
+      const box = d.detection.box;
+
+      new faceapi.draw.DrawBox(box, {
+        label: isMatch ? match.label : 'غير معروف',
+        boxColor: isMatch ? '#107E3E' : '#C30C13'
+      }).draw(overlay);
+
+      const distancePct = (100 - match.distance * 100).toFixed(1);
+      if (isMatch) {
+        resultEl.className = 'match';
+        resultEl.innerHTML = `✅ تم التعرف: ${match.label}<div class="conf">دقة التطابق: ${distancePct}%</div>`;
+      } else {
+        resultEl.className = 'nomatch';
+        resultEl.innerHTML = `❌ وجه غير مطابق للصورة المرجعية<div class="conf">أقرب تطابق كان ${distancePct}% (غير كافٍ)</div>`;
+      }
+    });
+  }, 400);
+});
+
+startBtn.addEventListener('click', () => {
+  if (stream) {
+    stream.getTracks().forEach(t => t.stop());
+    stream = null;
+    if (loopTimer) clearInterval(loopTimer);
+    startBtn.textContent = '📷 تشغيل الكاميرا';
+    switchBtn.style.display = 'none';
+    resultEl.style.display = 'none';
+  } else {
+    startCamera();
+  }
+});
+
+switchBtn.addEventListener('click', () => {
+  currentFacing = currentFacing === 'user' ? 'environment' : 'user';
+  startCamera();
+});
+
+loadModels();
+</script>
+
+</body>
+</html>
