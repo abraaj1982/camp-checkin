@@ -117,12 +117,14 @@ video, canvas {
 
   <div class="card">
     <div class="ref-row">
-      <img src="https://drive.google.com/thumbnail?id=1CQJEnl_Y08pIybUOR_ZviitMmf5FSsUj&sz=w500" alt="reference" crossorigin="anonymous">
+      <img id="refImgPreview" src="" alt="reference" style="display:none">
+      <div id="refPlaceholder" style="width:56px;height:56px;border-radius:8px;border:2px dashed var(--sap-border);display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--sap-gray)">👤</div>
       <div>
-        <strong>صورتك الشخصية</strong>
-        <span>الصورة المرجعية المستخدمة بالاختبار</span>
+        <strong>الصورة المرجعية</strong>
+        <span id="refStatusText">اختر صورة من جوالك (تبقى محلية على جهازك فقط)</span>
       </div>
     </div>
+    <input type="file" id="refFileInput" accept="image/*" style="margin-top:12px; width:100%;">
   </div>
 
   <div id="status">⏳ جاري تحميل نماذج التعرف على الوجه...</div>
@@ -151,6 +153,7 @@ let faceMatcher = null;
 let currentFacing = 'user';
 let stream = null;
 let loopTimer = null;
+let modelsReady = false;
 
 function setStatus(text, cls) {
   statusEl.textContent = text;
@@ -163,40 +166,56 @@ async function loadModels() {
     await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
     await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
     await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+    modelsReady = true;
+    setStatus('📁 الآن اختر صورة مرجعية من جوالك (زر "اختيار ملف" بالأعلى)', 'ready');
   } catch (err) {
     setStatus('❌ فشل تحميل نماذج الذكاء الاصطناعي: ' + err.message, 'error');
+  }
+}
+
+const refFileInput = document.getElementById('refFileInput');
+const refImgPreview = document.getElementById('refImgPreview');
+const refPlaceholder = document.getElementById('refPlaceholder');
+const refStatusText = document.getElementById('refStatusText');
+
+refFileInput.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  if (!modelsReady) {
+    setStatus('⏳ لسا النماذج تتحمّل، انتظر لحظة وحاول مرة ثانية', 'error');
     return;
   }
 
-  setStatus('⏳ جاري تحميل الصورة المرجعية...');
-  let refImg;
-  try {
-    refImg = await faceapi.fetchImage('https://drive.google.com/thumbnail?id=1CQJEnl_Y08pIybUOR_ZviitMmf5FSsUj&sz=w500');
-  } catch (err) {
-    setStatus('❌ فشل تحميل الصورة المرجعية من Google Drive: ' + err.message, 'error');
-    return;
-  }
+  const objectUrl = URL.createObjectURL(file);
+  refImgPreview.src = objectUrl;
+  refImgPreview.style.display = 'block';
+  refPlaceholder.style.display = 'none';
+  refStatusText.textContent = 'جاري تحليل الصورة...';
 
   try {
+    const refImg = await faceapi.bufferToImage(file);
     const refDetection = await faceapi
       .detectSingleFace(refImg, new faceapi.TinyFaceDetectorOptions())
       .withFaceLandmarks()
       .withFaceDescriptor();
 
     if (!refDetection) {
-      setStatus('⚠️ لم يتم العثور على وجه بالصورة المرجعية', 'error');
+      setStatus('⚠️ لم يتم العثور على وجه بهذي الصورة، جرّب صورة أوضح', 'error');
+      refStatusText.textContent = 'فشل — جرّب صورة ثانية';
       return;
     }
 
     const labeled = [new faceapi.LabeledFaceDescriptors('أنت', [refDetection.descriptor])];
     faceMatcher = new faceapi.FaceMatcher(labeled, 0.55);
 
-    setStatus('✅ النماذج جاهزة — اضغط "تشغيل الكاميرا" للاختبار', 'ready');
+    refStatusText.textContent = 'تم تحليل الصورة بنجاح ✓';
+    setStatus('✅ جاهز — اضغط "تشغيل الكاميرا" للاختبار', 'ready');
     startBtn.disabled = false;
   } catch (err) {
-    setStatus('❌ خطأ بتحليل الصورة المرجعية: ' + err.message, 'error');
+    setStatus('❌ خطأ بتحليل الصورة: ' + err.message, 'error');
   }
-}
+});
 
 async function startCamera() {
   if (stream) {
