@@ -576,21 +576,14 @@ fieldset:disabled {
       <span>Supervisor Details</span>
     </div>
 
-    <div class="form-group">
-      <label>Select Your Name</label>
-      <div style="display: flex; gap: 8px;">
-        <select id="supervisorName" style="flex: 1;">
-          <option value="">-- Choose Your Name --</option>
-          <option value="Yasser Mustafa">Yasser Mustafa</option>
-          <option value="Mohammed Ismail">Mohammed Ismail</option>
-          <option value="Abbas Abdul Rab">Abbas Abdul Rab</option>
-          <option value="Hussain Mustafa">Hussain Mustafa</option>
-          <option value="Hamza">Hamza</option>
-        </select>
-        <button class="btn btn-primary" id="changeSupervisorBtn" style="display: none; width: auto;">
-          🔄 Change
-        </button>
+    <div class="form-group" style="display: flex; align-items: center; justify-content: space-between;">
+      <div>
+        <div style="font-size: 16px; font-weight: 600;" id="loggedInName"></div>
+        <div style="font-size: 12px; color: var(--sap-gray);" id="loggedInBus"></div>
       </div>
+      <button class="btn btn-primary" id="logoutBtn" style="width: auto; background: #6C757D;">
+        🚪 Logout
+      </button>
     </div>
 
     <div class="form-group">
@@ -606,7 +599,7 @@ fieldset:disabled {
       <span>QR Code Scanner</span>
     </div>
 
-    <fieldset id="scanFieldset" disabled>
+    <fieldset id="scanFieldset">
       <button class="btn btn-primary" id="startCameraBtn">
         📱 Start Camera
       </button>
@@ -633,7 +626,6 @@ fieldset:disabled {
         🔍 Search Student
       </button>
     </fieldset>
-    <div class="hint hint-warning" id="scanLockHint">⚠️ Select your name above to unlock the scanner</div>
     <div class="hint" id="dataStatus" style="margin-top: 8px;"></div>
   </div>
 
@@ -725,7 +717,17 @@ fieldset:disabled {
 </div>
 
 <script>
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzZYgQ_IUjIueJeZgVb4gPmIRGXaPCII5MqtSidEe2TdF5_EFqpsA4MHLxcB7pOX1RGAg/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4lEBGPNxghwq9UmK0iljI5QdS-8iCvC-K09dDtbZCXGvGZyA4repTE3rFVVRp5zS4yw/exec';
+
+// ===== AUTH GATE: must be logged in to use this screen =====
+const mukhayyamToken = sessionStorage.getItem('mukhayyam_token');
+const mukhayyamFullName = sessionStorage.getItem('mukhayyam_fullName');
+const mukhayyamRole = sessionStorage.getItem('mukhayyam_role');
+const mukhayyamAssignedBus = sessionStorage.getItem('mukhayyam_assignedBus');
+
+if (!mukhayyamToken) {
+  window.location.href = 'login.html';
+}
 
 let html5QrcodeScanner = null;
 let currentStudent = null;
@@ -795,18 +797,19 @@ document.addEventListener('DOMContentLoaded', function() {
   updateDateTime();
   setInterval(updateDateTime, 1000);
 
-  // Load saved supervisor name
-  const savedSupervisor = localStorage.getItem('supervisorName');
-  if (savedSupervisor) {
-    document.getElementById('supervisorName').value = savedSupervisor;
-    document.getElementById('supervisorName').disabled = true;
-    document.getElementById('changeSupervisorBtn').style.display = 'block';
-  }
+  document.getElementById('loggedInName').textContent = '👤 ' + (mukhayyamFullName || '');
+  document.getElementById('loggedInBus').textContent = mukhayyamRole === 'admin'
+    ? 'أدمن (السكرتارية) — كل الباصات'
+    : 'مشرف باص ' + (mukhayyamAssignedBus || '—');
 
-  updateScanLock();
   loadAllData();
   setupNameSearch();
   renderActivityLog();
+});
+
+document.getElementById('logoutBtn').addEventListener('click', function() {
+  sessionStorage.clear();
+  window.location.href = 'login.html';
 });
 
 // Setup Name Search with Autocomplete
@@ -863,35 +866,6 @@ function setupNameSearch() {
     }
   });
 }
-
-// Enable/disable the scanner based on whether a supervisor is selected
-function updateScanLock() {
-  const hasSupervisor = !!document.getElementById('supervisorName').value;
-  document.getElementById('scanFieldset').disabled = !hasSupervisor;
-  document.getElementById('scanLockHint').style.display = hasSupervisor ? 'none' : 'block';
-}
-
-// Change Supervisor
-document.getElementById('changeSupervisorBtn').addEventListener('click', function() {
-  localStorage.removeItem('supervisorName');
-  document.getElementById('supervisorName').value = '';
-  document.getElementById('supervisorName').disabled = false;
-  document.getElementById('changeSupervisorBtn').style.display = 'none';
-  stopQRScanner();
-  resetStudent();
-  updateScanLock();
-});
-
-// Save supervisor name
-document.getElementById('supervisorName').addEventListener('change', function() {
-  if (this.value) {
-    localStorage.setItem('supervisorName', this.value);
-    this.disabled = true;
-    document.getElementById('changeSupervisorBtn').style.display = 'block';
-    showAlert('✅ Name Saved', 'success', 'You can now start scanning QR codes!');
-  }
-  updateScanLock();
-});
 
 // Start Camera
 document.getElementById('startCameraBtn').addEventListener('click', function() {
@@ -961,11 +935,6 @@ function onQRCodeError(error) {
 
 // Search Student
 function searchStudent(studentId) {
-  if (!document.getElementById('supervisorName').value) {
-    showAlert('Please select your name', 'error');
-    return;
-  }
-
   studentId = String(studentId).trim();
 
   // Instant local lookup (no network round-trip) once data is preloaded
@@ -1112,8 +1081,9 @@ function saveCheckInOut(action) {
 
   const data = {
     action: action,
+    token: mukhayyamToken,
     studentId: currentStudent.studentId,
-    supervisor: document.getElementById('supervisorName').value,
+    supervisor: mukhayyamFullName,
     bus: currentStudent.busNumber,
     notes: document.getElementById('notesInput').value
   };
@@ -1140,7 +1110,7 @@ function saveCheckInOut(action) {
           studentId: String(currentStudent.studentId),
           action: actionLabel,
           timestamp: data.timestamp,
-          supervisor: document.getElementById('supervisorName').value,
+          supervisor: mukhayyamFullName,
           bus: currentStudent.busNumber,
           notes: document.getElementById('notesInput').value
         });

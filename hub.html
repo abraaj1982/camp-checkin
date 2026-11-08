@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>الصفحة الرئيسية — MUKHAYYAM</title>
+<style>
+:root {
+  --sap-blue: #0A6ED4;
+  --sap-green: #107E3E;
+  --sap-orange: #E87722;
+  --sap-red: #C30C13;
+  --sap-gray: #6C757D;
+  --sap-text: #32363A;
+  --sap-bg: #F8F9FA;
+  --sap-border: #D3D3D3;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  background: var(--sap-bg);
+  color: var(--sap-text);
+  min-height: 100vh;
+}
+.topbar {
+  background: linear-gradient(135deg, var(--sap-blue) 0%, #0052A3 100%);
+  color: white;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.topbar .who { font-size: 14px; }
+.topbar .who strong { font-size: 16px; }
+.topbar .roleBadge {
+  background: rgba(255,255,255,.2);
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  margin-right: 8px;
+}
+.logoutBtn {
+  background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.4);
+  color: white;
+  padding: 7px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.container { max-width: 640px; margin: 0 auto; padding: 20px; }
+.card {
+  background: white;
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  border: 1px solid var(--sap-border);
+}
+.card h2 { font-size: 15px; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 5px; margin-top: 12px; }
+label:first-child { margin-top: 0; }
+input[type=text], input[type=password], select {
+  width: 100%;
+  padding: 10px 11px;
+  border: 1px solid var(--sap-border);
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+}
+input:focus, select:focus { outline: none; border-color: var(--sap-blue); }
+.busRow { display: none; }
+.btn {
+  margin-top: 16px;
+  width: 100%;
+  padding: 11px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  background: var(--sap-blue);
+  color: white;
+}
+.btn:disabled { opacity: .6; cursor: not-allowed; }
+#createMsg {
+  margin-top: 12px;
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  text-align: center;
+  display: none;
+}
+#createMsg.error { display: block; background: #FADAD4; color: var(--sap-red); }
+#createMsg.ok { display: block; background: #E1F5EB; color: var(--sap-green); }
+.hint { font-size: 11px; color: var(--sap-gray); margin-top: 4px; }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: right; padding: 8px 6px; border-bottom: 1px solid var(--sap-border); }
+th { font-size: 11px; color: var(--sap-gray); font-weight: 600; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+.badge-active { background: #E1F5EB; color: var(--sap-green); }
+.badge-locked { background: #FADAD4; color: var(--sap-red); }
+.badge-disabled { background: #F0F0F0; color: var(--sap-gray); }
+.rowBtn {
+  padding: 5px 10px;
+  border: 1px solid var(--sap-border);
+  border-radius: 5px;
+  font-size: 11px;
+  cursor: pointer;
+  background: white;
+  margin-left: 4px;
+}
+.rowBtn:hover { background: var(--sap-bg); }
+.rowBtn.danger { color: var(--sap-red); border-color: var(--sap-red); }
+#usersListMsg {
+  margin-top: 10px;
+  padding: 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  text-align: center;
+  display: none;
+}
+#usersListMsg.error { display: block; background: #FADAD4; color: var(--sap-red); }
+#usersListMsg.ok { display: block; background: #E1F5EB; color: var(--sap-green); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="who">
+    مرحباً، <strong id="whoName">...</strong>
+    <span class="roleBadge" id="whoRole"></span>
+  </div>
+  <button class="logoutBtn" id="logoutBtn">تسجيل خروج</button>
+</div>
+
+<div class="container">
+
+  <div class="card" id="adminCard">
+    <h2>➕ إضافة مستخدم جديد</h2>
+    <form id="createUserForm">
+      <label>اسم المستخدم (Username)</label>
+      <input type="text" id="newUsername" required>
+
+      <label>كلمة المرور</label>
+      <input type="text" id="newPassword" required>
+      <div class="hint">تُعرض نصاً هنا فقط لتسهيل نسخها وإعطائها للمستخدم — تُشفَّر بالكامل عند الحفظ.</div>
+
+      <label>الاسم الكامل</label>
+      <input type="text" id="newFullName" required>
+
+      <label>الدور</label>
+      <select id="newRole">
+        <option value="admin">أدمن (السكرتارية)</option>
+        <option value="supervisor">مشرف باص</option>
+        <option value="camp_leader">قائد المخيم</option>
+        <option value="finance">مالية</option>
+        <option value="shirts_coordinator">مسؤول القمصان</option>
+      </select>
+
+      <div class="busRow" id="busRow">
+        <label>رقم الباص المخصَّص</label>
+        <input type="text" id="newAssignedBus" placeholder="مثال: 1">
+      </div>
+
+      <button type="submit" class="btn" id="createBtn">إنشاء الحساب</button>
+    </form>
+    <div id="createMsg"></div>
+  </div>
+
+  <div class="card" id="usersListCard">
+    <h2>📋 المستخدمون الحاليون</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>الاسم</th>
+          <th>المستخدم</th>
+          <th>الدور</th>
+          <th>الباص</th>
+          <th>الحالة</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="usersListBody">
+        <tr><td colspan="6" style="text-align:center; color: var(--sap-gray);">جاري التحميل...</td></tr>
+      </tbody>
+    </table>
+    <div id="usersListMsg"></div>
+  </div>
+
+</div>
+
+<script>
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4lEBGPNxghwq9UmK0iljI5QdS-8iCvC-K09dDtbZCXGvGZyA4repTE3rFVVRp5zS4yw/exec';
+
+const token = sessionStorage.getItem('mukhayyam_token');
+const fullName = sessionStorage.getItem('mukhayyam_fullName');
+const role = sessionStorage.getItem('mukhayyam_role');
+
+if (!token) {
+  window.location.href = 'login.html';
+}
+
+document.getElementById('whoName').textContent = fullName || '';
+document.getElementById('whoRole').textContent = role === 'admin' ? 'السكرتارية' : (role || '');
+
+document.getElementById('logoutBtn').addEventListener('click', () => {
+  sessionStorage.clear();
+  window.location.href = 'login.html';
+});
+
+const roleSelect = document.getElementById('newRole');
+const busRow = document.getElementById('busRow');
+roleSelect.addEventListener('change', () => {
+  busRow.style.display = roleSelect.value === 'supervisor' ? 'block' : 'none';
+});
+
+const form = document.getElementById('createUserForm');
+const createMsg = document.getElementById('createMsg');
+const createBtn = document.getElementById('createBtn');
+
+function setCreateMsg(text, cls) {
+  createMsg.textContent = text;
+  createMsg.className = cls || '';
+}
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  setCreateMsg('', '');
+  createBtn.disabled = true;
+  createBtn.textContent = 'جاري الإنشاء...';
+
+  const payload = {
+    action: 'createUser',
+    token: token,
+    username: document.getElementById('newUsername').value.trim(),
+    password: document.getElementById('newPassword').value,
+    fullName: document.getElementById('newFullName').value.trim(),
+    role: roleSelect.value,
+    assignedBus: document.getElementById('newAssignedBus').value.trim()
+  };
+
+  try {
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      setCreateMsg('✅ تم إنشاء الحساب بنجاح: ' + data.username + ' (' + data.role + ')', 'ok');
+      form.reset();
+      busRow.style.display = 'none';
+    } else {
+      setCreateMsg('❌ ' + (data.error || 'فشل الإنشاء'), 'error');
+    }
+  } catch (err) {
+    setCreateMsg('تعذّر الاتصال بالخادم: ' + err.message, 'error');
+  } finally {
+    createBtn.disabled = false;
+    createBtn.textContent = 'إنشاء الحساب';
+  }
+
+  loadUsersList();
+});
+
+// ---------------- Users list / reset password / unlock ----------------
+
+const usersListBody = document.getElementById('usersListBody');
+const usersListMsg = document.getElementById('usersListMsg');
+
+function setUsersListMsg(text, cls) {
+  usersListMsg.textContent = text;
+  usersListMsg.className = cls || '';
+}
+
+const roleLabels = {
+  admin: 'أدمن (السكرتارية)',
+  supervisor: 'مشرف باص',
+  camp_leader: 'قائد المخيم',
+  finance: 'مالية',
+  shirts_coordinator: 'مسؤول القمصان'
+};
+
+async function loadUsersList() {
+  try {
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'listUsers', token: token })
+    });
+    const data = await res.json();
+
+    if (!data.success) {
+      usersListBody.innerHTML = '<tr><td colspan="6" style="text-align:center; color: var(--sap-red);">' + (data.error || 'فشل التحميل') + '</td></tr>';
+      return;
+    }
+
+    if (data.users.length === 0) {
+      usersListBody.innerHTML = '<tr><td colspan="6" style="text-align:center; color: var(--sap-gray);">لا يوجد مستخدمون</td></tr>';
+      return;
+    }
+
+    usersListBody.innerHTML = '';
+    data.users.forEach(u => {
+      const tr = document.createElement('tr');
+
+      const tdName = document.createElement('td');
+      tdName.textContent = u.fullName;
+      tr.appendChild(tdName);
+
+      const tdUser = document.createElement('td');
+      tdUser.textContent = u.username;
+      tr.appendChild(tdUser);
+
+      const tdRole = document.createElement('td');
+      tdRole.textContent = roleLabels[u.role] || u.role;
+      tr.appendChild(tdRole);
+
+      const tdBus = document.createElement('td');
+      tdBus.textContent = u.assignedBus || '—';
+      tr.appendChild(tdBus);
+
+      const tdStatus = document.createElement('td');
+      const badge = document.createElement('span');
+      if (!u.active) {
+        badge.className = 'badge badge-disabled';
+        badge.textContent = 'معطَّل';
+      } else if (u.locked) {
+        badge.className = 'badge badge-locked';
+        badge.textContent = 'مقفول';
+      } else {
+        badge.className = 'badge badge-active';
+        badge.textContent = 'نشط';
+      }
+      tdStatus.appendChild(badge);
+      tr.appendChild(tdStatus);
+
+      const tdActions = document.createElement('td');
+      const resetBtn = document.createElement('button');
+      resetBtn.className = 'rowBtn';
+      resetBtn.textContent = '🔑 إعادة تعيين';
+      resetBtn.addEventListener('click', () => resetPasswordFor(u.username));
+      tdActions.appendChild(resetBtn);
+
+      if (u.locked) {
+        const unlockBtn = document.createElement('button');
+        unlockBtn.className = 'rowBtn danger';
+        unlockBtn.textContent = '🔓 فك القفل';
+        unlockBtn.addEventListener('click', () => unlockAccountFor(u.username));
+        tdActions.appendChild(unlockBtn);
+      }
+
+      tr.appendChild(tdActions);
+      usersListBody.appendChild(tr);
+    });
+  } catch (err) {
+    usersListBody.innerHTML = '<tr><td colspan="6" style="text-align:center; color: var(--sap-red);">تعذّر الاتصال بالخادم</td></tr>';
+  }
+}
+
+async function resetPasswordFor(username) {
+  const newPassword = prompt('كلمة المرور الجديدة لـ "' + username + '":');
+  if (!newPassword) return;
+
+  setUsersListMsg('', '');
+  try {
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'resetPassword', token: token, targetUsername: username, newPassword: newPassword })
+    });
+    const data = await res.json();
+    if (data.success) {
+      setUsersListMsg('✅ تم تغيير كلمة مرور "' + username + '" بنجاح — سلّمه كلمة المرور الجديدة.', 'ok');
+    } else {
+      setUsersListMsg('❌ ' + (data.error || 'فشلت العملية'), 'error');
+    }
+  } catch (err) {
+    setUsersListMsg('تعذّر الاتصال بالخادم: ' + err.message, 'error');
+  }
+}
+
+async function unlockAccountFor(username) {
+  setUsersListMsg('', '');
+  try {
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'unlockAccount', token: token, targetUsername: username })
+    });
+    const data = await res.json();
+    if (data.success) {
+      setUsersListMsg('✅ تم فك قفل حساب "' + username + '".', 'ok');
+      loadUsersList();
+    } else {
+      setUsersListMsg('❌ ' + (data.error || 'فشلت العملية'), 'error');
+    }
+  } catch (err) {
+    setUsersListMsg('تعذّر الاتصال بالخادم: ' + err.message, 'error');
+  }
+}
+
+if (role === 'admin') {
+  loadUsersList();
+} else {
+  document.getElementById('usersListCard').style.display = 'none';
+}
+</script>
+
+</body>
+</html>
