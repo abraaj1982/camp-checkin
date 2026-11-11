@@ -587,7 +587,8 @@ const PERMISSIONS_SEED_ = [
   ['verify', 'التحقق من النتائج', 'خاصة'], ['announce', 'نشر الإعلانات', 'خاصة'],
   ['budget', 'تحديد ميزانيات اللجان', 'خاصة'],
   ['support', 'الدعم الفني (كلمات المرور وفك القفل)', 'خاصة'],
-  ['print', 'طباعة الأساور والكشوف', 'خاصة']
+  ['print', 'طباعة الأساور والكشوف', 'خاصة'],
+  ['custody', 'الأمانات (هواتف وحقائب) والانسحاب المبكر', 'شاشة']
 ];
 
 // Creates the sheet if missing, and appends any missing header columns (never deletes anything).
@@ -641,6 +642,8 @@ function SETUP_createTabs() {
   ensureSheetWithHeaders_(ss, 'Bags', ['Time', 'StudentID', 'Bus', 'Mode', 'Count', 'Expected', 'Supervisor', 'ClientId'], log);
   ensureSheetWithHeaders_(ss, 'BusLive', ['Bus', 'Status', 'Lat', 'Lng', 'Accuracy', 'UpdatedAt', 'Supervisor', 'Boarded', 'Total'], log);
 
+  ensureSheetWithHeaders_(ss, 'Custody', ['Time', 'StudentID', 'Item', 'Action', 'Count', 'Tag', 'By', 'ClientId', 'Notes'], log);
+  ensureSheetWithHeaders_(ss, 'Withdrawals', ['Id', 'StudentID', 'Time', 'GuardianName', 'Reason', 'Status', 'CreatedBy', 'ClosedAt', 'ClosedBy', 'ClientId'], log);
   ensureSheetWithHeaders_(ss, 'Cases', ['Id', 'Time', 'Type', 'Bus', 'StudentID', 'Text', 'Status', 'CreatedBy', 'UpdatedBy', 'ClientId'], log);
 
   const msg = log.join('\n');

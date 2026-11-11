@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="ar" dir="rtl" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>الأمانات — MUKHAYYAM</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.4/html5-qrcode.min.js"></script>
+<link rel="stylesheet" href="theme.css">
+<style>
+.page{max-width:720px;margin:0 auto;padding:14px;display:flex;flex-direction:column;gap:12px}
+.tabs{display:flex;gap:6px}.tabs button{flex:1;min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-weight:600;cursor:pointer}
+.tabs button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+input[type=text],input[type=search]{width:100%;box-sizing:border-box}
+.two{display:flex;gap:8px}.two>*{flex:1}
+.item{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--card)}
+.kpis{display:flex;gap:10px;flex-wrap:wrap}.kpis .card{flex:1 1 130px;padding:12px}
+.chk{display:flex;align-items:center;gap:8px;padding:6px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hdr">
+    <div class="logo">م</div>
+    <div style="flex:1;min-width:0"><div class="t" id="hT"></div><div class="s" id="hS"></div></div>
+    <a class="tool" href="hub.html" id="homeBtn" style="text-decoration:none;display:flex;align-items:center"></a>
+    <button class="tool" id="langBtn"></button>
+    <button class="tool" id="themeBtn"></button>
+  </header>
+  <main class="page" id="app"></main>
+</div>
+<script>
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4lEBGPNxghwq9UmK0iljI5QdS-8iCvC-K09dDtbZCXGvGZyA4repTE3rFVVRp5zS4yw/exec';
+const token = sessionStorage.getItem('mukhayyam_token');
+let perms = [];
+try { perms = JSON.parse(sessionStorage.getItem('mukhayyam_permissions') || '[]'); } catch (e) {}
+const can = k => perms.indexOf('*') !== -1 || perms.indexOf(k) !== -1;
+if (!token) location.href = 'login.html'; else if (!can('custody')) location.href = 'hub.html';
+
+const pref = { get(k, d) { try { return localStorage.getItem('mk_pref_' + k) || d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('mk_pref_' + k, v); } catch (e) {} } };
+const $ = id => document.getElementById(id);
+const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2));
+const AUTH_ERR = /EXPIRED|IDLE_TIMEOUT|REVOKED|BAD_SIGNATURE|MALFORMED|USER_NOT_FOUND|ACCOUNT_DISABLED|BAD_PAYLOAD/;
+
+const T = {
+ ar: { dir: 'rtl', title: 'الأمانات', sub: 'الهواتف والحقائب والانسحاب المبكر', home: 'الرئيسية', lang: 'English', dark: '🌙', light: '☀',
+  tHandover: 'استلام وتسليم', tWithdraw: 'الانسحاب', tSummary: 'الملخص',
+  search: 'ابحث بالاسم أو الرقم', scan: 'مسح السوار', stopScan: 'إيقاف الكاميرا', noCam: 'تعذّر تشغيل الكاميرا. ابحث بالاسم أو الرقم.', none: 'لا نتائج', team: 'الفريق', bus: n => 'باص ' + n,
+  phone: 'الهاتف', held: 'مستلَم', notHeld: 'غير مستلَم', tag: 'رقم الكيس (اختياري)', recvPhone: 'استلام الهاتف', retPhone: 'تسليم الهاتف',
+  bags: 'الحقائب', inCustody: 'لدى الأمانات', expected: n => 'المتوقع: ' + n, recvBags: 'استلام', retBags: 'تسليم',
+  wd: 'الانسحاب المبكر', guardian: 'اسم المستلِم (ولي الأمر أو من ينوب)', reason: 'سبب الانسحاب', openWd: 'فتح طلب انسحاب', openNow: 'طلب انسحاب مفتوح',
+  closeWd: 'إغلاق الانسحاب', cancelWd: 'إلغاء الطلب', needBack: 'يُغلق الانسحاب بعد تسليم:', phoneBack: 'الهاتف', bagsBack: n => n + ' حقيبة', allBack: '✓ كل الأغراض سُلّمت',
+  done: 'تم', error: 'تعذّر الاتصال. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.',
+  open: 'مفتوح', closed: 'مغلق', cancelled: 'ملغى', noWd: 'لا توجد طلبات انسحاب.', recvBy: 'المستلِم',
+  sPhones: 'هواتف لدى الأمانات', sBags: 'حقائب لدى الأمانات', sOpen: 'انسحاب مفتوح', sClosed: 'انسحاب مكتمل', holders: 'من لديهم أغراض', noHolders: 'لا توجد أغراض لدى الأمانات.', confirmClose: 'تأكيد إغلاق الانسحاب؟', confirmCancel: 'إلغاء طلب الانسحاب؟',
+  codes: { ALREADY_HELD: 'الهاتف مستلَم مسبقاً', NOT_HELD: 'لا يوجد هاتف مستلَم لهذا الطالب', EXCEEDS_HELD: 'المُسلَّم أكثر من المستلَم', ALREADY_OPEN: 'يوجد طلب انسحاب مفتوح لهذا الطالب', ALREADY_WITHDRAWN: 'هذا الطالب منسحب مسبقاً', ITEMS_NOT_RETURNED: 'لا يُغلق الانسحاب قبل تسليم الهاتف والحقائب', NOT_FOUND: 'الطالب غير موجود', NOT_OPEN: 'الطلب ليس مفتوحاً' } },
+ en: { dir: 'ltr', title: 'Custody', sub: 'Phones, luggage and early withdrawal', home: 'Home', lang: 'العربية', dark: '🌙', light: '☀',
+  tHandover: 'Handover', tWithdraw: 'Withdrawals', tSummary: 'Summary',
+  search: 'Search by name or number', scan: 'Scan wristband', stopScan: 'Stop camera', noCam: 'Could not start the camera. Search by name or number.', none: 'No results', team: 'Team', bus: n => 'Bus ' + n,
+  phone: 'Phone', held: 'In custody', notHeld: 'Not received', tag: 'Bag number (optional)', recvPhone: 'Receive phone', retPhone: 'Return phone',
+  bags: 'Luggage', inCustody: 'In custody', expected: n => 'Expected: ' + n, recvBags: 'Receive', retBags: 'Return',
+  wd: 'Early withdrawal', guardian: 'Receiver name (guardian or delegate)', reason: 'Reason', openWd: 'Open withdrawal', openNow: 'Withdrawal open',
+  closeWd: 'Close withdrawal', cancelWd: 'Cancel request', needBack: 'Withdrawal closes after returning:', phoneBack: 'Phone', bagsBack: n => n + ' bag(s)', allBack: '✓ Everything returned',
+  done: 'Done', error: 'Connection problem. Try again.', sessionEnd: 'Session expired. Please log in again.',
+  open: 'Open', closed: 'Closed', cancelled: 'Cancelled', noWd: 'No withdrawal requests.', recvBy: 'Receiver',
+  sPhones: 'Phones in custody', sBags: 'Bags in custody', sOpen: 'Open withdrawals', sClosed: 'Completed withdrawals', holders: 'Holding items', noHolders: 'Nothing in custody.', confirmClose: 'Confirm closing the withdrawal?', confirmCancel: 'Cancel the withdrawal request?',
+  codes: { ALREADY_HELD: 'Phone already received', NOT_HELD: 'No phone received for this student', EXCEEDS_HELD: 'More than was received', ALREADY_OPEN: 'An open withdrawal already exists', ALREADY_WITHDRAWN: 'Student already withdrawn', ITEMS_NOT_RETURNED: 'Cannot close before the phone and bags are returned', NOT_FOUND: 'Student not found', NOT_OPEN: 'Request is not open' } }
+};
+const st = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), tab: 'handover', q: '', results: [], cur: null, bagN: 1, tag: '', guardian: '', reason: '', msg: null, cam: false, sum: null, wds: [] };
+const L = () => T[st.lang];
+
+async function api(payload) {
+  const r = await (await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(Object.assign({ token: token }, payload)) })).json();
+  if (r && r.code && AUTH_ERR.test(r.code)) { st.msg = { cls: 'bad', t: L().sessionEnd }; render(); setTimeout(() => { sessionStorage.clear(); location.href = 'login.html'; }, 1500); throw new Error('auth'); }
+  return r;
+}
+const say = (cls, t) => { st.msg = { cls: cls, t: t }; };
+const errText = r => (r && L().codes[r.code]) || (r && r.error) || L().error;
+
+/* ---------- actions ---------- */
+let qTimer = null;
+function onQ(v) {
+  st.q = v; clearTimeout(qTimer);
+  if (v.trim().length < 1) { st.results = []; return renderResults(); }
+  qTimer = setTimeout(async () => { try { const r = await api({ action: 'custodyFind', q: v.trim() }); if (r.success && st.q === v) { st.results = r.results; renderResults(); } } catch (e) {} }, 300);
+}
+function pick(id) {
+  const s = st.results.find(x => x.id === id) || (st.cur && st.cur.id === id ? st.cur : null); if (!s) return;
+  st.cur = s; st.bagN = Math.max(1, s.bags || s.bagsExpected || 1); st.tag = ''; st.guardian = ''; st.reason = ''; st.msg = null; render();
+}
+async function identify(text) {
+  const m = String(text || '').trim().match(/^MKH:(.+)$/i); const id = m ? m[1].trim() : String(text || '').trim();
+  try { const r = await api({ action: 'custodyFind', q: id }); const hit = r.success && r.results.find(x => x.id === id); if (hit) { st.results = [hit]; pick(id); } else { say('bad', L().codes.NOT_FOUND); render(); } } catch (e) {}
+}
+window.__onScanText = identify;
+async function act(body, okMsg) {
+  try {
+    const r = await api(body);
+    if (r.success) { if (r.custody) st.cur = r.custody; say('ok', okMsg || L().done); await loadSummary(); }
+    else { if (r.custody) st.cur = r.custody; say('bad', errText(r) + (r.outstanding ? '' : '')); }
+  } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
+  render();
+}
+const record = (item, op) => act({ action: 'custodyRecord', studentId: st.cur.id, item: item, op: op, count: item === 'bags' ? st.bagN : 1, tag: item === 'phone' && op === 'receive' ? st.tag : '', clientId: uid() });
+async function openWd() { await act({ action: 'withdrawStart', studentId: st.cur.id, guardian: st.guardian, reason: st.reason, clientId: uid() }); await refreshCur(); }
+async function refreshCur() { if (!st.cur) return; try { const r = await api({ action: 'custodyFind', q: st.cur.id }); const h = r.success && r.results.find(x => x.id === st.cur.id); if (h) st.cur = h; } catch (e) {} render(); }
+async function closeWd(id) {
+  if (!confirm(L().confirmClose)) return;
+  try {
+    const r = await api({ action: 'withdrawClose', id: id });
+    if (r.success) { say('ok', L().done); st.cur = null; } else say('bad', errText(r));
+  } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
+  await loadSummary(); await loadWds(); render();
+}
+async function cancelWd(id) {
+  if (!confirm(L().confirmCancel)) return;
+  try { const r = await api({ action: 'withdrawCancel', id: id }); say(r.success ? 'ok' : 'bad', r.success ? L().done : errText(r)); } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
+  await loadSummary(); await loadWds(); await refreshCur();
+}
+async function loadSummary() { try { const r = await api({ action: 'custodySummary' }); if (r.success) st.sum = r; } catch (e) {} }
+async function loadWds() { try { const r = await api({ action: 'withdrawList' }); if (r.success) st.wds = r.withdrawals; } catch (e) {} }
+function setTab(t) { st.tab = t; st.msg = null; if (st.cam) stopCam(); if (t === 'summary') loadSummary().then(render); if (t === 'withdraw') loadWds().then(render); render(); }
+
+/* ---------- camera ---------- */
+let scanner = null;
+async function startCam() {
+  if (typeof Html5Qrcode === 'undefined') { say('warn', L().noCam); return render(); }
+  try { scanner = new Html5Qrcode('reader'); st.cam = true; render(); await scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: 220 }, text => { stopCam(); identify(text); }, () => {}); }
+  catch (e) { st.cam = false; say('warn', L().noCam); render(); }
+}
+async function stopCam() { try { if (scanner) { await scanner.stop(); scanner.clear(); } } catch (e) {} scanner = null; st.cam = false; render(); }
+
+/* ---------- views ---------- */
+function resultsHtml() {
+  const l = L();
+  if (!st.q.trim()) return '';
+  if (!st.results.length) return `<div class="muted" style="padding:8px">${l.none}</div>`;
+  return st.results.map(s => `<button class="res" data-pick="${esc(s.id)}"><b>${esc(s.name)}</b><span class="muted"> · ${esc(s.id)} · ${esc(s.team)} · ${l.bus(esc(s.bus))}</span></button>`).join('');
+}
+function renderResults() { const e = $('qres'); if (e) e.innerHTML = resultsHtml(); }
+
+function studentCard() {
+  const l = L(), c = st.cur; if (!c) return '';
+  const w = c.withdrawal;
+  const wdBlock = w
+    ? `<div class="item" style="margin-top:10px"><div style="display:flex;justify-content:space-between;align-items:center"><b>${l.openNow}</b><span class="pill warn">${l.open}</span></div>
+       <div class="muted" style="margin:6px 0">${l.recvBy}: ${esc(w.guardian)} · ${esc(w.reason)}</div>
+       <div style="margin:6px 0"><div class="kl">${l.needBack}</div>
+         ${c.phone || c.bags > 0 ? `${c.phone ? `<div class="chk">☐ ${l.phoneBack}${c.phoneTag ? ' (' + esc(c.phoneTag) + ')' : ''}</div>` : ''}${c.bags > 0 ? `<div class="chk">☐ ${l.bagsBack(c.bags)}</div>` : ''}` : `<div class="chk" style="color:var(--ok)">${l.allBack}</div>`}</div>
+       <div class="two"><button class="btn" data-closewd="${esc(w.id)}" ${c.phone || c.bags > 0 ? 'disabled style="opacity:.5"' : ''}>${l.closeWd}</button><button class="btn alt" data-cancelwd="${esc(w.id)}">${l.cancelWd}</button></div></div>`
+    : `<div class="item" style="margin-top:10px"><b>${l.wd}</b>
+       <label class="lbl" for="g" style="margin-top:8px">${l.guardian}</label><input id="g" type="text" value="${esc(st.guardian)}" maxlength="60" autocomplete="off">
+       <label class="lbl" for="rs" style="margin-top:8px">${l.reason}</label><input id="rs" type="text" value="${esc(st.reason)}" maxlength="200" autocomplete="off">
+       <button class="btn full" style="margin-top:10px" data-openwd="1">${l.openWd}</button></div>`;
+  return `<section class="card">
+    <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div><div class="muted" style="font-size:13px">${esc(c.id)}</div><div class="big2">${esc(c.name)}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><span class="pill">${esc(c.team)}</span><span class="pill">${l.bus(esc(c.bus))}</span></div></div><button class="tool" data-clear="1" aria-label="x">✕</button></div>
+    <div class="item" style="margin-top:12px"><div style="display:flex;justify-content:space-between;align-items:center"><b>${l.phone}</b><span class="pill ${c.phone ? 'warn' : 'ok'}">${c.phone ? l.held + (c.phoneTag ? ' · ' + esc(c.phoneTag) : '') : l.notHeld}</span></div>
+      ${c.phone ? `<button class="btn full" style="margin-top:8px" data-rec="phone:return">${l.retPhone}</button>`
+        : `<input id="tg" type="text" placeholder="${l.tag}" value="${esc(st.tag)}" maxlength="30" style="margin-top:8px" autocomplete="off"><button class="btn full" style="margin-top:8px" data-rec="phone:receive">${l.recvPhone}</button>`}</div>
+    <div class="item" style="margin-top:10px"><div style="display:flex;justify-content:space-between;align-items:center"><b>${l.bags}</b><span class="pill ${c.bags ? 'warn' : ''}">${l.inCustody}: ${c.bags}</span></div>
+      <div class="muted" style="font-size:12.5px;margin-top:2px">${l.expected(c.bagsExpected || 0)}</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:14px;margin:10px 0"><button class="step" data-bagdelta="-1" aria-label="−">−</button><b style="font-size:24px;min-width:30px;text-align:center">${st.bagN}</b><button class="step" data-bagdelta="1" aria-label="+">+</button></div>
+      <div class="two"><button class="btn" data-rec="bags:receive">${l.recvBags}</button><button class="btn alt" data-rec="bags:return" ${c.bags ? '' : 'disabled style="opacity:.5"'}>${l.retBags}</button></div></div>
+    ${wdBlock}</section>`;
+}
+function handoverView() {
+  const l = L();
+  return `<section class="card"><label class="lbl" for="q">${l.search}</label><input id="q" type="search" value="${esc(st.q)}" autocomplete="off">
+    <button class="btn alt full" style="margin-top:8px" data-cam="1">${st.cam ? l.stopScan : l.scan}</button>${st.cam ? '<div id="reader" style="width:100%;margin-top:8px"></div>' : ''}<div id="qres" style="margin-top:6px">${resultsHtml()}</div></section>${studentCard()}`;
+}
+function withdrawView() {
+  const l = L();
+  if (!st.wds.length) return `<div class="card muted">${l.noWd}</div>`;
+  return st.wds.map(w => `<div class="item"><div style="display:flex;justify-content:space-between;align-items:center"><b>${esc(w.name)}</b><span class="pill ${w.status === 'open' ? 'warn' : w.status === 'closed' ? 'ok' : ''}">${l[w.status] || esc(w.status)}</span></div>
+    <div class="muted" style="font-size:13px">${esc(w.studentId)} · ${esc(w.team)} · ${l.bus(esc(w.bus))}</div><div style="margin:6px 0">${l.recvBy}: ${esc(w.guardian)} · ${esc(w.reason)}</div>
+    ${w.status === 'open' ? `<div class="two"><button class="btn" data-closewd="${esc(w.id)}" ${w.outstanding.phone || w.outstanding.bags ? 'disabled style="opacity:.5"' : ''}>${l.closeWd}</button><button class="btn alt" data-cancelwd="${esc(w.id)}">${l.cancelWd}</button></div>` : ''}</div>`).join('');
+}
+function summaryView() {
+  const l = L(), s = st.sum; if (!s) return `<div class="card muted">...</div>`;
+  const k = (lab, v) => `<div class="card"><div class="kl">${lab}</div><div class="kv">${v}</div></div>`;
+  return `<div class="kpis">${k(l.sPhones, s.phones)}${k(l.sBags, s.bags)}${k(l.sOpen, s.withdrawalsOpen)}${k(l.sClosed, s.withdrawalsClosed)}</div>
+   <section class="card"><h2 class="h2" style="margin-bottom:8px">${l.holders}</h2>${(s.holders || []).length ? s.holders.map(h => `<div class="row"><span><b>${esc(h.name)}</b> · ${esc(h.team)} · ${l.bus(esc(h.bus))}</span><span>${h.phone ? '📱 ' + esc(h.phoneTag) + ' ' : ''}${h.bags ? '🧳 ' + h.bags : ''}</span></div>`).join('') : `<div class="muted">${l.noHolders}</div>`}</section>`;
+}
+function render() {
+  const l = L(); document.documentElement.lang = st.lang; document.documentElement.dir = l.dir; document.documentElement.dataset.theme = st.theme; document.title = l.title + ' — MUKHAYYAM';
+  $('hT').textContent = l.title; $('hS').textContent = l.sub; $('homeBtn').textContent = l.home; $('langBtn').textContent = l.lang; $('themeBtn').textContent = st.theme === 'light' ? l.dark : l.light;
+  const keepQ = document.activeElement && document.activeElement.id === 'q';
+  $('app').innerHTML = `${st.msg ? `<div class="banner ${st.msg.cls}" role="alert">${esc(st.msg.t)}</div>` : ''}
+   <div class="tabs">${[['handover', l.tHandover], ['withdraw', l.tWithdraw], ['summary', l.tSummary]].map(t => `<button class="${st.tab === t[0] ? 'on' : ''}" data-tab="${t[0]}">${t[1]}</button>`).join('')}</div>
+   ${st.tab === 'handover' ? handoverView() : st.tab === 'withdraw' ? withdrawView() : summaryView()}`;
+  if (keepQ) { const q = $('q'); q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
+}
+document.addEventListener('input', e => {
+  if (e.target.id === 'q') onQ(e.target.value); else if (e.target.id === 'tg') st.tag = e.target.value; else if (e.target.id === 'g') st.guardian = e.target.value; else if (e.target.id === 'rs') st.reason = e.target.value;
+});
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('button'); if (!b) return; const d = b.dataset;
+  if (d.tab) setTab(d.tab);
+  else if (d.pick) pick(d.pick);
+  else if (d.clear) { st.cur = null; st.msg = null; render(); }
+  else if (d.cam) { st.cam ? stopCam() : startCam(); }
+  else if (d.bagdelta) { st.bagN = Math.min(20, Math.max(1, st.bagN + Number(d.bagdelta))); render(); }
+  else if (d.rec) { const p = d.rec.split(':'); record(p[0], p[1]); }
+  else if (d.openwd) openWd();
+  else if (d.closewd) closeWd(d.closewd);
+  else if (d.cancelwd) cancelWd(d.cancelwd);
+});
+$('langBtn').onclick = () => { st.lang = st.lang === 'ar' ? 'en' : 'ar'; pref.set('lang', st.lang); render(); };
+$('themeBtn').onclick = () => { st.theme = st.theme === 'light' ? 'dark' : 'light'; pref.set('theme', st.theme); render(); };
+render(); loadSummary();
+</script>
+</body></html>

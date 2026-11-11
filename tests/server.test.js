@@ -17,7 +17,7 @@ const ctx={console,Logger:{log:()=>{}},Date,
   computeDigest:(a,seed)=>[...crypto.createHash('sha256').update(seed).digest()],DigestAlgorithm:{SHA_256:1},getUuid:()=>crypto.randomUUID(),
   formatDate:(d,tz,f)=>{const x=new Date(d.getTime()+4*3600e3);return String(x.getUTCHours()).padStart(2,'0')+':'+String(x.getUTCMinutes()).padStart(2,'0')}}};
 vm.createContext(ctx);
-vm.runInContext(fs.readFileSync(__dirname+'/../server/Auth.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Code.gs','utf8'),ctx);
+vm.runInContext(fs.readFileSync(__dirname+'/../server/Auth.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Code.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Custody.gs','utf8'),ctx);
 const U=['Username','PasswordHash','Salt','FullName','Role','AssignedBus','Active','FailedAttempts','LockedUntil','TokenEpoch','LastActivityAt','CreatedAt','LastLogin'];
 book.Users=mkSheet([U]);book.Settings=mkSheet([['Key','Value']]);book.AuditLog=mkSheet([['Timestamp','ActorUsername','Action','TargetUsername','Details']]);
 // student sheet: reordered columns, includes Photo URL + Contact number which must never leak
@@ -113,6 +113,40 @@ r=post({action:'printList',token:t1});assert(!r.success,'supervisor cannot print
 r=post({action:'printList',token:T});assert(r.success&&r.students.length===4&&!JSON.stringify(r).includes('9999000'),'admin print list (no phones)');
 post({action:'createUser',token:T,username:'prt',password:'p5',fullName:'طباعة',role:'supervisor',permissions:['print'],committees:[]});
 const tp=post({action:'login',username:'prt',password:'p5'}).token;r=post({action:'printList',token:tp});assert(r.success,'print permission works');
+// ---- custody + withdrawal
+post({action:'createUser',token:T,username:'sec',password:'p6',fullName:'أمانات',role:'supervisor',permissions:['custody'],committees:[]});
+const ts=post({action:'login',username:'sec',password:'p6'}).token;
+r=post({action:'custodyFind',token:t1,q:'1001'});assert(!r.success,'supervisor cannot use custody');
+r=post({action:'custodyFind',token:ts,q:'سعيد'});assert(r.success&&r.results.length===1&&r.results[0].id==='2001'&&!JSON.stringify(r).includes('9999000'),'custody search across buses, no phones');
+r=post({action:'custodyRecord',token:ts,studentId:'1001',item:'phone',op:'receive',tag:'S-12',clientId:'m1'});assert(r.success&&r.custody.phone===true&&r.custody.phoneTag==='S-12','phone received');
+r=post({action:'custodyRecord',token:ts,studentId:'1001',item:'phone',op:'receive',clientId:'m2'});assert(!r.success&&r.code==='ALREADY_HELD','phone cannot be received twice');
+r=post({action:'custodyRecord',token:ts,studentId:'1001',item:'phone',op:'receive',tag:'S-12',clientId:'m1'});assert(r.repeated,'phone receive retry idempotent');
+r=post({action:'custodyRecord',token:ts,studentId:'1001',item:'bags',op:'receive',count:3,clientId:'m3'});assert(r.success&&r.custody.bags===3,'3 bags received');
+r=post({action:'custodyRecord',token:ts,studentId:'1001',item:'bags',op:'return',count:5});assert(!r.success&&r.code==='EXCEEDS_HELD','cannot return more bags than held');
+r=post({action:'custodyRecord',token:ts,studentId:'2001',item:'phone',op:'return'});assert(!r.success&&r.code==='NOT_HELD','cannot return a phone never received');
+r=post({action:'custodyRecord',token:ts,studentId:'1001',item:'bags',op:'receive',count:99});assert(!r.success,'absurd bag count rejected');
+r=post({action:'custodySummary',token:ts});assert(r.success&&r.phones===1&&r.bags===3&&r.holders.length===1&&r.holders[0].name==='أحمد','custody summary with holders');
+r=post({action:'custodySummary',token:tl});assert(r.success&&r.phones===1&&!r.holders,'leader sees totals only (no holder names)');
+r=post({action:'withdrawStart',token:ts,studentId:'1001',guardian:'أبو أحمد',reason:'ظرف عائلي',clientId:'w1'});assert(r.success&&r.id,'withdrawal opened');
+const wid=r.id;
+r=post({action:'withdrawStart',token:ts,studentId:'1001',guardian:'أبو أحمد',reason:'ظرف عائلي',clientId:'w1'});assert(r.repeated&&r.id===wid,'withdrawal open retry idempotent');
+r=post({action:'withdrawStart',token:ts,studentId:'1001',guardian:'آخر',reason:'سبب'});assert(!r.success&&r.code==='ALREADY_OPEN','second open withdrawal refused');
+r=post({action:'withdrawStart',token:ts,studentId:'1002',guardian:'x',reason:'سبب'});assert(!r.success,'guardian name required');
+r=post({action:'leaderSummary',token:tl});assert(r.alerts.some(a=>a.type==='withdraw_open'&&a.count===1),'alert: open withdrawal');
+r=post({action:'withdrawClose',token:ts,id:wid});assert(!r.success&&r.code==='ITEMS_NOT_RETURNED'&&r.outstanding.phone===true&&r.outstanding.bags===3,'cannot close while phone and bags are held');
+r=post({action:'custodyRecord',token:ts,studentId:'1001',item:'phone',op:'return'});assert(r.success&&r.custody.phone===false,'phone returned');
+r=post({action:'withdrawClose',token:ts,id:wid});assert(!r.success&&r.outstanding.bags===3&&r.outstanding.phone===false,'still blocked while bags are held');
+r=post({action:'custodyRecord',token:ts,studentId:'1001',item:'bags',op:'return',count:3});assert(r.success&&r.custody.bags===0,'bags returned');
+r=post({action:'withdrawClose',token:t1,id:wid});assert(!r.success,'supervisor cannot close a withdrawal');
+r=post({action:'withdrawClose',token:ts,id:wid});assert(r.success,'withdrawal closes once everything is returned');
+r=post({action:'scan',token:T,studentId:'1001',op:'board'});assert(!r.success&&r.code==='WITHDRAWN','withdrawn student cannot board again');
+r=post({action:'withdrawClose',token:ts,id:wid});assert(!r.success&&r.code==='NOT_OPEN','closed withdrawal cannot be closed again');
+r=post({action:'withdrawList',token:ts});assert(r.success&&r.withdrawals[0].status==='closed'&&r.withdrawals[0].guardian==='أبو أحمد','withdrawal list');
+r=post({action:'withdrawStart',token:ts,studentId:'1001',guardian:'نفس',reason:'سبب'});assert(!r.success&&r.code==='ALREADY_WITHDRAWN','already-withdrawn student refused');
+r=post({action:'withdrawStart',token:ts,studentId:'1002',guardian:'أبو سالم',reason:'سبب آخر'});const w2=r.id;
+r=post({action:'withdrawCancel',token:ts,id:w2});assert(r.success,'withdrawal cancelled');
+r=post({action:'withdrawClose',token:ts,id:w2});assert(!r.success&&r.code==='NOT_OPEN','cancelled withdrawal cannot close');
+assert(book.AuditLog.rows.some(x=>x[2]==='WITHDRAW_CLOSED'),'audit: withdrawal closed');
 // ---- sheet check
 r=post({action:'checkStudentSheet',token:T});assert(r.success&&r.report.ok&&r.report.total===4,'student sheet check passes');
 console.log(fails?`\n${fails} FAILED`:'\nALL PASSED');

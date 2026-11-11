@@ -48,7 +48,14 @@ const ACTIONS_ = {
   createCase: function(d) { return handleCreateCase_(d); },
   listCases: function(d) { return handleListCases_(d); },
   updateCase: function(d) { return handleUpdateCase_(d); },
-  history: function(d) { return handleHistory_(d); }
+  history: function(d) { return handleHistory_(d); },
+  custodyFind: function(d) { return handleCustodyFind_(d); },
+  custodyRecord: function(d) { return handleCustodyRecord_(d); },
+  custodySummary: function(d) { return handleCustodySummary_(d); },
+  withdrawStart: function(d) { return handleWithdrawStart_(d); },
+  withdrawClose: function(d) { return handleWithdrawClose_(d); },
+  withdrawCancel: function(d) { return handleWithdrawCancel_(d); },
+  withdrawList: function(d) { return handleWithdrawList_(d); }
 };
 
 function doPost(e) {
@@ -409,6 +416,8 @@ function buildAlerts_(perBus, students, lastByKey) {
   Object.keys(shortBags).forEach(function(b) { alerts.push({ type: 'bags', level: 'warn', bus: b, count: shortBags[b] }); });
   const open = readCases_().filter(function(c) { return c.status === 'open'; }).length;
   if (open) alerts.push({ type: 'cases_open', level: 'warn', count: open });
+  const wOpen = readWithdrawals_().filter(function(w) { return w.status === 'open'; }).length;
+  if (wOpen) alerts.push({ type: 'withdraw_open', level: 'warn', count: wOpen });
   const rank = { bad: 0, warn: 1, info: 2 };
   alerts.sort(function(a, b) { return rank[a.level] - rank[b.level]; });
   return alerts;
