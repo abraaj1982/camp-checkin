@@ -729,6 +729,13 @@ if (!mukhayyamToken) {
   window.location.href = 'login.html';
 }
 
+// Only people with the check-in permission may use this screen (the server enforces it too).
+let mukhayyamPermissions = [];
+try { mukhayyamPermissions = JSON.parse(sessionStorage.getItem('mukhayyam_permissions') || '[]'); } catch (e) {}
+if (mukhayyamToken && mukhayyamPermissions.indexOf('*') === -1 && mukhayyamPermissions.indexOf('checkin') === -1) {
+  window.location.href = 'hub.html';
+}
+
 let html5QrcodeScanner = null;
 let currentStudent = null;
 let cameraStarted = false;

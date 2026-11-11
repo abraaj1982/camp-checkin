@@ -131,8 +131,13 @@ form.addEventListener('submit', async (e) => {
       sessionStorage.setItem('mukhayyam_fullName', data.fullName || '');
       sessionStorage.setItem('mukhayyam_role', data.role || '');
       sessionStorage.setItem('mukhayyam_assignedBus', data.assignedBus || '');
+      sessionStorage.setItem('mukhayyam_permissions', JSON.stringify(data.permissions || []));
+      sessionStorage.setItem('mukhayyam_committees', JSON.stringify(data.committees || []));
       setMsg('تم الدخول بنجاح، جاري التحويل...', 'ok');
-      const destination = (data.role === 'supervisor') ? 'supervisor_app_professional.html' : 'hub.html';
+      // Someone whose ONLY screen is check-in goes straight to it; everyone else gets the home page.
+      const perms = data.permissions || [];
+      const onlyCheckin = perms.length === 1 && perms[0] === 'checkin';
+      const destination = onlyCheckin ? 'supervisor_app_professional.html' : 'hub.html';
       setTimeout(() => { window.location.href = destination; }, 500);
     } else {
       setMsg(data.error || 'خطأ غير معروف', 'error');
