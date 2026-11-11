@@ -641,6 +641,8 @@ function SETUP_createTabs() {
   ensureSheetWithHeaders_(ss, 'Bags', ['Time', 'StudentID', 'Bus', 'Mode', 'Count', 'Expected', 'Supervisor', 'ClientId'], log);
   ensureSheetWithHeaders_(ss, 'BusLive', ['Bus', 'Status', 'Lat', 'Lng', 'Accuracy', 'UpdatedAt', 'Supervisor', 'Boarded', 'Total'], log);
 
+  ensureSheetWithHeaders_(ss, 'Cases', ['Id', 'Time', 'Type', 'Bus', 'StudentID', 'Text', 'Status', 'CreatedBy', 'UpdatedBy', 'ClientId'], log);
+
   const msg = log.join('\n');
   Logger.log(msg);
   return msg;

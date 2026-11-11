@@ -80,6 +80,31 @@ r=post({action:'bag',token:t1,studentId:'1001',mode:'load',count:99});assert(!r.
 // ---- leader summary
 r=post({action:'leaderSummary',token:tl});assert(r.success&&r.total===4&&r.boarded===2&&r.perBus.length===2&&r.bags.loaded===2,'leader summary numbers');
 r=post({action:'leaderSummary',token:t1});assert(!r.success,'supervisor cannot read leader summary');
+// ---- alerts
+r=post({action:'leaderSummary',token:tl});
+assert(r.alerts.some(a=>a.type==='missing'&&a.bus==='1'&&a.missing===1&&a.level==='bad'),'alert: departed bus with missing students');
+assert(r.alerts.some(a=>a.type==='no_report'&&a.bus==='2'),'alert: bus that never reported');
+assert(!r.alerts.some(a=>a.type==='stale'),'no stale alert for fresh location');
+book.BusLive.rows[1][5]=new Date(Date.now()-10*60e3);
+r=post({action:'leaderSummary',token:tl});assert(r.alerts.some(a=>a.type==='stale'&&a.bus==='1'&&a.ageSec>=590),'alert: location older than 5 minutes');
+// ---- cases
+r=post({action:'createCase',token:t1,type:'bus',text:'عطل في المكيف',bus:'2',clientId:'k1'});assert(r.success&&r.id,'supervisor raises a case');
+assert(book.Cases.rows[1][3]==='1','case bus forced to the supervisor\'s own bus');
+r=post({action:'createCase',token:t1,type:'bus',text:'عطل في المكيف',clientId:'k1'});assert(r.repeated&&book.Cases.rows.length===2,'case retry idempotent');
+r=post({action:'createCase',token:t1,type:'hack',text:'abc'});assert(!r.success,'invalid case type rejected');
+r=post({action:'createCase',token:t1,type:'other',text:'x'});assert(!r.success,'too-short case rejected');
+r=post({action:'listCases',token:t1});assert(!r.success,'supervisor cannot list cases');
+r=post({action:'listCases',token:tl});assert(r.success&&r.cases.length===1&&r.cases[0].status==='open','leader lists cases');
+r=post({action:'leaderSummary',token:tl});assert(r.alerts.some(a=>a.type==='cases_open'&&a.count===1),'alert: open cases');
+const cid=book.Cases.rows[1][0];
+r=post({action:'updateCase',token:t1,id:cid,status:'closed'});assert(!r.success,'supervisor cannot close cases');
+r=post({action:'updateCase',token:tl,id:cid,status:'ack'});assert(r.success&&book.Cases.rows[1][6]==='ack','leader acknowledges case');
+r=post({action:'updateCase',token:tl,id:cid,status:'bogus'});assert(!r.success,'invalid case status rejected');
+// ---- student history
+r=post({action:'history',token:tl,studentId:'1001'});assert(r.success&&r.events.length>=2&&r.events.some(e=>e.kind==='bags_load'),'history shows scans and bags');
+assert(!JSON.stringify(r).includes('9999000'),'history has no phone numbers');
+r=post({action:'history',token:t1,studentId:'1001'});assert(!r.success,'supervisor cannot read history');
+r=post({action:'history',token:tl,studentId:'nope'});assert(!r.success&&r.code==='NOT_FOUND','history: unknown student');
 // ---- allbuses permission
 post({action:'updateUserAccess',token:T,targetUsername:'sup1',permissions:['checkin','allbuses'],committees:[]});
 r=post({action:'scan',token:t1,studentId:'2002',op:'board'});assert(r.success,'allbuses can record any bus');

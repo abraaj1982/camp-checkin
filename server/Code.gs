@@ -44,7 +44,11 @@ const ACTIONS_ = {
   bag: function(d) { return handleBag_(d); },
   busLive: function(d) { return handleBusLive_(d); },
   leaderSummary: function(d) { return handleLeaderSummary_(d); },
-  printList: function(d) { return handlePrintList_(d); }
+  printList: function(d) { return handlePrintList_(d); },
+  createCase: function(d) { return handleCreateCase_(d); },
+  listCases: function(d) { return handleListCases_(d); },
+  updateCase: function(d) { return handleUpdateCase_(d); },
+  history: function(d) { return handleHistory_(d); }
 };
 
 function doPost(e) {
@@ -373,7 +377,131 @@ function handleLeaderSummary_(data) {
     const lastByKey = {};
     for (let r = 1; r < bvals.length; r++) lastByKey[bvals[r][bh.indexOf('StudentID')] + '|' + bvals[r][bh.indexOf('Mode')]] = Number(bvals[r][bh.indexOf('Count')]) || 0;
     Object.keys(lastByKey).forEach(function(k) { if (k.split('|')[1] === 'load') loaded += lastByKey[k]; else unloaded += lastByKey[k]; });
-    return { success: true, total: total, boarded: boarded, withdrawn: withdrawn, perBus: perBus, bags: { loaded: loaded, unloaded: unloaded } };
+    return { success: true, total: total, boarded: boarded, withdrawn: withdrawn, perBus: perBus, bags: { loaded: loaded, unloaded: unloaded },
+      alerts: buildAlerts_(perBus, students, lastByKey) };
+  });
+}
+
+// ---------------- Smart alerts (rules only, computed on the server) ----------------
+const STALE_SEC = 300;
+function buildAlerts_(perBus, students, lastByKey) {
+  const alerts = [];
+  const live = {};
+  const lv = busLiveSheet_().getDataRange().getValues();
+  const h = lv[0], now = Date.now();
+  for (let r = 1; r < lv.length; r++) {
+    const b = String(lv[r][h.indexOf('Bus')]); if (!b) continue;
+    const u = lv[r][h.indexOf('UpdatedAt')];
+    const t = u instanceof Date ? u.getTime() : new Date(u).getTime();
+    live[b] = { status: String(lv[r][h.indexOf('Status')]), ageSec: Math.max(0, Math.round((now - t) / 1000)) };
+  }
+  perBus.forEach(function(p) {
+    const l = live[p.bus];
+    if (!l) { alerts.push({ type: 'no_report', level: 'info', bus: p.bus }); return; }
+    if (l.status !== 'arrived' && l.ageSec > STALE_SEC) alerts.push({ type: 'stale', level: 'warn', bus: p.bus, ageSec: l.ageSec });
+    if ((l.status === 'departed' || l.status === 'onway' || l.status === 'arrived') && p.missing > 0) alerts.push({ type: 'missing', level: 'bad', bus: p.bus, missing: p.missing });
+  });
+  const shortBags = {};
+  students.forEach(function(s) {
+    const c = lastByKey[s.id + '|load'];
+    if (s.bags > 0 && c !== undefined && c < s.bags) shortBags[s.bus] = (shortBags[s.bus] || 0) + 1;
+  });
+  Object.keys(shortBags).forEach(function(b) { alerts.push({ type: 'bags', level: 'warn', bus: b, count: shortBags[b] }); });
+  const open = readCases_().filter(function(c) { return c.status === 'open'; }).length;
+  if (open) alerts.push({ type: 'cases_open', level: 'warn', count: open });
+  const rank = { bad: 0, warn: 1, info: 2 };
+  alerts.sort(function(a, b) { return rank[a.level] - rank[b.level]; });
+  return alerts;
+}
+
+// ---------------- Cases (raise an issue to the administration) ----------------
+const CASE_TYPES = ['student', 'bus', 'lost', 'other'];
+function casesSheet_() { return getSheetByName_('Cases'); }
+function readCases_() {
+  const v = casesSheet_().getDataRange().getValues();
+  const h = v[0], out = [];
+  for (let r = 1; r < v.length; r++) {
+    const g = function(n) { return v[r][h.indexOf(n)]; };
+    if (!g('Id')) continue;
+    out.push({ id: String(g('Id')), time: g('Time') instanceof Date ? g('Time').toISOString() : String(g('Time')), type: g('Type'), bus: String(g('Bus')), studentId: String(g('StudentID')),
+      text: String(g('Text')), status: String(g('Status')), by: String(g('CreatedBy')), updatedBy: String(g('UpdatedBy')) });
+  }
+  return out;
+}
+function handleCreateCase_(data) {
+  return withAuth_(data, requireAnyPerm_(['checkin', 'dashboard', 'manage']), function(user) {
+    const type = String(data.type || 'other');
+    if (CASE_TYPES.indexOf(type) === -1) return { success: false, error: 'Invalid type' };
+    const text = String(data.text || '').trim().slice(0, 300);
+    if (text.length < 3) return { success: false, error: 'اكتب وصفاً مختصراً' };
+    const clientId = String(data.clientId || '').slice(0, 60);
+    let bus = String(data.bus || '').slice(0, 10);
+    if (!hasPerm_(user, 'allbuses') && hasPerm_(user, 'checkin')) bus = String(user.AssignedBus || '');
+    const lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    try {
+      const sheet = casesSheet_();
+      const v = sheet.getDataRange().getValues(), h = v[0];
+      if (clientId) for (let r = 1; r < v.length; r++) if (String(v[r][h.indexOf('ClientId')]) === clientId) return { success: true, repeated: true, id: String(v[r][h.indexOf('Id')]) };
+      const id = 'C' + Date.now().toString(36).toUpperCase();
+      sheet.appendRow([id, new Date(), type, bus, String(data.studentId || '').slice(0, 40), text, 'open', user.Username, '', clientId]);
+      writeAudit_(user.Username, 'CASE_CREATED', id, type);
+      return { success: true, id: id };
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+function handleListCases_(data) {
+  return withAuth_(data, requireAnyPerm_(['dashboard', 'stats', 'manage']), function() {
+    const rank = { open: 0, ack: 1, closed: 2 };
+    const list = readCases_().sort(function(a, b) { return (rank[a.status] - rank[b.status]) || (a.time < b.time ? 1 : -1); }).slice(0, 100);
+    return { success: true, cases: list };
+  });
+}
+function handleUpdateCase_(data) {
+  return withAuth_(data, requireAnyPerm_(['dashboard', 'manage']), function(user) {
+    const status = String(data.status);
+    if (['ack', 'closed'].indexOf(status) === -1) return { success: false, error: 'Invalid status' };
+    const lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    try {
+      const sheet = casesSheet_();
+      const v = sheet.getDataRange().getValues(), h = v[0];
+      for (let r = 1; r < v.length; r++) {
+        if (String(v[r][h.indexOf('Id')]) === String(data.id)) {
+          sheet.getRange(r + 1, h.indexOf('Status') + 1).setValue(status);
+          sheet.getRange(r + 1, h.indexOf('UpdatedBy') + 1).setValue(user.Username);
+          writeAudit_(user.Username, 'CASE_' + status.toUpperCase(), String(data.id), '');
+          return { success: true };
+        }
+      }
+      return { success: false, error: 'غير موجود' };
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+
+// ---------------- Student movement history (no phone numbers) ----------------
+function handleHistory_(data) {
+  return withAuth_(data, requireAnyPerm_(['manage', 'dashboard']), function(user) {
+    const st = findStudent_(data.studentId);
+    if (!st) return { success: false, code: 'NOT_FOUND', error: 'الطالب غير موجود' };
+    const events = [];
+    const sv = scansSheet_().getDataRange().getValues(), sh = sv[0];
+    for (let r = 1; r < sv.length; r++) if (String(sv[r][sh.indexOf('StudentID')]) === st.id) {
+      const t = sv[r][sh.indexOf('Time')];
+      events.push({ time: t instanceof Date ? t.toISOString() : String(t), kind: String(sv[r][sh.indexOf('Action')]), bus: String(sv[r][sh.indexOf('Bus')]), by: String(sv[r][sh.indexOf('Supervisor')]), method: String(sv[r][sh.indexOf('Method')]) });
+    }
+    const bv = bagsSheet_().getDataRange().getValues(), bh = bv[0];
+    for (let r = 1; r < bv.length; r++) if (String(bv[r][bh.indexOf('StudentID')]) === st.id) {
+      const t = bv[r][bh.indexOf('Time')];
+      events.push({ time: t instanceof Date ? t.toISOString() : String(t), kind: 'bags_' + bv[r][bh.indexOf('Mode')], bus: String(bv[r][bh.indexOf('Bus')]), by: String(bv[r][bh.indexOf('Supervisor')]), count: Number(bv[r][bh.indexOf('Count')]) });
+    }
+    events.sort(function(a, b) { return a.time < b.time ? -1 : 1; });
+    writeAudit_(user.Username, 'VIEW_HISTORY', st.id, '');
+    return { success: true, student: { id: st.id, name: st.name, team: st.team, bus: st.bus }, events: events };
   });
 }
 
