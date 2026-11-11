@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="ar" dir="rtl" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>طباعة الأساور والكشوف — MUKHAYYAM</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<link rel="stylesheet" href="theme.css">
+<style>
+.page{max-width:1000px;margin:0 auto;padding:16px;display:flex;flex-direction:column;gap:14px}
+.ctl{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}
+.ctl label{font-size:13px;font-weight:600;display:block;margin-bottom:4px}
+select,input[type=number]{width:100%;border:1px solid var(--line);border-radius:10px;min-height:44px;padding:0 10px;font-size:15px;background:var(--input);color:var(--ink)}
+.teams{display:flex;flex-wrap:wrap;gap:10px}.tm{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:10px;padding:6px 10px;background:var(--card)}
+.tm input[type=color]{width:34px;height:34px;border:0;padding:0;background:none;cursor:pointer}
+#sheet{background:#fff;color:#000;border:1px solid var(--line);border-radius:12px;padding:10px}
+/* wristband */
+.wb{display:flex;align-items:center;gap:2mm;border:.3mm dashed #888;margin:0 0 2mm;padding:1.5mm 2mm;break-inside:avoid;page-break-inside:avoid;background:#fff;color:#000;overflow:hidden}
+.wb .qr{flex:none;display:flex;align-items:center;justify-content:center}
+.wb .info{flex:1;min-width:0;line-height:1.05}
+.wb .num{font-weight:700;font-family:'IBM Plex Sans Arabic',monospace;letter-spacing:.2mm}
+.wb .bus{font-weight:700}
+.wb .nm{font-size:2.6mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wb .band{flex:none;align-self:stretch;width:9mm;border-radius:1mm;display:flex;align-items:center;justify-content:center;font-size:2.4mm;font-weight:700;color:#fff;text-shadow:0 0 1px #000}
+/* paper list */
+.pl{break-after:page;page-break-after:always;margin-bottom:8mm}
+.pl:last-child{break-after:auto}
+.pl table{width:100%;border-collapse:collapse;font-size:11pt;color:#000}
+.pl th,.pl td{border:.3mm solid #444;padding:1.4mm 2mm;text-align:start}
+.pl th{background:#eee}
+.pl h2{font-size:15pt;margin:0 0 3mm;color:#000}
+.box{width:5mm;height:5mm;border:.4mm solid #000;display:inline-block}
+.qrgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:3mm}
+.qrc{border:.3mm solid #888;padding:2mm;text-align:center;break-inside:avoid;color:#000;font-size:9pt}
+.qrc .q{display:flex;justify-content:center}
+@media print{
+  @page{size:A4;margin:8mm}
+  body{background:#fff}
+  .noprint,.hdr,#netmsg{display:none!important}
+  .page{max-width:none;padding:0}
+  #sheet{border:0;padding:0;border-radius:0}
+}
+</style>
+</head>
+<body>
+<header class="hdr noprint"><div class="logo">م</div><div style="flex:1"><div class="t">طباعة الأساور والكشوف</div><div class="s">للسكرتارية فقط</div></div><a class="tool" href="hub.html" style="text-decoration:none;display:flex;align-items:center">الرئيسية</a></header>
+<div class="page">
+  <section class="card noprint">
+    <div class="ctl">
+      <div><label for="mode">ماذا تريد أن تطبع؟</label><select id="mode"><option value="wb">أساور الطلاب (QR)</option><option value="list">كشف حضور ورقي لكل باص</option><option value="qrs">ورقة QR احتياطية لكل باص</option></select></div>
+      <div><label for="bus">الباص</label><select id="bus"><option value="">كل الباصات</option></select></div>
+      <div class="wbOpt"><label for="w">عرض السوار (مم)</label><input id="w" type="number" min="60" max="300" value="250"></div>
+      <div class="wbOpt"><label for="h">ارتفاع السوار (مم)</label><input id="h" type="number" min="15" max="60" value="25"></div>
+      <div class="wbOpt"><label for="nm">اسم الطالب على السوار</label><select id="nm"><option value="0">لا</option><option value="1">نعم</option></select></div>
+      <div class="wbOpt"><label for="cp">عدد النسخ لكل طالب</label><input id="cp" type="number" min="1" max="3" value="1"></div>
+      <div class="wbOpt"><label for="lim">عينة للتجربة</label><select id="lim"><option value="0">كل الطلاب</option><option value="5">أول 5 فقط (لتجربة المسح)</option></select></div>
+    </div>
+    <div class="wbOpt" style="margin-top:12px"><div style="font-weight:600;font-size:13px;margin-bottom:6px">ألوان الفرق (تظهر على السوار)</div><div class="teams" id="teams"></div></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;align-items:center"><button class="btn" id="printBtn">طباعة</button><span class="muted" id="count"></span></div>
+    <div class="banner warn" style="margin-top:12px">جرّب سواراً واحداً أولاً: اطبعه وامسحه بجوالين مختلفين قبل طباعة الكمية كلها. حجم رمز QR لا يقل عن 20 مم.</div>
+  </section>
+  <section id="netmsg"></section>
+  <section id="sheet" aria-live="polite"></section>
+</div>
+<script>
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4lEBGPNxghwq9UmK0iljI5QdS-8iCvC-K09dDtbZCXGvGZyA4repTE3rFVVRp5zS4yw/exec';
+const token = sessionStorage.getItem('mukhayyam_token');
+let perms = [];
+try { perms = JSON.parse(sessionStorage.getItem('mukhayyam_permissions') || '[]'); } catch (e) {}
+if (!token) location.href = 'login.html';
+else if (perms.indexOf('*') === -1 && perms.indexOf('manage') === -1 && perms.indexOf('print') === -1) location.href = 'hub.html';
+try { document.documentElement.dataset.theme = localStorage.getItem('mk_pref_theme') || 'light'; } catch (e) {}
+const PALETTE = ['#1F6FA8', '#C2455A', '#2E7D4F', '#D4912A', '#7A5C99', '#2A9D8F', '#8D5524', '#555555'];
+const $ = id => document.getElementById(id);
+const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+let ALL = [];
+let colors = {};
+try { colors = JSON.parse(localStorage.getItem('mk_team_colors') || '{}'); } catch (e) {}
+
+function qrInto(el, text, px) {
+  if (typeof QRCode === 'undefined') { el.textContent = text; return; }
+  new QRCode(el, { text: text, width: px, height: px, correctLevel: QRCode.CorrectLevel.M });
+}
+const mm2px = mm => Math.round(mm * 3.78 * 2); // 2x for sharper printing
+
+function colorOf(team) { if (!colors[team]) { const names = Object.keys(colors); colors[team] = PALETTE[names.length % PALETTE.length]; } return colors[team]; }
+function buildTeams() {
+  const teams = Array.from(new Set(ALL.map(s => s.team).filter(Boolean))).sort();
+  teams.forEach(colorOf);
+  $('teams').innerHTML = teams.length ? teams.map(t => `<label class="tm"><input type="color" value="${colors[t]}" data-team="${esc(t)}" aria-label="لون ${esc(t)}"><span>${esc(t)}</span></label>`).join('') : '<span class="muted">لا توجد أسماء فرق في الشيت (عمود Team name).</span>';
+  $('teams').querySelectorAll('input').forEach(i => i.oninput = () => { colors[i.dataset.team] = i.value; try { localStorage.setItem('mk_team_colors', JSON.stringify(colors)); } catch (e) {} draw(); });
+}
+function pick() {
+  let list = ALL.slice();
+  const bus = $('bus').value; if (bus) list = list.filter(s => s.bus === bus);
+  list.sort((a, b) => (Number(a.bus) - Number(b.bus)) || a.team.localeCompare(b.team) || a.id.localeCompare(b.id, undefined, { numeric: true }));
+  const lim = Number($('lim').value); if (lim) list = list.slice(0, lim);
+  return list;
+}
+function draw() {
+  const mode = $('mode').value, list = pick();
+  document.querySelectorAll('.wbOpt').forEach(e => e.style.display = mode === 'wb' ? '' : 'none');
+  $('count').textContent = list.length + ' ' + (mode === 'wb' ? 'سواراً' : 'طالباً');
+  const sheet = $('sheet'); sheet.innerHTML = '';
+  if (!list.length) { sheet.innerHTML = '<div class="muted" style="padding:20px;text-align:center;color:#555">لا يوجد طلاب.</div>'; return; }
+  if (mode === 'wb') {
+    const w = Number($('w').value) || 250, h = Number($('h').value) || 25, showName = $('nm').value === '1', copies = Math.max(1, Math.min(3, Number($('cp').value) || 1));
+    const q = Math.max(20, h - 4); // QR side in mm (>= 20mm)
+    list.forEach(s => { for (let c = 0; c < copies; c++) {
+      const d = document.createElement('div'); d.className = 'wb'; d.style.width = w + 'mm'; d.style.minHeight = h + 'mm';
+      d.innerHTML = `<div class="qr" style="width:${q}mm;height:${q}mm"></div><div class="info"><div class="num" style="font-size:${Math.max(7, q * .38)}mm">${esc(s.id)}</div><div class="bus" style="font-size:${Math.max(5, q * .25)}mm">باص ${esc(s.bus)}</div>${showName ? `<div class="nm">${esc(s.name)}</div>` : ''}</div><div class="band" style="background:${colorOf(s.team)}">${esc((s.team || '').slice(0, 8))}</div>`;
+      sheet.appendChild(d); qrInto(d.querySelector('.qr'), 'MKH:' + s.id, mm2px(q));
+    } });
+  } else {
+    const byBus = {}; list.forEach(s => { (byBus[s.bus] = byBus[s.bus] || []).push(s); });
+    Object.keys(byBus).sort((a, b) => a - b).forEach(bus => {
+      const d = document.createElement('div'); d.className = 'pl';
+      if (mode === 'list') d.innerHTML = `<h2>كشف حضور · باص ${esc(bus)} · ${byBus[bus].length} طالباً</h2><table><thead><tr><th>#</th><th>رقم الطالب</th><th>الاسم</th><th>الفريق</th><th>الصف</th><th>حضر</th></tr></thead><tbody>${byBus[bus].map((s, i) => `<tr><td>${i + 1}</td><td><b>${esc(s.id)}</b></td><td>${esc(s.name)}</td><td>${esc(s.team)}</td><td>${esc(s.cls)}</td><td><span class="box"></span></td></tr>`).join('')}</tbody></table>`;
+      else { d.innerHTML = `<h2>ورقة QR احتياطية · باص ${esc(bus)}</h2><div class="qrgrid">${byBus[bus].map(s => `<div class="qrc"><div class="q" data-id="${esc(s.id)}"></div><b>${esc(s.id)}</b><br>${esc(s.name)}</div>`).join('')}</div>`; }
+      sheet.appendChild(d);
+      d.querySelectorAll('.q').forEach(el => qrInto(el, 'MKH:' + el.dataset.id, 110));
+    });
+  }
+}
+['mode', 'bus', 'w', 'h', 'nm', 'cp', 'lim'].forEach(id => $(id).addEventListener('input', draw));
+$('printBtn').onclick = () => window.print();
+(async function init() {
+  try {
+    const res = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'printList', token: token }) });
+    const r = await res.json();
+    if (!r.success) { if (/EXPIRED|IDLE|REVOKED|SIGNATURE|MALFORMED|NOT_FOUND|DISABLED/.test(r.code || '')) { sessionStorage.clear(); location.href = 'login.html'; return; } $('netmsg').innerHTML = '<div class="banner bad">' + esc(r.error || 'خطأ') + '</div>'; return; }
+    ALL = r.students;
+    const buses = Array.from(new Set(ALL.map(s => s.bus).filter(Boolean))).sort((a, b) => a - b);
+    $('bus').innerHTML = '<option value="">كل الباصات</option>' + buses.map(b => `<option value="${esc(b)}">باص ${esc(b)}</option>`).join('');
+    buildTeams(); draw();
+  } catch (e) { $('netmsg').innerHTML = '<div class="banner warn">تعذّر الاتصال بالخادم.</div>'; }
+})();
+</script>
+</body></html>

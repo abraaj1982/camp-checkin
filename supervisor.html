@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="ar" dir="rtl" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>مشرف الباص — MUKHAYYAM</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.4/html5-qrcode.min.js"></script>
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="hdr">
+    <div class="logo">م</div>
+    <div style="flex:1;min-width:0"><div class="t" id="busTitle">—</div><div class="s" id="supName"></div></div>
+    <button class="tool" id="langBtn" aria-label="Language"></button>
+    <button class="tool" id="themeBtn"></button>
+    <button class="tool" id="logoutBtn"></button>
+  </header>
+  <div id="netbar" class="netbar" hidden></div>
+  <main id="app"></main>
+</div>
+<script>
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4lEBGPNxghwq9UmK0iljI5QdS-8iCvC-K09dDtbZCXGvGZyA4repTE3rFVVRp5zS4yw/exec';
+const LOC_INTERVAL_MS = 20000;
+
+/* ---------- session ---------- */
+const token = sessionStorage.getItem('mukhayyam_token');
+let perms = [];
+try { perms = JSON.parse(sessionStorage.getItem('mukhayyam_permissions') || '[]'); } catch (e) {}
+if (!token || (perms.indexOf('*') === -1 && perms.indexOf('checkin') === -1)) { location.href = token ? 'hub.html' : 'login.html'; }
+const me = { name: sessionStorage.getItem('mukhayyam_fullName') || '', bus: sessionStorage.getItem('mukhayyam_assignedBus') || '' };
+const NS = 'mk_sup_' + (me.name || 'x');
+const store = { get(k, d) { try { const v = localStorage.getItem(NS + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(NS + k, JSON.stringify(v)); } catch (e) {} } };
+const pref = { get(k, d) { try { return localStorage.getItem('mk_pref_' + k) || d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('mk_pref_' + k, v); } catch (e) {} } };
+
+/* ---------- i18n ---------- */
+const I = {
+ ar: { dir: 'rtl', bus: n => 'باص ' + n, sup: n => 'مشرف: ' + n, boarded: 'صعدوا', remaining: n => n > 0 ? 'ناقص ' + n : 'اكتمل الباص', how: 'كيف تريد التعرف على الطالب؟',
+  m_qr: 'السوار', m_face: 'الوجه', m_name: 'الاسم', m_num: 'الرقم', soon: 'قريباً', scanQr: 'وجّه الكاميرا إلى سوار الطالب', startCam: 'تشغيل الكاميرا', stopCam: 'إيقاف الكاميرا', noCam: 'تعذّر تشغيل الكاميرا. استخدم الاسم أو الرقم.',
+  nameLbl: 'اكتب اسم الطالب', numLbl: 'اكتب رقم الطالب', none: 'لا توجد نتيجة', student: 'طالب', team: 'الفريق', cls: 'الصف',
+  board: 'تسجيل الصعود', undo: 'تراجع عن آخر تسجيل', next: 'الطالب التالي', done: 'سُجّل الصعود', undone: 'تم التراجع',
+  dup: t => 'مسجَّل صعوده مسبقاً' + (t ? ' الساعة ' + t : '') + '. لا يُسجَّل مرتين.', other: (b, s) => 'ليس من باصك. هو في باص ' + b + (s ? ' (المشرف: ' + s + ')' : '') + '. يمكنك الاطلاع فقط.', withdrawn: 'الطالب منسحب.', notFound: 'الطالب غير موجود.',
+  otherOffline: 'هذا الطالب ليس في باصك، والبحث في بقية الباصات يحتاج اتصالاً.', bags: 'الأغراض', load: 'تحميل', unload: 'تنزيل', bagCount: 'عدد الحقائب', expected: n => 'المتوقع: ' + n, saveBags: 'تسجيل الأغراض', bagsSaved: 'سُجّلت الأغراض', bagShort: n => 'ينقص ' + n + ' من الحقائب المتوقعة.',
+  missing: 'لم يصعدوا بعد', allIn: 'اكتمل الباص', trip: 'حالة الرحلة', st_boarding: 'الصعود', st_departed: 'انطلق', st_onway: 'في الطريق', st_arrived: 'وصل', shareLoc: 'مشاركة الموقع مع القائد', locOn: 'الموقع يُرسَل', locOff: 'الموقع متوقف', lastSent: t => 'آخر إرسال ' + t,
+  confirmDepart: n => n > 0 ? 'ينقص ' + n + ' طالباً. هل تؤكد الانطلاق؟' : 'اكتمل الباص. تأكيد الانطلاق؟', yes: 'نعم', cancel: 'إلغاء',
+  offline: 'غير متصل. ما تسجّله يُحفظ ويُرسَل تلقائياً.', pending: n => n + ' بانتظار الإرسال', synced: 'تم الإرسال', loading: 'جارٍ التحميل...', logout: 'خروج', lang: 'English', dark: '🌙', light: '☀', err: 'حدث خطأ. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.', paper: 'عند انقطاع الإنترنت يُستخدم الكشف الورقي.' },
+ en: { dir: 'ltr', bus: n => 'Bus ' + n, sup: n => 'Supervisor: ' + n, boarded: 'Boarded', remaining: n => n > 0 ? n + ' remaining' : 'Bus full', how: 'How do you want to identify the student?',
+  m_qr: 'Wristband', m_face: 'Face', m_name: 'Name', m_num: 'Number', soon: 'Soon', scanQr: 'Point the camera at the wristband', startCam: 'Start camera', stopCam: 'Stop camera', noCam: 'Camera unavailable. Use name or number.',
+  nameLbl: "Type the student's name", numLbl: "Type the student's number", none: 'No result', student: 'Student', team: 'Team', cls: 'Grade',
+  board: 'Mark as boarded', undo: 'Undo last record', next: 'Next student', done: 'Boarding recorded', undone: 'Undone',
+  dup: t => 'Already boarded' + (t ? ' at ' + t : '') + '. Cannot be recorded twice.', other: (b, s) => 'Not on your bus. Student is on bus ' + b + (s ? ' (supervisor: ' + s + ')' : '') + '. View only.', withdrawn: 'Student has withdrawn.', notFound: 'Student not found.',
+  otherOffline: 'This student is not on your bus, and searching other buses needs a connection.', bags: 'Belongings', load: 'Loading', unload: 'Unloading', bagCount: 'Number of bags', expected: n => 'Expected: ' + n, saveBags: 'Save belongings', bagsSaved: 'Belongings saved', bagShort: n => n + ' of the expected bags missing.',
+  missing: 'Not boarded yet', allIn: 'Bus full', trip: 'Trip status', st_boarding: 'Boarding', st_departed: 'Departed', st_onway: 'On the way', st_arrived: 'Arrived', shareLoc: 'Share location with the leader', locOn: 'Location is being sent', locOff: 'Location sharing off', lastSent: t => 'Last sent ' + t,
+  confirmDepart: n => n > 0 ? n + ' student(s) missing. Confirm departure?' : 'Bus is full. Confirm departure?', yes: 'Yes', cancel: 'Cancel',
+  offline: 'Offline. What you record is saved and sent automatically.', pending: n => n + ' waiting to send', synced: 'Synced', loading: 'Loading...', logout: 'Log out', lang: 'العربية', dark: '🌙', light: '☀', err: 'Something went wrong. Try again.', sessionEnd: 'Session ended. Please sign in again.', paper: 'Use the paper list if the internet is down.' }
+};
+const st = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), method: 'qr', roster: store.get('roster', null), q: '', remote: [], cur: null, banner: null, last: null, bagMode: 'load', bagN: 0, cam: false, status: store.get('status', 'boarding'), loc: false, lastSent: '', confirm: false, online: navigator.onLine, busy: false };
+const L = () => I[st.lang];
+const $ = id => document.getElementById(id);
+const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2));
+
+/* ---------- API + offline queue ---------- */
+async function api(payload) {
+  const res = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(Object.assign({ token: token }, payload)) });
+  return res.json();
+}
+const AUTH_ERR = /EXPIRED|IDLE_TIMEOUT|REVOKED|BAD_SIGNATURE|MALFORMED|USER_NOT_FOUND|ACCOUNT_DISABLED|BAD_PAYLOAD/;
+let queue = store.get('queue', []);
+const saveQueue = () => store.set('queue', queue);
+let flushing = false;
+async function flush() {
+  if (flushing || !queue.length || !navigator.onLine) return;
+  flushing = true;
+  try {
+    while (queue.length) {
+      const op = queue[0];
+      let r;
+      try { r = await api(op.body); } catch (e) { break; } // network problem: keep the queue, retry later
+      if (r && r.code && AUTH_ERR.test(r.code)) { st.banner = { cls: 'bad', msg: L().sessionEnd }; render(); setTimeout(() => { sessionStorage.clear(); location.href = 'login.html'; }, 1500); break; }
+      queue.shift(); saveQueue();
+      applyServerResult(op, r);
+    }
+  } finally { flushing = false; }
+  await refreshRoster(true);
+  render();
+}
+function applyServerResult(op, r) {
+  if (!r) return;
+  if (op.kind === 'scan' && !r.success && (r.code === 'OTHER_BUS' || r.code === 'NOT_FOUND')) {
+    const s = rosterFind(op.body.studentId); if (s) { s.state = 'none'; s.at = ''; s.pending = false; }
+    st.banner = { cls: 'bad', msg: (r.code === 'OTHER_BUS' ? L().other(r.student ? r.student.bus : '', r.student ? r.student.supervisor : '') : L().notFound) };
+  }
+}
+function enqueue(kind, body) { queue.push({ kind: kind, body: Object.assign({ clientId: uid() }, body) }); saveQueue(); flush(); }
+
+/* ---------- roster ---------- */
+function rosterFind(id) { return st.roster && st.roster.students.find(s => s.id === String(id).trim()); }
+async function refreshRoster(silent) {
+  if (!navigator.onLine) return;
+  try {
+    const r = await api({ action: 'roster' });
+    if (r.success) { st.roster = r; store.set('roster', r); if (r.bus) { me.bus = r.bus; $('busTitle').textContent = L().bus(r.bus); } }
+    else if (r.code && AUTH_ERR.test(r.code)) { sessionStorage.clear(); location.href = 'login.html'; }
+  } catch (e) { /* offline: keep cached roster */ }
+}
+const counts = () => { const s = st.roster ? st.roster.students : []; const b = s.filter(x => x.state === 'boarded').length; return { b: b, t: s.length }; };
+
+/* ---------- scan handling ---------- */
+function parseQr(text) { let t = String(text || '').trim(); const m = t.match(/^MKH:(.+)$/i); if (m) t = m[1]; return t; }
+async function identify(idOrObj) {
+  const id = typeof idOrObj === 'string' ? parseQr(idOrObj) : idOrObj.id;
+  const mine = rosterFind(id);
+  st.banner = null; st.last = null; st.bagN = mine ? (mine.bagsExpected || 0) : 0;
+  if (mine) { st.cur = Object.assign({ mine: true }, mine); }
+  else if (navigator.onLine) {
+    try { const r = await api({ action: 'lookup', q: id }); const hit = r.success && r.results.find(x => x.id === id); st.cur = hit ? Object.assign({ mine: false }, hit) : { notFound: true, id: id }; }
+    catch (e) { st.cur = { offlineOther: true, id: id }; }
+  } else st.cur = { offlineOther: true, id: id };
+  render();
+}
+async function pickRemote(s) { st.cur = Object.assign({ mine: false }, s); st.banner = null; render(); }
+function board() {
+  const c = st.cur; if (!c || !c.mine) return;
+  const s = rosterFind(c.id); if (!s || s.state === 'boarded') return;
+  s.state = 'boarded'; s.at = new Date().toTimeString().slice(0, 5); s.pending = true; store.set('roster', st.roster);
+  enqueue('scan', { action: 'scan', op: 'board', studentId: c.id, method: st.method });
+  if (st.bagN > 0 || (s.bagsExpected || 0) > 0) enqueue('bag', { action: 'bag', studentId: c.id, mode: st.bagMode, count: st.bagN });
+  st.last = { id: c.id, name: c.name, canUndo: true }; st.cur = null; st.q = ''; st.remote = [];
+  render();
+}
+function undo() {
+  const l = st.last; if (!l) return;
+  const s = rosterFind(l.id); if (s) { s.state = 'none'; s.at = ''; }
+  enqueue('scan', { action: 'scan', op: 'undo', studentId: l.id, method: 'undo' });
+  st.last = null; st.banner = { cls: 'ok', msg: L().undone }; render();
+}
+function resetCur() { st.cur = null; st.banner = null; st.q = ''; st.remote = []; render(); }
+window.__onScanText = identify; // used by the camera decoder (and by tests)
+
+/* ---------- camera ---------- */
+let scanner = null;
+async function startCam() {
+  if (typeof Html5Qrcode === 'undefined') { st.banner = { cls: 'warn', msg: L().noCam }; return render(); }
+  try {
+    scanner = new Html5Qrcode('reader'); st.cam = true; render();
+    await scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: 220 }, text => { stopCam(); identify(text); }, () => {});
+  } catch (e) { st.cam = false; st.banner = { cls: 'warn', msg: L().noCam }; render(); }
+}
+async function stopCam() { try { if (scanner) { await scanner.stop(); scanner.clear(); } } catch (e) {} scanner = null; st.cam = false; render(); }
+
+/* ---------- trip status + location ---------- */
+let watchId = null, lastPost = 0, lastPos = null, wake = null;
+async function postStatus(status, withGeo) {
+  const body = { action: 'busStatus' }; if (status) body.status = status;
+  if (withGeo && lastPos) { body.lat = lastPos.latitude; body.lng = lastPos.longitude; body.acc = lastPos.accuracy; }
+  try { const r = await api(body); if (r.success) st.lastSent = new Date().toTimeString().slice(0, 5); } catch (e) {}
+}
+function setStatus(s) { st.status = s; store.set('status', s); st.confirm = false; postStatus(s, true); render(); }
+function toggleLoc() {
+  if (st.loc) { navigator.geolocation.clearWatch(watchId); watchId = null; st.loc = false; if (wake) { try { wake.release(); } catch (e) {} wake = null; } return render(); }
+  if (!navigator.geolocation) return;
+  watchId = navigator.geolocation.watchPosition(p => { lastPos = p.coords; const now = Date.now(); if (now - lastPost >= LOC_INTERVAL_MS) { lastPost = now; postStatus('', true).then(render); } }, () => {}, { enableHighAccuracy: true, maximumAge: 10000 });
+  st.loc = true; try { navigator.wakeLock && navigator.wakeLock.request('screen').then(w => { wake = w; }); } catch (e) {}
+  render();
+}
+
+/* ---------- render ---------- */
+function bar() {
+  const n = $('netbar'); const p = queue.length;
+  if (!navigator.onLine) { n.hidden = false; n.className = 'netbar warn'; n.textContent = L().offline + (p ? ' · ' + L().pending(p) : ''); }
+  else if (p) { n.hidden = false; n.className = 'netbar info'; n.textContent = L().pending(p); }
+  else n.hidden = true;
+}
+function head() {
+  const l = L(); document.documentElement.lang = st.lang; document.documentElement.dir = l.dir; document.documentElement.dataset.theme = st.theme;
+  $('busTitle').textContent = l.bus(me.bus || '—'); $('supName').textContent = l.sup(me.name);
+  $('langBtn').textContent = l.lang; $('themeBtn').textContent = st.theme === 'light' ? l.dark : l.light; $('logoutBtn').textContent = l.logout;
+}
+function render() {
+  head(); bar();
+  const l = L(), c = counts(), left = c.t - c.b, R = st.roster;
+  if (!R) { $('app').innerHTML = `<div class="card muted">${l.loading}</div>`; return; }
+  const methods = [['qr', l.m_qr, '▣'], ['face', l.m_face, '◉'], ['name', l.m_name, 'Aa'], ['num', l.m_num, '#']];
+  let body = '';
+  if (st.method === 'qr') body = `<div class="scan">${st.cam ? '<div id="reader" style="width:100%"></div>' : `<div style="font-size:30px" aria-hidden="true">▣</div><b>${l.scanQr}</b>`}</div><button class="btn full" style="margin-top:10px" onclick="${st.cam ? 'stopCam()' : 'startCam()'}">${st.cam ? l.stopCam : l.startCam}</button>`;
+  else if (st.method === 'face') body = `<div class="scan"><div style="font-size:30px" aria-hidden="true">◉</div><b>${l.soon}</b></div>`;
+  else { const num = st.method === 'num'; body = `<label for="q" class="lbl">${num ? l.numLbl : l.nameLbl}</label><input id="q" type="${num ? 'search' : 'text'}" ${num ? 'inputmode="numeric"' : ''} value="${esc(st.q)}" oninput="onQ(this.value)" autocomplete="off"><div id="qres">${resList()}</div>`; }
+  let card = '';
+  if (st.cur) card = curCard();
+  else if (st.last) card = `<div class="card ok-b"><span class="pill ok">${l.done}</span><div class="big2">${esc(st.last.name)}</div><div style="display:flex;gap:8px;margin-top:12px"><button class="btn" style="flex:1" onclick="resetCur(); st.last=null; render()">${l.next}</button><button class="btn alt" style="flex:1" onclick="undo()">${l.undo}</button></div></div>`;
+  const miss = R.students.filter(s => s.state !== 'boarded' && s.state !== 'withdrawn');
+  const stats = ['boarding', 'departed', 'onway', 'arrived'];
+  $('app').innerHTML = `${st.banner ? `<div class="banner ${st.banner.cls}" role="alert">${esc(st.banner.msg)}</div>` : ''}
+  <section class="card"><div style="display:flex;justify-content:space-between;align-items:flex-end;gap:8px"><div><div class="kl">${l.boarded}</div><div class="kv">${c.b} <span class="muted" style="font-size:16px;font-weight:500">/ ${c.t}</span></div></div><span class="pill ${left > 0 ? 'warn' : 'ok'}">${l.remaining(left)}</span></div><div class="bar"><i style="width:${c.t ? Math.round(c.b / c.t * 100) : 0}%"></i></div></section>
+  <section class="card"><div class="kl" style="margin-bottom:8px">${l.how}</div><div class="methods">${methods.map(m => `<button class="m ${st.method === m[0] ? 'on' : ''}" ${m[0] === 'face' ? '' : ''} onclick="setMethod('${m[0]}')"><span aria-hidden="true" style="font-size:16px">${m[2]}</span>${m[1]}</button>`).join('')}</div><div style="margin-top:12px">${body}</div></section>
+  ${card}
+  <section class="card"><div style="display:flex;justify-content:space-between;margin-bottom:6px"><h2 class="h2">${l.missing}</h2><span class="pill ${miss.length ? 'warn' : 'ok'}">${miss.length}</span></div>${miss.length ? miss.map(s => `<div class="row"><span>${l.student} <b>${esc(s.id)}</b> · ${esc(s.team)}</span><span class="muted">${esc(s.name)}</span></div>`).join('') : `<div class="muted">${l.allIn}</div>`}</section>
+  <section class="card"><h2 class="h2" style="margin-bottom:8px">${l.trip}</h2><div class="stats">${stats.map(x => `<button class="chip ${st.status === x ? 'on' : ''}" onclick="${x === 'departed' ? 'st.confirm=true;render()' : "setStatus('" + x + "')"}">${l['st_' + x]}</button>`).join('')}</div>${st.confirm ? `<div class="banner warn">${l.confirmDepart(left)}<div style="display:flex;gap:8px;margin-top:8px"><button class="btn" style="flex:1" onclick="setStatus('departed')">${l.yes}</button><button class="btn alt" style="flex:1" onclick="st.confirm=false;render()">${l.cancel}</button></div></div>` : ''}
+  <button class="tick ${st.loc ? 'on' : ''}" style="margin-top:10px" onclick="toggleLoc()"><span class="sq">✓</span><span style="flex:1">${l.shareLoc}</span><span class="pill ${st.loc ? 'ok' : ''}">${st.loc ? l.locOn : l.locOff}</span></button>${st.lastSent ? `<div class="muted" style="font-size:12.5px;margin-top:6px">${l.lastSent(st.lastSent)}</div>` : ''}</section>
+  <div class="muted" style="font-size:12.5px;text-align:center;padding:4px 0 16px">${l.paper}</div>`;
+}
+function resList() {
+  const l = L(), q = st.q.trim().toLowerCase(); if (!q) return '';
+  const num = st.method === 'num';
+  const mine = (st.roster ? st.roster.students : []).filter(s => num ? s.id.startsWith(q) : (s.name.toLowerCase().includes(q) || s.id === q)).slice(0, 6);
+  const others = st.remote.filter(r => !mine.find(m => m.id === r.id));
+  const all = mine.map(s => Object.assign({ mine: true }, s)).concat(others.map(s => Object.assign({ mine: false }, s)));
+  if (!all.length) return `<div class="muted" style="margin-top:8px">${l.none}</div>`;
+  return all.map(s => `<button class="res" data-id="${esc(s.id)}" data-mine="${s.mine ? 1 : 0}"><span><b>${esc(s.id)}</b> · ${esc(s.name)}</span><span class="pill ${s.mine ? 'ok' : 'bad'}">${l.bus(s.bus)}</span></button>`).join('');
+}
+let qTimer = null;
+function onQ(v) {
+  st.q = v; const el = $('qres'); if (el) el.innerHTML = resList();
+  clearTimeout(qTimer);
+  if (v.trim().length >= 2 && navigator.onLine) qTimer = setTimeout(async () => { try { const r = await api({ action: 'lookup', q: v.trim() }); if (r.success && st.q === v) { st.remote = r.results; const e2 = $('qres'); if (e2) e2.innerHTML = resList(); } } catch (e) {} }, 350);
+}
+document.addEventListener('click', e => { const el = e.target.closest && e.target.closest('.res'); if (el) pickRes(el.dataset.id, el.dataset.mine === '1'); });
+const safeUrl = u => (/^https?:\/\//i.test(String(u || '')) ? u : '');
+function pickRes(id, mine) { if (mine) identify(id); else pickRemote(st.remote.find(r => r.id === id)); }
+function curCard() {
+  const l = L(), c = st.cur;
+  if (c.notFound) return `<div class="card"><div class="banner bad">${l.notFound} (${esc(c.id)})</div><button class="btn alt full" style="margin-top:10px" onclick="resetCur()">${l.next}</button></div>`;
+  if (c.offlineOther) return `<div class="card"><div class="banner warn">${l.otherOffline}</div><button class="btn alt full" style="margin-top:10px" onclick="resetCur()">${l.next}</button></div>`;
+  const dup = c.mine && c.state === 'boarded', wd = c.state === 'withdrawn';
+  let act;
+  if (!c.mine) act = `<div class="banner bad">${l.other(c.bus, c.supervisor)}</div><button class="btn full" style="margin-top:12px" disabled>${l.board}</button>`;
+  else if (wd) act = `<div class="banner bad">${l.withdrawn}</div><button class="btn full" style="margin-top:12px" disabled>${l.board}</button>`;
+  else if (dup) act = `<div class="banner warn">${l.dup(c.at)}</div><button class="btn full" style="margin-top:12px" disabled>${l.board}</button>`;
+  else act = `<button class="btn full" style="margin-top:14px" onclick="board()">${l.board}</button>`;
+  const exp = c.bagsExpected || 0;
+  const bags = (c.mine && !dup && !wd) ? `<div class="bags"><div style="display:flex;gap:8px"><button class="chip ${st.bagMode === 'load' ? 'on' : ''}" style="flex:1" onclick="st.bagMode='load';render()">${l.load}</button><button class="chip ${st.bagMode === 'unload' ? 'on' : ''}" style="flex:1" onclick="st.bagMode='unload';render()">${l.unload}</button></div><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px"><div><b>${l.bagCount}</b><div class="muted" style="font-size:12.5px">${l.expected(exp)}</div></div><div style="display:inline-flex;align-items:center;gap:10px"><button class="step" aria-label="−" onclick="st.bagN=Math.max(0,st.bagN-1);render()">−</button><b style="min-width:28px;text-align:center;font-size:22px">${st.bagN}</b><button class="step" aria-label="+" onclick="st.bagN=Math.min(20,st.bagN+1);render()">+</button></div></div>${exp > 0 && st.bagMode === 'load' && st.bagN < exp ? `<div class="banner warn">${l.bagShort(exp - st.bagN)}</div>` : ''}</div>` : '';
+  return `<div class="card" style="border-color:${c.mine && !dup && !wd ? 'var(--brand)' : 'var(--line)'}"><div style="display:flex;gap:14px;align-items:center"><div class="photo">${safeUrl(c.photo) ? `<img src="${esc(safeUrl(c.photo))}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}<span>${L().student}</span></div><div style="flex:1;min-width:0"><div class="muted" style="font-size:13px">${l.student} ${esc(c.id)}</div><div class="big2">${esc(c.name)}</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><span class="pill">${esc(c.team)}</span>${c.cls ? `<span class="pill">${l.cls} ${esc(c.cls)}</span>` : ''}<span class="pill ${c.mine ? 'ok' : 'bad'}">${l.bus(c.bus)}</span></div></div></div>${act}${bags}<button class="btn alt full" style="margin-top:8px;min-height:44px;font-size:14px" onclick="resetCur()">${l.cancel}</button></div>`;
+}
+function setMethod(m) { if (m !== 'qr' && st.cam) stopCam(); st.method = m; st.q = ''; st.remote = []; st.cur = null; render(); }
+
+$('langBtn').onclick = () => { st.lang = st.lang === 'ar' ? 'en' : 'ar'; pref.set('lang', st.lang); render(); };
+$('themeBtn').onclick = () => { st.theme = st.theme === 'light' ? 'dark' : 'light'; pref.set('theme', st.theme); render(); };
+$('logoutBtn').onclick = () => { if (queue.length && !confirm(L().pending(queue.length) + '. ' + L().logout + '?')) return; sessionStorage.clear(); location.href = 'login.html'; };
+window.addEventListener('online', () => { st.online = true; flush(); render(); });
+window.addEventListener('offline', () => { st.online = false; render(); });
+setInterval(() => { if (queue.length) flush(); }, 15000);
+setInterval(() => { if (navigator.onLine) refreshRoster(true).then(render); }, 60000);
+render();
+refreshRoster().then(() => { render(); flush(); });
+</script>
+</body></html>

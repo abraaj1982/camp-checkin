@@ -253,14 +253,16 @@ const ROLE_PRESETS = {
 };
 // Screens that already exist (others show as "قريباً").
 const SCREEN_LINKS = {
-  checkin: 'supervisor_app_professional.html',
-  dashboard: 'dashboard_v3.html',
+  checkin: 'supervisor.html',
+  dashboard: 'leader.html',
+  stats: 'leader.html',
+  print: 'wristbands.html',
   shirts: 'shirt_distribution.html'
 };
 const SCREEN_NAMES = {
   checkin: 'تسجيل الحضور', dashboard: 'لوحة المعلومات', committee: 'مصاريف اللجنة',
   finance: 'اعتماد المصاريف', shirts: 'توزيع القمصان', team: 'الفريق والإعلانات',
-  users: 'المستخدمون', results: 'إدخال النتائج', medical: 'الصفحة الطبية'
+  users: 'المستخدمون', results: 'إدخال النتائج', medical: 'الصفحة الطبية', print: 'طباعة الأساور والكشوف'
 };
 
 function can(key) { return permissions.indexOf('*') !== -1 || permissions.indexOf(key) !== -1; }

@@ -1,131 +1,53 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<!doctype html>
+<html lang="ar" dir="rtl" data-theme="light">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>تسجيل الدخول — MUKHAYYAM</title>
-<style>
-:root {
-  --sap-blue: #0A6ED4;
-  --sap-green: #107E3E;
-  --sap-red: #C30C13;
-  --sap-gray: #6C757D;
-  --sap-text: #32363A;
-  --sap-bg: #F8F9FA;
-  --sap-border: #D3D3D3;
-}
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body {
-  font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
-  background: linear-gradient(135deg, #E8F4FD 0%, #F8F9FA 100%);
-  color: var(--sap-text);
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-}
-.card {
-  background: white;
-  width: 100%;
-  max-width: 360px;
-  border-radius: 10px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-  overflow: hidden;
-}
-.card-header {
-  background: linear-gradient(135deg, var(--sap-blue) 0%, #0052A3 100%);
-  color: white;
-  padding: 24px 20px;
-  text-align: center;
-}
-.card-header h1 { font-size: 18px; font-weight: 700; }
-.card-header p { font-size: 12px; opacity: .9; margin-top: 4px; }
-.card-body { padding: 24px 20px; }
-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
-input[type=text], input[type=password] {
-  width: 100%;
-  padding: 11px 12px;
-  border: 1px solid var(--sap-border);
-  border-radius: 6px;
-  font-size: 14px;
-  margin-bottom: 16px;
-  font-family: inherit;
-}
-input:focus { outline: none; border-color: var(--sap-blue); }
-.btn {
-  width: 100%;
-  padding: 12px;
-  border: none;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-  background: var(--sap-blue);
-  color: white;
-}
-.btn:disabled { opacity: .6; cursor: not-allowed; }
-#msg {
-  margin-top: 14px;
-  padding: 10px;
-  border-radius: 6px;
-  font-size: 13px;
-  text-align: center;
-  display: none;
-}
-#msg.error { display: block; background: #FADAD4; color: var(--sap-red); }
-#msg.ok { display: block; background: #E1F5EB; color: var(--sap-green); }
-</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="theme.css">
+<style>.box{max-width:400px;margin:8vh auto 0;padding:0 16px}.card{padding:28px 22px}</style>
 </head>
 <body>
-
-<div class="card">
-  <div class="card-header">
-    <h1>🏕️ تسجيل الدخول</h1>
-    <p>منصة المخيم — دخول موحّد</p>
-  </div>
-  <div class="card-body">
-    <form id="loginForm">
-      <label for="username">اسم المستخدم</label>
-      <input type="text" id="username" autocomplete="username" required>
-
-      <label for="password">كلمة المرور</label>
-      <input type="password" id="password" autocomplete="current-password" required>
-
-      <button type="submit" class="btn" id="submitBtn">دخول</button>
+<div class="wrap" style="max-width:none">
+  <header class="hdr" style="justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><div class="logo">م</div><div><div class="t" id="hT"></div></div></div><div style="display:flex;gap:6px"><button class="tool" id="langBtn" aria-label="Language"></button><button class="tool" id="themeBtn"></button></div></header>
+  <div class="box"><div class="card">
+    <div style="text-align:center;margin-bottom:22px"><div class="logo" style="margin:0 auto 12px;width:56px;height:56px;font-size:28px;border-radius:16px">م</div><h1 style="font-size:22px" id="title"></h1></div>
+    <form id="form" autocomplete="on">
+      <label class="lbl" for="username" id="lblU"></label><input id="username" type="text" autocomplete="username" required style="margin-bottom:14px">
+      <label class="lbl" for="password" id="lblP"></label><input id="password" type="password" autocomplete="current-password" required>
+      <div id="msg" role="alert"></div>
+      <button type="submit" class="btn full" id="btn" style="margin-top:18px"></button>
     </form>
-    <div id="msg"></div>
-  </div>
+  </div></div>
 </div>
-
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4lEBGPNxghwq9UmK0iljI5QdS-8iCvC-K09dDtbZCXGvGZyA4repTE3rFVVRp5zS4yw/exec';
-
-const form = document.getElementById('loginForm');
-const msg = document.getElementById('msg');
-const submitBtn = document.getElementById('submitBtn');
-
-function setMsg(text, cls) {
-  msg.textContent = text;
-  msg.className = cls || '';
+const T = {
+  ar: { dir: 'rtl', hT: 'مِخيَم', title: 'تسجيل الدخول', u: 'اسم المستخدم', p: 'كلمة المرور', go: 'دخول', going: 'جارٍ الدخول...', lang: 'English', dark: '🌙', light: '☀',
+        bad: 'اسم المستخدم أو كلمة المرور غير صحيحة.', locked: 'الحساب مقفل مؤقتاً. تواصل مع السكرتارية.', disabled: 'الحساب معطَّل. تواصل مع السكرتارية.', net: 'تعذّر الاتصال. تحقق من الإنترنت وأعد المحاولة.', ok: 'تم الدخول...' },
+  en: { dir: 'ltr', hT: 'MUKHAYYAM', title: 'Sign in', u: 'Username', p: 'Password', go: 'Sign in', going: 'Signing in...', lang: 'العربية', dark: '🌙', light: '☀',
+        bad: 'Wrong username or password.', locked: 'Account temporarily locked. Contact the secretariat.', disabled: 'Account disabled. Contact the secretariat.', net: 'Could not connect. Check the internet and try again.', ok: 'Signed in...' }
+};
+const pref = { get(k, d) { try { return localStorage.getItem('mk_pref_' + k) || d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('mk_pref_' + k, v); } catch (e) {} } };
+const S = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light') };
+const $ = id => document.getElementById(id);
+function paint() {
+  const t = T[S.lang]; document.documentElement.lang = S.lang; document.documentElement.dir = t.dir; document.documentElement.dataset.theme = S.theme;
+  $('hT').textContent = t.hT; $('title').textContent = t.title; $('lblU').textContent = t.u; $('lblP').textContent = t.p; $('btn').textContent = t.go;
+  $('langBtn').textContent = t.lang; $('themeBtn').textContent = S.theme === 'light' ? t.dark : t.light; document.title = t.title + ' — MUKHAYYAM';
 }
+function msg(cls, text) { $('msg').innerHTML = text ? '<div class="banner ' + cls + '"></div>' : ''; if (text) $('msg').firstChild.textContent = text; }
+$('langBtn').onclick = () => { S.lang = S.lang === 'ar' ? 'en' : 'ar'; pref.set('lang', S.lang); paint(); };
+$('themeBtn').onclick = () => { S.theme = S.theme === 'light' ? 'dark' : 'light'; pref.set('theme', S.theme); paint(); };
+paint();
 
-form.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  setMsg('', '');
-  submitBtn.disabled = true;
-  submitBtn.textContent = 'جاري الدخول...';
-
-  const username = document.getElementById('username').value.trim();
-  const password = document.getElementById('password').value;
-
+$('form').addEventListener('submit', async e => {
+  e.preventDefault(); msg('', ''); const t = T[S.lang];
+  $('btn').disabled = true; $('btn').textContent = t.going;
   try {
-    const res = await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'login', username, password })
-    });
+    const res = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'login', username: $('username').value.trim(), password: $('password').value }) });
     const data = await res.json();
-
     if (data.success) {
       sessionStorage.setItem('mukhayyam_token', data.token);
       sessionStorage.setItem('mukhayyam_fullName', data.fullName || '');
@@ -133,24 +55,16 @@ form.addEventListener('submit', async (e) => {
       sessionStorage.setItem('mukhayyam_assignedBus', data.assignedBus || '');
       sessionStorage.setItem('mukhayyam_permissions', JSON.stringify(data.permissions || []));
       sessionStorage.setItem('mukhayyam_committees', JSON.stringify(data.committees || []));
-      setMsg('تم الدخول بنجاح، جاري التحويل...', 'ok');
-      // Someone whose ONLY screen is check-in goes straight to it; everyone else gets the home page.
-      const perms = data.permissions || [];
-      const onlyCheckin = perms.length === 1 && perms[0] === 'checkin';
-      const destination = onlyCheckin ? 'supervisor_app_professional.html' : 'hub.html';
-      setTimeout(() => { window.location.href = destination; }, 500);
-    } else {
-      setMsg(data.error || 'خطأ غير معروف', 'error');
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'دخول';
+      msg('ok', t.ok);
+      const p = data.permissions || [];
+      // One screen only (check-in) -> straight to it; otherwise the home menu of that person's screens.
+      location.href = (p.length === 1 && p[0] === 'checkin') ? 'supervisor.html' : 'hub.html';
+      return;
     }
-  } catch (err) {
-    setMsg('تعذّر الاتصال بالخادم: ' + err.message, 'error');
-    submitBtn.disabled = false;
-    submitBtn.textContent = 'دخول';
-  }
+    const err = String(data.error || '');
+    msg('bad', /locked/i.test(err) ? t.locked : /disabled/i.test(err) ? t.disabled : t.bad);
+  } catch (err) { msg('warn', t.net); }
+  $('btn').disabled = false; $('btn').textContent = t.go;
 });
 </script>
-
-</body>
-</html>
+</body></html>
