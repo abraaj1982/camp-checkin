@@ -63,7 +63,7 @@ function handleMedOpen_(data) {
       const all = readMedCases_();
       if (clientId) { const dup = all.filter(function(c) { return c.clientId === clientId; })[0]; if (dup) return { success: true, repeated: true, id: dup.id }; }
       if (all.some(function(c) { return c.studentId === s.id && c.status === 'open'; })) return { success: false, code: 'ALREADY_OPEN', error: 'يوجد ملف مفتوح لهذا الطالب' };
-      const id = 'M' + Date.now().toString(36).toUpperCase();
+      const id = newId_('M');
       medSheet_().appendRow([id, s.id, new Date(), user.Username, severity, complaint, '', 'open', '', '', clientId]);
       writeAudit_(user.Username, 'MED_OPENED', s.id, id);
       return { success: true, id: id };

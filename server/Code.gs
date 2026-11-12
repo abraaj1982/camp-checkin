@@ -64,7 +64,14 @@ const ACTIONS_ = {
   medClose: function(d) { return handleMedClose_(d); },
   medList: function(d) { return handleMedList_(d); },
   medStats: function(d) { return handleMedStats_(d); },
-  nutritionSummary: function(d) { return handleNutritionSummary_(d); }
+  nutritionSummary: function(d) { return handleNutritionSummary_(d); },
+  mediaList: function(d) { return handleMediaList_(d); },
+  annSave: function(d) { return handleAnnSave_(d); },
+  annStatus: function(d) { return handleAnnStatus_(d); },
+  resSave: function(d) { return handleResSave_(d); },
+  resStatus: function(d) { return handleResStatus_(d); },
+  bulletin: function(d) { return handleBulletin_(d); },
+  feed: function(d) { return handleFeed_(d); }
 };
 
 function doPost(e) {
@@ -80,6 +87,11 @@ function doPost(e) {
     Logger.log('doPost error: ' + error + '\n' + (error && error.stack));
     return json_({ success: false, error: 'Server error' }); // never leak internals
   }
+}
+
+// Unique record id: time + random suffix (two records created in the same millisecond never collide).
+function newId_(prefix) {
+  return prefix + Date.now().toString(36).toUpperCase() + Math.floor(Math.random() * 46656).toString(36).toUpperCase().padStart(3, '0');
 }
 
 // Authorize, then run. `fn(user)` returns the response object.
@@ -467,7 +479,7 @@ function handleCreateCase_(data) {
       const sheet = casesSheet_();
       const v = sheet.getDataRange().getValues(), h = v[0];
       if (clientId) for (let r = 1; r < v.length; r++) if (String(v[r][h.indexOf('ClientId')]) === clientId) return { success: true, repeated: true, id: String(v[r][h.indexOf('Id')]) };
-      const id = 'C' + Date.now().toString(36).toUpperCase();
+      const id = newId_('C');
       sheet.appendRow([id, new Date(), type, bus, String(data.studentId || '').slice(0, 40), text, 'open', user.Username, '', clientId]);
       writeAudit_(user.Username, 'CASE_CREATED', id, type);
       return { success: true, id: id };

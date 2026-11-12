@@ -30,7 +30,8 @@
 | الأمانات (هواتف وحقائب) والانسحاب المبكر | `custody.html` | ✅ جاهزة (تحتاج تجربة) | السكرتارية |
 | الطبيب (حالات وعلاج وإحصاءات، بيانات محمية) | `medical.html` | ✅ جاهزة (تحتاج تجربة) | الأطباء |
 | التغذية (أعداد الوجبات والحساسية الغذائية) | `nutrition.html` | ✅ جاهزة (تحتاج تجربة) | لجنة التغذية |
-| الإعلامية · التقارير | — | ⏳ قادمة | كل لجنة |
+| الإعلامية (إعلانات، فعاليات بعدّ تنازلي، نتائج، وتغذية شاشة العرض) | `media.html` | ✅ جاهزة (تحتاج تجربة) | اللجنة الإعلامية |
+| التقارير | — | ⏳ قادمة | القيادة والسكرتارية |
 | التعرف على الوجه كمساعد بعد QR | — | ⏳ قادمة | مشرفو الباصات |
 
 > الصفحات القديمة `supervisor_app_professional.html` و`dashboard_v3.html` و`dashboard_*` و`supervisor_app_v2.html` **متقادمة**: تعتمد على روابط قراءة عامة أُغلقت في الخادم الجديد، وحلّت محلها `supervisor.html` و`leader.html`.
@@ -55,6 +56,8 @@
 | `custody` | شاشة الأمانات والانسحاب المبكر |
 | `medical` | شاشة الطبيب (ملاحظات طبية محمية) |
 | `nutrition` | شاشة التغذية (الحساسية الغذائية فقط) |
+| `announce` | نشر الإعلانات والفعاليات |
+| `results` / `verify` | إدخال النتائج / التحقق منها ونشرها |
 | `manage` | إنشاء الحسابات وتعديل الصلاحيات |
 | `support` | إعادة كلمة المرور وفك القفل فقط (لا يلمس الحسابات الإدارية) |
 | `shirts`, `committee`, `results`, `medical`, `verify`, `announce` … | شاشات قادمة |
@@ -118,15 +121,17 @@
 ```
 camp-checkin/
 ├── README.md
-├── login.html · hub.html · supervisor.html · leader.html · wristbands.html · custody.html · medical.html · nutrition.html
+├── login.html · hub.html · supervisor.html · leader.html · wristbands.html · custody.html · medical.html · nutrition.html · media.html
 ├── theme.css                      # الألوان والخطوط لكل الشاشات
 ├── server/
 │   ├── Auth.gs                    # الدخول والتوكن والصلاحيات وإدارة الحسابات
 │   ├── Code.gs                    # الصعود والأغراض والباصات والتنبيهات والبلاغات (ضع SHEET_ID)
 │   ├── Custody.gs                 # الأمانات والانسحاب المبكر
-│   └── Health.gs                  # الطبيب والتغذية
+│   ├── Health.gs                  # الطبيب والتغذية
+│   └── Media.gs                   # الإعلانات والنتائج وتغذية شاشة العرض
 ├── tests/server.test.js           # اختبارات الخادم (Node فقط، بلا أي اتصال)
-├── docs/week2-handoff.md          # دليل التجربة والنشر وتفاصيل التغييرات
+├── docs/week2-handoff.md
+├── docs/display-feed.md           # ربط شاشة العرض (قراءة فقط)          # دليل التجربة والنشر وتفاصيل التغييرات
 ├── shirt_distribution.html + AppsScript_Shirts.gs   # أداة القمصان المستقلة
 ├── qr_codes_*.html · face_test/   # أدوات سابقة وتجارب
 └── dashboard_*.html · supervisor_app_*.html · AppsScript_Final_v2.gs   # قديمة (متقادمة)
@@ -139,7 +144,7 @@ camp-checkin/
 > جرّب دائماً على **نسخة اختبار** (شيت منفصل وسكربت منفصل) قبل الإنتاج. التفاصيل والسيناريوهات في [`docs/week2-handoff.md`](docs/week2-handoff.md).
 
 1. **الشيت:** أنشئ شيت المنصة (أو انسخ الحالي). تبويب `Settings` فيه `ActiveStudentSheetId`.
-2. **الخادم:** من الشيت: *Extensions ← Apps Script*. أنشئ أربعة ملفات والصق `server/Auth.gs` و`server/Code.gs` و`server/Custody.gs` و`server/Health.gs` كاملة، واستبدل `SHEET_ID` في `Code.gs` بمعرّف شيت المنصة.
+2. **الخادم:** من الشيت: *Extensions ← Apps Script*. أنشئ خمسة ملفات والصق `server/Auth.gs` و`server/Code.gs` و`server/Custody.gs` و`server/Health.gs` و`server/Media.gs` كاملة، واستبدل `SHEET_ID` في `Code.gs` بمعرّف شيت المنصة.
 3. شغّل الدالة **`SETUP_createTabs`** مرة واحدة (تنشئ التبويبات الناقصة ولا تمسح شيئاً، ويمكن تشغيلها مرات).
 4. **Deploy ← Web app** (Execute as: Me · Access: Anyone). انسخ رابط `/exec` وضعه في `APPS_SCRIPT_URL` داخل كل صفحة html.
 5. **أول مدير:** يُنشأ مرة واحدة بسر البدء (`ADMIN_printBootstrapSecret`) عبر `createUser`، ثم يُنشئ بقية الحسابات من `hub.html`.
@@ -169,7 +174,8 @@ node tests/server.test.js     # 52 فحصاً لمنطق الخادم (الدخ�
 - [ ] تجربة كل ما سبق على نسخة الاختبار ثم الإنتاج.
 - [x] الأمانات (هواتف وحقائب) والانسحاب المبكر: لا يُغلق الانسحاب قبل تسليم الهاتف والحقائب.
 - [x] الطبيب والتغذية.
-- [ ] الإعلامية والتقارير.
+- [x] الإعلامية (إعلانات وفعاليات ونتائج وتغذية شاشة العرض).
+- [ ] التقارير والتصدير.
 - [ ] ربط القمصان بالبيانات الرئيسية.
 - [ ] التعرف على الوجه كمساعد بعد QR (بموافقة وخصوصية).
 - [ ] بروفة كاملة قبل المخيم بأسبوع، وتجميد الكود قبله بسبعة أيام.

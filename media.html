@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="ar" dir="rtl" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>الإعلامية — MUKHAYYAM</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="theme.css">
+<style>
+.page{max-width:720px;margin:0 auto;padding:14px;display:flex;flex-direction:column;gap:12px}
+.tabs{display:flex;gap:6px}.tabs button{flex:1;min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-weight:600;cursor:pointer}
+.tabs button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+input[type=text],input[type=search]{width:100%;box-sizing:border-box}
+.two{display:flex;gap:8px}.two>*{flex:1}
+.item{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--card)}
+.kpis{display:flex;gap:10px;flex-wrap:wrap}.kpis .card{flex:1 1 130px;padding:12px}
+.chk{display:flex;align-items:center;gap:8px;padding:6px 0}
+.brow2{display:grid;grid-template-columns:1fr 60px 60px;gap:8px;align-items:center;padding:5px 0;font-size:14px}
+textarea{width:100%;box-sizing:border-box;min-height:84px;font:inherit;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+select{width:100%;box-sizing:border-box;min-height:44px;font:inherit;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:0 8px}
+.cd{font-size:28px;font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hdr">
+    <div class="logo">م</div>
+    <div style="flex:1;min-width:0"><div class="t" id="hT"></div><div class="s" id="hS"></div></div>
+    <a class="tool" href="hub.html" id="homeBtn" style="text-decoration:none;display:flex;align-items:center"></a>
+    <button class="tool" id="langBtn"></button>
+    <button class="tool" id="themeBtn"></button>
+  </header>
+  <main class="page" id="app"></main>
+</div>
+<script>
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4lEBGPNxghwq9UmK0iljI5QdS-8iCvC-K09dDtbZCXGvGZyA4repTE3rFVVRp5zS4yw/exec';
+const token = sessionStorage.getItem('mukhayyam_token');
+let perms = [];
+try { perms = JSON.parse(sessionStorage.getItem('mukhayyam_permissions') || '[]'); } catch (e) {}
+const can = k => perms.indexOf('*') !== -1 || perms.indexOf(k) !== -1;
+if (!token) location.href = 'login.html'; else if (!can('announce') && !can('results') && !can('verify')) location.href = 'hub.html';
+const pref = { get(k, d) { try { return localStorage.getItem('mk_pref_' + k) || d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('mk_pref_' + k, v); } catch (e) {} } };
+const $ = id => document.getElementById(id);
+const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2));
+const AUTH_ERR = /EXPIRED|IDLE_TIMEOUT|REVOKED|BAD_SIGNATURE|MALFORMED|USER_NOT_FOUND|ACCOUNT_DISABLED|BAD_PAYLOAD/;
+async function api(payload) {
+  const r = await (await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(Object.assign({ token: token }, payload)) })).json();
+  if (r && r.code && AUTH_ERR.test(r.code)) { st.msg = { cls: 'bad', t: L().sessionEnd }; render(); setTimeout(() => { sessionStorage.clear(); location.href = 'login.html'; }, 1500); throw new Error('auth'); }
+  return r;
+}
+const T = {
+ ar: { dir: 'rtl', title: 'الإعلامية', sub: 'الإعلانات والفعاليات والنتائج', home: 'الرئيسية', lang: 'English', dark: '🌙', light: '☀',
+  tAnn: 'الإعلانات', tRes: 'النتائج', countdown: 'العد التنازلي لبداية المخيم', days: 'يوم', hours: 'ساعة', mins: 'دقيقة', started: 'بدأ المخيم',
+  newAnn: 'إعلان / فعالية جديدة', title_: 'العنوان', body: 'النص', kind: 'النوع', announce: 'إعلان', event: 'فعالية (بعدّ تنازلي)', other: 'أخرى', when: 'موعد الفعالية', audience: 'الجمهور', public: 'شاشات العرض والجميع', staff: 'فريق العمل فقط', pinned: 'تثبيت في الأعلى',
+  saveDraft: 'حفظ كمسودة', update: 'تحديث', cancelEdit: 'إلغاء التعديل', publish: 'نشر', unpublish: 'إعادة لمسودة', archive: 'أرشفة', edit: 'تعديل', draft: 'مسودة', published: 'منشور', archived: 'مؤرشف',
+  noAnn: 'لا توجد إعلانات.', newRes: 'إدخال نتيجة', comp: 'المسابقة', team: 'الفريق', place: 'المركز', points: 'النقاط', addRes: 'إضافة', needVerify: 'النشر يحتاج صلاحية «التحقق من النتائج».',
+  publishAll: 'نشر مسابقة', noRes: 'لا توجد نتائج.', done: 'تم', error: 'تعذّر الاتصال. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.', confirmPub: 'نشر هذا العنصر؟', feedNote: 'المنشور للجمهور يظهر في شاشات العرض خلال ثوانٍ.' },
+ en: { dir: 'ltr', title: 'Media', sub: 'Announcements, events and results', home: 'Home', lang: 'العربية', dark: '🌙', light: '☀',
+  tAnn: 'Announcements', tRes: 'Results', countdown: 'Countdown to camp', days: 'days', hours: 'hours', mins: 'min', started: 'Camp has started',
+  newAnn: 'New announcement / event', title_: 'Title', body: 'Text', kind: 'Type', announce: 'Announcement', event: 'Event (countdown)', other: 'Other', when: 'Event time', audience: 'Audience', public: 'Display screens and everyone', staff: 'Staff only', pinned: 'Pin to top',
+  saveDraft: 'Save draft', update: 'Update', cancelEdit: 'Cancel edit', publish: 'Publish', unpublish: 'Back to draft', archive: 'Archive', edit: 'Edit', draft: 'Draft', published: 'Published', archived: 'Archived',
+  noAnn: 'No announcements.', newRes: 'Enter a result', comp: 'Competition', team: 'Team', place: 'Place', points: 'Points', addRes: 'Add', needVerify: 'Publishing needs the “verify results” permission.',
+  publishAll: 'Publish competition', noRes: 'No results.', done: 'Done', error: 'Connection problem. Try again.', sessionEnd: 'Session expired. Please log in again.', confirmPub: 'Publish this item?', feedNote: 'Public items appear on the display screens within seconds.' }
+};
+const L = () => T[st.lang];
+const blank = () => ({ id: '', title: '', body: '', kind: 'announce', startsAt: '', audience: 'public', pinned: false });
+const st = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), tab: can('announce') ? 'ann' : 'res', anns: [], results: [], campStart: '2026-12-27', form: blank(), rf: { competition: '', team: '', place: '', points: '' }, msg: null };
+const say = (cls, t) => { st.msg = { cls: cls, t: t }; };
+const errText = r => (r && r.code === 'NEEDS_VERIFY' ? L().needVerify : (r && r.error) || L().error);
+
+async function load() { try { const r = await api({ action: 'mediaList' }); if (r.success) { st.anns = r.announcements; st.results = r.results; st.campStart = r.campStart; } } catch (e) {} render(); }
+async function call(body, okMsg) { try { const r = await api(body); say(r.success ? 'ok' : 'bad', r.success ? (okMsg || L().done) : errText(r)); return r; } catch (e) { if (e.message !== 'auth') say('bad', L().error); return { success: false }; } }
+async function saveAnn() {
+  const f = st.form, body = { action: 'annSave', id: f.id || undefined, title: f.title, body: f.body, kind: f.kind, startsAt: f.kind === 'event' && f.startsAt ? new Date(f.startsAt).toISOString() : '', audience: f.audience, pinned: f.pinned, clientId: f.id ? undefined : uid() };
+  const r = await call(body); if (r.success) st.form = blank(); await load();
+}
+async function annStatus(id, status) { if (status === 'published' && !confirm(L().confirmPub)) return; await call({ action: 'annStatus', id: id, status: status }); await load(); }
+function editAnn(id) { const a = st.anns.find(x => x.id === id); if (!a) return; st.form = { id: a.id, title: a.title, body: a.body, kind: a.kind, startsAt: a.startsAt ? toLocal(a.startsAt) : '', audience: a.audience, pinned: a.pinned }; st.msg = null; render(); window.scrollTo(0, 0); }
+const toLocal = iso => { const d = new Date(iso); if (isNaN(d)) return ''; const p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes()); };
+async function addRes() { const f = st.rf; const r = await call({ action: 'resSave', competition: f.competition, team: f.team, place: f.place, points: f.points, clientId: uid() }); if (r.success) { st.rf.team = ''; st.rf.place = ''; st.rf.points = ''; } await load(); }
+async function resStatus(ids, status) { if (status === 'published' && !confirm(L().confirmPub)) return; await call({ action: 'resStatus', ids: ids, status: status }); await load(); }
+function setTab(t) { st.tab = t; st.msg = null; render(); }
+
+function countdown() {
+  const l = L(), ms = new Date(st.campStart + 'T00:00:00').getTime() - Date.now();
+  if (isNaN(ms)) return '';
+  if (ms <= 0) return `<b class="cd">${l.started}</b>`;
+  const d = Math.floor(ms / 864e5), h = Math.floor(ms % 864e5 / 36e5), m = Math.floor(ms % 36e5 / 6e4);
+  return `<span class="cd">${d}</span> ${l.days} <span class="cd">${h}</span> ${l.hours} <span class="cd">${m}</span> ${l.mins}`;
+}
+const pill = s => `<span class="pill ${s === 'published' ? 'ok' : s === 'draft' ? 'warn' : ''}">${esc(L()[s] || s)}</span>`;
+function annView() {
+  const l = L(), f = st.form;
+  const form = `<section class="card"><h2 class="h2" style="margin-bottom:8px">${l.newAnn}</h2>
+    <label class="lbl" for="ft">${l.title_}</label><input id="ft" type="text" maxlength="100" value="${esc(f.title)}">
+    <label class="lbl" for="fb" style="margin-top:8px">${l.body}</label><textarea id="fb" maxlength="600">${esc(f.body)}</textarea>
+    <div class="two" style="margin-top:8px"><div><label class="lbl" for="fk">${l.kind}</label><select id="fk"><option value="announce" ${f.kind === 'announce' ? 'selected' : ''}>${l.announce}</option><option value="event" ${f.kind === 'event' ? 'selected' : ''}>${l.event}</option><option value="other" ${f.kind === 'other' ? 'selected' : ''}>${l.other}</option></select></div>
+      <div><label class="lbl" for="fa">${l.audience}</label><select id="fa"><option value="public" ${f.audience === 'public' ? 'selected' : ''}>${l.public}</option><option value="staff" ${f.audience === 'staff' ? 'selected' : ''}>${l.staff}</option></select></div></div>
+    ${f.kind === 'event' ? `<label class="lbl" for="fw" style="margin-top:8px">${l.when}</label><input id="fw" type="datetime-local" value="${esc(f.startsAt)}">` : ''}
+    <label class="chk" style="margin-top:8px"><input id="fp" type="checkbox" ${f.pinned ? 'checked' : ''}> ${l.pinned}</label>
+    <div class="two" style="margin-top:10px"><button class="btn" data-saveann="1">${f.id ? l.update : l.saveDraft}</button>${f.id ? `<button class="btn alt" data-canceledit="1">${l.cancelEdit}</button>` : ''}</div></section>`;
+  const list = st.anns.length ? st.anns.map(a => `<div class="item"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>${a.pinned ? '📌 ' : ''}${esc(a.title)}</b><span>${pill(a.status)} <span class="pill">${esc(l[a.audience])}</span></span></div>
+    ${a.kind === 'event' && a.startsAt ? `<div class="muted" style="font-size:13px">🕒 ${esc(new Date(a.startsAt).toLocaleString(st.lang === 'ar' ? 'ar' : 'en'))}</div>` : ''}<div style="margin:6px 0">${esc(a.body)}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="chip" data-edit="${esc(a.id)}">${l.edit}</button>${a.status !== 'published' ? `<button class="chip on" data-annst="${esc(a.id)}:published">${l.publish}</button>` : `<button class="chip" data-annst="${esc(a.id)}:draft">${l.unpublish}</button>`}${a.status !== 'archived' ? `<button class="chip" data-annst="${esc(a.id)}:archived">${l.archive}</button>` : ''}</div></div>`).join('') : `<div class="card muted">${l.noAnn}</div>`;
+  return (can('announce') ? form : '') + list;
+}
+function resView() {
+  const l = L(), f = st.rf;
+  const form = `<section class="card"><h2 class="h2" style="margin-bottom:8px">${l.newRes}</h2><label class="lbl" for="rc">${l.comp}</label><input id="rc" type="text" maxlength="60" value="${esc(f.competition)}">
+    <div class="two" style="margin-top:8px"><div><label class="lbl" for="rt">${l.team}</label><input id="rt" type="text" maxlength="40" value="${esc(f.team)}"></div><div><label class="lbl" for="rp">${l.place}</label><input id="rp" type="text" inputmode="numeric" value="${esc(f.place)}"></div><div><label class="lbl" for="rs">${l.points}</label><input id="rs" type="text" inputmode="decimal" value="${esc(f.points)}"></div></div>
+    <button class="btn full" style="margin-top:10px" data-addres="1">${l.addRes}</button></section>`;
+  const groups = {}; const order = [];
+  st.results.forEach(r => { (groups[r.competition] = groups[r.competition] || (order.push(r.competition), [])).push(r); });
+  const list = order.length ? order.map(c => { const rows = groups[c].slice().sort((a, b) => (a.place || 999) - (b.place || 999)); const drafts = rows.filter(r => r.status === 'draft').map(r => r.id);
+    return `<div class="item"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>${esc(c)}</b>${drafts.length && can('verify') ? `<button class="chip on" data-respub="${esc(drafts.join(','))}">${l.publishAll}</button>` : ''}</div>
+     ${rows.map(r => `<div class="brow2"><span>${esc(r.team)} ${pill(r.status)}</span><span>${r.place === null ? '—' : '#' + r.place}</span><span>${r.points === null ? '—' : r.points}</span></div>`).join('')}
+     ${drafts.length && !can('verify') ? `<div class="muted" style="font-size:12.5px">${l.needVerify}</div>` : ''}</div>`; }).join('') : `<div class="card muted">${l.noRes}</div>`;
+  return (can('results') || can('verify') ? form : '') + list;
+}
+function render() {
+  const l = L(); document.documentElement.lang = st.lang; document.documentElement.dir = l.dir; document.documentElement.dataset.theme = st.theme; document.title = l.title + ' — MUKHAYYAM';
+  $('hT').textContent = l.title; $('hS').textContent = l.sub; $('homeBtn').textContent = l.home; $('langBtn').textContent = l.lang; $('themeBtn').textContent = st.theme === 'light' ? l.dark : l.light;
+  const ae = document.activeElement, keep = ae && ae.id && ae.tagName !== 'BUTTON' ? { id: ae.id, pos: ae.selectionStart } : null;
+  const tabs = [can('announce') ? ['ann', l.tAnn] : null, can('results') || can('verify') ? ['res', l.tRes] : null].filter(Boolean);
+  $('app').innerHTML = `${st.msg ? `<div class="banner ${st.msg.cls}" role="alert">${esc(st.msg.t)}</div>` : ''}
+   <section class="card"><div class="kl">${l.countdown}</div><div id="cd">${countdown()}</div><div class="muted" style="font-size:12.5px;margin-top:4px">${l.feedNote}</div></section>
+   <div class="tabs">${tabs.map(t => `<button class="${st.tab === t[0] ? 'on' : ''}" data-tab="${t[0]}">${t[1]}</button>`).join('')}</div>${st.tab === 'ann' ? annView() : resView()}`;
+  if (keep && $(keep.id)) { const e = $(keep.id); e.focus(); try { e.setSelectionRange(keep.pos, keep.pos); } catch (x) {} }
+}
+document.addEventListener('input', e => {
+  const i = e.target.id, v = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+  if (i === 'ft') st.form.title = v; else if (i === 'fb') st.form.body = v; else if (i === 'fw') st.form.startsAt = v; else if (i === 'fp') st.form.pinned = v;
+  else if (i === 'rc') st.rf.competition = v; else if (i === 'rt') st.rf.team = v; else if (i === 'rp') st.rf.place = v; else if (i === 'rs') st.rf.points = v;
+});
+document.addEventListener('change', e => { if (e.target.id === 'fk') { st.form.kind = e.target.value; render(); } else if (e.target.id === 'fa') st.form.audience = e.target.value; });
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('button'); if (!b) return; const d = b.dataset;
+  if (d.tab) setTab(d.tab); else if (d.saveann) saveAnn(); else if (d.canceledit) { st.form = blank(); render(); }
+  else if (d.edit) editAnn(d.edit); else if (d.annst) { const p = d.annst.split(':'); annStatus(p[0], p[1]); }
+  else if (d.addres) addRes(); else if (d.respub) resStatus(d.respub.split(','), 'published');
+});
+$('langBtn').onclick = () => { st.lang = st.lang === 'ar' ? 'en' : 'ar'; pref.set('lang', st.lang); render(); };
+$('themeBtn').onclick = () => { st.theme = st.theme === 'light' ? 'dark' : 'light'; pref.set('theme', st.theme); render(); };
+setInterval(() => { const e = $('cd'); if (e) e.innerHTML = countdown(); }, 30000);
+render(); load();
+</script>
+</body></html>

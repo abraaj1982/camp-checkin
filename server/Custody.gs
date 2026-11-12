@@ -143,7 +143,7 @@ function handleWithdrawStart_(data) {
       if (clientId) { const dup = all.filter(function(w) { return w.clientId === clientId; })[0]; if (dup) return { success: true, repeated: true, id: dup.id }; }
       if (all.some(function(w) { return w.studentId === student.id && w.status === 'open'; })) return { success: false, code: 'ALREADY_OPEN', error: 'يوجد طلب انسحاب مفتوح لهذا الطالب' };
       if (scanStates_().states[student.id] && scanStates_().states[student.id].state === 'withdrawn') return { success: false, code: 'ALREADY_WITHDRAWN', error: 'منسحب مسبقاً' };
-      const id = 'W' + Date.now().toString(36).toUpperCase();
+      const id = newId_('W');
       withdrawalsSheet_().appendRow([id, student.id, new Date(), guardian, reason, 'open', user.Username, '', '', clientId]);
       writeAudit_(user.Username, 'WITHDRAW_OPENED', student.id, id);
       return { success: true, id: id, custody: custodyView_(student, custodyStates_().states, readWithdrawals_()) };

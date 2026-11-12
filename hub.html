@@ -150,6 +150,7 @@ th { font-size: 11px; color: var(--sap-gray); font-weight: 600; }
 
   <div class="card">
     <h2>🏠 شاشاتك</h2>
+    <div class="card" id="bulletinCard" style="display:none;"><h2>📢 إعلانات</h2><div id="bulletinList"></div></div>
     <div class="tiles" id="tiles"></div>
     <div class="hint" id="noTiles" style="display:none;">لا توجد شاشات مفعّلة لحسابك بعد. تواصل مع السكرتارية.</div>
   </div>
@@ -272,12 +273,15 @@ const SCREEN_LINKS = {
   custody: 'custody.html',
   medical: 'medical.html',
   nutrition: 'nutrition.html',
+  announce: 'media.html',
+  results: 'media.html',
+  verify: 'media.html',
   shirts: 'shirt_distribution.html'
 };
 const SCREEN_NAMES = {
   checkin: 'تسجيل الحضور', dashboard: 'لوحة المعلومات', committee: 'مصاريف اللجنة',
   finance: 'اعتماد المصاريف', shirts: 'توزيع القمصان', team: 'الفريق والإعلانات',
-  users: 'المستخدمون', results: 'إدخال النتائج', medical: 'الصفحة الطبية', print: 'طباعة الأساور والكشوف', custody: 'الأمانات والانسحاب', nutrition: 'التغذية'
+  users: 'المستخدمون', results: 'إدخال النتائج', medical: 'الصفحة الطبية', print: 'طباعة الأساور والكشوف', custody: 'الأمانات والانسحاب', nutrition: 'التغذية', announce: 'الإعلامية', verify: 'التحقق من النتائج'
 };
 
 function can(key) { return permissions.indexOf('*') !== -1 || permissions.indexOf(key) !== -1; }
@@ -305,7 +309,9 @@ function renderTiles() {
   const box = document.getElementById('tiles');
   box.innerHTML = '';
   const keys = Object.keys(SCREEN_NAMES).filter(k => k !== 'users' && can(k));
+  const seen = {};
   keys.forEach(k => {
+    if (SCREEN_LINKS[k]) { if (seen[SCREEN_LINKS[k]]) return; seen[SCREEN_LINKS[k]] = true; }
     const a = document.createElement(SCREEN_LINKS[k] ? 'a' : 'div');
     a.className = 'tile' + (SCREEN_LINKS[k] ? '' : ' soon');
     if (SCREEN_LINKS[k]) a.href = SCREEN_LINKS[k];
@@ -656,8 +662,25 @@ document.getElementById('checkSheetBtn').addEventListener('click', async () => {
 
 // ---------------- startup ----------------
 
+async function loadBulletin() {
+  try {
+    const d = await api({ action: 'bulletin' });
+    if (!d.success || !d.items.length) return;
+    const list = document.getElementById('bulletinList'); list.innerHTML = '';
+    d.items.slice(0, 5).forEach(it => {
+      const row = document.createElement('div'); row.style.cssText = 'padding:8px 0;border-top:1px solid var(--sap-border, #ddd)';
+      const t = document.createElement('b'); t.textContent = (it.pinned ? '📌 ' : '') + it.title; row.appendChild(t);
+      if (it.body) { const b = document.createElement('div'); b.textContent = it.body; b.style.marginTop = '2px'; row.appendChild(b); }
+      if (it.kind === 'event' && it.startsAt) { const w = document.createElement('div'); w.className = 'hint'; w.textContent = '🕒 ' + new Date(it.startsAt).toLocaleString('ar'); row.appendChild(w); }
+      list.appendChild(row);
+    });
+    document.getElementById('bulletinCard').style.display = 'block';
+  } catch (e) { /* no bulletin: ignore */ }
+}
+
 renderHeader();
 renderTiles();
+loadBulletin();
 
 // The server is the source of truth: refresh permissions once, then draw the admin parts if allowed.
 (async function init() {

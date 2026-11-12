@@ -17,7 +17,7 @@ const ctx={console,Logger:{log:()=>{}},Date,
   computeDigest:(a,seed)=>[...crypto.createHash('sha256').update(seed).digest()],DigestAlgorithm:{SHA_256:1},getUuid:()=>crypto.randomUUID(),
   formatDate:(d,tz,f)=>{const x=new Date(d.getTime()+4*3600e3);return String(x.getUTCHours()).padStart(2,'0')+':'+String(x.getUTCMinutes()).padStart(2,'0')}}};
 vm.createContext(ctx);
-vm.runInContext(fs.readFileSync(__dirname+'/../server/Auth.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Code.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Custody.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Health.gs','utf8'),ctx);
+vm.runInContext(fs.readFileSync(__dirname+'/../server/Auth.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Code.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Custody.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Health.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Media.gs','utf8'),ctx);
 const U=['Username','PasswordHash','Salt','FullName','Role','AssignedBus','Active','FailedAttempts','LockedUntil','TokenEpoch','LastActivityAt','CreatedAt','LastLogin'];
 book.Users=mkSheet([U]);book.Settings=mkSheet([['Key','Value']]);book.AuditLog=mkSheet([['Timestamp','ActorUsername','Action','TargetUsername','Details']]);
 // student sheet: reordered columns, includes Photo URL + Contact number which must never leak
@@ -194,6 +194,40 @@ r=post({action:'login',username:'tmp1',password:'p9'});assert(r.success,'re-enab
 r=post({action:'setUserActive',token:T,targetUsername:'Admin',active:false});assert(!r.success,'admin cannot disable themselves');
 r=post({action:'setUserActive',token:T,targetUsername:'tmp1',active:'no'});assert(!r.success,'invalid value rejected');
 assert(book.AuditLog.rows.some(x=>x[2]==='USER_DISABLED'&&x[3]==='tmp1'),'audit: account disabled');
+// ---- media: announcements, results, public feed
+post({action:'createUser',token:T,username:'med',password:'pa',fullName:'إعلامي',role:'media',permissions:['announce','results'],committees:[]});
+const tm=post({action:'login',username:'med',password:'pa'}).token;
+post({action:'createUser',token:T,username:'ver',password:'pb',fullName:'محقق',role:'verifier',permissions:['verify'],committees:[]});
+const tv=post({action:'login',username:'ver',password:'pb'}).token;
+r=post({action:'mediaList',token:t1});assert(!r.success,'supervisor cannot open media');
+r=post({action:'annSave',token:t1,title:'مرحباً بكم'});assert(!r.success,'supervisor cannot create announcements');
+r=post({action:'annSave',token:tm,title:'م',body:''});assert(!r.success,'short title rejected');
+r=post({action:'annSave',token:tm,title:'فعالية',kind:'event'});assert(!r.success,'event needs a date');
+r=post({action:'annSave',token:tm,title:'تعليمات للمشرفين',body:'الكل في الباص 6:00',audience:'staff',clientId:'a1'});assert(r.success,'staff announcement drafted');const a1=r.id;
+r=post({action:'annSave',token:tm,title:'تعليمات للمشرفين',body:'x',audience:'staff',clientId:'a1'});assert(r.repeated&&r.id===a1,'announcement retry idempotent');
+r=post({action:'annSave',token:tm,title:'حفل الافتتاح',body:'في الساحة',kind:'event',startsAt:'2026-12-28T18:00:00Z',audience:'public',pinned:true});assert(r.success,'public event drafted');const a2=r.id;
+r=post({action:'bulletin',token:t1});assert(r.success&&r.items.length===0,'drafts are not in the bulletin');
+r=post({action:'annStatus',token:tm,id:a1,status:'published'});assert(r.success,'staff announcement published');
+r=post({action:'annStatus',token:tm,id:a2,status:'published'});assert(r.success,'public event published');
+r=post({action:'bulletin',token:t1});assert(r.success&&r.items.length===2&&r.items[0].id===a2,'bulletin: pinned first, both audiences visible to staff');
+r=post({action:'bulletin',token:'bad'});assert(!r.success,'bulletin needs a login');
+r=post({action:'feed',key:'anything'});assert(!r.success,'feed disabled until a key exists');
+const fk=run('ADMIN_createFeedKey')();
+r=post({action:'feed',key:'wrong'+fk});assert(!r.success,'feed rejects a wrong key');
+r=post({action:'feed',key:fk});assert(r.success&&r.announcements.length===1&&r.announcements[0].title==='حفل الافتتاح'&&!JSON.stringify(r).includes('تعليمات للمشرفين'),'feed shows ONLY published public items');
+assert(r.campStart==='2026-12-27'&&!!r.serverTime,'feed carries camp start + server time');
+r=post({action:'resSave',token:tm,competition:'كرة القدم',team:'الأزرق',place:1,points:30});assert(r.success,'result entered');const r1=r.id;
+r=post({action:'resSave',token:tm,competition:'كرة القدم',team:'الأحمر',place:2,points:20});const r2=r.id;
+r=post({action:'resSave',token:tm,competition:'كرة القدم',team:'الأخضر'});assert(!r.success,'place or points required');
+r=post({action:'resSave',token:tm,competition:'كرة القدم',team:'x',place:0});assert(!r.success,'bad place rejected');
+r=post({action:'resStatus',token:tm,ids:[r1,r2],status:'published'});assert(!r.success&&r.code==='NEEDS_VERIFY','entering results is not enough to publish them');
+r=post({action:'feed',key:fk});assert(r.results.length===0,'unverified results are not public');
+r=post({action:'resStatus',token:tv,ids:[r2,r1],status:'published'});assert(r.success&&r.changed===2,'verifier publishes results');
+r=post({action:'feed',key:fk});assert(r.results.length===1&&r.results[0].rows[0].team==='الأزرق'&&r.results[0].rows[1].team==='الأحمر','feed results ordered by place');
+r=post({action:'resStatus',token:tv,id:r2,status:'archived'});r=post({action:'feed',key:fk});assert(r.results[0].rows.length===1,'archived result leaves the feed');
+r=post({action:'annStatus',token:tm,id:a2,status:'archived'});r=post({action:'feed',key:fk});assert(r.announcements.length===0,'archived announcement leaves the feed');
+assert(!JSON.stringify(post({action:'feed',key:fk})).match(/9999000|أحمد|ربو/),'feed has no student data');
+assert(book.AuditLog.rows.some(x=>x[2]==='RESULT_PUBLISHED'),'audit: results published');
 // ---- sheet check
 r=post({action:'checkStudentSheet',token:T});assert(r.success&&r.report.ok&&r.report.total===4,'student sheet check passes');
 console.log(fails?`\n${fails} FAILED`:'\nALL PASSED');
