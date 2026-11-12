@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ar" dir="rtl" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>التغذية — MUKHAYYAM</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="theme.css">
+<style>
+.page{max-width:720px;margin:0 auto;padding:14px;display:flex;flex-direction:column;gap:12px}
+.tabs{display:flex;gap:6px}.tabs button{flex:1;min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-weight:600;cursor:pointer}
+.tabs button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+input[type=text],input[type=search]{width:100%;box-sizing:border-box}
+.two{display:flex;gap:8px}.two>*{flex:1}
+.item{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--card)}
+.kpis{display:flex;gap:10px;flex-wrap:wrap}.kpis .card{flex:1 1 130px;padding:12px}
+.chk{display:flex;align-items:center;gap:8px;padding:6px 0}
+.brow2{display:grid;grid-template-columns:90px 1fr 36px;gap:8px;align-items:center;padding:5px 0;font-size:14px}
+@media print{.hdr,.tool,.chip{display:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hdr">
+    <div class="logo">م</div>
+    <div style="flex:1;min-width:0"><div class="t" id="hT"></div><div class="s" id="hS"></div></div>
+    <a class="tool" href="hub.html" id="homeBtn" style="text-decoration:none;display:flex;align-items:center"></a>
+    <button class="tool" id="langBtn"></button>
+    <button class="tool" id="themeBtn"></button>
+  </header>
+  <main class="page" id="app"></main>
+</div>
+<script>
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4lEBGPNxghwq9UmK0iljI5QdS-8iCvC-K09dDtbZCXGvGZyA4repTE3rFVVRp5zS4yw/exec';
+const token = sessionStorage.getItem('mukhayyam_token');
+let perms = [];
+try { perms = JSON.parse(sessionStorage.getItem('mukhayyam_permissions') || '[]'); } catch (e) {}
+const can = k => perms.indexOf('*') !== -1 || perms.indexOf(k) !== -1;
+const pref = { get(k, d) { try { return localStorage.getItem('mk_pref_' + k) || d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('mk_pref_' + k, v); } catch (e) {} } };
+const $ = id => document.getElementById(id);
+const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2));
+const AUTH_ERR = /EXPIRED|IDLE_TIMEOUT|REVOKED|BAD_SIGNATURE|MALFORMED|USER_NOT_FOUND|ACCOUNT_DISABLED|BAD_PAYLOAD/;
+async function api(payload) {
+  const r = await (await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(Object.assign({ token: token }, payload)) })).json();
+  if (r && r.code && AUTH_ERR.test(r.code)) { st.msg = { cls: 'bad', t: L().sessionEnd }; render(); setTimeout(() => { sessionStorage.clear(); location.href = 'login.html'; }, 1500); throw new Error('auth'); }
+  return r;
+}
+const L = () => T[st.lang];
+const say = (cls, t) => { st.msg = { cls: cls, t: t }; };
+const errText = r => (r && L().codes && L().codes[r.code]) || (r && r.error) || L().error;
+
+if (!token) location.href = 'login.html'; else if (!can('nutrition')) location.href = 'hub.html';
+const T = {
+ ar: { dir: 'rtl', title: 'التغذية', sub: 'أعداد الوجبات والحساسية الغذائية', home: 'الرئيسية', lang: 'English', dark: '🌙', light: '☀',
+  present: 'الطلاب الحاضرون', of: 'من', sups: 'المشرفون', meals: 'وجبات للتحضير', note: 'الحاضرون = من سُجّل صعوده ولم ينسحب. المشرفون = حسابات الباصات الفعّالة.',
+  byTeam: 'الحاضرون حسب الفريق', allergies: 'الحساسية الغذائية', onlyPresent: 'الحاضرون فقط', all: 'الكل', presentB: 'حاضر', absentB: 'لم يصل', none: 'لا توجد حالات حساسية غذائية مسجّلة.',
+  noCol: 'عمود «Food allergy» غير موجود في شيت الطلاب. أضِفه ليظهر هنا.', team: 'الفريق', updated: 'آخر تحديث', error: 'تعذّر تحميل البيانات.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.', print: 'طباعة' },
+ en: { dir: 'ltr', title: 'Nutrition', sub: 'Meal counts and food allergies', home: 'Home', lang: 'العربية', dark: '🌙', light: '☀',
+  present: 'Students present', of: 'of', sups: 'Supervisors', meals: 'Meals to prepare', note: 'Present = checked in and not withdrawn. Supervisors = active bus accounts.',
+  byTeam: 'Present by team', allergies: 'Food allergies', onlyPresent: 'Present only', all: 'All', presentB: 'Present', absentB: 'Not arrived', none: 'No food allergies on record.',
+  noCol: 'The “Food allergy” column is missing from the student sheet. Add it to show it here.', team: 'Team', updated: 'Updated', error: 'Could not load data.', sessionEnd: 'Session expired. Please log in again.', print: 'Print' }
+};
+const st = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), d: null, onlyPresent: false, err: '', at: '', msg: null };
+async function load() {
+  try { const r = await api({ action: 'nutritionSummary' }); if (r.success) { st.d = r; st.err = ''; st.at = new Date().toTimeString().slice(0, 5); } else st.err = L().error; } catch (e) { if (e.message !== 'auth') st.err = L().error; }
+  render();
+}
+function render() {
+  const l = L(); document.documentElement.lang = st.lang; document.documentElement.dir = l.dir; document.documentElement.dataset.theme = st.theme; document.title = l.title + ' — MUKHAYYAM';
+  $('hT').textContent = l.title; $('hS').textContent = l.sub; $('homeBtn').textContent = l.home; $('langBtn').textContent = l.lang; $('themeBtn').textContent = st.theme === 'light' ? l.dark : l.light;
+  const d = st.d; if (!d) { $('app').innerHTML = `<div class="card muted">${st.err || '...'}</div>`; return; }
+  const k = (lab, v, n) => `<div class="card"><div class="kl">${lab}</div><div class="kv">${v}</div><div class="kl">${n || ''}</div></div>`;
+  const list = (d.allergies || []).filter(a => !st.onlyPresent || a.present).sort((a, b) => (b.present - a.present) || a.name.localeCompare(b.name));
+  const mx = Math.max(1, ...d.byTeam.map(t => t.count));
+  $('app').innerHTML = `${st.err ? `<div class="banner bad">${esc(st.err)}</div>` : ''}${st.msg ? `<div class="banner ${st.msg.cls}">${esc(st.msg.t)}</div>` : ''}
+   <div class="kpis">${k(l.present, d.studentsPresent, l.of + ' ' + d.studentsTotal)}${k(l.sups, d.supervisors)}${k(l.meals, d.mealsToPrepare)}</div>
+   <div class="muted" style="font-size:12.5px">${l.note} · ${l.updated} ${esc(st.at)}</div>
+   <section class="card"><h2 class="h2" style="margin-bottom:6px">${l.byTeam}</h2>${d.byTeam.length ? d.byTeam.map(t => `<div class="brow2"><span>${esc(t.team)}</span><div class="bar" style="margin:0"><i style="width:${Math.round(t.count / mx * 100)}%"></i></div><b>${t.count}</b></div>`).join('') : '<div class="muted">—</div>'}</section>
+   <section class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px"><h2 class="h2">${l.allergies} (${(d.allergies || []).length})</h2>
+     <span style="display:flex;gap:6px"><button class="chip ${st.onlyPresent ? 'on' : ''}" data-filter="1">${l.onlyPresent}</button><button class="chip" data-print="1">${l.print}</button></span></div>
+     ${d.allergyColumnPresent === false ? `<div class="banner warn">${l.noCol}</div>` : ''}
+     ${list.length ? list.map(a => `<div class="row"><span><b>${esc(a.name)}</b> <span class="muted">· ${esc(a.team)}</span><br><span style="color:var(--bad);font-weight:600">${esc(a.allergy)}</span></span><span class="pill ${a.present ? 'ok' : ''}">${a.present ? l.presentB : l.absentB}</span></div>`).join('') : `<div class="muted">${l.none}</div>`}</section>`;
+}
+document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('button'); if (!b) return; if (b.dataset.filter) { st.onlyPresent = !st.onlyPresent; render(); } else if (b.dataset.print) window.print(); });
+
+$('langBtn').onclick = () => { st.lang = st.lang === 'ar' ? 'en' : 'ar'; pref.set('lang', st.lang); render(); };
+$('themeBtn').onclick = () => { st.theme = st.theme === 'light' ? 'dark' : 'light'; pref.set('theme', st.theme); render(); };
+render(); load(); setInterval(() => { if (!document.hidden && navigator.onLine) load(); }, 30000);
+</script>
+</body></html>

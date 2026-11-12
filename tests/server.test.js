@@ -17,7 +17,7 @@ const ctx={console,Logger:{log:()=>{}},Date,
   computeDigest:(a,seed)=>[...crypto.createHash('sha256').update(seed).digest()],DigestAlgorithm:{SHA_256:1},getUuid:()=>crypto.randomUUID(),
   formatDate:(d,tz,f)=>{const x=new Date(d.getTime()+4*3600e3);return String(x.getUTCHours()).padStart(2,'0')+':'+String(x.getUTCMinutes()).padStart(2,'0')}}};
 vm.createContext(ctx);
-vm.runInContext(fs.readFileSync(__dirname+'/../server/Auth.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Code.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Custody.gs','utf8'),ctx);
+vm.runInContext(fs.readFileSync(__dirname+'/../server/Auth.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Code.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Custody.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Health.gs','utf8'),ctx);
 const U=['Username','PasswordHash','Salt','FullName','Role','AssignedBus','Active','FailedAttempts','LockedUntil','TokenEpoch','LastActivityAt','CreatedAt','LastLogin'];
 book.Users=mkSheet([U]);book.Settings=mkSheet([['Key','Value']]);book.AuditLog=mkSheet([['Timestamp','ActorUsername','Action','TargetUsername','Details']]);
 // student sheet: reordered columns, includes Photo URL + Contact number which must never leak
@@ -147,6 +147,41 @@ r=post({action:'withdrawStart',token:ts,studentId:'1002',guardian:'أبو سال
 r=post({action:'withdrawCancel',token:ts,id:w2});assert(r.success,'withdrawal cancelled');
 r=post({action:'withdrawClose',token:ts,id:w2});assert(!r.success&&r.code==='NOT_OPEN','cancelled withdrawal cannot close');
 assert(book.AuditLog.rows.some(x=>x[2]==='WITHDRAW_CLOSED'),'audit: withdrawal closed');
+// ---- doctors + nutrition
+book.Bus.rows[0].push('Food allergy','Medical notes');
+book.Bus.rows[1].push('فول سوداني','ربو');book.Bus.rows[2].push('','');book.Bus.rows[3].push('','سكري');book.Bus.rows[4].push('لاكتوز','');
+for(const k of Object.keys(cache))delete cache[k];
+post({action:'createUser',token:T,username:'doc',password:'p7',fullName:'طبيب',role:'supervisor',permissions:['medical'],committees:[]});
+const td=post({action:'login',username:'doc',password:'p7'}).token;
+post({action:'createUser',token:T,username:'nut',password:'p8',fullName:'تغذية',role:'supervisor',permissions:['nutrition'],committees:[]});
+const tn=post({action:'login',username:'nut',password:'p8'}).token;
+r=post({action:'medFind',token:t1,q:'1001'});assert(!r.success,'supervisor cannot open the medical screen');
+r=post({action:'medFind',token:tn,q:'1001'});assert(!r.success,'nutrition cannot open the medical screen');
+r=post({action:'medFind',token:td,q:'1001'});assert(r.success&&r.results[0].hasNotes===true&&!JSON.stringify(r).includes('ربو')&&!JSON.stringify(r).includes('9999000'),'search shows only a flag, never the notes');
+r=post({action:'medInfo',token:td,studentId:'1001'});assert(r.success&&r.notes==='ربو'&&r.foodAllergy==='فول سوداني','doctor reads one student\'s notes');
+assert(book.AuditLog.rows.some(x=>x[2]==='MED_VIEW'&&x[3]==='1001'),'audit: medical notes viewed');
+r=post({action:'medInfo',token:tl,studentId:'1001'});assert(!r.success,'leader cannot read medical notes');
+r=post({action:'medOpen',token:td,studentId:'1001',complaint:'صداع وحرارة',severity:'urgent',clientId:'d1'});assert(r.success&&r.id,'case opened');
+const mid=r.id;
+r=post({action:'medOpen',token:td,studentId:'1001',complaint:'صداع وحرارة',severity:'urgent',clientId:'d1'});assert(r.repeated&&r.id===mid,'case open retry idempotent');
+r=post({action:'medOpen',token:td,studentId:'1001',complaint:'آخر'});assert(!r.success&&r.code==='ALREADY_OPEN','one open case per student');
+r=post({action:'medOpen',token:td,studentId:'1002',complaint:'x'});assert(!r.success,'complaint required');
+r=post({action:'medOpen',token:td,studentId:'1002',complaint:'ألم بطن',severity:'bad'});assert(!r.success,'invalid severity rejected');
+r=post({action:'leaderSummary',token:tl});assert(r.alerts.some(a=>a.type==='med_urgent'&&a.count===1)&&!JSON.stringify(r).includes('صداع'),'leader alert shows a count only');
+r=post({action:'medList',token:tl});assert(!r.success,'leader cannot list medical cases');
+r=post({action:'medClose',token:td,id:mid});assert(!r.success&&r.code==='TREATMENT_REQUIRED','cannot close without treatment');
+r=post({action:'medUpdate',token:td,id:mid,treatment:'خافض حرارة وراحة'});assert(r.success,'treatment saved');
+r=post({action:'medClose',token:td,id:mid});assert(r.success,'case closed');
+r=post({action:'medClose',token:td,id:mid});assert(!r.success&&r.code==='NOT_OPEN','closed case cannot close again');
+r=post({action:'medList',token:td});assert(r.success&&r.cases[0].status==='closed'&&r.cases[0].treatment==='خافض حرارة وراحة','doctor lists cases with details');
+r=post({action:'medStats',token:tl});assert(r.success&&r.total===1&&r.closed===1&&r.urgent===1&&r.byTeam[0].count===1&&!JSON.stringify(r).includes('صداع')&&!JSON.stringify(r).includes('أحمد'),'stats are counts only');
+r=post({action:'medStats',token:t1});assert(!r.success,'supervisor cannot read medical stats');
+r=post({action:'nutritionSummary',token:t1});assert(!r.success,'supervisor cannot read nutrition');
+r=post({action:'nutritionSummary',token:tn});
+assert(r.success&&r.studentsTotal===4&&r.studentsPresent>=1&&r.supervisors>=1&&r.mealsToPrepare===r.studentsPresent+r.supervisors,'nutrition counts: students present + supervisors');
+assert(r.allergies.length===2&&r.allergies.some(a=>a.name==='أحمد'&&a.allergy==='فول سوداني')&&!JSON.stringify(r).includes('ربو')&&!JSON.stringify(r).includes('سكري'),'nutrition sees FOOD allergies by name only, no medical notes');
+r=post({action:'nutritionSummary',token:tl});assert(r.success&&!r.allergies&&r.studentsPresent>=1,'leader sees meal counts only (no allergy names)');
+for(const a of ['roster','lookup','printList','leaderSummary','history','custodySummary']){const rr=JSON.stringify(post({action:a,token:T,q:'أحمد',studentId:'1001'}));assert(!rr.includes('ربو')&&!rr.includes('سكري')&&!rr.includes('فول سوداني'),'no medical/allergy data leaks via '+a);}
 // ---- sheet check
 r=post({action:'checkStudentSheet',token:T});assert(r.success&&r.report.ok&&r.report.total===4,'student sheet check passes');
 console.log(fails?`\n${fails} FAILED`:'\nALL PASSED');

@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="ar" dir="rtl" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>الطبيب — MUKHAYYAM</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="theme.css">
+<style>
+.page{max-width:720px;margin:0 auto;padding:14px;display:flex;flex-direction:column;gap:12px}
+.tabs{display:flex;gap:6px}.tabs button{flex:1;min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-weight:600;cursor:pointer}
+.tabs button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+input[type=text],input[type=search]{width:100%;box-sizing:border-box}
+.two{display:flex;gap:8px}.two>*{flex:1}
+.item{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--card)}
+.kpis{display:flex;gap:10px;flex-wrap:wrap}.kpis .card{flex:1 1 130px;padding:12px}
+.chk{display:flex;align-items:center;gap:8px;padding:6px 0}
+.brow2{display:grid;grid-template-columns:90px 1fr 36px;gap:8px;align-items:center;padding:5px 0;font-size:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hdr">
+    <div class="logo">م</div>
+    <div style="flex:1;min-width:0"><div class="t" id="hT"></div><div class="s" id="hS"></div></div>
+    <a class="tool" href="hub.html" id="homeBtn" style="text-decoration:none;display:flex;align-items:center"></a>
+    <button class="tool" id="langBtn"></button>
+    <button class="tool" id="themeBtn"></button>
+  </header>
+  <main class="page" id="app"></main>
+</div>
+<script>
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4lEBGPNxghwq9UmK0iljI5QdS-8iCvC-K09dDtbZCXGvGZyA4repTE3rFVVRp5zS4yw/exec';
+const token = sessionStorage.getItem('mukhayyam_token');
+let perms = [];
+try { perms = JSON.parse(sessionStorage.getItem('mukhayyam_permissions') || '[]'); } catch (e) {}
+const can = k => perms.indexOf('*') !== -1 || perms.indexOf(k) !== -1;
+const pref = { get(k, d) { try { return localStorage.getItem('mk_pref_' + k) || d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('mk_pref_' + k, v); } catch (e) {} } };
+const $ = id => document.getElementById(id);
+const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2));
+const AUTH_ERR = /EXPIRED|IDLE_TIMEOUT|REVOKED|BAD_SIGNATURE|MALFORMED|USER_NOT_FOUND|ACCOUNT_DISABLED|BAD_PAYLOAD/;
+async function api(payload) {
+  const r = await (await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(Object.assign({ token: token }, payload)) })).json();
+  if (r && r.code && AUTH_ERR.test(r.code)) { st.msg = { cls: 'bad', t: L().sessionEnd }; render(); setTimeout(() => { sessionStorage.clear(); location.href = 'login.html'; }, 1500); throw new Error('auth'); }
+  return r;
+}
+const L = () => T[st.lang];
+const say = (cls, t) => { st.msg = { cls: cls, t: t }; };
+const errText = r => (r && L().codes && L().codes[r.code]) || (r && r.error) || L().error;
+
+if (!token) location.href = 'login.html'; else if (!can('medical')) location.href = 'hub.html';
+const T = {
+ ar: { dir: 'rtl', title: 'الطبيب', sub: 'الحالات الطبية (بيانات محمية)', home: 'الرئيسية', lang: 'English', dark: '🌙', light: '☀',
+  tCases: 'الحالات', tStats: 'الإحصاءات', search: 'ابحث عن طالب بالاسم أو الرقم', bus: n => 'باص ' + n, none: 'لا نتائج',
+  showNotes: 'عرض الملاحظات الطبية', hideNotes: 'إخفاء', notesWarn: 'يُسجَّل اطّلاعك على هذه البيانات. لا تشاركها خارج الفريق الطبي.', noNotes: 'لا توجد ملاحظات مسجّلة', foodAl: 'حساسية غذائية',
+  complaint: 'الشكوى', urgent: 'عاجلة', normal: 'عادية', openCase: 'فتح ملف حالة', hasOpen: 'يوجد ملف مفتوح لهذا الطالب', open: 'مفتوحة', closed: 'مغلقة',
+  treatment: 'العلاج / الإجراء', saveTr: 'حفظ', closeCase: 'إغلاق الحالة', confirmClose: 'إغلاق الحالة؟', noCases: 'لا توجد حالات.', openedAt: 'فُتحت', by: 'بواسطة',
+  total: 'إجمالي الحالات', openN: 'مفتوحة', closedN: 'مغلقة', urgentN: 'عاجلة', avg: 'متوسط وقت الإغلاق (د)', byDay: 'حسب اليوم', byTeam: 'حسب الفريق', byBus: 'حسب الباص',
+  done: 'تم', error: 'تعذّر الاتصال. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.',
+  codes: { ALREADY_OPEN: 'يوجد ملف مفتوح لهذا الطالب', NOT_OPEN: 'الملف مغلق', TREATMENT_REQUIRED: 'اكتب العلاج أو الإجراء قبل الإغلاق', NOT_FOUND: 'الطالب غير موجود' } },
+ en: { dir: 'ltr', title: 'Doctor', sub: 'Medical cases (protected data)', home: 'Home', lang: 'العربية', dark: '🌙', light: '☀',
+  tCases: 'Cases', tStats: 'Statistics', search: 'Search a student by name or number', bus: n => 'Bus ' + n, none: 'No results',
+  showNotes: 'Show medical notes', hideNotes: 'Hide', notesWarn: 'Your access to this data is logged. Do not share it outside the medical team.', noNotes: 'No notes on record', foodAl: 'Food allergy',
+  complaint: 'Complaint', urgent: 'Urgent', normal: 'Normal', openCase: 'Open a case', hasOpen: 'This student already has an open case', open: 'Open', closed: 'Closed',
+  treatment: 'Treatment / action', saveTr: 'Save', closeCase: 'Close case', confirmClose: 'Close this case?', noCases: 'No cases.', openedAt: 'Opened', by: 'by',
+  total: 'Total cases', openN: 'Open', closedN: 'Closed', urgentN: 'Urgent', avg: 'Avg. time to close (min)', byDay: 'By day', byTeam: 'By team', byBus: 'By bus',
+  done: 'Done', error: 'Connection problem. Try again.', sessionEnd: 'Session expired. Please log in again.',
+  codes: { ALREADY_OPEN: 'This student already has an open case', NOT_OPEN: 'Case is closed', TREATMENT_REQUIRED: 'Enter the treatment before closing', NOT_FOUND: 'Student not found' } }
+};
+const st = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), tab: 'cases', q: '', results: [], cur: null, notes: null, complaint: '', severity: 'normal', cases: [], stats: null, msg: null, drafts: {} };
+
+let qTimer = null, hideTimer = null;
+function onQ(v) {
+  st.q = v; clearTimeout(qTimer);
+  if (!v.trim()) { st.results = []; return renderResults(); }
+  qTimer = setTimeout(async () => { try { const r = await api({ action: 'medFind', q: v.trim() }); if (r.success && st.q === v) { st.results = r.results; renderResults(); } } catch (e) {} }, 300);
+}
+function pick(id) { st.cur = st.results.find(x => x.id === id) || null; hideNotes(true); st.complaint = ''; st.severity = 'normal'; st.msg = null; render(); }
+async function showNotes() {
+  try { const r = await api({ action: 'medInfo', studentId: st.cur.id }); if (r.success) { st.notes = r; clearTimeout(hideTimer); hideTimer = setTimeout(() => hideNotes(), 30000); } else say('bad', errText(r)); } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
+  render();
+}
+function hideNotes(silent) { clearTimeout(hideTimer); st.notes = null; if (!silent) render(); }
+async function openCase() {
+  try { const r = await api({ action: 'medOpen', studentId: st.cur.id, complaint: st.complaint, severity: st.severity, clientId: uid() });
+    if (r.success) { say('ok', L().done); st.cur = null; st.q = ''; st.results = []; hideNotes(true); await loadCases(); } else say('bad', errText(r));
+  } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
+  render();
+}
+async function saveTreatment(id, close) {
+  const text = (st.drafts[id] !== undefined ? st.drafts[id] : (st.cases.find(c => c.id === id) || {}).treatment) || '';
+  if (close && !confirm(L().confirmClose)) return;
+  try {
+    let r = await api({ action: 'medUpdate', id: id, treatment: text });
+    if (r.success && close) r = await api({ action: 'medClose', id: id, treatment: text });
+    say(r.success ? 'ok' : 'bad', r.success ? L().done : errText(r)); delete st.drafts[id];
+  } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
+  await loadCases(); render();
+}
+async function loadCases() { try { const r = await api({ action: 'medList' }); if (r.success) st.cases = r.cases; } catch (e) {} }
+async function loadStats() { try { const r = await api({ action: 'medStats' }); if (r.success) st.stats = r; } catch (e) {} }
+function setTab(t) { st.tab = t; st.msg = null; hideNotes(true); if (t === 'stats') loadStats().then(render); render(); }
+
+function resultsHtml() {
+  const l = L(); if (!st.q.trim()) return '';
+  if (!st.results.length) return `<div class="muted" style="padding:8px">${l.none}</div>`;
+  return st.results.map(s => `<button class="res" data-pick="${esc(s.id)}"><b>${esc(s.name)}</b><span class="muted"> · ${esc(s.id)} · ${esc(s.team)} · ${l.bus(esc(s.bus))}</span></button>`).join('');
+}
+function renderResults() { const e = $('qres'); if (e) e.innerHTML = resultsHtml(); }
+function studentCard() {
+  const l = L(), c = st.cur; if (!c) return '';
+  const n = st.notes;
+  return `<section class="card"><div style="display:flex;justify-content:space-between;gap:8px"><div><div class="muted" style="font-size:13px">${esc(c.id)}</div><div class="big2">${esc(c.name)}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><span class="pill">${esc(c.team)}</span><span class="pill">${l.bus(esc(c.bus))}</span></div></div><button class="tool" data-clear="1" aria-label="x">✕</button></div>
+    <div class="item" style="margin-top:12px">${n ? `<div class="banner warn" style="margin:0 0 8px">${l.notesWarn}</div><div><b>${l.showNotes}</b><div style="margin:6px 0">${n.notes ? esc(n.notes) : `<span class="muted">${l.noNotes}</span>`}</div>${n.foodAl || n.foodAllergy ? `<div><b>${l.foodAl}:</b> ${esc(n.foodAllergy)}</div>` : ''}</div><button class="btn alt full" style="margin-top:8px" data-hide="1">${l.hideNotes}</button>`
+      : c.hasNotes ? `<button class="btn alt full" data-notes="1">🔒 ${l.showNotes}</button>` : `<span class="muted">${l.noNotes}</span>`}</div>
+    ${c.openCase ? `<div class="banner warn" style="margin-top:10px">${l.hasOpen}</div>` : `<div class="item" style="margin-top:10px"><label class="lbl" for="cm">${l.complaint}</label><input id="cm" type="text" maxlength="500" value="${esc(st.complaint)}" autocomplete="off">
+      <div class="two" style="margin-top:8px"><button class="chip ${st.severity === 'normal' ? 'on' : ''}" data-sev="normal">${l.normal}</button><button class="chip ${st.severity === 'urgent' ? 'on' : ''}" data-sev="urgent">${l.urgent}</button></div>
+      <button class="btn full" style="margin-top:10px" data-opencase="1">${l.openCase}</button></div>`}</section>`;
+}
+function casesView() {
+  const l = L();
+  const list = st.cases.length ? st.cases.map(c => { const tr = st.drafts[c.id] !== undefined ? st.drafts[c.id] : c.treatment;
+    return `<div class="item"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>${esc(c.name)}</b><span><span class="pill ${c.severity === 'urgent' ? 'bad' : ''}">${l[c.severity]}</span> <span class="pill ${c.status === 'open' ? 'warn' : 'ok'}">${l[c.status]}</span></span></div>
+    <div class="muted" style="font-size:13px">${esc(c.studentId)} · ${esc(c.team)} · ${l.bus(esc(c.bus))}</div><div style="margin:6px 0"><b>${l.complaint}:</b> ${esc(c.complaint)}</div>
+    ${c.status === 'open' ? `<label class="lbl" for="tr-${esc(c.id)}">${l.treatment}</label><input id="tr-${esc(c.id)}" data-tr="${esc(c.id)}" type="text" maxlength="800" value="${esc(tr)}" autocomplete="off"><div class="two" style="margin-top:8px"><button class="btn alt" data-save="${esc(c.id)}">${l.saveTr}</button><button class="btn" data-closecase="${esc(c.id)}">${l.closeCase}</button></div>`
+      : `<div><b>${l.treatment}:</b> ${esc(c.treatment)}</div>`}</div>`; }).join('') : `<div class="card muted">${l.noCases}</div>`;
+  return `<section class="card"><label class="lbl" for="q">${l.search}</label><input id="q" type="search" value="${esc(st.q)}" autocomplete="off"><div id="qres" style="margin-top:6px">${resultsHtml()}</div></section>${studentCard()}${list}`;
+}
+function statsView() {
+  const l = L(), s = st.stats; if (!s) return `<div class="card muted">...</div>`;
+  const k = (lab, v) => `<div class="card"><div class="kl">${lab}</div><div class="kv">${v}</div></div>`;
+  const bars = (title, arr) => { const mx = Math.max(1, ...arr.map(a => a.count)); return `<section class="card"><h2 class="h2" style="margin-bottom:6px">${title}</h2>${arr.length ? arr.map(a => `<div class="brow2"><span>${esc(a.key)}</span><div class="bar" style="margin:0"><i style="width:${Math.round(a.count / mx * 100)}%"></i></div><b>${a.count}</b></div>`).join('') : '<div class="muted">—</div>'}</section>`; };
+  return `<div class="kpis">${k(l.total, s.total)}${k(l.openN, s.open)}${k(l.closedN, s.closed)}${k(l.urgentN, s.urgent)}${k(l.avg, s.avgCloseMinutes)}</div>${bars(l.byDay, s.byDay)}${bars(l.byTeam, s.byTeam)}${bars(l.byBus, s.byBus)}`;
+}
+function render() {
+  const l = L(); document.documentElement.lang = st.lang; document.documentElement.dir = l.dir; document.documentElement.dataset.theme = st.theme; document.title = l.title + ' — MUKHAYYAM';
+  $('hT').textContent = l.title; $('hS').textContent = l.sub; $('homeBtn').textContent = l.home; $('langBtn').textContent = l.lang; $('themeBtn').textContent = st.theme === 'light' ? l.dark : l.light;
+  const ae = document.activeElement, keep = ae && ae.id ? { id: ae.id, pos: ae.selectionStart } : null;
+  $('app').innerHTML = `${st.msg ? `<div class="banner ${st.msg.cls}" role="alert">${esc(st.msg.t)}</div>` : ''}
+   <div class="tabs">${[['cases', l.tCases], ['stats', l.tStats]].map(t => `<button class="${st.tab === t[0] ? 'on' : ''}" data-tab="${t[0]}">${t[1]}</button>`).join('')}</div>${st.tab === 'cases' ? casesView() : statsView()}`;
+  if (keep && $(keep.id)) { const e = $(keep.id); e.focus(); try { e.setSelectionRange(keep.pos, keep.pos); } catch (x) {} }
+}
+document.addEventListener('input', e => {
+  if (e.target.id === 'q') onQ(e.target.value); else if (e.target.id === 'cm') st.complaint = e.target.value; else if (e.target.dataset.tr) st.drafts[e.target.dataset.tr] = e.target.value;
+});
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('button'); if (!b) return; const d = b.dataset;
+  if (d.tab) setTab(d.tab); else if (d.pick) pick(d.pick); else if (d.clear) { st.cur = null; hideNotes(true); render(); }
+  else if (d.notes) showNotes(); else if (d.hide) hideNotes(); else if (d.sev) { st.severity = d.sev; render(); }
+  else if (d.opencase) openCase(); else if (d.save) saveTreatment(d.save, false); else if (d.closecase) saveTreatment(d.closecase, true);
+});
+document.addEventListener('visibilitychange', () => { if (document.hidden && st.notes) hideNotes(); });
+
+$('langBtn').onclick = () => { st.lang = st.lang === 'ar' ? 'en' : 'ar'; pref.set('lang', st.lang); render(); };
+$('themeBtn').onclick = () => { st.theme = st.theme === 'light' ? 'dark' : 'light'; pref.set('theme', st.theme); render(); };
+render(); loadCases().then(render);
+</script>
+</body></html>

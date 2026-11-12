@@ -55,7 +55,15 @@ const ACTIONS_ = {
   withdrawStart: function(d) { return handleWithdrawStart_(d); },
   withdrawClose: function(d) { return handleWithdrawClose_(d); },
   withdrawCancel: function(d) { return handleWithdrawCancel_(d); },
-  withdrawList: function(d) { return handleWithdrawList_(d); }
+  withdrawList: function(d) { return handleWithdrawList_(d); },
+  medFind: function(d) { return handleMedFind_(d); },
+  medInfo: function(d) { return handleMedInfo_(d); },
+  medOpen: function(d) { return handleMedOpen_(d); },
+  medUpdate: function(d) { return handleMedUpdate_(d); },
+  medClose: function(d) { return handleMedClose_(d); },
+  medList: function(d) { return handleMedList_(d); },
+  medStats: function(d) { return handleMedStats_(d); },
+  nutritionSummary: function(d) { return handleNutritionSummary_(d); }
 };
 
 function doPost(e) {
@@ -90,7 +98,9 @@ const STUDENT_HEADERS_ = {
   cls: ['class', 'grade', 'الصف'],
   photo: ['photo url', 'photo', 'الصورة'],
   shirt: ['shirt size', 'shirt', 'مقاس القميص'],
-  bags: ['bags', 'bag count', 'عدد الحقائب']
+  bags: ['bags', 'bag count', 'عدد الحقائب'],
+  foodAllergy: ['food allergy', 'food allergies', 'allergy', 'الحساسية الغذائية', 'حساسية الطعام'],
+  medical: ['medical notes', 'medical', 'health', 'chronic', 'ملاحظات طبية', 'الحالة الصحية']
 };
 const STUDENT_REQUIRED_ = ['id', 'name', 'bus'];
 
@@ -128,6 +138,8 @@ function readStudents_() {
       cls: String(cell(data[i], 'cls') || '').trim(),
       photo: String(cell(data[i], 'photo') || '').trim(),
       bags: Number(cell(data[i], 'bags')) || 0,
+      foodAllergy: String(cell(data[i], 'foodAllergy') || '').trim(),
+      medical: String(cell(data[i], 'medical') || '').trim(),
       _row: i + 1
     });
   }
@@ -417,6 +429,8 @@ function buildAlerts_(perBus, students, lastByKey) {
   const open = readCases_().filter(function(c) { return c.status === 'open'; }).length;
   if (open) alerts.push({ type: 'cases_open', level: 'warn', count: open });
   const wOpen = readWithdrawals_().filter(function(w) { return w.status === 'open'; }).length;
+  const medUrgent = readMedCases_().filter(function(c) { return c.status === 'open' && c.severity === 'urgent'; }).length;
+  if (medUrgent) alerts.push({ type: 'med_urgent', level: 'bad', count: medUrgent });
   if (wOpen) alerts.push({ type: 'withdraw_open', level: 'warn', count: wOpen });
   const rank = { bad: 0, warn: 1, info: 2 };
   alerts.sort(function(a, b) { return rank[a.level] - rank[b.level]; });
