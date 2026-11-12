@@ -497,6 +497,27 @@ function handleUnlockAccount_(data) {
   return { success: true };
 }
 
+// Enable / disable an account from the app (instead of editing the sheet). Takes effect on the very next request.
+function handleSetUserActive_(data) {
+  const auth = authorize_(data.token, requirePerm_('manage'));
+  if (!auth.ok) return { success: false, error: 'Not authorized: ' + auth.reason, code: auth.reason };
+  if (typeof data.active !== 'boolean') return { success: false, error: 'Invalid request' };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(5000);
+  try {
+    const { headers, sheet, rows } = readSheetAsObjects_(USERS_SHEET);
+    const target = rows.find(function(r) { return r.Username === data.targetUsername; });
+    if (!target) return { success: false, error: 'User not found' };
+    if (target.Username === auth.user.Username) return { success: false, error: 'لا يمكنك تعطيل حسابك بنفسك' };
+    if (target.Role === 'admin' && auth.user.Role !== 'admin') return { success: false, error: 'الحسابات الإدارية يعدّلها المدير فقط' };
+    setCellByColumnName_(sheet, headers, target._rowNumber, 'Active', data.active);
+    writeAudit_(auth.user.Username, data.active ? 'USER_ENABLED' : 'USER_DISABLED', target.Username, '');
+    return { success: true };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 // ---------------- Week 1: catalog + access management ----------------
 
 // Active permission rows / committee rows straight from the sheet (so adding a row there = adding it here).

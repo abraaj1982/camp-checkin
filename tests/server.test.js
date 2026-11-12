@@ -182,6 +182,18 @@ assert(r.success&&r.studentsTotal===4&&r.studentsPresent>=1&&r.supervisors>=1&&r
 assert(r.allergies.length===2&&r.allergies.some(a=>a.name==='أحمد'&&a.allergy==='فول سوداني')&&!JSON.stringify(r).includes('ربو')&&!JSON.stringify(r).includes('سكري'),'nutrition sees FOOD allergies by name only, no medical notes');
 r=post({action:'nutritionSummary',token:tl});assert(r.success&&!r.allergies&&r.studentsPresent>=1,'leader sees meal counts only (no allergy names)');
 for(const a of ['roster','lookup','printList','leaderSummary','history','custodySummary']){const rr=JSON.stringify(post({action:a,token:T,q:'أحمد',studentId:'1001'}));assert(!rr.includes('ربو')&&!rr.includes('سكري')&&!rr.includes('فول سوداني'),'no medical/allergy data leaks via '+a);}
+// ---- enable/disable accounts from the app
+post({action:'createUser',token:T,username:'tmp1',password:'p9',fullName:'مؤقت',role:'supervisor',permissions:['checkin'],assignedBus:'1',committees:[]});
+let tt=post({action:'login',username:'tmp1',password:'p9'}).token;
+r=post({action:'setUserActive',token:tt,targetUsername:'sup1',active:false});assert(!r.success,'supervisor cannot disable accounts');
+r=post({action:'setUserActive',token:T,targetUsername:'tmp1',active:false});assert(r.success,'admin disables an account');
+r=post({action:'busState',token:tt});assert(!r.success&&r.code==='ACCOUNT_DISABLED','disabled account is cut off on its very next request');
+r=post({action:'login',username:'tmp1',password:'p9'});assert(!r.success,'disabled account cannot log in');
+r=post({action:'setUserActive',token:T,targetUsername:'tmp1',active:true});assert(r.success,'admin re-enables it');
+r=post({action:'login',username:'tmp1',password:'p9'});assert(r.success,'re-enabled account can log in again');
+r=post({action:'setUserActive',token:T,targetUsername:'Admin',active:false});assert(!r.success,'admin cannot disable themselves');
+r=post({action:'setUserActive',token:T,targetUsername:'tmp1',active:'no'});assert(!r.success,'invalid value rejected');
+assert(book.AuditLog.rows.some(x=>x[2]==='USER_DISABLED'&&x[3]==='tmp1'),'audit: account disabled');
 // ---- sheet check
 r=post({action:'checkStudentSheet',token:T});assert(r.success&&r.report.ok&&r.report.total===4,'student sheet check passes');
 console.log(fails?`\n${fails} FAILED`:'\nALL PASSED');

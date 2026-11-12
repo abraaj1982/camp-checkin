@@ -173,8 +173,12 @@ th { font-size: 11px; color: var(--sap-gray); font-weight: 600; }
         <select id="newRole">
           <option value="supervisor">مشرف باص</option>
           <option value="camp_leader">قائد المخيم</option>
-          <option value="finance">مالية</option>
           <option value="shirts_coordinator">مسؤول القمصان</option>
+          <option value="doctor">طبيب</option>
+          <option value="nutrition_officer">لجنة التغذية</option>
+          <option value="custody_officer">الأمانات</option>
+          <option value="printer">الطباعة</option>
+          <option value="support">دعم فني</option>
           <option value="admin">أدمن (السكرتارية) — كل الصلاحيات</option>
         </select>
 
@@ -240,15 +244,23 @@ const roleLabels = {
   admin: 'السكرتارية',
   supervisor: 'مشرف باص',
   camp_leader: 'قائد المخيم',
-  finance: 'مالية',
-  shirts_coordinator: 'مسؤول القمصان'
+  shirts_coordinator: 'مسؤول القمصان',
+  doctor: 'طبيب',
+  nutrition_officer: 'لجنة التغذية',
+  custody_officer: 'الأمانات',
+  printer: 'الطباعة',
+  support: 'دعم فني'
 };
 // Starting tick-boxes for each template (the server stores whatever is ticked).
 const ROLE_PRESETS = {
   supervisor: ['checkin'],
   camp_leader: ['dashboard'],
-  finance: ['finance', 'approve', 'budget'],
   shirts_coordinator: ['shirts'],
+  doctor: ['medical'],
+  nutrition_officer: ['nutrition'],
+  custody_officer: ['custody'],
+  printer: ['print'],
+  support: ['support'],
   admin: []
 };
 // Screens that already exist (others show as "قريباً").
@@ -350,8 +362,10 @@ async function ensureCatalog() {
   return catalog;
 }
 
-function screenItems() { return catalog.permissions.filter(p => p.group === 'شاشة').map(p => ({ key: p.key, label: p.label })); }
-function powerItems() { return catalog.permissions.filter(p => p.group !== 'شاشة').map(p => ({ key: p.key, label: p.label })); }
+// Screens cancelled after the planning meeting (finance/budgets) are hidden from the tick-boxes.
+const HIDDEN_PERMS = ['committee', 'finance', 'approve', 'budget'];
+function screenItems() { return catalog.permissions.filter(p => p.group === 'شاشة' && HIDDEN_PERMS.indexOf(p.key) === -1).map(p => ({ key: p.key, label: p.label })); }
+function powerItems() { return catalog.permissions.filter(p => p.group !== 'شاشة' && HIDDEN_PERMS.indexOf(p.key) === -1).map(p => ({ key: p.key, label: p.label })); }
 function committeeItems() { return catalog.committees.map(c => ({ key: c.id, label: c.name })); }
 
 // ---------------- create user ----------------
@@ -468,6 +482,14 @@ async function loadUsersList() {
       resetBtn.addEventListener('click', () => resetPasswordFor(u.username));
       tdActions.appendChild(resetBtn);
 
+      if (can('manage')) {
+        const toggleBtn = document.createElement('button');
+        toggleBtn.className = 'rowBtn' + (u.active ? ' danger' : '');
+        toggleBtn.textContent = u.active ? '⛔ تعطيل' : '✅ تفعيل';
+        toggleBtn.addEventListener('click', () => setActiveFor(u, !u.active));
+        tdActions.appendChild(toggleBtn);
+      }
+
       if (u.locked) {
         const unlockBtn = document.createElement('button');
         unlockBtn.className = 'rowBtn danger';
@@ -574,6 +596,15 @@ async function openEditor(u) {
   box.appendChild(saveBtn); box.appendChild(cancelBtn); box.appendChild(msg);
   editBox.appendChild(box);
   box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+async function setActiveFor(u, active) {
+  if (!confirm((active ? 'تفعيل حساب ' : 'تعطيل حساب ') + u.fullName + '؟' + (active ? '' : '\nلن يستطيع الدخول فوراً.'))) return;
+  try {
+    const data = await api({ action: 'setUserActive', targetUsername: u.username, active: active });
+    if (!data.success) { alert(data.error || 'تعذّر التنفيذ'); return; }
+    loadUsersList();
+  } catch (e) { alert('تعذّر الاتصال'); }
 }
 
 async function resetPasswordFor(username) {

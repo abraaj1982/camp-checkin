@@ -32,6 +32,7 @@ const ACTIONS_ = {
   listUsers: function(d) { return handleListUsers_(d); },
   resetPassword: function(d) { return handleResetPassword_(d); },
   unlockAccount: function(d) { return handleUnlockAccount_(d); },
+  setUserActive: function(d) { return handleSetUserActive_(d); },
   getMyAccess: function(d) { return handleGetMyAccess_(d); },
   getCatalog: function(d) { return handleGetCatalog_(d); },
   updateUserAccess: function(d) { return handleUpdateUserAccess_(d); },
