@@ -311,6 +311,13 @@ function handleBusState_(data) {
 // ---------------- Bus status + location (BusLive: one row per bus) ----------------
 function busLiveSheet_() { return getSheetByName_('BusLive'); }
 
+function distMeters_(lat1, lng1, lat2, lng2) {
+  const R = 6371000, rad = Math.PI / 180;
+  const a = Math.sin((lat2 - lat1) * rad / 2) * Math.sin((lat2 - lat1) * rad / 2) +
+    Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin((lng2 - lng1) * rad / 2) * Math.sin((lng2 - lng1) * rad / 2);
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
 function handleBusStatus_(data) {
   return withAuth_(data, requirePerm_('checkin'), function(user) {
     const bus = String(user.AssignedBus).trim();
@@ -332,8 +339,15 @@ function handleBusStatus_(data) {
       const prev = row === -1 ? {} : {
         Status: vals[row - 1][h.indexOf('Status')], Lat: vals[row - 1][h.indexOf('Lat')], Lng: vals[row - 1][h.indexOf('Lng')], Accuracy: vals[row - 1][h.indexOf('Accuracy')]
       };
+      // No manual "departed" button anymore: the bus is 'onway' automatically once its position moves (> ~7 km/h between two updates).
+      let autoStatus = '';
+      if (hasGeo && row !== -1 && prev.Lat !== '' && prev.Lng !== '') {
+        const pu = vals[row - 1][h.indexOf('UpdatedAt')];
+        const dt = (Date.now() - (pu instanceof Date ? pu.getTime() : new Date(pu).getTime())) / 1000;
+        if (dt >= 5 && dt <= 600 && distMeters_(Number(prev.Lat), Number(prev.Lng), lat, lng) / dt > 2) autoStatus = 'onway';
+      }
       const rec = {
-        Bus: bus, Status: status || prev.Status || 'boarding',
+        Bus: bus, Status: status || autoStatus || prev.Status || 'boarding',
         Lat: hasGeo ? lat : (prev.Lat || ''), Lng: hasGeo ? lng : (prev.Lng || ''), Accuracy: hasGeo ? (Number(data.acc) || '') : (prev.Accuracy || ''),
         UpdatedAt: new Date(), Supervisor: user.FullName, Boarded: c.boarded, Total: c.total
       };

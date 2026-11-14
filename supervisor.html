@@ -44,7 +44,7 @@ const I = {
   dup: t => 'مسجَّل صعوده مسبقاً' + (t ? ' الساعة ' + t : '') + '. لا يُسجَّل مرتين.', other: (b, s) => 'ليس من باصك. هو في باص ' + b + (s ? ' (المشرف: ' + s + ')' : '') + '. يمكنك الاطلاع فقط.', withdrawn: 'الطالب منسحب.', notFound: 'الطالب غير موجود.',
   otherOffline: 'هذا الطالب ليس في باصك، والبحث في بقية الباصات يحتاج اتصالاً.', bags: 'الأغراض', load: 'تحميل', unload: 'تنزيل', bagCount: 'عدد الحقائب', expected: n => 'المتوقع: ' + n, saveBags: 'تسجيل الأغراض', bagsSaved: 'سُجّلت الأغراض', bagShort: n => 'ينقص ' + n + ' من الحقائب المتوقعة.',
   missing: 'لم يصعدوا بعد', boardedList: 'صعدوا (الأحدث أولاً)', allList: 'الكل', remainShort: 'المتبقي', boardedShort: 'صعدوا', notYet: 'لم يصعد', withdrawnShort: 'منسحب', noneBoarded: 'لم يصعد أحد بعد', allIn: 'اكتمل الباص', trip: 'حالة الرحلة', st_boarding: 'الصعود', st_departed: 'انطلق', st_onway: 'في الطريق', st_arrived: 'وصل', shareLoc: 'مشاركة الموقع مع القائد', locOn: 'الموقع يُرسَل', locOff: 'الموقع متوقف', lastSent: t => 'آخر إرسال ' + t,
-  confirmDepart: n => n > 0 ? 'ينقص ' + n + ' طالباً. هل تؤكد الانطلاق؟' : 'اكتمل الباص. تأكيد الانطلاق؟', yes: 'نعم', cancel: 'إلغاء',
+  tracking: 'تتبع الباص', trackNote: 'يُرسَل موقع باصك تلقائياً للقائد ما دامت هذه الصفحة مفتوحة. أبقِ الشاشة مضاءة والجوال على الشاحن.', locDenied: 'لم يُسمح بالموقع. افتح إعدادات المتصفح للموقع واسمح بالوصول للموقع ثم أعد تحميل الصفحة.', confirmDepart: n => n > 0 ? 'ينقص ' + n + ' طالباً. هل تؤكد الانطلاق؟' : 'اكتمل الباص. تأكيد الانطلاق؟', yes: 'نعم', cancel: 'إلغاء',
   offline: 'غير متصل. ما تسجّله يُحفظ ويُرسَل تلقائياً.', pending: n => n + ' بانتظار الإرسال', synced: 'تم الإرسال', loading: 'جارٍ التحميل...', report: 'إبلاغ الإدارة', reportAsk: 'اكتب المشكلة باختصار (طالب، باص، مفقود...)', reportSent: 'أُرسل البلاغ إلى الإدارة', logout: 'خروج', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح', err: 'حدث خطأ. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.', paper: 'عند انقطاع الإنترنت يُستخدم الكشف الورقي.' },
  en: { dir: 'ltr', bus: n => 'Bus ' + n, sup: n => 'Supervisor: ' + n, boarded: 'Boarded', remaining: n => n > 0 ? n + ' remaining' : 'Bus full', how: 'How do you want to identify the student?',
   m_qr: 'Wristband', m_face: 'Face', m_name: 'Name', m_num: 'Number', soon: 'Soon', scanQr: 'Point the camera at the wristband', startCam: 'Start camera', stopCam: 'Stop camera', noCam: 'Camera unavailable. Use name or number.',
@@ -53,7 +53,7 @@ const I = {
   dup: t => 'Already boarded' + (t ? ' at ' + t : '') + '. Cannot be recorded twice.', other: (b, s) => 'Not on your bus. Student is on bus ' + b + (s ? ' (supervisor: ' + s + ')' : '') + '. View only.', withdrawn: 'Student has withdrawn.', notFound: 'Student not found.',
   otherOffline: 'This student is not on your bus, and searching other buses needs a connection.', bags: 'Belongings', load: 'Loading', unload: 'Unloading', bagCount: 'Number of bags', expected: n => 'Expected: ' + n, saveBags: 'Save belongings', bagsSaved: 'Belongings saved', bagShort: n => n + ' of the expected bags missing.',
   missing: 'Not boarded yet', boardedList: 'Boarded (latest first)', allList: 'All', remainShort: 'Remaining', boardedShort: 'Boarded', notYet: 'Not yet', withdrawnShort: 'Withdrawn', noneBoarded: 'No one has boarded yet', allIn: 'Bus full', trip: 'Trip status', st_boarding: 'Boarding', st_departed: 'Departed', st_onway: 'On the way', st_arrived: 'Arrived', shareLoc: 'Share location with the leader', locOn: 'Location is being sent', locOff: 'Location sharing off', lastSent: t => 'Last sent ' + t,
-  confirmDepart: n => n > 0 ? n + ' student(s) missing. Confirm departure?' : 'Bus is full. Confirm departure?', yes: 'Yes', cancel: 'Cancel',
+  tracking: 'Bus tracking', trackNote: 'Your bus location is sent to the leader automatically while this page is open. Keep the screen on and the phone charging.', locDenied: 'Location access was blocked. Allow location for this site in the browser settings, then reload.', confirmDepart: n => n > 0 ? n + ' student(s) missing. Confirm departure?' : 'Bus is full. Confirm departure?', yes: 'Yes', cancel: 'Cancel',
   offline: 'Offline. What you record is saved and sent automatically.', pending: n => n + ' waiting to send', synced: 'Synced', loading: 'Loading...', report: 'Report to administration', reportAsk: 'Describe the problem briefly (student, bus, lost item...)', reportSent: 'Report sent to the administration', logout: 'Log out', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light', err: 'Something went wrong. Try again.', sessionEnd: 'Session ended. Please sign in again.', paper: 'Use the paper list if the internet is down.' }
 };
 const st = { listTab: 'all', lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), method: 'qr', roster: store.get('roster', null), q: '', remote: [], cur: null, banner: null, last: null, bagMode: 'load', bagN: 0, cam: false, status: store.get('status', 'boarding'), loc: false, lastSent: '', confirm: false, online: navigator.onLine, busy: false };
@@ -173,14 +173,28 @@ async function postStatus(status, withGeo) {
   if (withGeo && lastPos) { body.lat = lastPos.latitude; body.lng = lastPos.longitude; body.acc = lastPos.accuracy; }
   try { const r = await api(body); if (r.success) st.lastSent = new Date().toTimeString().slice(0, 5); } catch (e) {}
 }
-function setStatus(s) { st.status = s; store.set('status', s); st.confirm = false; postStatus(s, true); render(); }
-function toggleLoc() {
-  if (st.loc) { navigator.geolocation.clearWatch(watchId); watchId = null; st.loc = false; if (wake) { try { wake.release(); } catch (e) {} wake = null; } return render(); }
-  if (!navigator.geolocation) return;
-  watchId = navigator.geolocation.watchPosition(p => { lastPos = p.coords; const now = Date.now(); if (now - lastPost >= LOC_INTERVAL_MS) { lastPost = now; postStatus('', true).then(render); } }, () => {}, { enableHighAccuracy: true, maximumAge: 10000 });
-  st.loc = true; try { navigator.wakeLock && navigator.wakeLock.request('screen').then(w => { wake = w; }); } catch (e) {}
-  render();
+function stopLoc() {
+  if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+  st.loc = false; if (wake) { try { wake.release(); } catch (e) {} wake = null; }
 }
+function holdScreen() { try { if (navigator.wakeLock && !wake) navigator.wakeLock.request('screen').then(w => { wake = w; w.addEventListener('release', () => { wake = null; }); }).catch(() => {}); } catch (e) {} }
+function startLoc() {
+  if (!navigator.geolocation || watchId !== null) return;
+  st.locDenied = false;
+  watchId = navigator.geolocation.watchPosition(
+    p => { st.loc = true; st.locDenied = false; lastPos = p.coords; const now = Date.now(); if (now - lastPost >= LOC_INTERVAL_MS) { lastPost = now; postStatus('', true).then(render); } else render(); },
+    err => { if (err && err.code === 1) { st.locDenied = true; stopLoc(); render(); } },
+    { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 });
+  st.loc = true; holdScreen(); render();
+}
+// Sharing is ON by default for every bus supervisor; he can switch it off for the rest of this session only.
+function toggleLoc() {
+  if (st.loc) { try { sessionStorage.setItem('mk_loc_off', '1'); } catch (e) {} stopLoc(); return render(); }
+  try { sessionStorage.removeItem('mk_loc_off'); } catch (e) {}
+  startLoc();
+}
+function locOffByUser() { try { return sessionStorage.getItem('mk_loc_off') === '1'; } catch (e) { return false; } }
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { if (!locOffByUser()) { if (watchId === null) startLoc(); else holdScreen(); } } });
 
 /* ---------- render ---------- */
 function bar() {
@@ -208,15 +222,15 @@ function render() {
   else if (st.last) card = `<div class="card ok-b"><span class="pill ok">${l.done}</span><div class="big2">${esc(st.last.name)}</div><div style="display:flex;gap:8px;margin-top:12px"><button class="btn" style="flex:1" onclick="resetCur(); st.last=null; render()">${l.next}</button>${(canUndoAny() || Date.now() - (st.last.at || 0) < UNDO_MS) ? `<button class="btn alt" style="flex:1" onclick="undo()">${l.undo}</button>` : ''}</div></div>`;
   const miss = R.students.filter(s => s.state !== 'boarded' && s.state !== 'withdrawn');
   const done = R.students.filter(s => s.state === 'boarded').sort((a, b) => String(b.at).localeCompare(String(a.at)));
-  const stats = ['boarding', 'departed', 'onway', 'arrived'];
   $('app').innerHTML = `${st.banner ? `<div class="banner ${st.banner.cls}" role="alert">${esc(st.banner.msg)}</div>` : ''}
   <section class="card"><div style="display:flex;justify-content:space-between;align-items:flex-end;gap:8px"><div><div class="kl">${l.boarded}</div><div class="kv">${c.b} <span class="muted" style="font-size:16px;font-weight:500">/ ${c.t}</span></div></div><span class="pill ${left > 0 ? 'warn' : 'ok'}">${l.remaining(left)}</span></div><div class="bar"><i style="width:${c.t ? Math.round(c.b / c.t * 100) : 0}%"></i></div></section>
   ${card}
   <section class="card"><div class="kl" style="margin-bottom:8px">${l.how}</div><div class="methods">${methods.map(m => `<button class="m ${st.method === m[0] ? 'on' : ''}" ${m[0] === 'face' ? '' : ''} onclick="setMethod('${m[0]}')"><span aria-hidden="true" style="font-size:16px">${m[2]}</span>${m[1]}</button>`).join('')}</div><div style="margin-top:12px">${body}</div></section>
   <section class="card" id="lists"><div class="tabs" role="tablist"><button class="${st.listTab === 'all' ? 'on' : ''}" data-ltab="all">${l.allList} (${R.students.length})</button><button class="${st.listTab === 'missing' ? 'on' : ''}" data-ltab="missing">${l.remainShort} (${miss.length})</button><button class="${st.listTab === 'done' ? 'on' : ''}" data-ltab="done">${l.boardedShort} (${done.length})</button></div>
   <div style="max-height:340px;overflow:auto;margin-top:8px">${(rows => rows.length ? rows.map(s => `<div class="row"><span>${esc(s.name)}<span class="muted" style="font-size:12.5px"> · ${esc(s.id)}</span></span><span style="display:flex;gap:6px;align-items:center">${s.state === 'boarded' ? `<span class="pill ok">✓ ${esc(s.at || '')}${s.pending ? ' ⏳' : ''}</span>${canUndoAny() ? `<button class="chip" data-undoid="${esc(s.id)}">${l.undoRow}</button>` : ''}` : s.state === 'withdrawn' ? `<span class="pill bad">${l.withdrawnShort}</span>` : `<span class="pill warn">${l.notYet}</span>`}</span></div>`).join('') : `<div class="muted">${st.listTab === 'done' ? l.noneBoarded : l.allIn}</div>`)(R.students.filter(s => st.listTab === 'all' || (st.listTab === 'missing' ? (s.state !== 'boarded' && s.state !== 'withdrawn') : s.state === 'boarded')).slice().sort((a, b) => st.listTab === 'done' ? String(b.at).localeCompare(String(a.at)) : a.name.localeCompare(b.name, 'ar')))}</div></section>
-  <section class="card"><h2 class="h2" style="margin-bottom:8px">${l.trip}</h2><div class="stats">${stats.map(x => `<button class="chip ${st.status === x ? 'on' : ''}" onclick="${x === 'departed' ? 'st.confirm=true;render()' : "setStatus('" + x + "')"}">${l['st_' + x]}</button>`).join('')}</div>${st.confirm ? `<div class="banner warn">${l.confirmDepart(left)}<div style="display:flex;gap:8px;margin-top:8px"><button class="btn" style="flex:1" onclick="setStatus('departed')">${l.yes}</button><button class="btn alt" style="flex:1" onclick="st.confirm=false;render()">${l.cancel}</button></div></div>` : ''}
-  <button class="tick ${st.loc ? 'on' : ''}" style="margin-top:10px" onclick="toggleLoc()"><span class="sq">✓</span><span style="flex:1">${l.shareLoc}</span><span class="pill ${st.loc ? 'ok' : ''}">${st.loc ? l.locOn : l.locOff}</span></button>${st.lastSent ? `<div class="muted" style="font-size:12.5px;margin-top:6px">${l.lastSent(st.lastSent)}</div>` : ''}</section>
+  <section class="card"><h2 class="h2" style="margin-bottom:8px">${l.tracking}</h2>
+  <button class="tick ${st.loc ? 'on' : ''}" onclick="toggleLoc()"><span class="sq">✓</span><span style="flex:1">${l.shareLoc}</span><span class="pill ${st.loc ? 'ok' : (st.locDenied ? 'bad' : '')}">${st.loc ? l.locOn : l.locOff}</span></button>
+  ${st.locDenied ? `<div class="banner bad">${l.locDenied}</div>` : ''}${st.lastSent ? `<div class="muted" style="font-size:12.5px;margin-top:6px">${l.lastSent(st.lastSent)}</div>` : ''}<div class="muted" style="font-size:12.5px;margin-top:6px">${l.trackNote}</div></section>
   <div class="muted" style="font-size:12.5px;text-align:center;padding:4px 0 16px">${l.paper}</div>
   <section class="card"><button class="btn alt full" onclick="reportCase()">${l.report}</button></section>`;
 }
@@ -267,6 +281,7 @@ window.addEventListener('offline', () => { st.online = false; render(); });
 setInterval(() => { if (queue.length) flush(); }, 15000);
 setInterval(() => { if (navigator.onLine) refreshRoster(true).then(render); }, 60000);
 render();
+if (!locOffByUser()) startLoc();
 refreshRoster().then(() => { render(); flush(); });
 </script>
 </body></html>

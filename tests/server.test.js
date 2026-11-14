@@ -262,6 +262,17 @@ r=post({action:'scan',token:tu1,studentId:'3002',op:'board'});
 r=post({action:'scan',token:tu1,studentId:'3002',op:'undo'});assert(!r.success&&r.code==='UNDO_EXPIRED','supervisor cannot undo after 2 minutes');
 r=post({action:'scan',token:tgen,studentId:'3002',op:'undo'});assert(r.success,"holder of 'undo' undoes any student, any time");
 r=post({action:'scan',token:tgen,studentId:'3001',op:'undo'});assert(r.success,"holder of 'undo' undoes an older record too");
+// ---- automatic 'onway' status from movement (no manual departure button needed)
+post({action:'createUser',token:T,username:'mv',password:'mv-12345',fullName:'متحرك',role:'supervisor',permissions:['checkin'],assignedBus:'2',committees:[]});
+const tmv=post({action:'login',username:'mv',password:'mv-12345'}).token;
+r=post({action:'busStatus',token:tmv,lat:23.5800,lng:58.4000,acc:10});assert(r.success,'bus 2 first position');
+{const row=book.BusLive.rows.find(x=>x[0]==='2');assert(row[1]==='boarding','status starts as boarding (no manual action)');row[5]=new Date(Date.now()-30e3);}
+r=post({action:'busStatus',token:tmv,lat:23.5800,lng:58.4005,acc:10});
+{const row=book.BusLive.rows.find(x=>x[0]==='2');assert(row[1]==='boarding','tiny movement (~5 m in 30 s) does not change status');row[5]=new Date(Date.now()-30e3);}
+r=post({action:'busStatus',token:tmv,lat:23.5850,lng:58.4000,acc:10});
+{const row=book.BusLive.rows.find(x=>x[0]==='2');assert(row[1]==='onway','real movement (~550 m in 30 s) sets onway automatically');}
+r=post({action:'scan',token:tgen,studentId:'2001',op:'undo'});assert(r.success,'general supervisor undoes a bus-2 student');
+r=post({action:'leaderSummary',token:tl});assert(r.alerts.some(a=>a.type==='missing'&&a.bus==='2'&&a.missing===1),'alert: bus is moving while a student is not checked in');
 // ---- sheet check
 r=post({action:'checkStudentSheet',token:T});assert(r.success&&r.report.ok&&r.report.total===6,'student sheet check passes');
 console.log(fails?`\n${fails} FAILED`:'\nALL PASSED');
