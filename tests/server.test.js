@@ -291,6 +291,28 @@ r=post({action:'leaderAll',token:tl});assert(r.success&&r.summary&&r.summary.tot
 r=post({action:'leaderAll',token:t1});assert(!r.success,'supervisor cannot use leaderAll');
 post({action:'createUser',token:T,username:'mapper',password:'map-12345',fullName:'خريطة',role:'x',permissions:['livemap'],committees:[]});
 {const tmap=post({action:'login',username:'mapper',password:'map-12345'}).token;r=post({action:'leaderAll',token:tmap});assert(r.success&&!r.summary&&Array.isArray(r.buses)&&!r.cases,'livemap-only user gets the map data only (no numbers, no cases)');}
+// ---- leader extras: camp location, auto-arrival, speed, supervisor phone, missing names, committees
+run('SETUP_createTabs')();for(const k of Object.keys(cache))delete cache[k];
+assert(book.Users.rows[0].includes('Phone')&&book.BusLive.rows[0].includes('Speed'),'setup adds Users.Phone and BusLive.Speed');
+r=post({action:'setCampLocation',token:tl,lat:23.6,lng:58.5});assert(!r.success,'leader without manage cannot set the camp location');
+r=post({action:'setCampLocation',token:T,lat:23.6,lng:58.5});assert(r.success,'admin sets the camp location');
+r=post({action:'setCampLocation',token:T,lat:'x',lng:1});assert(!r.success,'invalid location rejected');
+r=post({action:'updateUserProfile',token:T,targetUsername:'mv',fullName:'متحرك',phone:'+968 9123-4567'});assert(r.success,'supervisor phone saved');
+r=post({action:'listUsers',token:T});assert(r.users.find(x=>x.username==='mv').phone==='+96891234567','phone stored cleaned');
+{const row=book.BusLive.rows.find(x=>x[0]==='2');row[5]=new Date(Date.now()-30e3);}
+r=post({action:'busStatus',token:tmv,lat:23.6010,lng:58.5000,acc:10});
+{const row=book.BusLive.rows.find(x=>x[0]==='2');const h=book.BusLive.rows[0];assert(row[h.indexOf('Status')]==='arrived','bus inside the camp area is marked arrived automatically');assert(Number(row[h.indexOf('Speed')])>0,'speed stored');}
+r=post({action:'leaderAll',token:tl});
+assert(r.camp&&r.camp.lat===23.6,'leaderAll returns camp location');
+assert(r.extra&&r.extra.missingByBus['1']&&r.extra.missingByBus['1'].length>=1&&r.extra.missingByBus['1'][0].name,'leaderAll: names still missing per bus');
+assert(r.extra.supervisors['2'].some(x=>x.phone==='+96891234567'),'leaderAll: supervisor phone per bus');
+assert(Array.isArray(r.extra.byTeam)&&r.extra.byTeam[0].total>0,'leaderAll: headcount per team');
+assert(typeof r.extra.committees.meals==='number'&&'medOpen' in r.extra.committees&&'phones' in r.extra.committees,'leaderAll: committees in numbers');
+assert(!JSON.stringify(r.extra.committees).match(/صداع|ربو/),'committees contain NO medical details');
+assert(Array.isArray(r.extra.feed)&&r.extra.feed.length>0&&r.extra.feed[0].name,'leaderAll: activity feed with names');
+assert(!JSON.stringify(r).includes('9999000'),'leaderAll has no student phone numbers');
+assert(r.canSetCamp===false,'leader (no manage) cannot set camp');
+r=post({action:'leaderAll',token:T});assert(r.canSetCamp===true,'admin can set camp');
 // ---- sheet check
 r=post({action:'checkStudentSheet',token:T});assert(r.success&&r.report.ok&&r.report.total===6,'student sheet check passes');
 console.log(fails?`\n${fails} FAILED`:'\nALL PASSED');

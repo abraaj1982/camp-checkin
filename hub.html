@@ -520,6 +520,15 @@ async function openEditor(u, passwordOnly) {
     const hn = document.createElement('h3'); hn.textContent = '👤 الاسم الكامل'; box.appendChild(hn);
     const nameIn = document.createElement('input'); nameIn.type = 'text'; nameIn.value = u.fullName || ''; nameIn.maxLength = 60;
     box.appendChild(nameIn);
+    // supervisor phone (shown to the camp leader with a "call" button)
+    const hph = document.createElement('h3'); hph.textContent = '📞 رقم الجوال (يظهر للقائد فقط)'; box.appendChild(hph);
+    const phoneIn = document.createElement('input'); phoneIn.type = 'tel'; phoneIn.inputMode = 'tel'; phoneIn.value = u.phone || ''; phoneIn.placeholder = 'مثال: 96891234567'; phoneIn.maxLength = 20;
+    box.appendChild(phoneIn);
+    phoneIn.addEventListener('change', async () => {
+      try { const d = await api({ action: 'updateUserProfile', targetUsername: u.username, fullName: u.fullName, phone: phoneIn.value.trim() });
+        if (d.success) { u.phone = phoneIn.value.trim(); flash('✓ حُفظ رقم الجوال'); } else flash('❌ ' + (d.error || 'فشل الحفظ'), true);
+      } catch (e) { flash('تعذّر الاتصال بالخادم', true); }
+    });
     nameIn.addEventListener('change', async () => {
       const v = nameIn.value.trim(); if (v.length < 2 || v === u.fullName) return;
       try { const d = await api({ action: 'updateUserProfile', targetUsername: u.username, fullName: v });

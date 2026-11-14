@@ -47,6 +47,7 @@ const ACTIONS_ = {
   busLive: function(d) { return handleBusLive_(d); },
   leaderSummary: function(d) { return handleLeaderSummary_(d); },
   leaderAll: function(d) { return handleLeaderAll_(d); },
+  setCampLocation: function(d) { return handleSetCampLocation_(d); },
   printList: function(d) { return handlePrintList_(d); },
   createCase: function(d) { return handleCreateCase_(d); },
   listCases: function(d) { return handleListCases_(d); },
@@ -314,6 +315,21 @@ function handleBusState_(data) {
 // ---------------- Bus status + location (BusLive: one row per bus) ----------------
 function busLiveSheet_() { return getSheetByName_('BusLive'); }
 
+const CAMP_RADIUS_M = 400;
+function campLocation_() {
+  const lat = Number(getSetting_('CampLat')), lng = Number(getSetting_('CampLng'));
+  return (isFinite(lat) && isFinite(lng) && (lat !== 0 || lng !== 0) && getSetting_('CampLat') !== null) ? { lat: lat, lng: lng } : null;
+}
+function handleSetCampLocation_(data) {
+  return withAuth_(data, requirePerm_('manage'), function(user) {
+    const lat = Number(data.lat), lng = Number(data.lng);
+    if (!isFinite(lat) || !isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return { success: false, error: 'موقع غير صالح' };
+    setSetting_('CampLat', lat); setSetting_('CampLng', lng);
+    writeAudit_(user.Username, 'CAMP_LOCATION_SET', '', lat + ',' + lng);
+    return { success: true, camp: { lat: lat, lng: lng } };
+  });
+}
+
 function distMeters_(lat1, lng1, lat2, lng2) {
   const R = 6371000, rad = Math.PI / 180;
   const a = Math.sin((lat2 - lat1) * rad / 2) * Math.sin((lat2 - lat1) * rad / 2) +
@@ -343,16 +359,24 @@ function handleBusStatus_(data) {
         Status: vals[row - 1][h.indexOf('Status')], Lat: vals[row - 1][h.indexOf('Lat')], Lng: vals[row - 1][h.indexOf('Lng')], Accuracy: vals[row - 1][h.indexOf('Accuracy')]
       };
       // No manual "departed" button anymore: the bus is 'onway' automatically once its position moves (> ~7 km/h between two updates).
-      let autoStatus = '';
+      let autoStatus = '', speed = '';
       if (hasGeo && row !== -1 && prev.Lat !== '' && prev.Lng !== '') {
         const pu = vals[row - 1][h.indexOf('UpdatedAt')];
         const dt = (Date.now() - (pu instanceof Date ? pu.getTime() : new Date(pu).getTime())) / 1000;
-        if (dt >= 5 && dt <= 600 && distMeters_(Number(prev.Lat), Number(prev.Lng), lat, lng) / dt > 2) autoStatus = 'onway';
+        if (dt >= 5 && dt <= 600) {
+          const v = distMeters_(Number(prev.Lat), Number(prev.Lng), lat, lng) / dt; // metres per second
+          speed = Math.round(v * 10) / 10;
+          if (v > 2) autoStatus = 'onway';
+        }
       }
+      // Arrived automatically when the bus is inside the camp area (camp location is set by the leader on the map).
+      const camp = campLocation_();
+      if (hasGeo && camp && distMeters_(camp.lat, camp.lng, lat, lng) <= CAMP_RADIUS_M) autoStatus = 'arrived';
+      if (!autoStatus && prev.Status === 'arrived') autoStatus = 'arrived'; // stays arrived
       const rec = {
         Bus: bus, Status: status || autoStatus || prev.Status || 'boarding',
         Lat: hasGeo ? lat : (prev.Lat || ''), Lng: hasGeo ? lng : (prev.Lng || ''), Accuracy: hasGeo ? (Number(data.acc) || '') : (prev.Accuracy || ''),
-        UpdatedAt: new Date(), Supervisor: user.FullName, Boarded: c.boarded, Total: c.total
+        UpdatedAt: new Date(), Supervisor: user.FullName, Boarded: c.boarded, Total: c.total, Speed: speed
       };
       const out = h.map(function(n) { return rec.hasOwnProperty(n) ? rec[n] : ''; });
       if (row === -1) sheet.appendRow(out); else sheet.getRange(row, 1, 1, out.length).setValues([out]);
@@ -374,7 +398,8 @@ function liveBuses_() {
     if (!g('Bus')) continue;
     const upd = g('UpdatedAt') instanceof Date ? g('UpdatedAt') : new Date(g('UpdatedAt'));
     buses.push({ bus: String(g('Bus')), status: g('Status'), lat: g('Lat') === '' ? null : Number(g('Lat')), lng: g('Lng') === '' ? null : Number(g('Lng')),
-      ageSec: Math.max(0, Math.round((now - upd.getTime()) / 1000)), supervisor: g('Supervisor'), boarded: Number(g('Boarded')) || 0, total: Number(g('Total')) || 0 });
+      ageSec: Math.max(0, Math.round((now - upd.getTime()) / 1000)), supervisor: g('Supervisor'), boarded: Number(g('Boarded')) || 0, total: Number(g('Total')) || 0,
+      speed: h.indexOf('Speed') === -1 || g('Speed') === '' ? null : Number(g('Speed')) });
   }
   return buses;
 }
@@ -384,6 +409,46 @@ function handleBusLive_(data) {
   });
 }
 
+// Everything else the leader sees: names still missing per bus, supervisors' phones, headcount per team,
+// committees in NUMBERS only (no medical details), the next event and the latest activity.
+function leaderExtra_() {
+  const students = readStudents_().students;
+  const sc = scanStates_();
+  const byId = {}; students.forEach(function(s) { byId[s.id] = s; });
+  const buses = {}; students.forEach(function(s) { buses[s.bus] = true; });
+  const missingByBus = {};
+  Object.keys(buses).forEach(function(b) {
+    missingByBus[b] = busCounts_(b, students, sc.states).missing.map(function(s) { return { id: s.id, name: s.name, team: s.team, cls: s.cls }; });
+  });
+  const users = readUsersCached_().filter(function(u) { return u.Active === true && String(u.AssignedBus || '').trim() !== ''; });
+  const supervisors = {};
+  users.forEach(function(u) { const b = String(u.AssignedBus).trim(); (supervisors[b] = supervisors[b] || []).push({ name: u.FullName, phone: String(u.Phone || '').trim() }); });
+  const byTeam = {};
+  students.forEach(function(s) {
+    const t = s.team || '—', x = byTeam[t] || (byTeam[t] = { team: t, total: 0, present: 0 });
+    x.total++; const st = sc.states[s.id]; if (st && st.state === 'boarded') x.present++;
+  });
+  const committees = {};
+  try { const med = readMedCases_(); committees.medOpen = med.filter(function(m) { return m.status === 'open'; }).length; committees.medUrgent = med.filter(function(m) { return m.status === 'open' && m.severity === 'urgent'; }).length; committees.medToday = med.filter(function(m) { return String(m.openedAt).slice(0, 10) === new Date().toISOString().slice(0, 10); }).length; } catch (e) { /* tab missing */ }
+  try { const cs = custodyStates_().states; let ph = 0, bg = 0; Object.keys(cs).forEach(function(k) { if (cs[k].phone) ph++; bg += cs[k].bags; }); committees.phones = ph; committees.bags = bg; } catch (e) { /* tab missing */ }
+  try { committees.withdrawOpen = readWithdrawals_().filter(function(w) { return w.status === 'open'; }).length; } catch (e) { /* tab missing */ }
+  let present = 0; Object.keys(sc.states).forEach(function(k) { if (sc.states[k].state === 'boarded') present++; });
+  committees.meals = present + users.length;
+  let nextEvent = null;
+  try {
+    const now = new Date().toISOString();
+    const ev = publicAnnouncements_(['public', 'staff']).filter(function(a) { return a.kind === 'event' && a.startsAt && a.startsAt > now; }).sort(function(a, b) { return a.startsAt < b.startsAt ? -1 : 1; })[0];
+    if (ev) nextEvent = { title: ev.title, startsAt: ev.startsAt, body: ev.body };
+  } catch (e) { /* tab missing */ }
+  const feed = [];
+  const sv = scansSheet_().getDataRange().getValues(), sh = sv[0];
+  for (let r = sv.length - 1; r >= 1 && feed.length < 12; r--) {
+    const id = String(sv[r][sh.indexOf('StudentID')]), t = sv[r][sh.indexOf('Time')];
+    feed.push({ time: t instanceof Date ? t.toISOString() : String(t), action: String(sv[r][sh.indexOf('Action')]), bus: String(sv[r][sh.indexOf('Bus')]), name: byId[id] ? byId[id].name : id, by: String(sv[r][sh.indexOf('Supervisor')]) });
+  }
+  return { missingByBus: missingByBus, supervisors: supervisors, byTeam: Object.keys(byTeam).sort().map(function(k) { return byTeam[k]; }), committees: committees, nextEvent: nextEvent, feed: feed, present: present };
+}
+
 // ONE round trip for the whole leader screen (summary + buses + cases): authorises once instead of three times.
 function handleLeaderAll_(data) {
   return withAuth_(data, requireAnyPerm_(['dashboard', 'stats', 'livemap']), function(user) {
@@ -391,6 +456,9 @@ function handleLeaderAll_(data) {
     if (hasPerm_(user, 'dashboard') || hasPerm_(user, 'stats')) out.summary = leaderSummaryCached_();
     if (hasPerm_(user, 'dashboard') || hasPerm_(user, 'livemap')) out.buses = liveBuses_();
     if (hasPerm_(user, 'dashboard') || hasPerm_(user, 'stats') || hasPerm_(user, 'manage')) out.cases = casesForList_();
+    out.camp = campLocation_();
+    if (hasPerm_(user, 'dashboard')) out.extra = leaderExtra_();
+    out.canSetCamp = hasPerm_(user, 'manage');
     return out;
   });
 }

@@ -487,6 +487,7 @@ function handleListUsers_(data) {
       fullName: r.FullName,
       role: r.Role,
       assignedBus: r.AssignedBus,
+      phone: String(r.Phone || ''),
       committees: splitCsv_(r.Committees),
       permissions: getUserPermissions_(r),
       active: r.Active === true,
@@ -546,6 +547,7 @@ function handleUpdateUserProfile_(data) {
   if (!auth.ok) return { success: false, error: 'Not authorized: ' + auth.reason, code: auth.reason };
   const fullName = String(data.fullName || '').trim().slice(0, 60);
   if (fullName.length < 2) return { success: false, error: 'اكتب الاسم الكامل' };
+  const phone = data.phone === undefined ? null : String(data.phone).replace(/[^0-9+]/g, '').slice(0, 20);
   const lock = LockService.getScriptLock();
   lock.waitLock(5000);
   try {
@@ -554,7 +556,8 @@ function handleUpdateUserProfile_(data) {
     if (!target) return { success: false, error: 'User not found' };
     if (target.Role === 'admin' && auth.user.Role !== 'admin') return { success: false, error: 'الحسابات الإدارية يعدّلها المدير فقط' };
     setCellByColumnName_(sheet, headers, target._rowNumber, 'FullName', fullName);
-    writeAudit_(auth.user.Username, 'USER_RENAMED', target.Username, '');
+    if (phone !== null && headers.indexOf('Phone') !== -1) setCellByColumnName_(sheet, headers, target._rowNumber, 'Phone', phone);
+    writeAudit_(auth.user.Username, 'USER_PROFILE_UPDATED', target.Username, '');
     return { success: true };
   } finally {
     lock.releaseLock();
@@ -705,7 +708,7 @@ function SETUP_createTabs() {
   Object.keys(SHEET_MEMO_).forEach(function(k) { delete SHEET_MEMO_[k]; });
   const log = [];
 
-  ensureSheetWithHeaders_(ss, 'Users', ['Committees', 'Permissions'], log);
+  ensureSheetWithHeaders_(ss, 'Users', ['Committees', 'Permissions', 'Phone'], log);
 
   const com = ensureSheetWithHeaders_(ss, 'Committees',
     ['CommitteeID', 'Name', 'Type', 'ResultsEnabled', 'Budget', 'SortOrder', 'Active'], log);
@@ -728,7 +731,7 @@ function SETUP_createTabs() {
 
   ensureSheetWithHeaders_(ss, 'Scans', ['Time', 'StudentID', 'Action', 'Bus', 'Supervisor', 'Method', 'ClientId', 'Notes'], log);
   ensureSheetWithHeaders_(ss, 'Bags', ['Time', 'StudentID', 'Bus', 'Mode', 'Count', 'Expected', 'Supervisor', 'ClientId'], log);
-  ensureSheetWithHeaders_(ss, 'BusLive', ['Bus', 'Status', 'Lat', 'Lng', 'Accuracy', 'UpdatedAt', 'Supervisor', 'Boarded', 'Total'], log);
+  ensureSheetWithHeaders_(ss, 'BusLive', ['Bus', 'Status', 'Lat', 'Lng', 'Accuracy', 'UpdatedAt', 'Supervisor', 'Boarded', 'Total', 'Speed'], log);
 
   ensureSheetWithHeaders_(ss, 'Custody', ['Time', 'StudentID', 'Item', 'Action', 'Count', 'Tag', 'By', 'ClientId', 'Notes'], log);
   ensureSheetWithHeaders_(ss, 'Withdrawals', ['Id', 'StudentID', 'Time', 'GuardianName', 'Reason', 'Status', 'CreatedBy', 'ClosedAt', 'ClosedBy', 'ClientId'], log);

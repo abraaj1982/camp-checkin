@@ -18,6 +18,27 @@
 .pin{width:30px;height:30px;border-radius:50%;color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;border:3px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.4);font-size:14px}
 .pin.f{background:#2E7D4F}.pin.s{background:#D4912A}.pin.o{background:#C2455A}
 @keyframes pulse{50%{opacity:.55}}.sk{animation:pulse 1.2s infinite;background:var(--soft)}
+.kpi .kv{font-size:38px}.kpi.hero{background:linear-gradient(135deg,var(--brand),#1F4A2B);color:#fff;border:0}.kpi.hero .kl{color:rgba(255,255,255,.85)}
+.ring{--p:0;width:74px;height:74px;border-radius:50%;background:conic-gradient(#fff calc(var(--p)*1%),rgba(255,255,255,.25) 0);display:flex;align-items:center;justify-content:center;flex:none}
+.ring b{width:56px;height:56px;border-radius:50%;background:var(--brand);display:flex;align-items:center;justify-content:center;font-size:16px}
+.ev{display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,#E9B04C,#d39320);color:#1b1b1b;border:0}
+.ev .cd{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;margin-inline-start:auto;white-space:nowrap}
+.bus .top{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.bus .meta{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:13px;color:var(--muted);margin-top:6px}
+.bus .acts{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.mini{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;min-height:38px;padding:0 12px;font:inherit;font-size:13.5px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.mini.call{border-color:var(--brand);color:var(--brand);font-weight:600}
+.names{margin-top:8px;max-height:220px;overflow:auto;border-top:1px solid var(--line)}
+.names div{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+.eta{font-weight:700;color:var(--brand)}
+.grid4{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.com{padding:14px}.com .kv{font-size:28px}
+.feed div{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid var(--line);font-size:13.5px}
+.bar.team i{background:#4F7F55}
+.camp-pin{font-size:26px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))}
+.toolsbar{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+#printArea{display:none}
+@media print{body *{visibility:hidden}#printArea,#printArea *{visibility:visible}#printArea{display:block;position:absolute;inset:0;padding:10mm;color:#000;background:#fff}#printArea h2{font-size:15pt;margin:6mm 0 2mm}#printArea table{width:100%;border-collapse:collapse;font-size:11pt}#printArea td,#printArea th{border:.3mm solid #555;padding:1.5mm 2mm;text-align:start}}
 </style>
 </head>
 <body>
@@ -38,89 +59,210 @@ if (!token) location.href = 'login.html'; else if (!can('dashboard') && !can('li
 
 const pref = { get(k, d) { try { return localStorage.getItem('mk_pref_' + k) || d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('mk_pref_' + k, v); } catch (e) {} } };
 const T = {
- ar: { dir: 'rtl', title: 'القائد', sub: 'متابعة المخيم مباشرة', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح', boarded: 'صعدوا', total: 'إجمالي الطلاب', remaining: 'لم يصعدوا بعد', withdrawn: 'منسحبون', bagsIn: 'حقائب محمّلة', bagsOut: 'حقائب منزّلة', of: 'من', map: 'تتبع الباصات مباشرة', live: 'مباشر', byBus: 'الحضور حسب الباص', bus: n => 'باص ' + n,
-  st: { boarding: 'يصعدون', departed: 'انطلق', onway: 'في الطريق', arrived: 'وصل' }, noLoc: 'لا يوجد موقع بعد', ago: s => s < 90 ? 'منذ ' + s + ' ث' : 'منذ ' + Math.round(s / 60) + ' د', lastSeen: s => 'آخر موقع ' + (s < 90 ? 'منذ ' + s + ' ث' : 'منذ ' + Math.round(s / 60) + ' د'),
-  noMap: 'تعذّر تحميل الخريطة. تظهر الحالة في القائمة.', offline: 'غير متصل. تُعرض آخر بيانات.', loading: 'جارٍ التحميل...', stale: 'هذه آخر بيانات محفوظة، جارٍ التحديث...', supervisor: 'المشرف', err: 'تعذّر تحميل البيانات.', note: 'الموقع من هاتف المشرف، ويتحدّث ما دامت شاشته مفتوحة.' },
- en: { dir: 'ltr', title: 'Camp leader', sub: 'Live camp overview', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light', boarded: 'Boarded', total: 'Total students', remaining: 'Not boarded yet', withdrawn: 'Withdrawn', bagsIn: 'Bags loaded', bagsOut: 'Bags unloaded', of: 'of', map: 'Live bus tracking', live: 'Live', byBus: 'Attendance by bus', bus: n => 'Bus ' + n,
-  st: { boarding: 'Boarding', departed: 'Departed', onway: 'On the way', arrived: 'Arrived' }, noLoc: 'No location yet', ago: s => s < 90 ? s + 's ago' : Math.round(s / 60) + ' min ago', lastSeen: s => 'Last seen ' + (s < 90 ? s + 's ago' : Math.round(s / 60) + ' min ago'),
-  noMap: 'Could not load the map. Status is shown in the list.', offline: 'Offline. Showing the latest data.', loading: 'Loading...', stale: 'Showing the last saved data, refreshing...', supervisor: 'Supervisor', err: 'Could not load data.', note: 'Location comes from the supervisor’s phone and updates while his screen is open.' }
+ ar: { dir: 'rtl', title: 'القائد', sub: 'متابعة المخيم مباشرة', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح', of: 'من', bus: n => 'باص ' + n,
+  present: 'صعدوا / في المخيم', remaining: 'لم يصعدوا بعد', arrivedBuses: 'باصات وصلت', withdrawn: 'منسحبون', meals: 'وجبات اليوم', mealsNote: 'طلاب + مشرفون',
+  map: 'تتبع الباصات مباشرة', live: 'مباشر', byBus: 'الحضور حسب الباص', byTeam: 'الحضور حسب الفريق', committees: 'اللجان الآن', feed: 'آخر الأحداث', noFeed: 'لا أحداث بعد.',
+  st: { boarding: 'يصعدون', departed: 'انطلق', onway: 'في الطريق', arrived: 'وصل' }, notStarted: 'لم يبدأ', noLoc: 'لا يوجد موقع بعد', lastSeen: s => 'آخر موقع ' + (s < 90 ? 'منذ ' + s + ' ث' : 'منذ ' + Math.round(s / 60) + ' د'),
+  eta: (m, km) => 'يصل خلال ~' + m + ' د (' + km + ' كم)', arrivedOk: 'وصل المخيم ✓', speed: k => k + ' كم/س', call: '📞 اتصال', missingBtn: n => '👥 الناقصون (' + n + ')', allIn: 'اكتمل الباص ✓', noPhone: 'لا رقم للمشرف',
+  medOpen: 'حالات طبية مفتوحة', medUrgent: n => n + ' عاجلة', phones: 'هواتف بالأمانات', bags: 'حقائب بالأمانات', withdrawOpen: 'انسحاب مفتوح',
+  nextEvent: 'الفعالية القادمة', d: 'ي', h: 'س', m: 'د', setCamp: '📍 تحديد موقع المخيم', setCampHint: 'اضغط على الخريطة في مكان المخيم', campSaved: 'حُفظ موقع المخيم', campNone: 'لم يُحدَّد موقع المخيم بعد (لحساب وقت الوصول والوصول التلقائي).',
+  sound: '🔔 صوت التنبيهات', soundOff: '🔕 الصوت متوقف', printReport: '🖨 طباعة التقرير', printAbsent: '🖨 كشف الغائبين', absentTitle: 'كشف من لم يصعد', reportTitle: 'تقرير حالة المخيم', at: 'في',
+  noMap: 'تعذّر تحميل الخريطة. تظهر الحالة في القائمة.', offline: 'غير متصل. تُعرض آخر بيانات.', loading: 'جارٍ التحميل...', stale: 'هذه آخر بيانات محفوظة، جارٍ التحديث...', err: 'تعذّر تحميل البيانات.', note: 'الموقع من هاتف المشرف، ويتحدّث ما دامت شاشته مفتوحة.',
+  actions: { board: 'صعد', undo: 'تراجع', withdraw: 'انسحب' }, num: '#', student: 'الطالب', team: 'الفريق', cls: 'الصف' },
+ en: { dir: 'ltr', title: 'Camp leader', sub: 'Live camp overview', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light', of: 'of', bus: n => 'Bus ' + n,
+  present: 'Boarded / at camp', remaining: 'Not boarded yet', arrivedBuses: 'Buses arrived', withdrawn: 'Withdrawn', meals: 'Meals today', mealsNote: 'students + supervisors',
+  map: 'Live bus tracking', live: 'Live', byBus: 'Attendance by bus', byTeam: 'Attendance by team', committees: 'Committees now', feed: 'Latest activity', noFeed: 'No activity yet.',
+  st: { boarding: 'Boarding', departed: 'Departed', onway: 'On the way', arrived: 'Arrived' }, notStarted: 'Not started', noLoc: 'No location yet', lastSeen: s => 'Last seen ' + (s < 90 ? s + 's ago' : Math.round(s / 60) + ' min ago'),
+  eta: (m, km) => 'Arrives in ~' + m + ' min (' + km + ' km)', arrivedOk: 'At camp ✓', speed: k => k + ' km/h', call: '📞 Call', missingBtn: n => '👥 Missing (' + n + ')', allIn: 'Bus complete ✓', noPhone: 'No supervisor phone',
+  medOpen: 'Open medical cases', medUrgent: n => n + ' urgent', phones: 'Phones in custody', bags: 'Bags in custody', withdrawOpen: 'Open withdrawals',
+  nextEvent: 'Next event', d: 'd', h: 'h', m: 'm', setCamp: '📍 Set camp location', setCampHint: 'Click the camp location on the map', campSaved: 'Camp location saved', campNone: 'Camp location not set yet (needed for arrival time and automatic arrival).',
+  sound: '🔔 Alert sound', soundOff: '🔕 Sound off', printReport: '🖨 Print report', printAbsent: '🖨 Absent list', absentTitle: 'Students not boarded', reportTitle: 'Camp status report', at: 'at',
+  noMap: 'Could not load the map. Status is shown in the list.', offline: 'Offline. Showing the latest data.', loading: 'Loading...', stale: 'Showing the last saved data, refreshing...', err: 'Could not load data.', note: 'Location comes from the supervisor’s phone and updates while his screen is open.',
+  actions: { board: 'boarded', undo: 'undone', withdraw: 'withdrew' }, num: '#', student: 'Student', team: 'Team', cls: 'Class' }
 };
 const X = {
- ar: { alerts: 'تنبيهات', none: 'لا توجد تنبيهات. كل شيء طبيعي.', stale: (b, a) => `باص ${b}: لم يصل موقعه منذ ${Math.round(a / 60)} دقيقة. اتصل بالمشرف.`, missing: (b, n) => `باص ${b}: يتحرك ويوجد ${n} طالب لم يُسجَّل صعودهم.`, no_report: b => `باص ${b}: لم يرسل أي حالة بعد.`, bags: (b, n) => `باص ${b}: ${n} طالب حقائبهم المحمّلة أقل من المتوقع.`, cases_open: n => `${n} بلاغ مفتوح يحتاج متابعة.`, med_urgent: n => `${n} حالة طبية عاجلة مفتوحة.`, withdraw_open: n => `${n} طلب انسحاب مفتوح.`, cases: 'البلاغات', noCases: 'لا توجد بلاغات.', ack: 'استلمت', close: 'إغلاق', ty: { student: 'طالب', bus: 'باص', lost: 'مفقود', other: 'أخرى' }, stt: { open: 'مفتوح', ack: 'قيد المتابعة', closed: 'مغلق' }, stale5: 'موقع قديم' },
- en: { alerts: 'Alerts', none: 'No alerts. Everything looks normal.', stale: (b, a) => `Bus ${b}: no location for ${Math.round(a / 60)} min. Call the supervisor.`, missing: (b, n) => `Bus ${b}: moving with ${n} student(s) not checked in.`, no_report: b => `Bus ${b}: has not reported yet.`, bags: (b, n) => `Bus ${b}: ${n} student(s) with fewer loaded bags than expected.`, cases_open: n => `${n} open case(s) need follow-up.`, med_urgent: n => `${n} urgent medical case(s) open.`, withdraw_open: n => `${n} open withdrawal request(s).`, cases: 'Cases', noCases: 'No cases.', ack: 'Acknowledge', close: 'Close', ty: { student: 'Student', bus: 'Bus', lost: 'Lost item', other: 'Other' }, stt: { open: 'Open', ack: 'In progress', closed: 'Closed' }, stale5: 'Stale location' }
+ ar: { alerts: 'تنبيهات', none: 'لا توجد تنبيهات. كل شيء طبيعي ✓', stale: (b, a) => `باص ${b}: لم يصل موقعه منذ ${Math.round(a / 60)} دقيقة. اتصل بالمشرف.`, missing: (b, n) => `باص ${b}: يتحرك ويوجد ${n} طالب لم يُسجَّل صعودهم.`, no_report: bs => `باصات لم تبدأ بعد: ${bs.join('، ')}`, bags: (b, n) => `باص ${b}: ${n} طالب حقائبهم المحمّلة أقل من المتوقع.`, cases_open: n => `${n} بلاغ مفتوح يحتاج متابعة.`, med_urgent: n => `${n} حالة طبية عاجلة مفتوحة.`, withdraw_open: n => `${n} طلب انسحاب مفتوح.`, cases: 'البلاغات', noCases: 'لا توجد بلاغات.', ack: 'استلمت', close: 'إغلاق', ty: { student: 'طالب', bus: 'باص', lost: 'مفقود', other: 'أخرى' }, stt: { open: 'مفتوح', ack: 'قيد المتابعة', closed: 'مغلق' } },
+ en: { alerts: 'Alerts', none: 'No alerts. Everything looks normal ✓', stale: (b, a) => `Bus ${b}: no location for ${Math.round(a / 60)} min. Call the supervisor.`, missing: (b, n) => `Bus ${b}: moving with ${n} student(s) not checked in.`, no_report: bs => `Buses not started yet: ${bs.join(', ')}`, bags: (b, n) => `Bus ${b}: ${n} student(s) with fewer loaded bags than expected.`, cases_open: n => `${n} open case(s) need follow-up.`, med_urgent: n => `${n} urgent medical case(s) open.`, withdraw_open: n => `${n} open withdrawal request(s).`, cases: 'Cases', noCases: 'No cases.', ack: 'Acknowledge', close: 'Close', ty: { student: 'Student', bus: 'Bus', lost: 'Lost item', other: 'Other' }, stt: { open: 'Open', ack: 'In progress', closed: 'Closed' } }
 };
-const X_ = () => X[st.lang];
-const st = { cases: [], lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), sum: null, live: [], err: '', fetchedAt: 0 };
-const L_ = () => T[st.lang];
+const st = { cases: [], lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), sum: null, live: [], extra: null, camp: null, canSetCamp: false, err: '', open: {}, picking: false, msg: '' };
+const L_ = () => T[st.lang], X_ = () => X[st.lang];
 const $ = id => document.getElementById(id);
 const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const AUTH_ERR = /EXPIRED|IDLE_TIMEOUT|REVOKED|BAD_SIGNATURE|MALFORMED|USER_NOT_FOUND|ACCOUNT_DISABLED|BAD_PAYLOAD/;
-async function api(a) { const r = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: a, token: token }) }); return r.json(); }
+async function api(a, extra) { const r = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(Object.assign({ action: a, token: token }, extra || {})) }); return r.json(); }
 
 // Saved copy of the last data: the screen shows it INSTANTLY, then refreshes (the server needs a few seconds).
-const CK = 'mk_leader_cache_v1';
-try { const c = JSON.parse(localStorage.getItem(CK) || 'null'); if (c && c.sum) { st.sum = c.sum; st.live = c.live || []; st.cases = c.cases || []; st.stale = true; st.cachedAt = c.at; } } catch (e) {}
+const CK = 'mk_leader_cache_v2';
+try { const c = JSON.parse(localStorage.getItem(CK) || 'null'); if (c && c.sum) { Object.assign(st, { sum: c.sum, live: c.live || [], cases: c.cases || [], extra: c.extra || null, camp: c.camp || null, stale: true }); } } catch (e) {}
 async function poll() {
   try {
-    const r = await api('leaderAll');                      // ONE request for summary + buses + cases
+    const r = await api('leaderAll');                      // ONE request for the whole screen
     if (r && r.code && AUTH_ERR.test(r.code)) { sessionStorage.clear(); location.href = 'login.html'; return; }
     if (r && r.success) {
       if (r.summary) st.sum = r.summary; if (r.buses) st.live = r.buses; if (r.cases) st.cases = r.cases;
-      st.err = ''; st.stale = false; st.fetchedAt = Date.now();
-      try { localStorage.setItem(CK, JSON.stringify({ sum: st.sum, live: st.live, cases: st.cases, at: Date.now() })); } catch (e) {}
+      st.extra = r.extra || null; st.camp = r.camp || null; st.canSetCamp = !!r.canSetCamp;
+      st.err = ''; st.stale = false;
+      try { localStorage.setItem(CK, JSON.stringify({ sum: st.sum, live: st.live, cases: st.cases, extra: st.extra, camp: st.camp, at: Date.now() })); } catch (e) {}
+      ding();
     } else st.err = L_().err;
   } catch (e) { st.err = ''; }
   render();
 }
-const ageClass = a => a < 90 ? 'f' : a < 600 ? 's' : 'o';
 
-let map = null, markers = {}, mapFailed = false;
+/* ---------- helpers ---------- */
+const ageClass = a => a < 90 ? 'f' : a < 600 ? 's' : 'o';
+function distM(a, b, c, d) { const R = 6371000, r = Math.PI / 180, x = Math.sin((c - a) * r / 2) ** 2 + Math.cos(a * r) * Math.cos(c * r) * Math.sin((d - b) * r / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(x)); }
+function etaText(b) {
+  const l = L_(); if (b.status === 'arrived') return `<span class="eta">${l.arrivedOk}</span>`;
+  if (!st.camp || b.lat === null || b.lat === undefined) return '';
+  const road = distM(b.lat, b.lng, st.camp.lat, st.camp.lng) * 1.25;      // straight line × 1.25 ≈ road distance
+  const v = b.speed && b.speed > 3 ? b.speed : 13.9;                      // current speed, else ~50 km/h
+  return `<span class="eta">${l.eta(Math.max(1, Math.round(road / v / 60)), (road / 1000).toFixed(1))}</span>`;
+}
+function countdown(iso) {
+  const ms = new Date(iso).getTime() - Date.now(), l = L_(); if (!(ms > 0)) return '';
+  const d = Math.floor(ms / 864e5), h = Math.floor(ms % 864e5 / 36e5), m = Math.floor(ms % 36e5 / 6e4);
+  return (d ? d + l.d + ' ' : '') + h + l.h + ' ' + m + l.m;
+}
+// all buses (from the student list) merged with the live positions, so a bus that has not started still has a card
+function allBuses() {
+  const live = {}; st.live.forEach(b => { live[b.bus] = b; });
+  const per = (st.sum && st.sum.perBus) || [];
+  const keys = Array.from(new Set(per.map(p => p.bus).concat(Object.keys(live)))).sort((a, b) => Number(a) - Number(b));
+  return keys.map(k => { const p = per.find(x => x.bus === k) || {}, lv = live[k];
+    return Object.assign({ bus: k, status: lv ? lv.status : '', lat: null, lng: null, ageSec: null, supervisor: '', speed: null }, lv || {}, { boarded: p.boarded !== undefined ? p.boarded : (lv ? lv.boarded : 0), total: p.total !== undefined ? p.total : (lv ? lv.total : 0), missing: p.missing || 0, started: !!lv }); });
+}
+
+/* ---------- alert sound (only for NEW red alerts) ---------- */
+let seenBad = null, soundOn = (() => { try { return localStorage.getItem('mk_leader_sound') === '1'; } catch (e) { return false; } })();
+function ding() {
+  const bad = ((st.sum && st.sum.alerts) || []).filter(a => a.level === 'bad').map(a => a.type + a.bus);
+  if (seenBad && soundOn && bad.some(k => seenBad.indexOf(k) === -1)) {
+    try { const ac = new (window.AudioContext || window.webkitAudioContext)(); [0, .25].forEach(t => { const o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = 880; o.connect(g); g.connect(ac.destination); g.gain.setValueAtTime(.25, ac.currentTime + t); g.gain.exponentialRampToValueAtTime(.001, ac.currentTime + t + .2); o.start(ac.currentTime + t); o.stop(ac.currentTime + t + .2); }); } catch (e) {}
+  }
+  seenBad = bad;
+}
+
+/* ---------- map (kept alive across refreshes: no flicker, zoom is preserved) ---------- */
+let map = null, markers = {}, campMarker = null, campCircle = null;
 function drawMap() {
   const el = $('map'); if (!el) return;
-  if (typeof L === 'undefined') { mapFailed = true; el.innerHTML = '<div class="muted" style="padding:20px;text-align:center">' + esc(L_().noMap) + '</div>'; return; }
-  if (!map || map._container !== el) { map = L.map(el, { zoomControl: true }).setView([23.58, 58.4], 8); L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OpenStreetMap' }).addTo(map); markers = {}; }
+  if (typeof L === 'undefined') { el.innerHTML = '<div class="muted" style="padding:20px;text-align:center">' + esc(L_().noMap) + '</div>'; return; }
+  if (!map) {
+    map = L.map(el, { zoomControl: true }).setView(st.camp ? [st.camp.lat, st.camp.lng] : [23.58, 58.4], st.camp ? 11 : 8);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OpenStreetMap' }).addTo(map);
+    map.on('click', async ev => {
+      if (!st.picking) return; st.picking = false;
+      const r = await api('setCampLocation', { lat: +ev.latlng.lat.toFixed(6), lng: +ev.latlng.lng.toFixed(6) });
+      if (r.success) { st.camp = r.camp; st.msg = L_().campSaved; } render(); poll();
+    });
+  }
+  el.style.cursor = st.picking ? 'crosshair' : '';
   const pts = [];
   st.live.filter(b => b.lat !== null && b.lng !== null).forEach(b => {
-    const icon = L.divIcon({ className: '', html: '<div class="pin ' + ageClass(b.ageSec) + '">' + esc(b.bus) + '</div>', iconSize: [30, 30], iconAnchor: [15, 15] });
+    const icon = L.divIcon({ className: '', html: '<div class="pin ' + (b.status === 'arrived' ? 'f' : ageClass(b.ageSec)) + '">' + esc(b.bus) + '</div>', iconSize: [30, 30], iconAnchor: [15, 15] });
     if (markers[b.bus]) markers[b.bus].setLatLng([b.lat, b.lng]).setIcon(icon); else markers[b.bus] = L.marker([b.lat, b.lng], { icon: icon }).addTo(map);
     markers[b.bus].bindTooltip(L_().bus(b.bus) + ' · ' + L_().lastSeen(b.ageSec)); pts.push([b.lat, b.lng]);
   });
+  if (st.camp) {
+    const ll = [st.camp.lat, st.camp.lng]; pts.push(ll);
+    if (!campMarker) { campMarker = L.marker(ll, { icon: L.divIcon({ className: '', html: '<div class="camp-pin">⛺</div>', iconSize: [30, 30], iconAnchor: [15, 15] }) }).addTo(map); campCircle = L.circle(ll, { radius: 400, color: '#2B6B3A', weight: 1, fillOpacity: .08 }).addTo(map); }
+    else { campMarker.setLatLng(ll); campCircle.setLatLng(ll); }
+  }
   if (pts.length && !map._fitted) { map.fitBounds(pts, { padding: [40, 40], maxZoom: 14 }); map._fitted = true; }
+  setTimeout(() => { try { map.invalidateSize(); } catch (e) {} }, 50);
 }
+
+/* ---------- printing ---------- */
+function printAbsent() {
+  const l = L_(), mb = (st.extra && st.extra.missingByBus) || {};
+  const when = new Date().toLocaleString(st.lang === 'ar' ? 'ar' : 'en');
+  $('printArea').innerHTML = `<h1>${l.absentTitle}</h1><div>${esc(when)}</div>` + Object.keys(mb).sort((a, b) => a - b).map(b => `<h2>${l.bus(esc(b))} (${mb[b].length})</h2>${mb[b].length ? `<table><tr><th>${l.num}</th><th>${l.student}</th><th>${l.team}</th><th>${l.cls}</th></tr>${mb[b].map((s, i) => `<tr><td>${i + 1}</td><td>${esc(s.name)} · ${esc(s.id)}</td><td>${esc(s.team)}</td><td>${esc(s.cls)}</td></tr>`).join('')}</table>` : `<div>${l.allIn}</div>`}`).join('');
+  window.print();
+}
+function printReport() {
+  const l = L_(), s = st.sum, x = st.extra || {}, c = x.committees || {};
+  const when = new Date().toLocaleString(st.lang === 'ar' ? 'ar' : 'en');
+  $('printArea').innerHTML = `<h1>${l.reportTitle}</h1><div>${esc(when)}</div>
+   <h2>${l.byBus}</h2><table><tr><th></th><th>${l.present}</th><th>${l.remaining}</th></tr>${allBuses().map(b => `<tr><td>${l.bus(esc(b.bus))} · ${esc(l.st[b.status] || l.notStarted)}</td><td>${b.boarded} / ${b.total}</td><td>${b.missing}</td></tr>`).join('')}<tr><th>Σ</th><th>${s.boarded} / ${s.total}</th><th>${s.total - s.boarded - s.withdrawn}</th></tr></table>
+   ${x.byTeam ? `<h2>${l.byTeam}</h2><table>${x.byTeam.map(t => `<tr><td>${esc(t.team)}</td><td>${t.present} / ${t.total}</td></tr>`).join('')}</table>` : ''}
+   <h2>${l.committees}</h2><table><tr><td>${l.medOpen}</td><td>${c.medOpen || 0}</td></tr><tr><td>${l.phones}</td><td>${c.phones || 0}</td></tr><tr><td>${l.bags}</td><td>${c.bags || 0}</td></tr><tr><td>${l.withdrawOpen}</td><td>${c.withdrawOpen || 0}</td></tr><tr><td>${l.meals}</td><td>${c.meals || 0}</td></tr></table>`;
+  window.print();
+}
+
+/* ---------- render ---------- */
 function render() {
-  const l = L_(); document.documentElement.lang = st.lang; document.documentElement.dir = l.dir; document.documentElement.dataset.theme = st.theme;
+  const keepMap = map ? $('map') : null; if (keepMap) keepMap.remove();   // the live map survives re-renders
+  const l = L_(), x = X_(); document.documentElement.lang = st.lang; document.documentElement.dir = l.dir; document.documentElement.dataset.theme = st.theme;
   $('hT').textContent = l.title; $('hS').textContent = l.sub; $('homeBtn').textContent = l.home; $('langBtn').textContent = l.lang; $('themeBtn').textContent = st.theme === 'light' ? l.dark : l.light; document.title = l.title + ' — MUKHAYYAM';
   const nb = $('netbar'); if (!navigator.onLine) { nb.hidden = false; nb.className = 'netbar warn'; nb.textContent = l.offline; } else nb.hidden = true;
-  const s = st.sum; if (!s) { $('app').innerHTML = st.err ? '<div class="card muted">' + esc(st.err) + '</div>' : '<div class="kpis">' + [1, 2, 3, 4].map(() => '<div class="card kpi sk"><div class="kl">&nbsp;</div><div class="kv">&nbsp;</div></div>').join('') + '</div><div class="card sk" style="height:300px"></div><div class="muted" style="text-align:center">' + esc(l.loading) + '</div>'; return; }
-  const left = s.total - s.boarded - s.withdrawn;
-  const staleNote = st.stale ? `<div class="banner warn" style="margin-top:0">${l.stale}</div>` : '';
+  const s = st.sum;
+  if (!s) { $('app').innerHTML = st.err ? '<div class="card muted">' + esc(st.err) + '</div>' : '<div class="kpis">' + [1, 2, 3, 4].map(() => '<div class="card kpi sk"><div class="kl">&nbsp;</div><div class="kv">&nbsp;</div></div>').join('') + '</div><div class="card sk" style="height:300px"></div><div class="muted" style="text-align:center">' + esc(l.loading) + '</div>'; return; }
+  const ex = st.extra || {}, com = ex.committees || {}, buses = allBuses();
+  const left = s.total - s.boarded - s.withdrawn, pct = s.total ? Math.round(s.boarded / s.total * 100) : 0;
+  const arrived = buses.filter(b => b.status === 'arrived').length;
+  // alerts: "not started" buses grouped into ONE line
+  const al = s.alerts || [], nr = al.filter(a => a.type === 'no_report').map(a => a.bus), rest = al.filter(a => a.type !== 'no_report');
+  const amsg = a => a.type === 'stale' ? x.stale(esc(a.bus), a.ageSec) : a.type === 'missing' ? x.missing(esc(a.bus), a.missing) : a.type === 'bags' ? x.bags(esc(a.bus), a.count) : a.type === 'med_urgent' ? x.med_urgent(a.count) : a.type === 'withdraw_open' ? x.withdraw_open(a.count) : x.cases_open(a.count);
+  const alertsHtml = (rest.length || nr.length) ? rest.map(a => `<div class="banner ${a.level === 'bad' ? 'bad' : 'warn'}" style="margin:0 0 6px">${amsg(a)}</div>`).join('') + (nr.length ? `<div class="banner" style="margin:0;background:var(--soft)">${x.no_report(nr.map(esc))}</div>` : '') : `<div class="banner ok" style="margin:0">${x.none}</div>`;
   const kpi = (lab, v, n, c) => `<div class="card kpi"><div class="kl">${lab}</div><div class="kv" ${c ? `style="color:var(--${c})"` : ''}>${v}</div><div class="kl">${n || ''}</div></div>`;
-  const byBus = s.perBus.map(b => `<div class="brow"><span>${l.bus(esc(b.bus))}</span><div class="bar" style="margin:0" role="img" aria-label="${l.bus(esc(b.bus))}: ${b.boarded}/${b.total}"><i style="width:${b.total ? Math.round(b.boarded / b.total * 100) : 0}%"></i></div><span class="muted" style="text-align:end"><b style="color:var(--ink)">${b.boarded}</b> / ${b.total}</span></div>`).join('');
-  const cards = st.live.map(b => `<div class="bus"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>${l.bus(esc(b.bus))}</b><span class="pill ${b.status === 'arrived' ? 'ok' : b.ageSec >= 600 ? 'bad' : 'warn'}">${esc(l.st[b.status] || b.status)}</span></div><div class="muted" style="font-size:13px;margin-top:4px">${b.boarded} ${l.of} ${b.total}${b.supervisor ? ' · ' + esc(b.supervisor) : ''}</div><div style="font-size:13px;margin-top:2px;color:var(--${b.lat === null ? 'muted' : b.ageSec >= 300 ? 'bad' : 'ok'})">${b.lat === null ? l.noLoc : (b.ageSec >= 300 ? '⚠ ' : '') + l.lastSeen(b.ageSec)}</div></div>`).join('');
-  const x = X_();
-  const amsg = a => a.type === 'stale' ? x.stale(esc(a.bus), a.ageSec) : a.type === 'missing' ? x.missing(esc(a.bus), a.missing) : a.type === 'no_report' ? x.no_report(esc(a.bus)) : a.type === 'bags' ? x.bags(esc(a.bus), a.count) : a.type === 'med_urgent' ? x.med_urgent(a.count) : a.type === 'withdraw_open' ? x.withdraw_open(a.count) : x.cases_open(a.count);
-  const alertsHtml = (s.alerts && s.alerts.length ? s.alerts.map(a => `<div class="banner ${a.level === 'bad' ? 'bad' : a.level === 'info' ? '' : 'warn'}" style="margin:0 0 6px">${amsg(a)}</div>`).join('') : `<div class="muted">${x.none}</div>`);
-  const casesHtml = st.cases.length ? st.cases.map(c => `<div class="bus" style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>${esc(x.ty[c.type] || c.type)}${c.bus ? ' · ' + l.bus(esc(c.bus)) : ''}</b><span class="pill ${c.status === 'open' ? 'bad' : c.status === 'ack' ? 'warn' : 'ok'}">${esc(x.stt[c.status] || c.status)}</span></div><div style="margin:6px 0">${esc(c.text)}</div>${c.status !== 'closed' ? `<div style="display:flex;gap:8px">${c.status === 'open' ? `<button class="btn" data-case="${esc(c.id)}" data-st="ack">${x.ack}</button>` : ''}<button class="btn" data-case="${esc(c.id)}" data-st="closed">${x.close}</button></div>` : ''}</div>`).join('') : `<div class="muted">${x.noCases}</div>`;
-  $('app').innerHTML = `${staleNote}${st.err ? `<div class="banner bad">${esc(st.err)}</div>` : ''}
+  const hero = `<div class="card kpi hero" style="display:flex;align-items:center;gap:14px"><div class="ring" style="--p:${pct}"><b>${pct}%</b></div><div><div class="kl">${l.present}</div><div class="kv">${s.boarded}</div><div class="kl">${l.of} ${s.total}</div></div></div>`;
+  const ev = ex.nextEvent ? `<section class="card ev"><div style="font-size:30px">🎉</div><div><div style="font-size:13px;opacity:.8">${l.nextEvent}</div><b style="font-size:18px">${esc(ex.nextEvent.title)}</b></div><div class="cd" id="cd">${countdown(ex.nextEvent.startsAt)}</div></section>` : '';
+  const sup = (ex.supervisors || {});
+  const cards = buses.map(b => {
+    const sp = (sup[b.bus] || [])[0], miss = (ex.missingByBus || {})[b.bus] || [], open = st.open[b.bus];
+    const pill = !b.started ? `<span class="pill">${l.notStarted}</span>` : `<span class="pill ${b.status === 'arrived' ? 'ok' : b.status === 'onway' ? 'warn' : ''}">${esc(l.st[b.status] || b.status)}</span>`;
+    const seen = b.lat === null || b.lat === undefined ? `<span>${l.noLoc}</span>` : `<span style="color:var(--${b.ageSec >= 300 ? 'bad' : 'ok'})">${b.ageSec >= 300 ? '⚠ ' : ''}${l.lastSeen(b.ageSec)}</span>`;
+    return `<div class="bus"><div class="top"><b>${l.bus(esc(b.bus))}</b>${pill}</div>
+      <div class="bar" style="margin-top:8px"><i style="width:${b.total ? Math.round(b.boarded / b.total * 100) : 0}%"></i></div>
+      <div class="meta"><span><b style="color:var(--ink)">${b.boarded}</b> ${l.of} ${b.total}</span>${sp ? `<span>${esc(sp.name)}</span>` : (b.supervisor ? `<span>${esc(b.supervisor)}</span>` : '')}${seen}${b.speed && b.status !== 'arrived' ? `<span>${l.speed(Math.round(b.speed * 3.6))}</span>` : ''}</div>
+      ${etaText(b) ? `<div style="margin-top:6px">${etaText(b)}</div>` : ''}
+      <div class="acts">${sp && sp.phone ? `<a class="mini call" href="tel:${esc(sp.phone)}">${l.call}</a>` : ''}${ex.missingByBus ? (b.missing > 0 ? `<button class="mini" data-open="${esc(b.bus)}">${l.missingBtn(b.missing)}</button>` : (b.total ? `<span class="pill ok">${l.allIn}</span>` : '')) : ''}</div>
+      ${open && miss.length ? `<div class="names">${miss.map(m => `<div><span>${esc(m.name)}</span><span class="muted">${esc(m.id)} · ${esc(m.team)}</span></div>`).join('')}</div>` : ''}</div>`;
+  }).join('');
+  const byTeam = (ex.byTeam || []).map(t => `<div class="brow"><span>${esc(t.team)}</span><div class="bar team" style="margin:0"><i style="width:${t.total ? Math.round(t.present / t.total * 100) : 0}%"></i></div><span class="muted" style="text-align:end"><b style="color:var(--ink)">${t.present}</b> / ${t.total}</span></div>`).join('');
+  const comm = st.extra ? `<section class="card"><h2 class="h2" style="margin-bottom:10px">${l.committees}</h2><div class="grid4">
+    <div class="card com"><div class="kl">⚕️ ${l.medOpen}</div><div class="kv" style="color:var(--${com.medUrgent ? 'bad' : 'ink'})">${com.medOpen || 0}</div><div class="kl">${com.medUrgent ? l.medUrgent(com.medUrgent) : ''}</div></div>
+    <div class="card com"><div class="kl">📱 ${l.phones}</div><div class="kv">${com.phones || 0}</div></div>
+    <div class="card com"><div class="kl">🧳 ${l.bags}</div><div class="kv">${com.bags || 0}</div></div>
+    <div class="card com"><div class="kl">🚪 ${l.withdrawOpen}</div><div class="kv" style="color:var(--${com.withdrawOpen ? 'warn' : 'ink'})">${com.withdrawOpen || 0}</div></div>
+    <div class="card com"><div class="kl">🍽️ ${l.meals}</div><div class="kv">${com.meals || 0}</div><div class="kl">${l.mealsNote}</div></div></div></section>` : '';
+  const feed = st.extra ? `<section class="card feed"><h2 class="h2" style="margin-bottom:6px">${l.feed}</h2>${(ex.feed || []).length ? ex.feed.map(f => `<div><span>${f.action === 'board' ? '🟢' : f.action === 'undo' ? '↩️' : '🚪'} ${esc(f.name)} · ${l.actions[f.action] || esc(f.action)} · ${l.bus(esc(f.bus))}</span><span class="muted">${esc(new Date(f.time).toTimeString().slice(0, 5))}</span></div>`).join('') : `<div class="muted">${l.noFeed}</div>`}</section>` : '';
+  const casesHtml = st.cases.length ? st.cases.map(c => `<div class="bus" style="margin-bottom:8px"><div class="top"><b>${esc(x.ty[c.type] || c.type)}${c.bus ? ' · ' + l.bus(esc(c.bus)) : ''}</b><span class="pill ${c.status === 'open' ? 'bad' : c.status === 'ack' ? 'warn' : 'ok'}">${esc(x.stt[c.status] || c.status)}</span></div><div style="margin:6px 0">${esc(c.text)}</div>${c.status !== 'closed' ? `<div style="display:flex;gap:8px">${c.status === 'open' ? `<button class="btn" data-case="${esc(c.id)}" data-st="ack">${x.ack}</button>` : ''}<button class="btn" data-case="${esc(c.id)}" data-st="closed">${x.close}</button></div>` : ''}</div>`).join('') : `<div class="muted">${x.noCases}</div>`;
+  $('app').innerHTML = `${st.stale ? `<div class="banner warn" style="margin-top:0">${l.stale}</div>` : ''}${st.err ? `<div class="banner bad">${esc(st.err)}</div>` : ''}${st.msg ? `<div class="banner ok">${esc(st.msg)}</div>` : ''}
+  <div class="toolsbar"><button class="mini" id="soundBtn">${soundOn ? l.sound : l.soundOff}</button>${st.extra ? `<button class="mini" id="absentBtn">${l.printAbsent}</button>` : ''}<button class="mini" id="reportBtn">${l.printReport}</button></div>
+  ${ev}
   <section class="card"><h2 class="h2" style="margin-bottom:8px">${x.alerts}</h2>${alertsHtml}</section>
-  <div class="kpis">${kpi(l.boarded, s.boarded, l.of + ' ' + s.total, 'ok')}${kpi(l.remaining, left, '', left ? 'warn' : '')}${kpi(l.withdrawn, s.withdrawn, '', s.withdrawn ? 'bad' : '')}${kpi(l.bagsIn, s.bags.loaded)}${kpi(l.bagsOut, s.bags.unloaded)}</div>
-  <div class="cols"><section class="card c2"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 class="h2">${l.map}</h2><span class="pill ok">● ${l.live}</span></div><div id="map"></div><div class="muted" style="font-size:12.5px;margin-top:8px">${l.note}</div></section>
-  <aside class="c1" style="display:flex;flex-direction:column;gap:10px">${cards || ''}</aside></div>
-  <section class="card"><h2 class="h2" style="margin-bottom:6px">${l.byBus}</h2>${byBus}</section>
-  <section class="card"><h2 class="h2" style="margin-bottom:8px">${x.cases}</h2>${casesHtml}</section>`;
+  <div class="kpis">${hero}${kpi(l.remaining, left, '', left ? 'warn' : 'ok')}${kpi(l.arrivedBuses, arrived + ' / ' + buses.length, '', arrived === buses.length && buses.length ? 'ok' : '')}${kpi(l.withdrawn, s.withdrawn, '', s.withdrawn ? 'bad' : '')}</div>
+  <div class="cols"><section class="card c2"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap"><h2 class="h2">${l.map}</h2><span style="display:flex;gap:6px;align-items:center">${st.canSetCamp ? `<button class="mini" id="campBtn">${st.picking ? l.setCampHint : l.setCamp}</button>` : ''}<span class="pill ok">● ${l.live}</span></span></div><div id="map"></div><div class="muted" style="font-size:12.5px;margin-top:8px">${st.camp ? l.note : l.campNone}</div></section>
+  <aside class="c1" style="display:flex;flex-direction:column;gap:10px">${cards}</aside></div>
+  ${comm}
+  <div class="cols"><section class="card c1"><h2 class="h2" style="margin-bottom:6px">${l.byBus}</h2>${buses.map(b => `<div class="brow"><span>${l.bus(esc(b.bus))}</span><div class="bar" style="margin:0"><i style="width:${b.total ? Math.round(b.boarded / b.total * 100) : 0}%"></i></div><span class="muted" style="text-align:end"><b style="color:var(--ink)">${b.boarded}</b> / ${b.total}</span></div>`).join('')}</section>
+  ${byTeam ? `<section class="card c1"><h2 class="h2" style="margin-bottom:6px">${l.byTeam}</h2>${byTeam}</section>` : ''}</div>
+  <div class="cols">${feed ? `<div class="c1">${feed}</div>` : ''}<section class="card c1"><h2 class="h2" style="margin-bottom:8px">${x.cases}</h2>${casesHtml}</section></div>`;
+  if (keepMap) { const ph = $('map'); if (ph) ph.replaceWith(keepMap); }
   drawMap();
 }
 document.addEventListener('click', async e => {
-  const b = e.target.closest && e.target.closest('[data-case]'); if (!b || !can('dashboard') && !can('manage')) return;
-  b.disabled = true;
-  try { await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'updateCase', token: token, id: b.dataset.case, status: b.dataset.st }) }); } catch (err) {}
-  poll();
+  const t = e.target.closest && e.target.closest('button,[data-open]'); if (!t) return;
+  if (t.dataset.open) { st.open[t.dataset.open] = !st.open[t.dataset.open]; return render(); }
+  if (t.id === 'soundBtn') { soundOn = !soundOn; try { localStorage.setItem('mk_leader_sound', soundOn ? '1' : '0'); } catch (err) {} if (soundOn) { seenBad = null; ding(); } return render(); }
+  if (t.id === 'absentBtn') return printAbsent();
+  if (t.id === 'reportBtn') return printReport();
+  if (t.id === 'campBtn') { st.picking = !st.picking; st.msg = ''; return render(); }
+  if (t.dataset.case && (can('dashboard') || can('manage'))) {
+    t.disabled = true;
+    try { await api('updateCase', { id: t.dataset.case, status: t.dataset.st }); } catch (err) {}
+    poll();
+  }
 });
 $('langBtn').onclick = () => { st.lang = st.lang === 'ar' ? 'en' : 'ar'; pref.set('lang', st.lang); render(); };
 $('themeBtn').onclick = () => { st.theme = st.theme === 'light' ? 'dark' : 'light'; pref.set('theme', st.theme); render(); };
 window.addEventListener('online', poll); window.addEventListener('offline', render);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
 setInterval(() => { if (!document.hidden && navigator.onLine) poll(); }, POLL_MS);
+setInterval(() => { const e = $('cd'); if (e && st.extra && st.extra.nextEvent) e.textContent = countdown(st.extra.nextEvent.startsAt); }, 30000);
 render(); poll();
 </script>
+<div id="printArea"></div>
 </body></html>
