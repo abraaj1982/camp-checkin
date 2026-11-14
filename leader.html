@@ -150,7 +150,17 @@ function drawMap() {
   if (typeof L === 'undefined') { el.innerHTML = '<div class="muted" style="padding:20px;text-align:center">' + esc(L_().noMap) + '</div>'; return; }
   if (!map) {
     map = L.map(el, { zoomControl: true }).setView(st.camp ? [st.camp.lat, st.camp.lng] : [23.58, 58.4], st.camp ? 11 : 8);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OpenStreetMap' }).addTo(map);
+    // Two base maps: street map and satellite (Esri World Imagery, free, no key). The choice is remembered.
+    const street = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' });
+    const sat = L.layerGroup([
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' }),
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, opacity: .9 })   // place names over the satellite
+    ]);
+    let useSat = false; try { useSat = localStorage.getItem('mk_leader_map') === 'sat'; } catch (e) {}
+    (useSat ? sat : street).addTo(map);
+    const names = st.lang === 'ar' ? { street: '🗺 خريطة', sat: '🛰 قمر صناعي' } : { street: '🗺 Map', sat: '🛰 Satellite' };
+    L.control.layers({ [names.street]: street, [names.sat]: sat }, null, { position: 'topleft', collapsed: false }).addTo(map);
+    map.on('baselayerchange', e => { try { localStorage.setItem('mk_leader_map', e.layer === sat ? 'sat' : 'street'); } catch (err) {} });
     map.on('click', async ev => {
       if (!st.picking) return; st.picking = false;
       const r = await api('setCampLocation', { lat: +ev.latlng.lat.toFixed(6), lng: +ev.latlng.lng.toFixed(6) });
@@ -260,6 +270,7 @@ document.addEventListener('click', async e => {
 $('langBtn').onclick = () => { st.lang = st.lang === 'ar' ? 'en' : 'ar'; pref.set('lang', st.lang); render(); };
 $('themeBtn').onclick = () => { st.theme = st.theme === 'light' ? 'dark' : 'light'; pref.set('theme', st.theme); render(); };
 window.addEventListener('online', poll); window.addEventListener('offline', render);
+window.addEventListener('load', () => { if (!map) render(); });   // the map library loads after the first (instant, saved-data) render: redraw once it is ready
 document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
 setInterval(() => { if (!document.hidden && navigator.onLine) poll(); }, POLL_MS);
 setInterval(() => { const e = $('cd'); if (e && st.extra && st.extra.nextEvent) e.textContent = countdown(st.extra.nextEvent.startsAt); }, 30000);
