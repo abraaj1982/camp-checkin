@@ -83,7 +83,9 @@ function doPost(e) {
     const data = JSON.parse(e.postData.contents);
     const fn = Object.prototype.hasOwnProperty.call(ACTIONS_, data.action) ? ACTIONS_[data.action] : null;
     if (!fn) return json_({ success: false, error: 'Invalid action' });
-    return json_(fn(data));
+    const out = fn(data);
+    if (data.action !== 'leaderSummary') { try { CacheService.getScriptCache().remove('leader_v1'); } catch (e) { /* ignore */ } }
+    return json_(out);
   } catch (error) {
     Logger.log('doPost error: ' + error + '\n' + (error && error.stack));
     return json_({ success: false, error: 'Server error' }); // never leak internals
@@ -169,7 +171,7 @@ function findStudent_(id) {
 }
 
 function busSupervisorName_(bus) {
-  const rows = readSheetAsObjects_(USERS_SHEET).rows;
+  const rows = readUsersCached_();
   const u = rows.find(function(r) { return r.Active === true && String(r.AssignedBus).trim() === String(bus).trim(); });
   return u ? u.FullName : '';
 }
@@ -410,6 +412,16 @@ function handleBag_(data) {
 // ---------------- Leader summary (read-only) ----------------
 function handleLeaderSummary_(data) {
   return withAuth_(data, requireAnyPerm_(['dashboard', 'stats']), function() {
+    // The leader screen polls every 15 s: serve a 10 s cache (any write action clears it, see doPost).
+    const cache = CacheService.getScriptCache();
+    try { const hit = cache.get('leader_v1'); if (hit) return JSON.parse(hit); } catch (e) { /* recompute */ }
+    const out = computeLeaderSummary_();
+    try { cache.put('leader_v1', JSON.stringify(out), 10); } catch (e) { /* ignore */ }
+    return out;
+  });
+}
+function computeLeaderSummary_() {
+  return (function() {
     const students = readStudents_().students;
     const sc = scanStates_();
     const buses = {};
@@ -431,7 +443,7 @@ function handleLeaderSummary_(data) {
     Object.keys(lastByKey).forEach(function(k) { if (k.split('|')[1] === 'load') loaded += lastByKey[k]; else unloaded += lastByKey[k]; });
     return { success: true, total: total, boarded: boarded, withdrawn: withdrawn, perBus: perBus, bags: { loaded: loaded, unloaded: unloaded },
       alerts: buildAlerts_(perBus, students, lastByKey) };
-  });
+  })();
 }
 
 // ---------------- Smart alerts (rules only, computed on the server) ----------------

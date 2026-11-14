@@ -85,7 +85,7 @@ r=post({action:'leaderSummary',token:tl});
 assert(r.alerts.some(a=>a.type==='missing'&&a.bus==='1'&&a.missing===1&&a.level==='bad'),'alert: departed bus with missing students');
 assert(r.alerts.some(a=>a.type==='no_report'&&a.bus==='2'),'alert: bus that never reported');
 assert(!r.alerts.some(a=>a.type==='stale'),'no stale alert for fresh location');
-book.BusLive.rows[1][5]=new Date(Date.now()-10*60e3);
+book.BusLive.rows[1][5]=new Date(Date.now()-10*60e3);for(const k of Object.keys(cache))delete cache[k]; // direct sheet edit: drop the cache
 r=post({action:'leaderSummary',token:tl});assert(r.alerts.some(a=>a.type==='stale'&&a.bus==='1'&&a.ageSec>=590),'alert: location older than 5 minutes');
 // ---- cases
 r=post({action:'createCase',token:t1,type:'bus',text:'عطل في المكيف',bus:'2',clientId:'k1'});assert(r.success&&r.id,'supervisor raises a case');
@@ -273,6 +273,16 @@ r=post({action:'busStatus',token:tmv,lat:23.5850,lng:58.4000,acc:10});
 {const row=book.BusLive.rows.find(x=>x[0]==='2');assert(row[1]==='onway','real movement (~550 m in 30 s) sets onway automatically');}
 r=post({action:'scan',token:tgen,studentId:'2001',op:'undo'});assert(r.success,'general supervisor undoes a bus-2 student');
 r=post({action:'leaderSummary',token:tl});assert(r.alerts.some(a=>a.type==='missing'&&a.bus==='2'&&a.missing===1),'alert: bus is moving while a student is not checked in');
+// ---- speed caches: users cache is cleared by our own writes; leader summary cache is cleared by any write
+r=post({action:'leaderSummary',token:tl});const b1=r.boarded;
+post({action:'scan',token:tgen,studentId:'3002',op:'board'});
+r=post({action:'leaderSummary',token:tl});assert(r.boarded===b1+1,'leader summary is refreshed right after a write (cache cleared)');
+post({action:'setUserActive',token:T,targetUsername:'u1',active:false});
+r=post({action:'busState',token:tu1});assert(!r.success&&r.code==='ACCOUNT_DISABLED','disabling a user applies at once (users cache cleared)');
+post({action:'setUserActive',token:T,targetUsername:'u1',active:true});
+r=post({action:'busState',token:tu1});assert(r.success,'re-enabling applies at once');
+post({action:'updateUserAccess',token:T,targetUsername:'u1',permissions:['print'],committees:[]});
+r=post({action:'busState',token:tu1});assert(!r.success,'permission change applies at once (checkin removed)');
 // ---- sheet check
 r=post({action:'checkStudentSheet',token:T});assert(r.success&&r.report.ok&&r.report.total===6,'student sheet check passes');
 console.log(fails?`\n${fails} FAILED`:'\nALL PASSED');

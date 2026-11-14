@@ -78,6 +78,17 @@ function readSheetAsObjects_(sheetName) {
   return { headers: headers, rows: rows, sheet: sheet };
 }
 
+// Users table cached for 60 s (every request needs it for authorization). Every write we make to Users clears the cache,
+// so changes made from the app apply at once; a manual edit in the sheet applies within a minute.
+function readUsersCached_() {
+  const cache = CacheService.getScriptCache();
+  try { const hit = cache.get('users_v1'); if (hit) return JSON.parse(hit); } catch (e) { /* fall through */ }
+  const rows = readSheetAsObjects_(USERS_SHEET).rows;
+  try { cache.put('users_v1', JSON.stringify(rows), 60); } catch (e) { /* too large: skip */ }
+  return rows;
+}
+function clearUsersCache_() { try { CacheService.getScriptCache().remove('users_v1'); } catch (e) { /* ignore */ } }
+
 function colIndexByName_(headers, name) {
   const idx = headers.indexOf(name);
   if (idx === -1) throw new Error('Column not found: ' + name);
@@ -85,6 +96,7 @@ function colIndexByName_(headers, name) {
 }
 
 function setCellByColumnName_(sheet, headers, rowNumber, columnName, value) {
+  if (headers.indexOf('PasswordHash') !== -1) clearUsersCache_(); // a write to the Users tab
   sheet.getRange(rowNumber, colIndexByName_(headers, columnName)).setValue(value);
 }
 
@@ -350,8 +362,7 @@ function authorize_(token, requiredCheckFn) {
   const now = Date.now();
   if (!payload.exp || now > payload.exp) return { ok: false, reason: 'EXPIRED' };
 
-  const { headers, sheet, rows } = readSheetAsObjects_(USERS_SHEET);
-  const user = rows.find(r => r.Username === payload.sub);
+  const user = readUsersCached_().find(r => r.Username === payload.sub);
   if (!user) return { ok: false, reason: 'USER_NOT_FOUND' };
   if (user.Active !== true) return { ok: false, reason: 'ACCOUNT_DISABLED' };
 
@@ -369,7 +380,8 @@ function authorize_(token, requiredCheckFn) {
     const lock = LockService.getScriptLock();
     try {
       lock.waitLock(5000);
-      setCellByColumnName_(sheet, headers, user._rowNumber, 'LastActivityAt', new Date());
+      const fresh = readSheetAsObjects_(USERS_SHEET);
+      setCellByColumnName_(fresh.sheet, fresh.headers, user._rowNumber, 'LastActivityAt', new Date());
     } catch (e) {
       // best-effort
     } finally {
@@ -431,6 +443,7 @@ function handleCreateUser_(data) {
     Permissions: Array.isArray(data.permissions) ? data.permissions.join(',') : ''
   };
   sheet.appendRow(headers.map(function(h) { return values.hasOwnProperty(h) ? values[h] : ''; }));
+  clearUsersCache_();
 
   if (isBootstrap) {
     PropertiesService.getScriptProperties().setProperty('BOOTSTRAP_USED', 'true');
