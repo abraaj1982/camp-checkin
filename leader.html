@@ -17,6 +17,7 @@
 .brow{display:grid;grid-template-columns:90px 1fr 80px;gap:10px;align-items:center;padding:7px 0;font-size:14px}
 .pin{width:30px;height:30px;border-radius:50%;color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;border:3px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.4);font-size:14px}
 .pin.f{background:#2E7D4F}.pin.s{background:#D4912A}.pin.o{background:#C2455A}
+@keyframes pulse{50%{opacity:.55}}.sk{animation:pulse 1.2s infinite;background:var(--soft)}
 </style>
 </head>
 <body>
@@ -39,10 +40,10 @@ const pref = { get(k, d) { try { return localStorage.getItem('mk_pref_' + k) || 
 const T = {
  ar: { dir: 'rtl', title: 'القائد', sub: 'متابعة المخيم مباشرة', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح', boarded: 'صعدوا', total: 'إجمالي الطلاب', remaining: 'لم يصعدوا بعد', withdrawn: 'منسحبون', bagsIn: 'حقائب محمّلة', bagsOut: 'حقائب منزّلة', of: 'من', map: 'تتبع الباصات مباشرة', live: 'مباشر', byBus: 'الحضور حسب الباص', bus: n => 'باص ' + n,
   st: { boarding: 'يصعدون', departed: 'انطلق', onway: 'في الطريق', arrived: 'وصل' }, noLoc: 'لا يوجد موقع بعد', ago: s => s < 90 ? 'منذ ' + s + ' ث' : 'منذ ' + Math.round(s / 60) + ' د', lastSeen: s => 'آخر موقع ' + (s < 90 ? 'منذ ' + s + ' ث' : 'منذ ' + Math.round(s / 60) + ' د'),
-  noMap: 'تعذّر تحميل الخريطة. تظهر الحالة في القائمة.', offline: 'غير متصل. تُعرض آخر بيانات.', supervisor: 'المشرف', err: 'تعذّر تحميل البيانات.', note: 'الموقع من هاتف المشرف، ويتحدّث ما دامت شاشته مفتوحة.' },
+  noMap: 'تعذّر تحميل الخريطة. تظهر الحالة في القائمة.', offline: 'غير متصل. تُعرض آخر بيانات.', loading: 'جارٍ التحميل...', stale: 'هذه آخر بيانات محفوظة، جارٍ التحديث...', supervisor: 'المشرف', err: 'تعذّر تحميل البيانات.', note: 'الموقع من هاتف المشرف، ويتحدّث ما دامت شاشته مفتوحة.' },
  en: { dir: 'ltr', title: 'Camp leader', sub: 'Live camp overview', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light', boarded: 'Boarded', total: 'Total students', remaining: 'Not boarded yet', withdrawn: 'Withdrawn', bagsIn: 'Bags loaded', bagsOut: 'Bags unloaded', of: 'of', map: 'Live bus tracking', live: 'Live', byBus: 'Attendance by bus', bus: n => 'Bus ' + n,
   st: { boarding: 'Boarding', departed: 'Departed', onway: 'On the way', arrived: 'Arrived' }, noLoc: 'No location yet', ago: s => s < 90 ? s + 's ago' : Math.round(s / 60) + ' min ago', lastSeen: s => 'Last seen ' + (s < 90 ? s + 's ago' : Math.round(s / 60) + ' min ago'),
-  noMap: 'Could not load the map. Status is shown in the list.', offline: 'Offline. Showing the latest data.', supervisor: 'Supervisor', err: 'Could not load data.', note: 'Location comes from the supervisor’s phone and updates while his screen is open.' }
+  noMap: 'Could not load the map. Status is shown in the list.', offline: 'Offline. Showing the latest data.', loading: 'Loading...', stale: 'Showing the last saved data, refreshing...', supervisor: 'Supervisor', err: 'Could not load data.', note: 'Location comes from the supervisor’s phone and updates while his screen is open.' }
 };
 const X = {
  ar: { alerts: 'تنبيهات', none: 'لا توجد تنبيهات. كل شيء طبيعي.', stale: (b, a) => `باص ${b}: لم يصل موقعه منذ ${Math.round(a / 60)} دقيقة. اتصل بالمشرف.`, missing: (b, n) => `باص ${b}: يتحرك ويوجد ${n} طالب لم يُسجَّل صعودهم.`, no_report: b => `باص ${b}: لم يرسل أي حالة بعد.`, bags: (b, n) => `باص ${b}: ${n} طالب حقائبهم المحمّلة أقل من المتوقع.`, cases_open: n => `${n} بلاغ مفتوح يحتاج متابعة.`, med_urgent: n => `${n} حالة طبية عاجلة مفتوحة.`, withdraw_open: n => `${n} طلب انسحاب مفتوح.`, cases: 'البلاغات', noCases: 'لا توجد بلاغات.', ack: 'استلمت', close: 'إغلاق', ty: { student: 'طالب', bus: 'باص', lost: 'مفقود', other: 'أخرى' }, stt: { open: 'مفتوح', ack: 'قيد المتابعة', closed: 'مغلق' }, stale5: 'موقع قديم' },
@@ -56,13 +57,18 @@ const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"']
 const AUTH_ERR = /EXPIRED|IDLE_TIMEOUT|REVOKED|BAD_SIGNATURE|MALFORMED|USER_NOT_FOUND|ACCOUNT_DISABLED|BAD_PAYLOAD/;
 async function api(a) { const r = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: a, token: token }) }); return r.json(); }
 
+// Saved copy of the last data: the screen shows it INSTANTLY, then refreshes (the server needs a few seconds).
+const CK = 'mk_leader_cache_v1';
+try { const c = JSON.parse(localStorage.getItem(CK) || 'null'); if (c && c.sum) { st.sum = c.sum; st.live = c.live || []; st.cases = c.cases || []; st.stale = true; st.cachedAt = c.at; } } catch (e) {}
 async function poll() {
   try {
-    const [s, l, c] = await Promise.all([api('leaderSummary'), can('dashboard') || can('livemap') ? api('busLive') : Promise.resolve({ success: true, buses: [] }), api('listCases')]);
-    if (c && c.success) st.cases = c.cases;
-    for (const r of [s, l]) if (r && r.code && AUTH_ERR.test(r.code)) { sessionStorage.clear(); location.href = 'login.html'; return; }
-    if (s.success) st.sum = s; if (l.success) st.live = l.buses;
-    st.err = s.success ? '' : L_().err; st.fetchedAt = Date.now();
+    const r = await api('leaderAll');                      // ONE request for summary + buses + cases
+    if (r && r.code && AUTH_ERR.test(r.code)) { sessionStorage.clear(); location.href = 'login.html'; return; }
+    if (r && r.success) {
+      if (r.summary) st.sum = r.summary; if (r.buses) st.live = r.buses; if (r.cases) st.cases = r.cases;
+      st.err = ''; st.stale = false; st.fetchedAt = Date.now();
+      try { localStorage.setItem(CK, JSON.stringify({ sum: st.sum, live: st.live, cases: st.cases, at: Date.now() })); } catch (e) {}
+    } else st.err = L_().err;
   } catch (e) { st.err = ''; }
   render();
 }
@@ -85,8 +91,9 @@ function render() {
   const l = L_(); document.documentElement.lang = st.lang; document.documentElement.dir = l.dir; document.documentElement.dataset.theme = st.theme;
   $('hT').textContent = l.title; $('hS').textContent = l.sub; $('homeBtn').textContent = l.home; $('langBtn').textContent = l.lang; $('themeBtn').textContent = st.theme === 'light' ? l.dark : l.light; document.title = l.title + ' — MUKHAYYAM';
   const nb = $('netbar'); if (!navigator.onLine) { nb.hidden = false; nb.className = 'netbar warn'; nb.textContent = l.offline; } else nb.hidden = true;
-  const s = st.sum; if (!s) { $('app').innerHTML = '<div class="card muted">' + (st.err || '...') + '</div>'; return; }
+  const s = st.sum; if (!s) { $('app').innerHTML = st.err ? '<div class="card muted">' + esc(st.err) + '</div>' : '<div class="kpis">' + [1, 2, 3, 4].map(() => '<div class="card kpi sk"><div class="kl">&nbsp;</div><div class="kv">&nbsp;</div></div>').join('') + '</div><div class="card sk" style="height:300px"></div><div class="muted" style="text-align:center">' + esc(l.loading) + '</div>'; return; }
   const left = s.total - s.boarded - s.withdrawn;
+  const staleNote = st.stale ? `<div class="banner warn" style="margin-top:0">${l.stale}</div>` : '';
   const kpi = (lab, v, n, c) => `<div class="card kpi"><div class="kl">${lab}</div><div class="kv" ${c ? `style="color:var(--${c})"` : ''}>${v}</div><div class="kl">${n || ''}</div></div>`;
   const byBus = s.perBus.map(b => `<div class="brow"><span>${l.bus(esc(b.bus))}</span><div class="bar" style="margin:0" role="img" aria-label="${l.bus(esc(b.bus))}: ${b.boarded}/${b.total}"><i style="width:${b.total ? Math.round(b.boarded / b.total * 100) : 0}%"></i></div><span class="muted" style="text-align:end"><b style="color:var(--ink)">${b.boarded}</b> / ${b.total}</span></div>`).join('');
   const cards = st.live.map(b => `<div class="bus"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>${l.bus(esc(b.bus))}</b><span class="pill ${b.status === 'arrived' ? 'ok' : b.ageSec >= 600 ? 'bad' : 'warn'}">${esc(l.st[b.status] || b.status)}</span></div><div class="muted" style="font-size:13px;margin-top:4px">${b.boarded} ${l.of} ${b.total}${b.supervisor ? ' · ' + esc(b.supervisor) : ''}</div><div style="font-size:13px;margin-top:2px;color:var(--${b.lat === null ? 'muted' : b.ageSec >= 300 ? 'bad' : 'ok'})">${b.lat === null ? l.noLoc : (b.ageSec >= 300 ? '⚠ ' : '') + l.lastSeen(b.ageSec)}</div></div>`).join('');
@@ -94,7 +101,7 @@ function render() {
   const amsg = a => a.type === 'stale' ? x.stale(esc(a.bus), a.ageSec) : a.type === 'missing' ? x.missing(esc(a.bus), a.missing) : a.type === 'no_report' ? x.no_report(esc(a.bus)) : a.type === 'bags' ? x.bags(esc(a.bus), a.count) : a.type === 'med_urgent' ? x.med_urgent(a.count) : a.type === 'withdraw_open' ? x.withdraw_open(a.count) : x.cases_open(a.count);
   const alertsHtml = (s.alerts && s.alerts.length ? s.alerts.map(a => `<div class="banner ${a.level === 'bad' ? 'bad' : a.level === 'info' ? '' : 'warn'}" style="margin:0 0 6px">${amsg(a)}</div>`).join('') : `<div class="muted">${x.none}</div>`);
   const casesHtml = st.cases.length ? st.cases.map(c => `<div class="bus" style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>${esc(x.ty[c.type] || c.type)}${c.bus ? ' · ' + l.bus(esc(c.bus)) : ''}</b><span class="pill ${c.status === 'open' ? 'bad' : c.status === 'ack' ? 'warn' : 'ok'}">${esc(x.stt[c.status] || c.status)}</span></div><div style="margin:6px 0">${esc(c.text)}</div>${c.status !== 'closed' ? `<div style="display:flex;gap:8px">${c.status === 'open' ? `<button class="btn" data-case="${esc(c.id)}" data-st="ack">${x.ack}</button>` : ''}<button class="btn" data-case="${esc(c.id)}" data-st="closed">${x.close}</button></div>` : ''}</div>`).join('') : `<div class="muted">${x.noCases}</div>`;
-  $('app').innerHTML = `${st.err ? `<div class="banner bad">${esc(st.err)}</div>` : ''}
+  $('app').innerHTML = `${staleNote}${st.err ? `<div class="banner bad">${esc(st.err)}</div>` : ''}
   <section class="card"><h2 class="h2" style="margin-bottom:8px">${x.alerts}</h2>${alertsHtml}</section>
   <div class="kpis">${kpi(l.boarded, s.boarded, l.of + ' ' + s.total, 'ok')}${kpi(l.remaining, left, '', left ? 'warn' : '')}${kpi(l.withdrawn, s.withdrawn, '', s.withdrawn ? 'bad' : '')}${kpi(l.bagsIn, s.bags.loaded)}${kpi(l.bagsOut, s.bags.unloaded)}</div>
   <div class="cols"><section class="card c2"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 class="h2">${l.map}</h2><span class="pill ok">● ${l.live}</span></div><div id="map"></div><div class="muted" style="font-size:12.5px;margin-top:8px">${l.note}</div></section>

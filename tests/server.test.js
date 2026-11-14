@@ -286,6 +286,11 @@ r=post({action:'busState',token:tu1});assert(!r.success,'permission change appli
 // ---- usernames are not case-sensitive
 r=post({action:'login',username:'  ADMIN  ',password:'pw-12345'});assert(r.success,'login ignores case and surrounding spaces in the username');
 r=post({action:'createUser',token:T,username:'SUP1',password:'dup-12345',fullName:'مكرر',role:'supervisor',permissions:['checkin'],committees:[]});assert(!r.success,'cannot create a username that differs only by case');
+// ---- leaderAll: one round trip for the whole leader screen
+r=post({action:'leaderAll',token:tl});assert(r.success&&r.summary&&r.summary.total>0&&Array.isArray(r.buses)&&Array.isArray(r.cases),'leaderAll returns summary + buses + cases');
+r=post({action:'leaderAll',token:t1});assert(!r.success,'supervisor cannot use leaderAll');
+post({action:'createUser',token:T,username:'mapper',password:'map-12345',fullName:'خريطة',role:'x',permissions:['livemap'],committees:[]});
+{const tmap=post({action:'login',username:'mapper',password:'map-12345'}).token;r=post({action:'leaderAll',token:tmap});assert(r.success&&!r.summary&&Array.isArray(r.buses)&&!r.cases,'livemap-only user gets the map data only (no numbers, no cases)');}
 // ---- sheet check
 r=post({action:'checkStudentSheet',token:T});assert(r.success&&r.report.ok&&r.report.total===6,'student sheet check passes');
 console.log(fails?`\n${fails} FAILED`:'\nALL PASSED');

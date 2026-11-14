@@ -46,6 +46,7 @@ const ACTIONS_ = {
   bag: function(d) { return handleBag_(d); },
   busLive: function(d) { return handleBusLive_(d); },
   leaderSummary: function(d) { return handleLeaderSummary_(d); },
+  leaderAll: function(d) { return handleLeaderAll_(d); },
   printList: function(d) { return handlePrintList_(d); },
   createCase: function(d) { return handleCreateCase_(d); },
   listCases: function(d) { return handleListCases_(d); },
@@ -363,20 +364,34 @@ function handleBusStatus_(data) {
   });
 }
 
+function liveBuses_() {
+  const vals = busLiveSheet_().getDataRange().getValues();
+  const h = vals[0];
+  const now = Date.now();
+  const buses = [];
+  for (let r = 1; r < vals.length; r++) {
+    const g = function(n) { return vals[r][h.indexOf(n)]; };
+    if (!g('Bus')) continue;
+    const upd = g('UpdatedAt') instanceof Date ? g('UpdatedAt') : new Date(g('UpdatedAt'));
+    buses.push({ bus: String(g('Bus')), status: g('Status'), lat: g('Lat') === '' ? null : Number(g('Lat')), lng: g('Lng') === '' ? null : Number(g('Lng')),
+      ageSec: Math.max(0, Math.round((now - upd.getTime()) / 1000)), supervisor: g('Supervisor'), boarded: Number(g('Boarded')) || 0, total: Number(g('Total')) || 0 });
+  }
+  return buses;
+}
 function handleBusLive_(data) {
   return withAuth_(data, requireAnyPerm_(['dashboard', 'livemap']), function() {
-    const vals = busLiveSheet_().getDataRange().getValues();
-    const h = vals[0];
-    const now = Date.now();
-    const buses = [];
-    for (let r = 1; r < vals.length; r++) {
-      const g = function(n) { return vals[r][h.indexOf(n)]; };
-      if (!g('Bus')) continue;
-      const upd = g('UpdatedAt') instanceof Date ? g('UpdatedAt') : new Date(g('UpdatedAt'));
-      buses.push({ bus: String(g('Bus')), status: g('Status'), lat: g('Lat') === '' ? null : Number(g('Lat')), lng: g('Lng') === '' ? null : Number(g('Lng')),
-        ageSec: Math.max(0, Math.round((now - upd.getTime()) / 1000)), supervisor: g('Supervisor'), boarded: Number(g('Boarded')) || 0, total: Number(g('Total')) || 0 });
-    }
-    return { success: true, buses: buses };
+    return { success: true, buses: liveBuses_() };
+  });
+}
+
+// ONE round trip for the whole leader screen (summary + buses + cases): authorises once instead of three times.
+function handleLeaderAll_(data) {
+  return withAuth_(data, requireAnyPerm_(['dashboard', 'stats', 'livemap']), function(user) {
+    const out = { success: true };
+    if (hasPerm_(user, 'dashboard') || hasPerm_(user, 'stats')) out.summary = leaderSummaryCached_();
+    if (hasPerm_(user, 'dashboard') || hasPerm_(user, 'livemap')) out.buses = liveBuses_();
+    if (hasPerm_(user, 'dashboard') || hasPerm_(user, 'stats') || hasPerm_(user, 'manage')) out.cases = casesForList_();
+    return out;
   });
 }
 
@@ -410,15 +425,16 @@ function handleBag_(data) {
 }
 
 // ---------------- Leader summary (read-only) ----------------
+function leaderSummaryCached_() {
+  // The leader screen polls every 15 s: serve a 10 s cache (any write action clears it, see doPost).
+  const cache = CacheService.getScriptCache();
+  try { const hit = cache.get('leader_v1'); if (hit) return JSON.parse(hit); } catch (e) { /* recompute */ }
+  const out = computeLeaderSummary_();
+  try { cache.put('leader_v1', JSON.stringify(out), 10); } catch (e) { /* ignore */ }
+  return out;
+}
 function handleLeaderSummary_(data) {
-  return withAuth_(data, requireAnyPerm_(['dashboard', 'stats']), function() {
-    // The leader screen polls every 15 s: serve a 10 s cache (any write action clears it, see doPost).
-    const cache = CacheService.getScriptCache();
-    try { const hit = cache.get('leader_v1'); if (hit) return JSON.parse(hit); } catch (e) { /* recompute */ }
-    const out = computeLeaderSummary_();
-    try { cache.put('leader_v1', JSON.stringify(out), 10); } catch (e) { /* ignore */ }
-    return out;
-  });
+  return withAuth_(data, requireAnyPerm_(['dashboard', 'stats']), function() { return leaderSummaryCached_(); });
 }
 function computeLeaderSummary_() {
   return (function() {
@@ -520,11 +536,13 @@ function handleCreateCase_(data) {
     }
   });
 }
+function casesForList_() {
+  const rank = { open: 0, ack: 1, closed: 2 };
+  return readCases_().sort(function(a, b) { return (rank[a.status] - rank[b.status]) || (a.time < b.time ? 1 : -1); }).slice(0, 100);
+}
 function handleListCases_(data) {
   return withAuth_(data, requireAnyPerm_(['dashboard', 'stats', 'manage']), function() {
-    const rank = { open: 0, ack: 1, closed: 2 };
-    const list = readCases_().sort(function(a, b) { return (rank[a.status] - rank[b.status]) || (a.time < b.time ? 1 : -1); }).slice(0, 100);
-    return { success: true, cases: list };
+    return { success: true, cases: casesForList_() };
   });
 }
 function handleUpdateCase_(data) {
