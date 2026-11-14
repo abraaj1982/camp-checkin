@@ -135,10 +135,10 @@ function handleWithdrawReopen_(data) {
     try {
       const w = readWithdrawals_().filter(function(x) { return x.id === String(data.id); })[0];
       if (!w) return { success: false, error: 'غير موجود' };
-      if (w.status !== 'closed') return { success: false, code: 'NOT_CLOSED', error: 'لا يمكن إعادة طالب لم يُغلق انسحابه' };
+      if (w.status !== 'closed') return { success: false, code: 'NOT_CLOSED', error: 'لا يمكن إعادة طالب لم يُغلق استئذانه' };
       const student = findStudent_(w.studentId);
       const cur = scanStates_().states[w.studentId];
-      if (!cur || cur.state !== 'withdrawn') return { success: false, code: 'NOT_WITHDRAWN', error: 'الطالب ليس منسحباً الآن' };
+      if (!cur || cur.state !== 'withdrawn') return { success: false, code: 'NOT_WITHDRAWN', error: 'الطالب ليس خارجاً الآن' };
       setWithdrawalStatus_(w._row, 'reversed', user);
       scansSheet_().appendRow([new Date(), w.studentId, 'readmit', student ? student.bus : '', user.Username, 'custody', '', 'reverses withdrawal ' + w.id]);
       writeAudit_(user.Username, 'WITHDRAW_REVERSED', w.studentId, w.id);
@@ -156,15 +156,15 @@ function handleWithdrawStart_(data) {
     const guardian = String(data.guardian || '').trim().slice(0, 60);
     const reason = String(data.reason || '').trim().slice(0, 200);
     if (guardian.length < 2) return { success: false, error: 'اكتب اسم المستلِم' };
-    if (reason.length < 3) return { success: false, error: 'اكتب سبب الانسحاب' };
+    if (reason.length < 3) return { success: false, error: 'اكتب سبب الاستئذان' };
     const clientId = String(data.clientId || '').slice(0, 60);
     const lock = LockService.getScriptLock();
     lock.waitLock(10000);
     try {
       const all = readWithdrawals_();
       if (clientId) { const dup = all.filter(function(w) { return w.clientId === clientId; })[0]; if (dup) return { success: true, repeated: true, id: dup.id }; }
-      if (all.some(function(w) { return w.studentId === student.id && w.status === 'open'; })) return { success: false, code: 'ALREADY_OPEN', error: 'يوجد طلب انسحاب مفتوح لهذا الطالب' };
-      if (scanStates_().states[student.id] && scanStates_().states[student.id].state === 'withdrawn') return { success: false, code: 'ALREADY_WITHDRAWN', error: 'منسحب مسبقاً' };
+      if (all.some(function(w) { return w.studentId === student.id && w.status === 'open'; })) return { success: false, code: 'ALREADY_OPEN', error: 'يوجد استئذان خروج مفتوح لهذا الطالب' };
+      if (scanStates_().states[student.id] && scanStates_().states[student.id].state === 'withdrawn') return { success: false, code: 'ALREADY_WITHDRAWN', error: 'خرج مسبقاً' };
       const id = newId_('W');
       withdrawalsSheet_().appendRow([id, student.id, new Date(), guardian, reason, 'open', user.Username, '', '', clientId]);
       writeAudit_(user.Username, 'WITHDRAW_OPENED', student.id, id);
@@ -188,7 +188,7 @@ function closeWithdrawalCore_(w, user, method) {
   const student = findStudent_(w.studentId);
   const c = custodyOf_(custodyStates_().states, w.studentId);
   if (c.phone || c.bags > 0) {
-    return { success: false, code: 'ITEMS_NOT_RETURNED', error: 'لا يُغلق الانسحاب قبل تسليم الهاتف والحقائب',
+    return { success: false, code: 'ITEMS_NOT_RETURNED', error: 'لا يُغلق استئذان الخروج قبل تسليم الهاتف والحقائب',
       outstanding: { phone: c.phone, phoneTag: c.phoneTag, bags: c.bags } };
   }
   setWithdrawalStatus_(w._row, 'closed', user);

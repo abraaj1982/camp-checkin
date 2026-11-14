@@ -43,14 +43,14 @@ const safeUrl = u => (/^https?:\/\//i.test(String(u || '')) ? u : '');
 const AUTH_ERR = /EXPIRED|IDLE_TIMEOUT|REVOKED|BAD_SIGNATURE|MALFORMED|USER_NOT_FOUND|ACCOUNT_DISABLED|BAD_PAYLOAD/;
 const T = {
  ar: { dir: 'rtl', title: 'البوابة', sub: 'خروج الطلاب المأذون لهم من السكرتارية', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
-  tCheck: 'تحقق', tWaiting: 'بانتظار الخروج', tDone: 'خرجوا اليوم', search: 'اسم الطالب أو رقمه', scan: '▣ مسح سوار الطالب', stopScan: 'إيقاف الكاميرا', none: 'لا نتائج', bus: n => 'باص ' + n, team: 'الفريق', cls: 'الصف',
+  tCheck: 'تحقق', newExit: n => '🔔 وصل إذن خروج جديد: ' + n, tWaiting: 'بانتظار الخروج', tDone: 'خرجوا اليوم', search: 'اسم الطالب أو رقمه', scan: '▣ مسح سوار الطالب', stopScan: 'إيقاف الكاميرا', none: 'لا نتائج', bus: n => 'باص ' + n, team: 'الفريق', cls: 'الصف',
   goTitle: 'مأذون له بالخروج', goHow: 'تأكد أن المستلِم هو:', stopTitle: 'غير مأذون له. لا تُخرجه', stopHow: 'لا يوجد إذن خروج من السكرتارية. أرسله إلى السكرتارية.', doneTitle: 'خرج سابقاً', at: 'الساعة',
   confirm: '✔ تأكيد خروج الطالب', confirmAsk: 'تأكيد أن الطالب خرج من البوابة؟', problem: '⚠ مشكلة (لا يطابق / تردّد)', problemAsk: 'اكتب المشكلة باختصار (تصل للإدارة)', problemSent: 'أُرسلت المشكلة للإدارة',
   noWaiting: 'لا أحد بانتظار الخروج الآن.', noDone: 'لم يخرج أحد اليوم.', receiver: 'المستلِم', approved: 'اعتُمد', exited: 'خرج', by: 'بواسطة', refresh: '↻ تحديث', updated: 'آخر تحديث',
   done: 'تم تسجيل الخروج ✓', error: 'تعذّر الاتصال. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.', noCam: 'تعذّر تشغيل الكاميرا. ابحث بالاسم أو الرقم.', camDenied: 'لم يُسمح بالكاميرا. اسمح بها من إعدادات المتصفح ثم أعد تحميل الصفحة.',
   codes: { ITEMS_NOT_RETURNED: 'لم تُسلَّم أغراض الطالب (هاتف/حقائب). أرسله إلى السكرتارية ولا تُخرجه.', NOT_OPEN: 'لا يوجد إذن خروج مفتوح لهذا الطالب.' } },
  en: { dir: 'ltr', title: 'Gate', sub: 'Exit of students approved by the secretariat', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
-  tCheck: 'Check', tWaiting: 'Waiting to leave', tDone: 'Left today', search: 'Student name or number', scan: '▣ Scan student wristband', stopScan: 'Stop camera', none: 'No results', bus: n => 'Bus ' + n, team: 'Team', cls: 'Class',
+  tCheck: 'Check', newExit: n => '🔔 New exit approval: ' + n, tWaiting: 'Waiting to leave', tDone: 'Left today', search: 'Student name or number', scan: '▣ Scan student wristband', stopScan: 'Stop camera', none: 'No results', bus: n => 'Bus ' + n, team: 'Team', cls: 'Class',
   goTitle: 'Allowed to leave', goHow: 'Make sure the person taking him is:', stopTitle: 'NOT allowed. Do not let him out', stopHow: 'No exit approval from the secretariat. Send him to the secretariat.', doneTitle: 'Already left', at: 'at',
   confirm: '✔ Confirm the student left', confirmAsk: 'Confirm the student has left through the gate?', problem: '⚠ Problem (does not match / doubt)', problemAsk: 'Describe the problem briefly (goes to the administration)', problemSent: 'Problem sent to the administration',
   noWaiting: 'Nobody is waiting to leave.', noDone: 'Nobody has left today.', receiver: 'Receiver', approved: 'Approved', exited: 'Left', by: 'by', refresh: '↻ Refresh', updated: 'Updated',
@@ -68,7 +68,14 @@ const say = (cls, t) => { st.msg = { cls: cls, t: t }; };
 const errText = r => (r && L().codes[r.code]) || (r && r.error) || L().error;
 const hhmm = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toTimeString().slice(0, 5); };
 
-async function load() { try { const r = await api('gateList'); if (r.success) { st.waiting = r.waiting; st.exited = r.exited; st.at = new Date().toTimeString().slice(0, 5); } } catch (e) {} render(); }
+let seenIds = null, newCount = 0;
+function beep() { try { const C = window.AudioContext || window.webkitAudioContext; const a = new C(), o = a.createOscillator(), g = a.createGain(); o.connect(g); g.connect(a.destination); o.frequency.value = 880; g.gain.value = 0.15; o.start(); o.stop(a.currentTime + 0.35); } catch (e) {} }
+function notifyNew(list) {
+  const ids = list.map(s => s.id || s.studentId);
+  if (seenIds) { const fresh = list.filter(s => !seenIds.has(s.id || s.studentId)); if (fresh.length) { newCount += fresh.length; try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) {} beep(); st.msg = { cls: 'warn', t: L().newExit(fresh.map(s => s.name).join('، ')) }; } }
+  seenIds = new Set(ids);
+}
+async function load() { try { const r = await api('gateList'); if (r.success) { notifyNew(r.waiting); st.waiting = r.waiting; st.exited = r.exited; st.at = new Date().toTimeString().slice(0, 5); } } catch (e) {} render(); }
 let qTimer = null;
 function onQ(v) {
   st.q = v; clearTimeout(qTimer);
@@ -153,7 +160,7 @@ function render() {
   $('hT').textContent = l.title; $('hS').textContent = l.sub; $('homeBtn').textContent = l.home; $('langBtn').textContent = l.lang; $('themeBtn').textContent = st.theme === 'light' ? l.dark : l.light;
   const keepReader = st.cam ? $('reader') : null; if (keepReader) keepReader.remove();
   const ae = document.activeElement, keep = ae && ae.id === 'q' ? ae.selectionStart : null;
-  const tabs = [['check', l.tCheck], ['waiting', l.tWaiting + ' (' + st.waiting.length + ')'], ['done', l.tDone + ' (' + st.exited.length + ')']];
+  const tabs = [['check', l.tCheck], ['waiting', l.tWaiting + ' (' + st.waiting.length + ')' + (newCount ? ' 🔔' : '')], ['done', l.tDone + ' (' + st.exited.length + ')']];
   $('app').innerHTML = `${st.msg ? `<div class="banner ${st.msg.cls}" role="alert">${esc(st.msg.t)}</div>` : ''}
     <div class="tabs">${tabs.map(t => `<button class="${st.tab === t[0] ? 'on' : ''}" data-tab="${t[0]}">${t[1]}</button>`).join('')}</div>
     ${st.tab === 'check' ? checkView() : st.tab === 'waiting' ? waitingView() : doneView()}
@@ -164,7 +171,7 @@ function render() {
 document.addEventListener('input', e => { if (e.target.id === 'q') onQ(e.target.value); });
 document.addEventListener('click', e => {
   const b = e.target.closest && e.target.closest('button'); if (!b) return; const d = b.dataset;
-  if (d.tab) { st.tab = d.tab; st.msg = null; if (st.cam) stopCam(); else render(); }
+  if (d.tab) { st.tab = d.tab; st.msg = null; if (d.tab === 'waiting') newCount = 0; if (st.cam) stopCam(); else render(); }
   else if (d.cam) { st.cam ? stopCam() : startCam(); }
   else if (d.confirm) confirmExit(d.confirm);
   else if (d.problem) problem(d.problem);
@@ -174,7 +181,7 @@ document.addEventListener('click', e => {
 $('langBtn').onclick = () => { st.lang = st.lang === 'ar' ? 'en' : 'ar'; pref.set('lang', st.lang); render(); };
 $('themeBtn').onclick = () => { st.theme = st.theme === 'light' ? 'dark' : 'light'; pref.set('theme', st.theme); render(); };
 document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
-setInterval(() => { if (!document.hidden && navigator.onLine && !st.cam) load(); }, 15000);
+setInterval(() => { if (!document.hidden && navigator.onLine && !st.cam) load(); }, 10000);
 render(); load();
 </script>
 </body></html>

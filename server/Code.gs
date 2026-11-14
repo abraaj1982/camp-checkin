@@ -283,7 +283,7 @@ function handleScan_(data) {
       const cur = sc.states[student.id];
       if (action === 'board') {
         if (cur && cur.state === 'boarded') return { success: false, code: 'DUPLICATE', error: 'مسجَّل صعوده مسبقاً', at: fmtTime_(cur.at), student: publicStudent_(student, cur, false) };
-        if (cur && cur.state === 'withdrawn') return { success: false, code: 'WITHDRAWN', error: 'الطالب منسحب', student: publicStudent_(student, cur, false) };
+        if (cur && cur.state === 'withdrawn') return { success: false, code: 'WITHDRAWN', error: 'الطالب خرج بإذن', student: publicStudent_(student, cur, false) };
       }
       if (action === 'undo') {
         if (!cur || cur.state !== 'boarded') return { success: false, code: 'NOTHING_TO_UNDO', error: 'لا يوجد تسجيل للتراجع عنه' };
@@ -294,7 +294,7 @@ function handleScan_(data) {
           if (cur.by !== user.Username || cur.at.getTime() !== lastMine) return { success: false, code: 'NOT_LAST', error: 'يمكنك التراجع عن آخر تسجيل لك فقط. اطلب من المشرف العام' };
         }
       }
-      if (action === 'withdraw' && cur && cur.state === 'withdrawn') return { success: false, code: 'ALREADY_WITHDRAWN', error: 'منسحب مسبقاً' };
+      if (action === 'withdraw' && cur && cur.state === 'withdrawn') return { success: false, code: 'ALREADY_WITHDRAWN', error: 'خرج مسبقاً' };
       scansSheet_().appendRow([new Date(), student.id, action, student.bus, user.Username, String(data.method || '').slice(0, 20), clientId, String(data.notes || '').slice(0, 200)]);
       if (action === 'undo') writeAudit_(user.Username, 'SCAN_UNDO', student.id, 'bus=' + student.bus);
       const sc2 = scanStates_();
