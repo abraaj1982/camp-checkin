@@ -77,7 +77,7 @@ $('form').addEventListener('submit', async e => {
       msg('ok', t.ok);
       const p = data.permissions || [];
       // One screen only (check-in) -> straight to it; otherwise the home menu of that person's screens.
-      location.href = (p.length === 1 && p[0] === 'checkin') ? 'supervisor.html' : 'hub.html';
+      location.href = (p.length === 1 && p[0] === 'checkin') ? 'supervisor.html' : (p.length === 1 && p[0] === 'gate') ? 'gate.html' : 'hub.html';
       return;
     }
     const err = String(data.error || '');
