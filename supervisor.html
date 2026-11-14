@@ -38,7 +38,7 @@ const pref = { get(k, d) { try { return localStorage.getItem('mk_pref_' + k) || 
 /* ---------- i18n ---------- */
 const I = {
  ar: { dir: 'rtl', bus: n => 'باص ' + n, sup: n => 'مشرف: ' + n, boarded: 'صعدوا', remaining: n => n > 0 ? 'ناقص ' + n : 'اكتمل الباص', how: 'كيف تريد التعرف على الطالب؟',
-  m_qr: 'السوار', m_face: 'الوجه', m_name: 'الاسم', m_num: 'الرقم', soon: 'قريباً', scanQr: 'وجّه الكاميرا إلى سوار الطالب', startCam: 'تشغيل الكاميرا', stopCam: 'إيقاف الكاميرا', noCam: 'تعذّر تشغيل الكاميرا. استخدم الاسم أو الرقم.',
+  m_qr: 'السوار', m_face: 'الوجه', m_name: 'الاسم', m_num: 'الرقم', soon: 'قريباً', scanQr: 'وجّه الكاميرا إلى سوار الطالب', startCam: 'تشغيل الكاميرا', stopCam: 'إيقاف الكاميرا', noCam: 'تعذّر تشغيل الكاميرا. استخدم الاسم أو الرقم.', camDenied: 'لم يُسمح بالكاميرا. من إعدادات المتصفح للموقع اسمح بالكاميرا ثم أعد تحميل الصفحة.',
   nameLbl: 'اكتب اسم الطالب', numLbl: 'اكتب رقم الطالب', none: 'لا توجد نتيجة', student: 'طالب', team: 'الفريق', cls: 'الصف',
   board: 'تسجيل الصعود', undo: 'تراجع عن آخر تسجيل', next: 'الطالب التالي', done: 'سُجّل الصعود', undone: 'تم التراجع', undoLocked: 'لا يمكنك التراجع الآن (آخر تسجيل لك وخلال دقيقتين فقط). اطلب من المشرف العام.', undoRow: 'تراجع', confirmUndo: 'التراجع عن صعود هذا الطالب؟',
   dup: t => 'مسجَّل صعوده مسبقاً' + (t ? ' الساعة ' + t : '') + '. لا يُسجَّل مرتين.', other: (b, s) => 'ليس من باصك. هو في باص ' + b + (s ? ' (المشرف: ' + s + ')' : '') + '. يمكنك الاطلاع فقط.', withdrawn: 'الطالب منسحب.', notFound: 'الطالب غير موجود.',
@@ -47,7 +47,7 @@ const I = {
   tracking: 'تتبع الباص', trackNote: 'يُرسَل موقع باصك تلقائياً للقائد ما دامت هذه الصفحة مفتوحة. أبقِ الشاشة مضاءة والجوال على الشاحن.', locDenied: 'لم يُسمح بالموقع. افتح إعدادات المتصفح للموقع واسمح بالوصول للموقع ثم أعد تحميل الصفحة.', confirmDepart: n => n > 0 ? 'ينقص ' + n + ' طالباً. هل تؤكد الانطلاق؟' : 'اكتمل الباص. تأكيد الانطلاق؟', yes: 'نعم', cancel: 'إلغاء',
   offline: 'غير متصل. ما تسجّله يُحفظ ويُرسَل تلقائياً.', pending: n => n + ' بانتظار الإرسال', synced: 'تم الإرسال', loading: 'جارٍ التحميل...', report: 'إبلاغ الإدارة', reportAsk: 'اكتب المشكلة باختصار (طالب، باص، مفقود...)', reportSent: 'أُرسل البلاغ إلى الإدارة', logout: 'خروج', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح', err: 'حدث خطأ. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.', paper: 'عند انقطاع الإنترنت يُستخدم الكشف الورقي.' },
  en: { dir: 'ltr', bus: n => 'Bus ' + n, sup: n => 'Supervisor: ' + n, boarded: 'Boarded', remaining: n => n > 0 ? n + ' remaining' : 'Bus full', how: 'How do you want to identify the student?',
-  m_qr: 'Wristband', m_face: 'Face', m_name: 'Name', m_num: 'Number', soon: 'Soon', scanQr: 'Point the camera at the wristband', startCam: 'Start camera', stopCam: 'Stop camera', noCam: 'Camera unavailable. Use name or number.',
+  m_qr: 'Wristband', m_face: 'Face', m_name: 'Name', m_num: 'Number', soon: 'Soon', scanQr: 'Point the camera at the wristband', startCam: 'Start camera', stopCam: 'Stop camera', noCam: 'Camera unavailable. Use name or number.', camDenied: 'Camera access was blocked. Allow the camera for this site in the browser settings, then reload.',
   nameLbl: "Type the student's name", numLbl: "Type the student's number", none: 'No result', student: 'Student', team: 'Team', cls: 'Grade',
   board: 'Mark as boarded', undo: 'Undo last record', next: 'Next student', done: 'Boarding recorded', undone: 'Undone', undoLocked: 'You can no longer undo (only your last record, within 2 minutes). Ask the general supervisor.', undoRow: 'Undo', confirmUndo: 'Undo this student’s boarding?',
   dup: t => 'Already boarded' + (t ? ' at ' + t : '') + '. Cannot be recorded twice.', other: (b, s) => 'Not on your bus. Student is on bus ' + b + (s ? ' (supervisor: ' + s + ')' : '') + '. View only.', withdrawn: 'Student has withdrawn.', notFound: 'Student not found.',
@@ -158,11 +158,15 @@ window.__onScanText = identify; // used by the camera decoder (and by tests)
 /* ---------- camera ---------- */
 let scanner = null;
 async function startCam() {
-  if (typeof Html5Qrcode === 'undefined') { st.banner = { cls: 'warn', msg: L().noCam }; return render(); }
+  if (typeof Html5Qrcode === 'undefined') { st.banner = { cls: 'warn', msg: L().noCam + ' (library)' }; return render(); }
+  st.cam = true; st.banner = null; render();          // draw the #reader box FIRST, then attach the scanner to it
   try {
-    scanner = new Html5Qrcode('reader'); st.cam = true; render();
-    await scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: 220 }, text => { stopCam(); identify(text); }, () => {});
-  } catch (e) { st.cam = false; st.banner = { cls: 'warn', msg: L().noCam }; render(); }
+    scanner = new Html5Qrcode('reader');
+    await scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 220, height: 220 } }, text => { stopCam(); identify(text); }, () => {});
+  } catch (e) {
+    const m = String(e && (e.message || e)); scanner = null; st.cam = false;
+    st.banner = { cls: 'warn', msg: /NotAllowed|Permission|denied/i.test(m) ? L().camDenied : L().noCam + ' (' + m.slice(0, 80) + ')' }; render();
+  }
 }
 async function stopCam() { try { if (scanner) { await scanner.stop(); scanner.clear(); } } catch (e) {} scanner = null; st.cam = false; render(); }
 
@@ -209,6 +213,7 @@ function head() {
   $('langBtn').textContent = l.lang; $('themeBtn').textContent = st.theme === 'light' ? l.dark : l.light; $('logoutBtn').textContent = l.logout;
 }
 function render() {
+  const keepReader = st.cam ? document.getElementById('reader') : null; if (keepReader) keepReader.remove(); // the live video must survive re-renders
   head(); bar();
   const l = L(), c = counts(), left = c.t - c.b, R = st.roster;
   if (!R) { $('app').innerHTML = `<div class="card muted">${l.loading}</div>`; return; }
@@ -233,6 +238,7 @@ function render() {
   ${st.locDenied ? `<div class="banner bad">${l.locDenied}</div>` : ''}${st.lastSent ? `<div class="muted" style="font-size:12.5px;margin-top:6px">${l.lastSent(st.lastSent)}</div>` : ''}<div class="muted" style="font-size:12.5px;margin-top:6px">${l.trackNote}</div></section>
   <div class="muted" style="font-size:12.5px;text-align:center;padding:4px 0 16px">${l.paper}</div>
   <section class="card"><button class="btn alt full" onclick="reportCase()">${l.report}</button></section>`;
+  if (keepReader) { const ph = document.getElementById('reader'); if (ph) ph.replaceWith(keepReader); }
 }
 function resList() {
   const l = L(), q = st.q.trim().toLowerCase(); if (!q) return '';

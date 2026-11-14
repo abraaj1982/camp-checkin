@@ -37,7 +37,7 @@ const AUTH_ERR = /EXPIRED|IDLE_TIMEOUT|REVOKED|BAD_SIGNATURE|MALFORMED|USER_NOT_
 const T = {
  ar: { dir: 'rtl', title: 'الأمانات', sub: 'الهواتف والحقائب والانسحاب المبكر', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
   tHandover: 'استلام وتسليم', tWithdraw: 'الانسحاب', tSummary: 'الملخص',
-  search: 'ابحث بالاسم أو الرقم', scan: 'مسح السوار', stopScan: 'إيقاف الكاميرا', noCam: 'تعذّر تشغيل الكاميرا. ابحث بالاسم أو الرقم.', none: 'لا نتائج', team: 'الفريق', bus: n => 'باص ' + n,
+  search: 'ابحث بالاسم أو الرقم', scan: 'مسح السوار', stopScan: 'إيقاف الكاميرا', noCam: 'تعذّر تشغيل الكاميرا. ابحث بالاسم أو الرقم.', camDenied: 'لم يُسمح بالكاميرا. من إعدادات المتصفح للموقع اسمح بالكاميرا ثم أعد تحميل الصفحة.', none: 'لا نتائج', team: 'الفريق', bus: n => 'باص ' + n,
   phone: 'الهاتف', held: 'مستلَم', notHeld: 'غير مستلَم', tag: 'رقم الكيس (اختياري)', recvPhone: 'استلام الهاتف', retPhone: 'تسليم الهاتف',
   bags: 'الحقائب', inCustody: 'لدى الأمانات', expected: n => 'المتوقع: ' + n, recvBags: 'استلام', retBags: 'تسليم',
   wd: 'الانسحاب المبكر', guardian: 'اسم المستلِم (ولي الأمر أو من ينوب)', reason: 'سبب الانسحاب', openWd: 'فتح طلب انسحاب', openNow: 'طلب انسحاب مفتوح',
@@ -48,7 +48,7 @@ const T = {
   codes: { ALREADY_HELD: 'الهاتف مستلَم مسبقاً', NOT_HELD: 'لا يوجد هاتف مستلَم لهذا الطالب', EXCEEDS_HELD: 'المُسلَّم أكثر من المستلَم', ALREADY_OPEN: 'يوجد طلب انسحاب مفتوح لهذا الطالب', ALREADY_WITHDRAWN: 'هذا الطالب منسحب مسبقاً', ITEMS_NOT_RETURNED: 'لا يُغلق الانسحاب قبل تسليم الهاتف والحقائب', NOT_FOUND: 'الطالب غير موجود', NOT_OPEN: 'الطلب ليس مفتوحاً' } },
  en: { dir: 'ltr', title: 'Custody', sub: 'Phones, luggage and early withdrawal', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
   tHandover: 'Handover', tWithdraw: 'Withdrawals', tSummary: 'Summary',
-  search: 'Search by name or number', scan: 'Scan wristband', stopScan: 'Stop camera', noCam: 'Could not start the camera. Search by name or number.', none: 'No results', team: 'Team', bus: n => 'Bus ' + n,
+  search: 'Search by name or number', scan: 'Scan wristband', stopScan: 'Stop camera', noCam: 'Could not start the camera. Search by name or number.', camDenied: 'Camera access was blocked. Allow the camera for this site in the browser settings, then reload.', none: 'No results', team: 'Team', bus: n => 'Bus ' + n,
   phone: 'Phone', held: 'In custody', notHeld: 'Not received', tag: 'Bag number (optional)', recvPhone: 'Receive phone', retPhone: 'Return phone',
   bags: 'Luggage', inCustody: 'In custody', expected: n => 'Expected: ' + n, recvBags: 'Receive', retBags: 'Return',
   wd: 'Early withdrawal', guardian: 'Receiver name (guardian or delegate)', reason: 'Reason', openWd: 'Open withdrawal', openNow: 'Withdrawal open',
@@ -116,9 +116,15 @@ function setTab(t) { st.tab = t; st.msg = null; if (st.cam) stopCam(); if (t ===
 /* ---------- camera ---------- */
 let scanner = null;
 async function startCam() {
-  if (typeof Html5Qrcode === 'undefined') { say('warn', L().noCam); return render(); }
-  try { scanner = new Html5Qrcode('reader'); st.cam = true; render(); await scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: 220 }, text => { stopCam(); identify(text); }, () => {}); }
-  catch (e) { st.cam = false; say('warn', L().noCam); render(); }
+  if (typeof Html5Qrcode === 'undefined') { say('warn', L().noCam + ' (library)'); return render(); }
+  st.cam = true; st.msg = null; render();
+  try {
+    scanner = new Html5Qrcode('reader');
+    await scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 220, height: 220 } }, text => { stopCam(); identify(text); }, () => {});
+  } catch (e) {
+    const m = String(e && (e.message || e)); scanner = null; st.cam = false;
+    say('warn', /NotAllowed|Permission|denied/i.test(m) ? L().camDenied : L().noCam + ' (' + m.slice(0, 80) + ')'); render();
+  }
 }
 async function stopCam() { try { if (scanner) { await scanner.stop(); scanner.clear(); } } catch (e) {} scanner = null; st.cam = false; render(); }
 
@@ -175,12 +181,14 @@ function summaryView() {
    <section class="card"><h2 class="h2" style="margin-bottom:8px">${l.holders}</h2>${(s.holders || []).length ? s.holders.map(h => `<div class="row"><span><b>${esc(h.name)}</b> · ${esc(h.team)} · ${l.bus(esc(h.bus))}</span><span>${h.phone ? '📱 ' + esc(h.phoneTag) + ' ' : ''}${h.bags ? '🧳 ' + h.bags : ''}</span></div>`).join('') : `<div class="muted">${l.noHolders}</div>`}</section>`;
 }
 function render() {
+  const keepReader = st.cam ? document.getElementById('reader') : null; if (keepReader) keepReader.remove();
   const l = L(); document.documentElement.lang = st.lang; document.documentElement.dir = l.dir; document.documentElement.dataset.theme = st.theme; document.title = l.title + ' — MUKHAYYAM';
   $('hT').textContent = l.title; $('hS').textContent = l.sub; $('homeBtn').textContent = l.home; $('langBtn').textContent = l.lang; $('themeBtn').textContent = st.theme === 'light' ? l.dark : l.light;
   const keepQ = document.activeElement && document.activeElement.id === 'q';
   $('app').innerHTML = `${st.msg ? `<div class="banner ${st.msg.cls}" role="alert">${esc(st.msg.t)}</div>` : ''}
    <div class="tabs">${[['handover', l.tHandover], ['withdraw', l.tWithdraw], ['summary', l.tSummary]].map(t => `<button class="${st.tab === t[0] ? 'on' : ''}" data-tab="${t[0]}">${t[1]}</button>`).join('')}</div>
    ${st.tab === 'handover' ? handoverView() : st.tab === 'withdraw' ? withdrawView() : summaryView()}`;
+  if (keepReader) { const ph = document.getElementById('reader'); if (ph) ph.replaceWith(keepReader); }
   if (keepQ) { const q = $('q'); q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
 }
 document.addEventListener('input', e => {
