@@ -34,8 +34,11 @@
 .qrgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:3mm}
 .qrc{border:.3mm solid #888;padding:2mm;text-align:center;break-inside:avoid;color:#000;font-size:9pt}
 .qrc .q{display:flex;justify-content:center}
+/* qrcodejs makes a canvas + img at 2x pixels: force them to the real box size (this caused clipped / overlapping bands) */
+.wb .qr canvas{display:none!important}.wb .qr img{width:100%!important;height:100%!important;display:block}
+.qrc .q canvas{display:none!important}.qrc .q img{width:34mm!important;height:34mm!important;display:block}
 @media print{
-  @page{size:A4;margin:8mm}
+  @page{size:A4 landscape;margin:8mm} /* landscape so a 250 mm wristband fits the page */
   body{background:#fff}
   .noprint,.hdr,#netmsg{display:none!important}
   .page{max-width:none;padding:0}
