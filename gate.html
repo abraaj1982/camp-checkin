@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="ar" dir="rtl" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>البوابة — MUKHAYYAM</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="theme.css">
+<script src="ui.js" defer></script>
+<style>
+.verdict{border-radius:20px;padding:18px;text-align:center;font-weight:700}
+.verdict.go{background:var(--okbg);color:var(--ok);border:2px solid #4CC38A}
+.verdict.stop{background:var(--badbg);color:var(--bad);border:2px solid #E07A8A}
+.verdict.done{background:var(--soft);color:var(--ink);border:2px solid var(--line)}
+.verdict .big{font-size:22px;margin-top:4px}
+.stu{display:flex;gap:14px;align-items:center;text-align:start}
+.stu .photo{width:84px;height:104px}
+.btn.go{background:#1F7A45;min-height:64px;font-size:19px}
+.btn.go:disabled{opacity:.5}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hdr">
+    <div class="brand"><div class="logo">م</div><div style="min-width:0"><div class="t" id="campT"></div><div class="s" id="campS"></div></div></div>
+    <div class="tools"><a class="tool" href="hub.html" id="homeBtn"></a><button class="tool" id="langBtn"></button><button class="tool" id="themeBtn"></button></div>
+  </header>
+  <section class="hero compact"><div class="ic" aria-hidden="true">🚪</div><div><h1 id="hT"></h1><p id="hS"></p></div></section>
+  <main id="app"></main>
+</div>
+<script>
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4lEBGPNxghwq9UmK0iljI5QdS-8iCvC-K09dDtbZCXGvGZyA4repTE3rFVVRp5zS4yw/exec';
+const token = sessionStorage.getItem('mukhayyam_token');
+let perms = [];
+try { perms = JSON.parse(sessionStorage.getItem('mukhayyam_permissions') || '[]'); } catch (e) {}
+const can = k => perms.indexOf('*') !== -1 || perms.indexOf(k) !== -1;
+if (!token) location.href = 'login.html'; else if (!can('gate') && !can('custody') && !can('manage')) location.href = 'hub.html';
+
+const pref = { get(k, d) { try { return localStorage.getItem('mk_pref_' + k) || d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('mk_pref_' + k, v); } catch (e) {} } };
+const $ = id => document.getElementById(id);
+const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const safeUrl = u => (/^https?:\/\//i.test(String(u || '')) ? u : '');
+const AUTH_ERR = /EXPIRED|IDLE_TIMEOUT|REVOKED|BAD_SIGNATURE|MALFORMED|USER_NOT_FOUND|ACCOUNT_DISABLED|BAD_PAYLOAD/;
+const T = {
+ ar: { dir: 'rtl', title: 'البوابة', sub: 'خروج الطلاب المأذون لهم من السكرتارية', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
+  tCheck: 'تحقق', tWaiting: 'بانتظار الخروج', tDone: 'خرجوا اليوم', search: 'اسم الطالب أو رقمه', scan: '▣ مسح سوار الطالب', stopScan: 'إيقاف الكاميرا', none: 'لا نتائج', bus: n => 'باص ' + n, team: 'الفريق', cls: 'الصف',
+  goTitle: 'مأذون له بالخروج', goHow: 'تأكد أن المستلِم هو:', stopTitle: 'غير مأذون له. لا تُخرجه', stopHow: 'لا يوجد إذن خروج من السكرتارية. أرسله إلى السكرتارية.', doneTitle: 'خرج سابقاً', at: 'الساعة',
+  confirm: '✔ تأكيد خروج الطالب', confirmAsk: 'تأكيد أن الطالب خرج من البوابة؟', problem: '⚠ مشكلة (لا يطابق / تردّد)', problemAsk: 'اكتب المشكلة باختصار (تصل للإدارة)', problemSent: 'أُرسلت المشكلة للإدارة',
+  noWaiting: 'لا أحد بانتظار الخروج الآن.', noDone: 'لم يخرج أحد اليوم.', receiver: 'المستلِم', approved: 'اعتُمد', exited: 'خرج', by: 'بواسطة', refresh: '↻ تحديث', updated: 'آخر تحديث',
+  done: 'تم تسجيل الخروج ✓', error: 'تعذّر الاتصال. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.', noCam: 'تعذّر تشغيل الكاميرا. ابحث بالاسم أو الرقم.', camDenied: 'لم يُسمح بالكاميرا. اسمح بها من إعدادات المتصفح ثم أعد تحميل الصفحة.',
+  codes: { ITEMS_NOT_RETURNED: 'لم تُسلَّم أغراض الطالب (هاتف/حقائب). أرسله إلى السكرتارية ولا تُخرجه.', NOT_OPEN: 'لا يوجد إذن خروج مفتوح لهذا الطالب.' } },
+ en: { dir: 'ltr', title: 'Gate', sub: 'Exit of students approved by the secretariat', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
+  tCheck: 'Check', tWaiting: 'Waiting to leave', tDone: 'Left today', search: 'Student name or number', scan: '▣ Scan student wristband', stopScan: 'Stop camera', none: 'No results', bus: n => 'Bus ' + n, team: 'Team', cls: 'Class',
+  goTitle: 'Allowed to leave', goHow: 'Make sure the person taking him is:', stopTitle: 'NOT allowed. Do not let him out', stopHow: 'No exit approval from the secretariat. Send him to the secretariat.', doneTitle: 'Already left', at: 'at',
+  confirm: '✔ Confirm the student left', confirmAsk: 'Confirm the student has left through the gate?', problem: '⚠ Problem (does not match / doubt)', problemAsk: 'Describe the problem briefly (goes to the administration)', problemSent: 'Problem sent to the administration',
+  noWaiting: 'Nobody is waiting to leave.', noDone: 'Nobody has left today.', receiver: 'Receiver', approved: 'Approved', exited: 'Left', by: 'by', refresh: '↻ Refresh', updated: 'Updated',
+  done: 'Exit recorded ✓', error: 'Connection problem. Try again.', sessionEnd: 'Session expired. Please log in again.', noCam: 'Could not start the camera. Search by name or number.', camDenied: 'Camera blocked. Allow it in the browser settings and reload.',
+  codes: { ITEMS_NOT_RETURNED: 'The student’s items (phone/bags) are not returned. Send him to the secretariat; do not let him out.', NOT_OPEN: 'There is no open exit approval for this student.' } }
+};
+const st = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), tab: 'check', q: '', results: [], waiting: [], exited: [], msg: null, cam: false, at: '' };
+const L = () => T[st.lang];
+async function api(action, extra) {
+  const r = await (await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(Object.assign({ action: action, token: token }, extra || {})) })).json();
+  if (r && r.code && AUTH_ERR.test(r.code)) { st.msg = { cls: 'bad', t: L().sessionEnd }; render(); setTimeout(() => { sessionStorage.clear(); location.href = 'login.html'; }, 1500); throw new Error('auth'); }
+  return r;
+}
+const say = (cls, t) => { st.msg = { cls: cls, t: t }; };
+const errText = r => (r && L().codes[r.code]) || (r && r.error) || L().error;
+const hhmm = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toTimeString().slice(0, 5); };
+
+async function load() { try { const r = await api('gateList'); if (r.success) { st.waiting = r.waiting; st.exited = r.exited; st.at = new Date().toTimeString().slice(0, 5); } } catch (e) {} render(); }
+let qTimer = null;
+function onQ(v) {
+  st.q = v; clearTimeout(qTimer);
+  if (!v.trim()) { st.results = []; return renderResults(); }
+  qTimer = setTimeout(async () => { try { const r = await api('gateCheck', { q: v.trim() }); if (r.success && st.q === v) { st.results = r.results; renderResults(); } } catch (e) {} }, 300);
+}
+async function identify(text) {
+  const m = String(text || '').trim().match(/^MKH:(.+)$/i); const id = m ? m[1].trim() : String(text || '').trim();
+  st.q = id;
+  try { const r = await api('gateCheck', { q: id }); st.results = r.success ? r.results.filter(x => x.id === id || r.results.length === 1) : []; } catch (e) {}
+  render();
+}
+window.__onScanText = identify;
+async function confirmExit(wid) {
+  if (!confirm(L().confirmAsk)) return;
+  try { const r = await api('gateConfirm', { id: wid }); if (r.success) { say('ok', L().done); st.results = []; st.q = ''; await load(); return; } say('bad', errText(r)); } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
+  render();
+}
+async function problem(sid) {
+  const t = (prompt(L().problemAsk) || '').trim(); if (t.length < 3) return;
+  try { const r = await api('createCase', { type: 'student', studentId: sid, text: '[البوابة] ' + t, clientId: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())) }); say(r.success ? 'ok' : 'bad', r.success ? L().problemSent : errText(r)); } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
+  render();
+}
+
+/* ---------- camera (the library is downloaded only when the camera is first used) ---------- */
+let scanner = null, h5Promise = null;
+function loadScanner() {
+  if (typeof Html5Qrcode !== 'undefined') return Promise.resolve();
+  if (!h5Promise) h5Promise = new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.4/html5-qrcode.min.js'; s.onload = res; s.onerror = () => { h5Promise = null; rej(new Error('library')); }; document.head.appendChild(s); });
+  return h5Promise;
+}
+async function startCam() {
+  st.cam = true; st.msg = null; render();
+  try { await loadScanner(); } catch (e) { st.cam = false; say('warn', L().noCam); return render(); }
+  try { scanner = new Html5Qrcode('reader'); await scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 220, height: 220 } }, text => { stopCam(); identify(text); }, () => {}); }
+  catch (e) { const m = String(e && (e.message || e)); scanner = null; st.cam = false; say('warn', /NotAllowed|Permission|denied/i.test(m) ? L().camDenied : L().noCam + ' (' + m.slice(0, 80) + ')'); render(); }
+}
+async function stopCam() { try { if (scanner) { await scanner.stop(); scanner.clear(); } } catch (e) {} scanner = null; st.cam = false; render(); }
+
+/* ---------- views ---------- */
+function stuCard(s, extra) {
+  const l = L();
+  return `<div class="stu"><div class="photo">${safeUrl(s.photo) ? `<img src="${esc(safeUrl(s.photo))}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}</div>
+    <div style="flex:1;min-width:0"><div class="big2">${esc(s.name)}</div><div class="muted" style="font-size:13px">${esc(s.id)}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${s.team ? `<span class="pill">${esc(s.team)}</span>` : ''}${s.cls ? `<span class="pill">${l.cls} ${esc(s.cls)}</span>` : ''}${s.bus ? `<span class="pill">${l.bus(esc(s.bus))}</span>` : ''}</div>${extra || ''}</div></div>`;
+}
+function resultCard(s) {
+  const l = L();
+  if (s.exit === 'approved') return `<div class="verdict go"><div>✅</div><div class="big">${l.goTitle}</div></div>
+    <section class="card">${stuCard(s, `<div style="margin-top:8px">${l.goHow} <b>${esc(s.guardian)}</b></div>`)}
+    <button class="btn go full" style="margin-top:14px" data-confirm="${esc(s.wid)}">${l.confirm}</button>
+    <button class="btn alt full" style="margin-top:8px;min-height:46px" data-problem="${esc(s.id)}">${l.problem}</button></section>`;
+  if (s.exit === 'exited') return `<div class="verdict done"><div>↪️</div><div class="big">${l.doneTitle} ${l.at} ${esc(hhmm(s.exitedAt))}</div></div><section class="card">${stuCard(s)}</section>`;
+  return `<div class="verdict stop"><div>⛔</div><div class="big">${l.stopTitle}</div><div style="font-weight:500;margin-top:6px">${l.stopHow}</div></div>
+    <section class="card">${stuCard(s)}<button class="btn alt full" style="margin-top:12px;min-height:46px" data-problem="${esc(s.id)}">${l.problem}</button></section>`;
+}
+function resultsHtml() {
+  const l = L(); if (!st.q.trim()) return '';
+  if (!st.results.length) return `<div class="muted" style="padding:8px">${l.none}</div>`;
+  if (st.results.length === 1) return st.results[0] ? resultCard(st.results[0]) : '';
+  return st.results.map(s => `<button class="res" data-pick="${esc(s.id)}"><span><b>${esc(s.name)}</b> <span class="muted">· ${esc(s.id)} · ${l.bus(esc(s.bus))}</span></span><span class="pill ${s.exit === 'approved' ? 'ok' : s.exit === 'exited' ? '' : 'bad'}">${s.exit === 'approved' ? '✅' : s.exit === 'exited' ? '↪️' : '⛔'}</span></button>`).join('');
+}
+function renderResults() { const e = $('qres'); if (e) e.innerHTML = resultsHtml(); }
+function checkView() {
+  const l = L();
+  return `<section class="card"><label class="lbl" for="q">${l.search}</label><input id="q" type="search" value="${esc(st.q)}" autocomplete="off">
+    <button class="btn alt full" style="margin-top:8px" data-cam="1">${st.cam ? l.stopScan : l.scan}</button>${st.cam ? '<div id="reader" style="width:100%;margin-top:8px"></div>' : ''}</section>
+    <div id="qres" style="display:flex;flex-direction:column;gap:12px">${resultsHtml()}</div>`;
+}
+function waitingView() {
+  const l = L();
+  if (!st.waiting.length) return `<div class="card muted">${l.noWaiting}</div>`;
+  return st.waiting.map(s => `<section class="card">${stuCard(s, `<div style="margin-top:6px;font-size:13.5px">${l.receiver}: <b>${esc(s.guardian)}</b> <span class="muted">· ${l.approved} ${esc(hhmm(s.approvedAt))}</span></div>`)}<button class="btn go full" style="margin-top:12px" data-confirm="${esc(s.wid)}">${l.confirm}</button></section>`).join('');
+}
+function doneView() {
+  const l = L();
+  if (!st.exited.length) return `<div class="card muted">${l.noDone}</div>`;
+  return `<section class="card">${st.exited.map(s => `<div class="row"><span><b>${esc(s.name)}</b> <span class="muted">· ${l.bus(esc(s.bus))} · ${l.receiver}: ${esc(s.guardian)}</span></span><span class="pill ok">${l.exited} ${esc(hhmm(s.exitedAt))}</span></div>`).join('')}</section>`;
+}
+function render() {
+  const l = L(); document.documentElement.lang = st.lang; document.documentElement.dir = l.dir; document.documentElement.dataset.theme = st.theme; document.title = l.title + ' — MUKHAYYAM';
+  $('hT').textContent = l.title; $('hS').textContent = l.sub; $('homeBtn').textContent = l.home; $('langBtn').textContent = l.lang; $('themeBtn').textContent = st.theme === 'light' ? l.dark : l.light;
+  const keepReader = st.cam ? $('reader') : null; if (keepReader) keepReader.remove();
+  const ae = document.activeElement, keep = ae && ae.id === 'q' ? ae.selectionStart : null;
+  const tabs = [['check', l.tCheck], ['waiting', l.tWaiting + ' (' + st.waiting.length + ')'], ['done', l.tDone + ' (' + st.exited.length + ')']];
+  $('app').innerHTML = `${st.msg ? `<div class="banner ${st.msg.cls}" role="alert">${esc(st.msg.t)}</div>` : ''}
+    <div class="tabs">${tabs.map(t => `<button class="${st.tab === t[0] ? 'on' : ''}" data-tab="${t[0]}">${t[1]}</button>`).join('')}</div>
+    ${st.tab === 'check' ? checkView() : st.tab === 'waiting' ? waitingView() : doneView()}
+    <div class="muted" style="text-align:center;font-size:12.5px"><button class="chip" data-refresh="1">${l.refresh}</button> ${st.at ? l.updated + ' ' + esc(st.at) : ''}</div>`;
+  if (keepReader) { const ph = $('reader'); if (ph) ph.replaceWith(keepReader); }
+  if (keep !== null && $('q')) { const q = $('q'); q.focus(); try { q.setSelectionRange(keep, keep); } catch (e) {} }
+}
+document.addEventListener('input', e => { if (e.target.id === 'q') onQ(e.target.value); });
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('button'); if (!b) return; const d = b.dataset;
+  if (d.tab) { st.tab = d.tab; st.msg = null; if (st.cam) stopCam(); else render(); }
+  else if (d.cam) { st.cam ? stopCam() : startCam(); }
+  else if (d.confirm) confirmExit(d.confirm);
+  else if (d.problem) problem(d.problem);
+  else if (d.refresh) load();
+  else if (d.pick) { st.results = st.results.filter(x => x.id === d.pick); render(); }
+});
+$('langBtn').onclick = () => { st.lang = st.lang === 'ar' ? 'en' : 'ar'; pref.set('lang', st.lang); render(); };
+$('themeBtn').onclick = () => { st.theme = st.theme === 'light' ? 'dark' : 'light'; pref.set('theme', st.theme); render(); };
+document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
+setInterval(() => { if (!document.hidden && navigator.onLine && !st.cam) load(); }, 15000);
+render(); load();
+</script>
+</body></html>

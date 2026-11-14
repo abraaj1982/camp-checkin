@@ -183,6 +183,20 @@ function setWithdrawalStatus_(rowNum, status, user) {
   sheet.getRange(rowNum, h.indexOf('ClosedBy') + 1).setValue(user.Username);
 }
 
+// Shared by the secretariat ("close") and by the gate ("confirm exit"). Caller holds the script lock.
+function closeWithdrawalCore_(w, user, method) {
+  const student = findStudent_(w.studentId);
+  const c = custodyOf_(custodyStates_().states, w.studentId);
+  if (c.phone || c.bags > 0) {
+    return { success: false, code: 'ITEMS_NOT_RETURNED', error: 'لا يُغلق الانسحاب قبل تسليم الهاتف والحقائب',
+      outstanding: { phone: c.phone, phoneTag: c.phoneTag, bags: c.bags } };
+  }
+  setWithdrawalStatus_(w._row, 'closed', user);
+  scansSheet_().appendRow([new Date(), w.studentId, 'withdraw', student ? student.bus : '', user.Username, method, '', 'withdrawal ' + w.id]);
+  writeAudit_(user.Username, method === 'gate' ? 'GATE_EXIT' : 'WITHDRAW_CLOSED', w.studentId, w.id);
+  return { success: true };
+}
+
 function handleWithdrawClose_(data) {
   return withAuth_(data, requirePerm_('custody'), function(user) {
     const lock = LockService.getScriptLock();
@@ -191,16 +205,57 @@ function handleWithdrawClose_(data) {
       const w = readWithdrawals_().filter(function(x) { return x.id === String(data.id); })[0];
       if (!w) return { success: false, error: 'غير موجود' };
       if (w.status !== 'open') return { success: false, code: 'NOT_OPEN', error: 'الطلب ليس مفتوحاً' };
-      const student = findStudent_(w.studentId);
-      const c = custodyOf_(custodyStates_().states, w.studentId);
-      if (c.phone || c.bags > 0) {
-        return { success: false, code: 'ITEMS_NOT_RETURNED', error: 'لا يُغلق الانسحاب قبل تسليم الهاتف والحقائب',
-          outstanding: { phone: c.phone, phoneTag: c.phoneTag, bags: c.bags } };
-      }
-      setWithdrawalStatus_(w._row, 'closed', user);
-      scansSheet_().appendRow([new Date(), w.studentId, 'withdraw', student ? student.bus : '', user.Username, 'custody', '', 'withdrawal ' + w.id]);
-      writeAudit_(user.Username, 'WITHDRAW_CLOSED', w.studentId, w.id);
-      return { success: true };
+      return closeWithdrawalCore_(w, user, 'custody');
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+
+// ---------------- Gate (scouts on duty) ----------------
+// The SECRETARIAT approves a withdrawal (opens it). The scouts at the gate only see approved exits, check the
+// student (name / wristband) and confirm that he has left. They never see the reason, never create or approve a withdrawal.
+function gateStudent_(s) { return { id: s.id, name: s.name, cls: s.cls, team: s.team, bus: s.bus, photo: s.photo || '' }; }
+
+function handleGateList_(data) {
+  return withAuth_(data, requireAnyPerm_(['gate', 'custody', 'manage']), function() {
+    const byId = {};
+    readStudents_().students.forEach(function(s) { byId[s.id] = s; });
+    const all = readWithdrawals_();
+    const today = new Date().toISOString().slice(0, 10);
+    const mk = function(w) { const s = byId[w.studentId]; return Object.assign(s ? gateStudent_(s) : { id: w.studentId, name: w.studentId, cls: '', team: '', bus: '', photo: '' },
+      { wid: w.id, guardian: w.guardian, approvedAt: w.time, approvedBy: w.by, exitedAt: w.closedAt, exitedBy: w.closedBy }); };
+    return { success: true,
+      waiting: all.filter(function(w) { return w.status === 'open'; }).sort(function(a, b) { return a.time < b.time ? -1 : 1; }).map(mk),
+      exited: all.filter(function(w) { return w.status === 'closed' && String(w.closedAt).slice(0, 10) === today; }).sort(function(a, b) { return a.closedAt < b.closedAt ? 1 : -1; }).slice(0, 30).map(mk) };
+  });
+}
+
+// Is THIS student allowed to leave? (used when a scout scans a wristband or types a name)
+function handleGateCheck_(data) {
+  return withAuth_(data, requireAnyPerm_(['gate', 'custody', 'manage']), function() {
+    const q = String(data.q === undefined ? '' : data.q).trim().toLowerCase();
+    if (q.length < 1 || q.length > 60) return { success: true, results: [] };
+    const all = readWithdrawals_();
+    const res = readStudents_().students.filter(function(s) { return s.id.toLowerCase() === q || (q.length >= 2 && s.name.toLowerCase().indexOf(q) !== -1); })
+      .slice(0, 6).map(function(s) {
+        const open = all.filter(function(w) { return w.studentId === s.id && w.status === 'open'; })[0];
+        const done = all.filter(function(w) { return w.studentId === s.id && w.status === 'closed'; }).pop();
+        return Object.assign(gateStudent_(s), { exit: open ? 'approved' : (done ? 'exited' : 'none'), wid: open ? open.id : '', guardian: open ? open.guardian : (done ? done.guardian : ''), exitedAt: done ? done.closedAt : '' });
+      });
+    return { success: true, results: res };
+  });
+}
+
+function handleGateConfirm_(data) {
+  return withAuth_(data, requireAnyPerm_(['gate', 'custody']), function(user) {
+    const lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    try {
+      const w = readWithdrawals_().filter(function(x) { return x.id === String(data.id); })[0];
+      if (!w) return { success: false, error: 'غير موجود' };
+      if (w.status !== 'open') return { success: false, code: 'NOT_OPEN', error: 'لا يوجد إذن خروج مفتوح لهذا الطالب' };
+      return closeWithdrawalCore_(w, user, 'gate');
     } finally {
       lock.releaseLock();
     }

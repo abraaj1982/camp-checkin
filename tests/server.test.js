@@ -331,6 +331,29 @@ r=post({action:'history',token:tl,studentId:'3001'});assert(r.events.some(e=>e.k
 r=post({action:'withdrawStart',token:ts,studentId:'3002',guardian:'والد 3002',reason:'سبب خاص جداً'});
 r=post({action:'leaderAll',token:tl});assert(r.extra.withdrawals.some(w=>w.guardian==='والد 3002'&&w.status==='open'),'leader sees open withdrawals with the receiver name');
 assert(!JSON.stringify(r.extra.withdrawals).includes('سبب خاص جداً'),'the private reason is NOT shown to the leader');
+// ---- gate screen for the scouts: the secretariat approves, the scouts confirm the exit
+post({action:'createUser',token:T,username:'scout1',password:'sc-12345',fullName:'كشاف',role:'scout',permissions:['gate'],committees:[]});
+const tsc=post({action:'login',username:'scout1',password:'sc-12345'}).token;
+r=post({action:'gateList',token:t1});assert(!r.success,'supervisor cannot use the gate screen');
+r=post({action:'gateList',token:tsc});assert(r.success&&Array.isArray(r.waiting),'scout opens the gate list');
+r=post({action:'withdrawStart',token:tsc,studentId:'3001',guardian:'x',reason:'y'});assert(!r.success,'scout CANNOT approve (open) a withdrawal: only the secretariat');
+r=post({action:'gateCheck',token:tsc,q:'3001'});assert(r.success&&r.results[0].exit==='none','gate check: no permission to leave -> "none"');
+r=post({action:'withdrawStart',token:ts,studentId:'3001',guardian:'والد 3001',reason:'سبب سري للغاية'});const gw=r.id;
+r=post({action:'gateCheck',token:tsc,q:'3001'});assert(r.results[0].exit==='approved'&&r.results[0].wid===gw&&r.results[0].guardian==='والد 3001','gate check: approved by the secretariat');
+r=post({action:'gateList',token:tsc});assert(r.waiting.some(x=>x.wid===gw&&x.name&&x.guardian==='والد 3001'),'approved exit is waiting at the gate');
+assert(!JSON.stringify(r).includes('سبب سري للغاية')&&!JSON.stringify(r).includes('9999000'),'the gate sees NO reason and NO phone numbers');
+r=post({action:'gateConfirm',token:tsc,id:gw});assert(r.success,'scout confirms the exit');
+r=post({action:'gateConfirm',token:tsc,id:gw});assert(!r.success&&r.code==='NOT_OPEN','cannot confirm twice');
+r=post({action:'gateCheck',token:tsc,q:'3001'});assert(r.results[0].exit==='exited','after the exit the check says "exited"');
+r=post({action:'roster',token:tgen,bus:'1'});assert(r.students.find(x=>x.id==='3001').state==='withdrawn','the student is now WITHDRAWN in the lists');
+r=post({action:'gateList',token:tsc});assert(r.exited.some(x=>x.wid===gw&&x.exitedBy==='scout1'),'exit recorded with the scout name');
+assert(book.AuditLog.rows.some(x=>x[2]==='GATE_EXIT'&&x[1]==='scout1'),'audit: gate exit by the scout');
+// items not returned: the gate is blocked
+post({action:'withdrawStart',token:ts,studentId:'3002',guardian:'والد',reason:'سبب'});
+post({action:'custodyRecord',token:ts,studentId:'3002',item:'phone',op:'receive',tag:'G-1'});
+{const l=post({action:'gateList',token:tsc}).waiting.find(x=>x.id==='3002');r=post({action:'gateConfirm',token:tsc,id:l.wid});assert(!r.success&&r.code==='ITEMS_NOT_RETURNED','gate cannot let him out while his phone is still in custody');}
+r=post({action:'createCase',token:tsc,type:'student',text:'الاسم لا يطابق المستلِم',studentId:'3002'});assert(r.success,'scout can report a problem to the administration');
+r=post({action:'custodySummary',token:tsc});assert(!r.success,'scout has no access to custody data');
 // ---- sheet check
 r=post({action:'checkStudentSheet',token:T});assert(r.success&&r.report.ok&&r.report.total===6,'student sheet check passes');
 console.log(fails?`\n${fails} FAILED`:'\nALL PASSED');

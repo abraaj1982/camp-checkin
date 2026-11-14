@@ -60,6 +60,9 @@ const ACTIONS_ = {
   withdrawClose: function(d) { return handleWithdrawClose_(d); },
   withdrawCancel: function(d) { return handleWithdrawCancel_(d); },
   withdrawReopen: function(d) { return handleWithdrawReopen_(d); },
+  gateList: function(d) { return handleGateList_(d); },
+  gateCheck: function(d) { return handleGateCheck_(d); },
+  gateConfirm: function(d) { return handleGateConfirm_(d); },
   withdrawList: function(d) { return handleWithdrawList_(d); },
   medFind: function(d) { return handleMedFind_(d); },
   medInfo: function(d) { return handleMedInfo_(d); },
@@ -596,7 +599,7 @@ function readCases_() {
   return out;
 }
 function handleCreateCase_(data) {
-  return withAuth_(data, requireAnyPerm_(['checkin', 'dashboard', 'manage']), function(user) {
+  return withAuth_(data, requireAnyPerm_(['checkin', 'dashboard', 'manage', 'gate']), function(user) {
     const type = String(data.type || 'other');
     if (CASE_TYPES.indexOf(type) === -1) return { success: false, error: 'Invalid type' };
     const text = String(data.text || '').trim().slice(0, 300);

@@ -103,6 +103,7 @@ html[dir=rtl] #usersListCard td:nth-child(2){text-align:right}
           <option value="doctor">طبيب</option>
           <option value="nutrition_officer">لجنة التغذية</option>
           <option value="custody_officer">الأمانات</option>
+          <option value="scout">الكشافة (البوابة)</option>
           <option value="printer">الطباعة</option>
           <option value="support">دعم فني</option>
           <option value="admin">أدمن (السكرتارية) — كل الصلاحيات</option>
@@ -176,6 +177,7 @@ const roleLabels = {
   doctor: 'طبيب',
   nutrition_officer: 'لجنة التغذية',
   custody_officer: 'الأمانات',
+  scout: 'الكشافة (البوابة)',
   printer: 'الطباعة',
   support: 'دعم فني'
 };
@@ -188,6 +190,7 @@ const ROLE_PRESETS = {
   doctor: ['medical'],
   nutrition_officer: ['nutrition'],
   custody_officer: ['custody'],
+  scout: ['gate'],
   printer: ['print'],
   support: ['support'],
   admin: []
@@ -199,6 +202,7 @@ const SCREEN_LINKS = {
   stats: 'leader.html',
   print: 'wristbands.html',
   custody: 'custody.html',
+  gate: 'gate.html',
   medical: 'medical.html',
   nutrition: 'nutrition.html',
   announce: 'media.html',
@@ -209,10 +213,10 @@ const SCREEN_LINKS = {
 const SCREEN_NAMES = {
   checkin: 'تسجيل الحضور', dashboard: 'لوحة المعلومات', committee: 'مصاريف اللجنة',
   finance: 'اعتماد المصاريف', shirts: 'توزيع القمصان', team: 'الفريق والإعلانات',
-  users: 'المستخدمون', results: 'إدخال النتائج', medical: 'الصفحة الطبية', print: 'طباعة الأساور والكشوف', custody: 'الأمانات والانسحاب', nutrition: 'التغذية', announce: 'الإعلامية', verify: 'التحقق من النتائج'
+  users: 'المستخدمون', results: 'إدخال النتائج', medical: 'الصفحة الطبية', print: 'طباعة الأساور والكشوف', custody: 'الأمانات والانسحاب', gate: 'البوابة (الكشافة)', nutrition: 'التغذية', announce: 'الإعلامية', verify: 'التحقق من النتائج'
 };
 
-const SCREEN_ICONS = { checkin: '🚌', dashboard: '📍', stats: '📊', shirts: '👕', print: '🖨️', custody: '🔐', medical: '⚕️', nutrition: '🍽️', announce: '📣', results: '🏆', verify: '✅', team: '👥' };
+const SCREEN_ICONS = { checkin: '🚌', dashboard: '📍', stats: '📊', shirts: '👕', print: '🖨️', custody: '🔐', gate: '🚪', medical: '⚕️', nutrition: '🍽️', announce: '📣', results: '🏆', verify: '✅', team: '👥' };
 
 // dark / light (same preference as every other screen)
 (function themeInit() {
