@@ -55,6 +55,10 @@ html[dir=rtl] #usersListCard td:nth-child(2){text-align:right}
 .editBox{border:2px solid var(--brand);border-radius:18px;padding:16px;margin-top:14px;background:var(--note)}
 .editBox .title{font-weight:700;font-size:15px;margin-bottom:6px}
 .report{margin-top:12px;font-size:14px;line-height:1.8}.report .bad{color:var(--bad)}.report .good{color:var(--ok)}
+.pwrow{display:flex;gap:8px;align-items:stretch;flex-wrap:wrap}.pwrow input{flex:1 1 220px;min-width:0}.pwrow .pwbtn{min-height:48px}
+.pwbtn{flex:none;border:1px solid var(--field);background:var(--card);color:var(--brand);border-radius:14px;padding:0 12px;font:inherit;font-size:13.5px;font-weight:600;cursor:pointer;white-space:nowrap}
+.edHead{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.saved{position:sticky;bottom:10px;margin-top:14px;padding:12px 14px;border-radius:14px;background:var(--okbg);color:var(--ok);font-weight:600;text-align:center;display:none;box-shadow:var(--shadow)}.saved.show{display:block}.saved.bad{background:var(--badbg);color:var(--bad)}
 #bulletinList>div{padding:10px 0;border-top:1px solid var(--line)}#bulletinList>div:first-child{border-top:0;padding-top:0}
 </style>
 </head>
@@ -80,14 +84,14 @@ html[dir=rtl] #usersListCard td:nth-child(2){text-align:right}
     <div class="card" id="createCard">
       <h2>➕ إضافة مستخدم جديد</h2>
       <form id="createUserForm">
-        <label class="field">اسم المستخدم (Username)</label>
+        <label class="field">اسم المستخدم (للدخول) <span class="req">*</span></label>
         <input type="text" id="newUsername" required>
 
-        <label class="field">كلمة المرور</label>
-        <input type="text" id="newPassword" required>
-        <div class="hint">تُعرض نصاً هنا فقط لتسهيل نسخها وإعطائها للمستخدم — تُشفَّر بالكامل عند الحفظ.</div>
+        <label class="field">كلمة المرور <span class="req">*</span></label>
+        <div id="newPasswordBox"></div>
+        <div class="hint">6 أحرف على الأقل. «توليد» يقترح كلمة سهلة القراءة. تُشفَّر عند الحفظ ولا يمكن استرجاعها، فاحفظها قبل تسليمها.</div>
 
-        <label class="field">الاسم الكامل</label>
+        <label class="field">الاسم الكامل <span class="req">*</span></label>
         <input type="text" id="newFullName" required>
 
         <label class="field">قالب الصلاحيات (يمكنك تعديل العلامات بعده)</label>
@@ -107,7 +111,7 @@ html[dir=rtl] #usersListCard td:nth-child(2){text-align:right}
         <input type="text" id="newAssignedBus" placeholder="مثال: 1">
 
         <div id="newTicksArea">
-          <h3>الشاشات</h3>
+          <h3>✅ الشاشات (ضع علامة صح على ما يحتاجه)</h3>
           <div class="ticks" id="newScreens"></div>
           <h3>صلاحيات خاصة</h3>
           <div class="ticks power" id="newPowers"></div>
@@ -312,6 +316,7 @@ function committeeItems() { return catalog.committees.map(c => ({ key: c.id, lab
 const form = document.getElementById('createUserForm');
 const createMsg = document.getElementById('createMsg');
 const createBtn = document.getElementById('createBtn');
+{ const pf = passwordField('newPassword', true); pf.input.required = true; document.getElementById('newPasswordBox').appendChild(pf.wrap); }
 const roleSelect = document.getElementById('newRole');
 const newScreens = document.getElementById('newScreens');
 const newPowers = document.getElementById('newPowers');
@@ -333,6 +338,10 @@ form.addEventListener('submit', async (e) => {
   createBtn.textContent = 'جاري الإنشاء...';
 
   const isAdminRole = roleSelect.value === 'admin';
+  if (document.getElementById('newPassword').value.length < 6) {
+    setMsg(createMsg, '❌ كلمة المرور 6 أحرف على الأقل', 'error');
+    createBtn.disabled = false; createBtn.textContent = 'إنشاء الحساب'; return;
+  }
   const payload = {
     action: 'createUser',
     username: document.getElementById('newUsername').value.trim(),
@@ -347,7 +356,7 @@ form.addEventListener('submit', async (e) => {
   try {
     const data = await api(payload);
     if (data.success) {
-      setMsg(createMsg, '✅ تم إنشاء الحساب بنجاح: ' + data.username, 'ok');
+      setMsg(createMsg, '✅ تم إنشاء الحساب. سلّم المستخدم: اسم الدخول «' + payload.username + '» وكلمة المرور «' + payload.password + '». (لن تظهر كلمة المرور مرة أخرى)', 'ok');
       form.reset();
       applyPresetToNewForm();
       renderTicks(newCommittees, committeeItems(), []);
@@ -393,7 +402,7 @@ async function loadUsersList() {
     }
     usersListBody.innerHTML = '';
     data.users.forEach(u => {
-      const tr = document.createElement('tr');
+      const tr = document.createElement('tr'); tr.dataset.user = u.username;
       tr.appendChild(cell(u.fullName));
       tr.appendChild(cell(u.username));
       tr.appendChild(cell(permSummary(u) + (u.assignedBus ? ' — باص ' + u.assignedBus : '')));
@@ -410,7 +419,7 @@ async function loadUsersList() {
       if (can('manage')) {
         const editBtn = document.createElement('button');
         editBtn.className = 'rowBtn';
-        editBtn.textContent = '✏️ الصلاحيات';
+        editBtn.textContent = '✏️ تعديل المستخدم';
         editBtn.addEventListener('click', () => openEditor(u));
         tdActions.appendChild(editBtn);
       }
@@ -418,7 +427,7 @@ async function loadUsersList() {
       const resetBtn = document.createElement('button');
       resetBtn.className = 'rowBtn';
       resetBtn.textContent = '🔑 كلمة المرور';
-      resetBtn.addEventListener('click', () => resetPasswordFor(u.username));
+      resetBtn.addEventListener('click', () => openEditor(u, !can('manage')));
       tdActions.appendChild(resetBtn);
 
       if (can('manage')) {
@@ -444,97 +453,148 @@ async function loadUsersList() {
   }
 }
 
-async function openEditor(u) {
+// A password input with a "show / hide" button (and optional generator).
+function passwordField(id, withGenerate) {
+  const wrap = document.createElement('div'); wrap.className = 'pwrow';
+  const inp = document.createElement('input'); inp.type = 'password'; inp.autocomplete = 'new-password'; if (id) inp.id = id;
+  inp.placeholder = '6 أحرف على الأقل';
+  const show = document.createElement('button'); show.type = 'button'; show.className = 'pwbtn'; show.textContent = '👁 إظهار';
+  show.addEventListener('click', () => { inp.type = inp.type === 'password' ? 'text' : 'password'; show.textContent = inp.type === 'password' ? '👁 إظهار' : '🙈 إخفاء'; });
+  wrap.appendChild(inp); wrap.appendChild(show);
+  if (withGenerate) {
+    const gen = document.createElement('button'); gen.type = 'button'; gen.className = 'pwbtn'; gen.textContent = '🎲 توليد';
+    gen.addEventListener('click', () => { inp.value = makePassword(); inp.type = 'text'; show.textContent = '🙈 إخفاء'; inp.dispatchEvent(new Event('input')); });
+    wrap.appendChild(gen);
+  }
+  return { wrap: wrap, input: inp };
+}
+// Easy to read aloud / type on a phone: no 0/O, 1/l/I.
+function makePassword() {
+  const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+  const a = new Uint32Array(8); crypto.getRandomValues(a);
+  return Array.from(a, x => chars[x % chars.length]).join('');
+}
+
+// User file: every change saves by itself (no "save" button).
+async function openEditor(u, passwordOnly) {
   editBox.innerHTML = '';
-  try { await ensureCatalog(); } catch (err) { setMsg(usersListMsg, '❌ ' + err.message, 'error'); return; }
+  if (!passwordOnly) { try { await ensureCatalog(); } catch (err) { setMsg(usersListMsg, '❌ ' + err.message, 'error'); return; } }
 
   const box = document.createElement('div');
   box.className = 'editBox';
-  const title = document.createElement('div');
-  title.className = 'title';
-  title.textContent = 'صلاحيات: ' + u.fullName + ' (' + u.username + ')';
-  box.appendChild(title);
+  const head = document.createElement('div'); head.className = 'edHead';
+  const title = document.createElement('div'); title.className = 'title'; title.textContent = (passwordOnly ? 'كلمة مرور: ' : 'ملف المستخدم: ') + u.fullName;
+  const sub = document.createElement('div'); sub.className = 'hint'; sub.textContent = 'اسم الدخول: ' + u.username;
+  const close = document.createElement('button'); close.type = 'button'; close.className = 'rowBtn'; close.textContent = '✕ إغلاق';
+  close.addEventListener('click', () => { editBox.innerHTML = ''; });
+  const t2 = document.createElement('div'); t2.appendChild(title); t2.appendChild(sub);
+  head.appendChild(t2); head.appendChild(close); box.appendChild(head);
 
-  const isAdmin = u.role === 'admin';
-  const screensDiv = document.createElement('div'); screensDiv.className = 'ticks';
-  const powersDiv = document.createElement('div'); powersDiv.className = 'ticks power';
-  const comsDiv = document.createElement('div'); comsDiv.className = 'ticks';
-  const busInput = document.createElement('input'); busInput.type = 'text'; busInput.value = u.assignedBus || ''; busInput.placeholder = 'مثال: 1';
+  const status = document.createElement('div'); status.className = 'saved'; status.setAttribute('role', 'status');
+  const flash = (text, bad) => { status.textContent = text; status.className = 'saved show' + (bad ? ' bad' : ''); };
 
-  if (isAdmin) {
-    const note = document.createElement('div');
-    note.className = 'hint';
-    note.textContent = 'هذا الحساب بدور «أدمن» ويملك كل الصلاحيات دائماً. يمكنك فقط تحديد لجانه.';
-    box.appendChild(note);
-  } else {
-    const h0 = document.createElement('h3'); h0.textContent = 'قوالب جاهزة';
-    box.appendChild(h0);
-    const presets = document.createElement('div'); presets.className = 'presets';
-    Object.keys(ROLE_PRESETS).filter(r => r !== 'admin').forEach(r => {
-      const b = document.createElement('button');
-      b.type = 'button'; b.className = 'preset'; b.textContent = roleLabels[r];
-      b.addEventListener('click', () => {
-        renderTicks(screensDiv, screenItems(), ROLE_PRESETS[r]);
-        renderTicks(powersDiv, powerItems(), ROLE_PRESETS[r]);
-      });
-      presets.appendChild(b);
+  // ---- password (manage + support)
+  const pwSection = document.createElement('div');
+  const hp = document.createElement('h3'); hp.textContent = '🔑 تغيير كلمة المرور'; pwSection.appendChild(hp);
+  const pf = passwordField(null, true); pwSection.appendChild(pf.wrap);
+  const pBtn = document.createElement('button'); pBtn.type = 'button'; pBtn.className = 'btn secondary'; pBtn.textContent = 'تغيير كلمة المرور';
+  pBtn.addEventListener('click', async () => {
+    const v = pf.input.value;
+    if (v.length < 6) { flash('كلمة المرور 6 أحرف على الأقل', true); return; }
+    pBtn.disabled = true;
+    try {
+      const d = await api({ action: 'resetPassword', targetUsername: u.username, newPassword: v });
+      if (d.success) { flash('✓ تغيّرت كلمة المرور. سلّمها للمستخدم: ' + v); pf.input.value = ''; }
+      else flash('❌ ' + (d.error || 'فشلت العملية'), true);
+    } catch (e) { flash('تعذّر الاتصال بالخادم', true); }
+    pBtn.disabled = false;
+  });
+  pwSection.appendChild(pBtn);
+
+  if (!passwordOnly) {
+    const isAdmin = u.role === 'admin';
+    // ---- name
+    const hn = document.createElement('h3'); hn.textContent = '👤 الاسم الكامل'; box.appendChild(hn);
+    const nameIn = document.createElement('input'); nameIn.type = 'text'; nameIn.value = u.fullName || ''; nameIn.maxLength = 60;
+    box.appendChild(nameIn);
+    nameIn.addEventListener('change', async () => {
+      const v = nameIn.value.trim(); if (v.length < 2 || v === u.fullName) return;
+      try { const d = await api({ action: 'updateUserProfile', targetUsername: u.username, fullName: v });
+        if (d.success) { u.fullName = v; title.textContent = 'ملف المستخدم: ' + v; flash('✓ حُفظ الاسم'); loadUsersList(); } else flash('❌ ' + (d.error || 'فشل الحفظ'), true);
+      } catch (e) { flash('تعذّر الاتصال بالخادم', true); }
     });
-    box.appendChild(presets);
 
-    const h1 = document.createElement('h3'); h1.textContent = 'الشاشات';
-    box.appendChild(h1);
-    renderTicks(screensDiv, screenItems(), u.permissions || []);
-    box.appendChild(screensDiv);
+    const screensDiv = document.createElement('div'); screensDiv.className = 'ticks';
+    const powersDiv = document.createElement('div'); powersDiv.className = 'ticks power';
+    const comsDiv = document.createElement('div'); comsDiv.className = 'ticks';
+    const busInput = document.createElement('input'); busInput.type = 'text'; busInput.value = u.assignedBus || ''; busInput.placeholder = 'مثال: 1'; busInput.inputMode = 'numeric';
 
-    const h2 = document.createElement('h3'); h2.textContent = 'صلاحيات خاصة (حساسة — امنحها لأقل عدد ممكن)';
-    box.appendChild(h2);
-    renderTicks(powersDiv, powerItems(), u.permissions || []);
-    box.appendChild(powersDiv);
+    // Save the whole access state; queued so fast clicks never overwrite each other.
+    let saving = false, again = false;
+    async function saveAccess(what) {
+      if (saving) { again = true; return; }
+      saving = true; flash('… جارٍ الحفظ');
+      try {
+        const payload = { action: 'updateUserAccess', targetUsername: u.username,
+          permissions: isAdmin ? [] : ticked(screensDiv).concat(ticked(powersDiv)), committees: ticked(comsDiv) };
+        if (!isAdmin) payload.assignedBus = busInput.value.trim();
+        const d = await api(payload);
+        if (d.success) { flash('✓ ' + what + ' — يسري فوراً'); u.permissions = payload.permissions; u.assignedBus = payload.assignedBus; refreshUserRow(u); }
+        else flash('❌ ' + (d.error || 'فشل الحفظ'), true);
+      } catch (e) { flash('تعذّر الاتصال بالخادم. أعد المحاولة.', true); }
+      saving = false;
+      if (again) { again = false; saveAccess('حُفظت التعديلات'); }
+    }
+    const onTick = e => {
+      if (e.target.type !== 'checkbox') return;
+      const label = e.target.parentNode.textContent.trim();
+      saveAccess((e.target.checked ? 'أُضيفت «' : 'أُزيلت «') + label + '»');
+    };
 
-    const h4 = document.createElement('h3'); h4.textContent = 'رقم الباص (لتسجيل حضور باص محدد)';
-    box.appendChild(h4);
-    box.appendChild(busInput);
+    if (isAdmin) {
+      const note = document.createElement('div'); note.className = 'hint';
+      note.textContent = 'هذا الحساب بدور «أدمن» ويملك كل الصلاحيات دائماً. يمكنك فقط تحديد لجانه.';
+      box.appendChild(note);
+    } else {
+      const h0 = document.createElement('h3'); h0.textContent = 'قوالب جاهزة'; box.appendChild(h0);
+      const presets = document.createElement('div'); presets.className = 'presets';
+      Object.keys(ROLE_PRESETS).filter(r => r !== 'admin').forEach(r => {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'preset'; b.textContent = roleLabels[r];
+        b.addEventListener('click', () => {
+          renderTicks(screensDiv, screenItems(), ROLE_PRESETS[r]);
+          renderTicks(powersDiv, powerItems(), ROLE_PRESETS[r]);
+          saveAccess('طُبّق قالب «' + roleLabels[r] + '»');
+        });
+        presets.appendChild(b);
+      });
+      box.appendChild(presets);
+
+      const h1 = document.createElement('h3'); h1.textContent = '✅ الشاشات (علامة صح = تُضاف فوراً)'; box.appendChild(h1);
+      renderTicks(screensDiv, screenItems(), u.permissions || []); box.appendChild(screensDiv);
+      const h2 = document.createElement('h3'); h2.textContent = 'صلاحيات خاصة (حساسة: امنحها لأقل عدد ممكن)'; box.appendChild(h2);
+      renderTicks(powersDiv, powerItems(), u.permissions || []); box.appendChild(powersDiv);
+      const h4 = document.createElement('h3'); h4.textContent = '🚌 رقم الباص (لمشرف الباص)'; box.appendChild(h4);
+      box.appendChild(busInput);
+      screensDiv.addEventListener('change', onTick); powersDiv.addEventListener('change', onTick);
+      busInput.addEventListener('change', () => saveAccess('حُفظ رقم الباص'));
+    }
+    const h3 = document.createElement('h3'); h3.textContent = 'اللجان'; box.appendChild(h3);
+    renderTicks(comsDiv, committeeItems(), u.committees || []); box.appendChild(comsDiv);
+    comsDiv.addEventListener('change', onTick);
   }
 
-  const h3 = document.createElement('h3'); h3.textContent = 'اللجان';
-  box.appendChild(h3);
-  renderTicks(comsDiv, committeeItems(), u.committees || []);
-  box.appendChild(comsDiv);
-
-  const saveBtn = document.createElement('button');
-  saveBtn.type = 'button'; saveBtn.className = 'btn'; saveBtn.textContent = 'حفظ';
-  const cancelBtn = document.createElement('button');
-  cancelBtn.type = 'button'; cancelBtn.className = 'btn secondary'; cancelBtn.textContent = 'إلغاء';
-  cancelBtn.addEventListener('click', () => { editBox.innerHTML = ''; });
-  const msg = document.createElement('div'); msg.className = 'msg';
-
-  saveBtn.addEventListener('click', async () => {
-    saveBtn.disabled = true; saveBtn.textContent = 'جاري الحفظ...';
-    try {
-      const payload = {
-        action: 'updateUserAccess',
-        targetUsername: u.username,
-        permissions: isAdmin ? [] : ticked(screensDiv).concat(ticked(powersDiv)),
-        committees: ticked(comsDiv)
-      };
-      if (!isAdmin) payload.assignedBus = busInput.value.trim();
-      const data = await api(payload);
-      if (data.success) {
-        setMsg(msg, '✅ تم الحفظ — يسري فوراً بدون إعادة دخول المستخدم.', 'ok');
-        loadUsersList();
-      } else {
-        setMsg(msg, '❌ ' + (data.error || 'فشل الحفظ'), 'error');
-      }
-    } catch (err) {
-      setMsg(msg, 'تعذّر الاتصال بالخادم: ' + err.message, 'error');
-    } finally {
-      saveBtn.disabled = false; saveBtn.textContent = 'حفظ';
-    }
-  });
-
-  box.appendChild(saveBtn); box.appendChild(cancelBtn); box.appendChild(msg);
+  box.appendChild(pwSection);
+  box.appendChild(status);
   editBox.appendChild(box);
-  box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// Update one user's line in the list without reloading everything.
+function refreshUserRow(u) {
+  const i = (usersCache || []).findIndex(x => x.username === u.username);
+  if (i !== -1) usersCache[i] = Object.assign({}, usersCache[i], u);
+  const row = document.querySelector('tr[data-user="' + CSS.escape(u.username) + '"] td:nth-child(3)');
+  if (row) row.textContent = permSummary(u) + (u.assignedBus ? ' — باص ' + u.assignedBus : '');
 }
 
 async function setActiveFor(u, active) {
@@ -544,19 +604,6 @@ async function setActiveFor(u, active) {
     if (!data.success) { alert(data.error || 'تعذّر التنفيذ'); return; }
     loadUsersList();
   } catch (e) { alert('تعذّر الاتصال'); }
-}
-
-async function resetPasswordFor(username) {
-  const newPassword = prompt('كلمة المرور الجديدة لـ "' + username + '":');
-  if (!newPassword) return;
-  setMsg(usersListMsg, '', '');
-  try {
-    const data = await api({ action: 'resetPassword', targetUsername: username, newPassword: newPassword });
-    if (data.success) setMsg(usersListMsg, '✅ تم تغيير كلمة مرور "' + username + '" بنجاح — سلّمه كلمة المرور الجديدة.', 'ok');
-    else setMsg(usersListMsg, '❌ ' + (data.error || 'فشلت العملية'), 'error');
-  } catch (err) {
-    setMsg(usersListMsg, 'تعذّر الاتصال بالخادم: ' + err.message, 'error');
-  }
 }
 
 async function unlockAccountFor(username) {

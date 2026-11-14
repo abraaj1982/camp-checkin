@@ -29,12 +29,12 @@ let fails=0;const assert=(c,m)=>{if(!c){console.log('FAIL',m);fails++;process.ex
 run('SETUP_createTabs')();
 for(const n of ['Scans','Bags','BusLive'])assert(!!book[n]&&book[n].rows[0].length>=8-(n==='BusLive'?0:0)-(n==='BusLive'?-1:0)||!!book[n],'tab '+n+' created');
 const secret=run('getBootstrapSecret_()');
-post({action:'createUser',username:'Admin',password:'pw',fullName:'م',bootstrapSecret:secret});
-const T=post({action:'login',username:'Admin',password:'pw'}).token;
-post({action:'createUser',token:T,username:'sup1',password:'p1',fullName:'مشرف 1',role:'supervisor',assignedBus:'1'});
-post({action:'createUser',token:T,username:'sup2',password:'p2',fullName:'مشرف 2',role:'supervisor',assignedBus:'2'});
-post({action:'createUser',token:T,username:'lead',password:'p3',fullName:'القائد',role:'camp_leader'});
-const t1=post({action:'login',username:'sup1',password:'p1'}).token,t2=post({action:'login',username:'sup2',password:'p2'}).token,tl=post({action:'login',username:'lead',password:'p3'}).token;
+post({action:'createUser',username:'Admin',password:'pw-12345',fullName:'م',bootstrapSecret:secret});
+const T=post({action:'login',username:'Admin',password:'pw-12345'}).token;
+post({action:'createUser',token:T,username:'sup1',password:'p1-12345',fullName:'مشرف 1',role:'supervisor',assignedBus:'1'});
+post({action:'createUser',token:T,username:'sup2',password:'p2-12345',fullName:'مشرف 2',role:'supervisor',assignedBus:'2'});
+post({action:'createUser',token:T,username:'lead',password:'p3-12345',fullName:'القائد',role:'camp_leader'});
+const t1=post({action:'login',username:'sup1',password:'p1-12345'}).token,t2=post({action:'login',username:'sup2',password:'p2-12345'}).token,tl=post({action:'login',username:'lead',password:'p3-12345'}).token;
 // ---- security
 let r=JSON.parse(run('doGet')().t);assert(r.ok&&!r.students&&!r.records,'GET exposes no data');
 for(const a of ['getAllStudents','getDashboardData','lookup','roster','scan','busState','busLive','leaderSummary'])assert(!post({action:a}).success,'no token rejected: '+a);
@@ -111,11 +111,11 @@ r=post({action:'scan',token:t1,studentId:'2002',op:'board'});assert(r.success,'a
 // ---- print list
 r=post({action:'printList',token:t1});assert(!r.success,'supervisor cannot print list');
 r=post({action:'printList',token:T});assert(r.success&&r.students.length===4&&!JSON.stringify(r).includes('9999000'),'admin print list (no phones)');
-post({action:'createUser',token:T,username:'prt',password:'p5',fullName:'طباعة',role:'supervisor',permissions:['print'],committees:[]});
-const tp=post({action:'login',username:'prt',password:'p5'}).token;r=post({action:'printList',token:tp});assert(r.success,'print permission works');
+post({action:'createUser',token:T,username:'prt',password:'p5-12345',fullName:'طباعة',role:'supervisor',permissions:['print'],committees:[]});
+const tp=post({action:'login',username:'prt',password:'p5-12345'}).token;r=post({action:'printList',token:tp});assert(r.success,'print permission works');
 // ---- custody + withdrawal
-post({action:'createUser',token:T,username:'sec',password:'p6',fullName:'أمانات',role:'supervisor',permissions:['custody'],committees:[]});
-const ts=post({action:'login',username:'sec',password:'p6'}).token;
+post({action:'createUser',token:T,username:'sec',password:'p6-12345',fullName:'أمانات',role:'supervisor',permissions:['custody'],committees:[]});
+const ts=post({action:'login',username:'sec',password:'p6-12345'}).token;
 r=post({action:'custodyFind',token:t1,q:'1001'});assert(!r.success,'supervisor cannot use custody');
 r=post({action:'custodyFind',token:ts,q:'سعيد'});assert(r.success&&r.results.length===1&&r.results[0].id==='2001'&&!JSON.stringify(r).includes('9999000'),'custody search across buses, no phones');
 r=post({action:'custodyRecord',token:ts,studentId:'1001',item:'phone',op:'receive',tag:'S-12',clientId:'m1'});assert(r.success&&r.custody.phone===true&&r.custody.phoneTag==='S-12','phone received');
@@ -151,10 +151,10 @@ assert(book.AuditLog.rows.some(x=>x[2]==='WITHDRAW_CLOSED'),'audit: withdrawal c
 book.Bus.rows[0].push('Food allergy','Medical notes');
 book.Bus.rows[1].push('فول سوداني','ربو');book.Bus.rows[2].push('','');book.Bus.rows[3].push('','سكري');book.Bus.rows[4].push('لاكتوز','');
 for(const k of Object.keys(cache))delete cache[k];
-post({action:'createUser',token:T,username:'doc',password:'p7',fullName:'طبيب',role:'supervisor',permissions:['medical'],committees:[]});
-const td=post({action:'login',username:'doc',password:'p7'}).token;
-post({action:'createUser',token:T,username:'nut',password:'p8',fullName:'تغذية',role:'supervisor',permissions:['nutrition'],committees:[]});
-const tn=post({action:'login',username:'nut',password:'p8'}).token;
+post({action:'createUser',token:T,username:'doc',password:'p7-12345',fullName:'طبيب',role:'supervisor',permissions:['medical'],committees:[]});
+const td=post({action:'login',username:'doc',password:'p7-12345'}).token;
+post({action:'createUser',token:T,username:'nut',password:'p8-12345',fullName:'تغذية',role:'supervisor',permissions:['nutrition'],committees:[]});
+const tn=post({action:'login',username:'nut',password:'p8-12345'}).token;
 r=post({action:'medFind',token:t1,q:'1001'});assert(!r.success,'supervisor cannot open the medical screen');
 r=post({action:'medFind',token:tn,q:'1001'});assert(!r.success,'nutrition cannot open the medical screen');
 r=post({action:'medFind',token:td,q:'1001'});assert(r.success&&r.results[0].hasNotes===true&&!JSON.stringify(r).includes('ربو')&&!JSON.stringify(r).includes('9999000'),'search shows only a flag, never the notes');
@@ -183,22 +183,22 @@ assert(r.allergies.length===2&&r.allergies.some(a=>a.name==='أحمد'&&a.allerg
 r=post({action:'nutritionSummary',token:tl});assert(r.success&&!r.allergies&&r.studentsPresent>=1,'leader sees meal counts only (no allergy names)');
 for(const a of ['roster','lookup','printList','leaderSummary','history','custodySummary']){const rr=JSON.stringify(post({action:a,token:T,q:'أحمد',studentId:'1001'}));assert(!rr.includes('ربو')&&!rr.includes('سكري')&&!rr.includes('فول سوداني'),'no medical/allergy data leaks via '+a);}
 // ---- enable/disable accounts from the app
-post({action:'createUser',token:T,username:'tmp1',password:'p9',fullName:'مؤقت',role:'supervisor',permissions:['checkin'],assignedBus:'1',committees:[]});
-let tt=post({action:'login',username:'tmp1',password:'p9'}).token;
+post({action:'createUser',token:T,username:'tmp1',password:'p9-12345',fullName:'مؤقت',role:'supervisor',permissions:['checkin'],assignedBus:'1',committees:[]});
+let tt=post({action:'login',username:'tmp1',password:'p9-12345'}).token;
 r=post({action:'setUserActive',token:tt,targetUsername:'sup1',active:false});assert(!r.success,'supervisor cannot disable accounts');
 r=post({action:'setUserActive',token:T,targetUsername:'tmp1',active:false});assert(r.success,'admin disables an account');
 r=post({action:'busState',token:tt});assert(!r.success&&r.code==='ACCOUNT_DISABLED','disabled account is cut off on its very next request');
-r=post({action:'login',username:'tmp1',password:'p9'});assert(!r.success,'disabled account cannot log in');
+r=post({action:'login',username:'tmp1',password:'p9-12345'});assert(!r.success,'disabled account cannot log in');
 r=post({action:'setUserActive',token:T,targetUsername:'tmp1',active:true});assert(r.success,'admin re-enables it');
-r=post({action:'login',username:'tmp1',password:'p9'});assert(r.success,'re-enabled account can log in again');
+r=post({action:'login',username:'tmp1',password:'p9-12345'});assert(r.success,'re-enabled account can log in again');
 r=post({action:'setUserActive',token:T,targetUsername:'Admin',active:false});assert(!r.success,'admin cannot disable themselves');
 r=post({action:'setUserActive',token:T,targetUsername:'tmp1',active:'no'});assert(!r.success,'invalid value rejected');
 assert(book.AuditLog.rows.some(x=>x[2]==='USER_DISABLED'&&x[3]==='tmp1'),'audit: account disabled');
 // ---- media: announcements, results, public feed
-post({action:'createUser',token:T,username:'med',password:'pa',fullName:'إعلامي',role:'media',permissions:['announce','results'],committees:[]});
-const tm=post({action:'login',username:'med',password:'pa'}).token;
-post({action:'createUser',token:T,username:'ver',password:'pb',fullName:'محقق',role:'verifier',permissions:['verify'],committees:[]});
-const tv=post({action:'login',username:'ver',password:'pb'}).token;
+post({action:'createUser',token:T,username:'med',password:'pa-12345',fullName:'إعلامي',role:'media',permissions:['announce','results'],committees:[]});
+const tm=post({action:'login',username:'med',password:'pa-12345'}).token;
+post({action:'createUser',token:T,username:'ver',password:'pb-12345',fullName:'محقق',role:'verifier',permissions:['verify'],committees:[]});
+const tv=post({action:'login',username:'ver',password:'pb-12345'}).token;
 r=post({action:'mediaList',token:t1});assert(!r.success,'supervisor cannot open media');
 r=post({action:'annSave',token:t1,title:'مرحباً بكم'});assert(!r.success,'supervisor cannot create announcements');
 r=post({action:'annSave',token:tm,title:'م',body:''});assert(!r.success,'short title rejected');
@@ -228,6 +228,14 @@ r=post({action:'resStatus',token:tv,id:r2,status:'archived'});r=post({action:'fe
 r=post({action:'annStatus',token:tm,id:a2,status:'archived'});r=post({action:'feed',key:fk});assert(r.announcements.length===0,'archived announcement leaves the feed');
 assert(!JSON.stringify(post({action:'feed',key:fk})).match(/9999000|أحمد|ربو/),'feed has no student data');
 assert(book.AuditLog.rows.some(x=>x[2]==='RESULT_PUBLISHED'),'audit: results published');
+// ---- password policy + profile edit
+r=post({action:'createUser',token:T,username:'weak',password:'12345',fullName:'ضعيف',role:'supervisor',permissions:['checkin'],committees:[]});assert(!r.success&&r.code==='WEAK_PASSWORD','short password refused on create');
+r=post({action:'resetPassword',token:T,targetUsername:'tmp1',newPassword:'abc'});assert(!r.success&&r.code==='WEAK_PASSWORD','short password refused on reset');
+r=post({action:'updateUserProfile',token:T,targetUsername:'tmp1',fullName:'مشرف معدّل'});assert(r.success&&book.Users.rows.some(x=>x[0]==='tmp1'&&x[3]==='مشرف معدّل'),'admin renames a user from the app');
+r=post({action:'updateUserProfile',token:T,targetUsername:'tmp1',fullName:'x'});assert(!r.success,'empty name refused');
+r=post({action:'updateUserProfile',token:t1,targetUsername:'tmp1',fullName:'محاولة'});assert(!r.success,'supervisor cannot rename users');
+r=post({action:'updateUserAccess',token:T,targetUsername:'tmp1',permissions:['checkin','custody'],committees:[]});
+r=post({action:'login',username:'tmp1',password:'p9-12345'});assert(r.success&&r.permissions.includes('custody'),'ticked permission is effective on next login');
 // ---- sheet check
 r=post({action:'checkStudentSheet',token:T});assert(r.success&&r.report.ok&&r.report.total===4,'student sheet check passes');
 console.log(fails?`\n${fails} FAILED`:'\nALL PASSED');

@@ -360,6 +360,8 @@ function authorize_(token, requiredCheckFn) {
   return { ok: true, user: user };
 }
 
+const MIN_PASSWORD_LEN_ = 6;
+
 function handleCreateUser_(data) {
   const { headers, sheet } = readSheetAsObjects_(USERS_SHEET);
   const isBootstrap = !usersSheetHasAnyUser_();
@@ -381,6 +383,9 @@ function handleCreateUser_(data) {
 
   if (findUserRow_(data.username)) {
     return { success: false, error: 'Username already exists' };
+  }
+  if (!isBootstrap && String(data.password || '').length < MIN_PASSWORD_LEN_) {
+    return { success: false, code: 'WEAK_PASSWORD', error: 'كلمة المرور قصيرة: ' + MIN_PASSWORD_LEN_ + ' أحرف على الأقل' };
   }
 
   const { saltB64, hashHex } = hashPassword_(data.password);
@@ -470,6 +475,9 @@ function handleResetPassword_(data) {
     return { success: false, error: 'الدعم الفني لا يستطيع تغيير كلمة مرور حساب إداري' };
   }
 
+  if (String(data.newPassword || '').length < MIN_PASSWORD_LEN_) {
+    return { success: false, code: 'WEAK_PASSWORD', error: 'كلمة المرور قصيرة: ' + MIN_PASSWORD_LEN_ + ' أحرف على الأقل' };
+  }
   const { saltB64, hashHex } = hashPassword_(data.newPassword);
   setCellByColumnName_(sheet, headers, target._rowNumber, 'PasswordHash', hashHex);
   setCellByColumnName_(sheet, headers, target._rowNumber, 'Salt', saltB64);
@@ -495,6 +503,27 @@ function handleUnlockAccount_(data) {
 
   writeAudit_(auth.user.Username, 'UNLOCK_ACCOUNT', data.targetUsername, '');
   return { success: true };
+}
+
+// Edit a user's display name from the app (no need to open the sheet).
+function handleUpdateUserProfile_(data) {
+  const auth = authorize_(data.token, requirePerm_('manage'));
+  if (!auth.ok) return { success: false, error: 'Not authorized: ' + auth.reason, code: auth.reason };
+  const fullName = String(data.fullName || '').trim().slice(0, 60);
+  if (fullName.length < 2) return { success: false, error: 'اكتب الاسم الكامل' };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(5000);
+  try {
+    const { headers, sheet, rows } = readSheetAsObjects_(USERS_SHEET);
+    const target = rows.find(function(r) { return r.Username === data.targetUsername; });
+    if (!target) return { success: false, error: 'User not found' };
+    if (target.Role === 'admin' && auth.user.Role !== 'admin') return { success: false, error: 'الحسابات الإدارية يعدّلها المدير فقط' };
+    setCellByColumnName_(sheet, headers, target._rowNumber, 'FullName', fullName);
+    writeAudit_(auth.user.Username, 'USER_RENAMED', target.Username, '');
+    return { success: true };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // Enable / disable an account from the app (instead of editing the sheet). Takes effect on the very next request.
