@@ -140,6 +140,13 @@ function findStudentColumns_(headerRow) {
   return cols;
 }
 
+// Parents often write "لا يوجد" / "no" / "-" in health fields: treat these as empty.
+function realValue_(v) {
+  const t = String(v === undefined || v === null ? '' : v).trim();
+  const k = t.replace(/[.\-–—_\s\/]/g, '').toLowerCase();
+  return /^(|لا|لايوجد|لاتوجد|لاشيء|لاشي|ليس|ليسلديه|ليسلديهحساسية|لايعاني|سليم|none|no|non|na|nil|nothing|0)$/.test(k) ? '' : t;
+}
+
 function readStudents_() {
   const cache = CacheService.getScriptCache();
   const hit = cache.get('students_v2');
@@ -162,8 +169,8 @@ function readStudents_() {
       cls: String(cell(data[i], 'cls') || '').trim(),
       photo: String(cell(data[i], 'photo') || '').trim(),
       bags: Number(cell(data[i], 'bags')) || 0,
-      foodAllergy: String(cell(data[i], 'foodAllergy') || '').trim(),
-      medical: String(cell(data[i], 'medical') || '').trim(),
+      foodAllergy: realValue_(cell(data[i], 'foodAllergy')),
+      medical: realValue_(cell(data[i], 'medical')),
       _row: i + 1
     });
   }

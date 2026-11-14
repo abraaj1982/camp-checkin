@@ -107,6 +107,7 @@ async function refreshRoster(silent) {
     const r = await api({ action: 'roster' });
     if (r.success) { st.roster = r; store.set('roster', r); if (r.bus) { me.bus = r.bus; $('busTitle').textContent = L().bus(r.bus); } }
     else if (r.code && AUTH_ERR.test(r.code)) { sessionStorage.clear(); location.href = 'login.html'; }
+    else { st.loadErr = r.error || 'تعذّر تحميل القائمة'; render(); }
   } catch (e) { /* offline: keep cached roster */ }
 }
 const counts = () => { const s = st.roster ? st.roster.students : []; const b = s.filter(x => x.state === 'boarded').length; return { b: b, t: s.length }; };
@@ -222,7 +223,7 @@ function render() {
   const keepReader = st.cam ? document.getElementById('reader') : null; if (keepReader) keepReader.remove(); // the live video must survive re-renders
   head(); bar();
   const l = L(), c = counts(), left = c.t - c.b, R = st.roster;
-  if (!R) { $('app').innerHTML = `<div class="card muted">${l.loading}</div>`; return; }
+  if (!R) { $('app').innerHTML = st.loadErr ? `<div class="banner bad">${esc(st.loadErr)}</div><div class="card muted"><a href="hub.html">${l.home || 'الرئيسية'}</a></div>` : `<div class="card muted">${l.loading}</div>`; return; }
   const methods = [['qr', l.m_qr, '▣'], ['face', l.m_face, '◉'], ['name', l.m_name, 'Aa'], ['num', l.m_num, '#']];
   let body = '';
   if (st.method === 'qr') body = `<div class="scan">${st.cam ? '<div id="reader" style="width:100%"></div>' : `<div style="font-size:30px" aria-hidden="true">▣</div><b>${l.scanQr}</b>`}</div><button class="btn full" style="margin-top:10px" onclick="${st.cam ? 'stopCam()' : 'startCam()'}">${st.cam ? l.stopCam : l.startCam}</button>`;

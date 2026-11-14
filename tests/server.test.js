@@ -181,6 +181,7 @@ r=post({action:'nutritionSummary',token:tn});
 assert(r.success&&r.studentsTotal===4&&r.studentsPresent>=1&&r.supervisors>=1&&r.mealsToPrepare===r.studentsPresent+r.supervisors,'nutrition counts: students present + supervisors');
 assert(r.allergies.length===2&&r.allergies.some(a=>a.name==='أحمد'&&a.allergy==='فول سوداني')&&!JSON.stringify(r).includes('ربو')&&!JSON.stringify(r).includes('سكري'),'nutrition sees FOOD allergies by name only, no medical notes');
 r=post({action:'nutritionSummary',token:tl});assert(r.success&&!r.allergies&&r.studentsPresent>=1,'leader sees meal counts only (no allergy names)');
+assert(['لا يوجد','لا','-','N/A','none',' لا توجد '].every(v=>run('realValue_('+JSON.stringify(v)+')')==='')&&run('realValue_("فول سوداني")')==='فول سوداني','"لا يوجد" and similar answers are not counted as an allergy');
 r=post({action:'nutritionSummary',token:tn});assert(r.staffManual===false&&r.staff===r.supervisors&&r.ack===null&&r.mealsExpected===4+r.staff,'staff defaults to supervisor accounts; no ack yet');
 r=post({action:'nutritionSetStaff',token:t1,count:30});assert(!r.success,'supervisor cannot set the staff count');
 r=post({action:'nutritionSetStaff',token:tn,count:-2});assert(!r.success,'bad staff count rejected');
