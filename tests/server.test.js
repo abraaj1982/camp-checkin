@@ -236,6 +236,17 @@ r=post({action:'updateUserProfile',token:T,targetUsername:'tmp1',fullName:'x'});
 r=post({action:'updateUserProfile',token:t1,targetUsername:'tmp1',fullName:'محاولة'});assert(!r.success,'supervisor cannot rename users');
 r=post({action:'updateUserAccess',token:T,targetUsername:'tmp1',permissions:['checkin','custody'],committees:[]});
 r=post({action:'login',username:'tmp1',password:'p9-12345'});assert(r.success&&r.permissions.includes('custody'),'ticked permission is effective on next login');
+// ---- legacy slow hash is upgraded on first good login
+post({action:'createUser',token:T,username:'old1',password:'oldpass-12345',fullName:'قديم',role:'supervisor',permissions:['checkin'],assignedBus:'1',committees:[]});
+{const row=book.Users.rows.find(x=>x[0]==='old1');const salt=Buffer.from(row[2],'base64');
+ const legacy=run('(function(p,s){return bytesToHex_(pbkdf2_(p,s,LEGACY_PBKDF2_ITERATIONS,HASH_OUTPUT_BYTES));})')('oldpass-12345',[...salt].map(x=>x));
+ row[1]=legacy;assert(!row[1].includes('$'),'old account simulated with a legacy hash');
+ r=post({action:'login',username:'old1',password:'oldpass-12345'});assert(r.success,'legacy account can still log in');
+ assert(row[1].includes('$')&&row[1].startsWith('1000$'),'legacy hash upgraded to the fast format');
+ r=post({action:'login',username:'old1',password:'oldpass-12345'});assert(r.success,'upgraded account logs in again');
+ r=post({action:'login',username:'old1',password:'wrong-pass-1'});assert(!r.success,'wrong password still refused after upgrade');}
+// ---- editor recovery function exists and refuses the placeholder
+{let threw=false;try{run('ADMIN_resetPassword')();}catch(e){threw=true;}assert(threw,'ADMIN_resetPassword refuses the placeholder password');}
 // ---- sheet check
 r=post({action:'checkStudentSheet',token:T});assert(r.success&&r.report.ok&&r.report.total===4,'student sheet check passes');
 console.log(fails?`\n${fails} FAILED`:'\nALL PASSED');

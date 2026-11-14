@@ -286,6 +286,13 @@ function handleLogin_(data) {
     return { success: false, error: 'Invalid username or password' };
   }
 
+  // Old accounts store a slow legacy hash (login takes ~9 s): upgrade it silently on the first good login.
+  if (String(user.PasswordHash || '').indexOf('$') === -1) {
+    const up = hashPassword_(data.password);
+    setCellByColumnName_(sheet, headers, user._rowNumber, 'PasswordHash', up.hashHex);
+    setCellByColumnName_(sheet, headers, user._rowNumber, 'Salt', up.saltB64);
+  }
+
   writeLoginSuccessRow_(sheet, headers, user, now);
 
   const epoch = Number(user.TokenEpoch) || 0;
@@ -703,4 +710,28 @@ function SETUP_createTabs() {
   const msg = log.join('\n');
   Logger.log(msg);
   return msg;
+}
+
+
+// Emergency recovery, run from the Apps Script editor by the owner (never reachable from the web).
+// 1) Type the username and the new password below.  2) Run ADMIN_resetPassword.
+// 3) IMPORTANT: delete the password text from the line below and save.
+function ADMIN_resetPassword() {
+  const USERNAME = 'admin_test';
+  const NEW_PASSWORD = 'PUT-NEW-PASSWORD-HERE';
+  if (NEW_PASSWORD === 'PUT-NEW-PASSWORD-HERE' || String(NEW_PASSWORD).length < MIN_PASSWORD_LEN_) {
+    throw new Error('اكتب كلمة مرور جديدة (6 أحرف على الأقل) في السطر NEW_PASSWORD ثم شغّل الدالة');
+  }
+  const { headers, sheet, rows } = readSheetAsObjects_(USERS_SHEET);
+  const target = rows.find(function(r) { return r.Username === USERNAME; });
+  if (!target) throw new Error('المستخدم غير موجود: ' + USERNAME);
+  const h = hashPassword_(NEW_PASSWORD);
+  setCellByColumnName_(sheet, headers, target._rowNumber, 'PasswordHash', h.hashHex);
+  setCellByColumnName_(sheet, headers, target._rowNumber, 'Salt', h.saltB64);
+  setCellByColumnName_(sheet, headers, target._rowNumber, 'FailedAttempts', 0);
+  setCellByColumnName_(sheet, headers, target._rowNumber, 'LockedUntil', '');
+  setCellByColumnName_(sheet, headers, target._rowNumber, 'Active', true);
+  setCellByColumnName_(sheet, headers, target._rowNumber, 'TokenEpoch', (Number(target.TokenEpoch) || 0) + 1);
+  writeAudit_('EDITOR_OWNER', 'RESET_PASSWORD', USERNAME, 'from the script editor');
+  Logger.log('تم تغيير كلمة مرور ' + USERNAME + '. احذف كلمة المرور من الكود الآن.');
 }
