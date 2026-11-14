@@ -99,6 +99,7 @@ html[dir=rtl] #usersListCard td:nth-child(2){text-align:right}
           <option value="supervisor">مشرف باص</option>
           <option value="camp_leader">قائد المخيم</option>
           <option value="shirts_coordinator">مسؤول القمصان</option>
+          <option value="general_supervisor">مشرف عام (يتراجع ويسجّل لأي باص)</option>
           <option value="doctor">طبيب</option>
           <option value="nutrition_officer">لجنة التغذية</option>
           <option value="custody_officer">الأمانات</option>
@@ -171,6 +172,7 @@ const roleLabels = {
   supervisor: 'مشرف باص',
   camp_leader: 'قائد المخيم',
   shirts_coordinator: 'مسؤول القمصان',
+  general_supervisor: 'مشرف عام',
   doctor: 'طبيب',
   nutrition_officer: 'لجنة التغذية',
   custody_officer: 'الأمانات',
@@ -182,6 +184,7 @@ const ROLE_PRESETS = {
   supervisor: ['checkin'],
   camp_leader: ['dashboard'],
   shirts_coordinator: ['shirts'],
+  general_supervisor: ['checkin', 'allbuses', 'undo'],
   doctor: ['medical'],
   nutrition_officer: ['nutrition'],
   custody_officer: ['custody'],

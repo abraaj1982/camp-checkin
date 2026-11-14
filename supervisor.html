@@ -26,6 +26,8 @@ const LOC_INTERVAL_MS = 20000;
 /* ---------- session ---------- */
 const token = sessionStorage.getItem('mukhayyam_token');
 let perms = [];
+const canUndoAny = () => perms.indexOf('*') !== -1 || perms.indexOf('undo') !== -1;
+const UNDO_MS = 110 * 1000; // matches the server (2 min) with a small safety margin
 try { perms = JSON.parse(sessionStorage.getItem('mukhayyam_permissions') || '[]'); } catch (e) {}
 if (!token || (perms.indexOf('*') === -1 && perms.indexOf('checkin') === -1)) { location.href = token ? 'hub.html' : 'login.html'; }
 const me = { name: sessionStorage.getItem('mukhayyam_fullName') || '', bus: sessionStorage.getItem('mukhayyam_assignedBus') || '' };
@@ -38,7 +40,7 @@ const I = {
  ar: { dir: 'rtl', bus: n => 'باص ' + n, sup: n => 'مشرف: ' + n, boarded: 'صعدوا', remaining: n => n > 0 ? 'ناقص ' + n : 'اكتمل الباص', how: 'كيف تريد التعرف على الطالب؟',
   m_qr: 'السوار', m_face: 'الوجه', m_name: 'الاسم', m_num: 'الرقم', soon: 'قريباً', scanQr: 'وجّه الكاميرا إلى سوار الطالب', startCam: 'تشغيل الكاميرا', stopCam: 'إيقاف الكاميرا', noCam: 'تعذّر تشغيل الكاميرا. استخدم الاسم أو الرقم.',
   nameLbl: 'اكتب اسم الطالب', numLbl: 'اكتب رقم الطالب', none: 'لا توجد نتيجة', student: 'طالب', team: 'الفريق', cls: 'الصف',
-  board: 'تسجيل الصعود', undo: 'تراجع عن آخر تسجيل', next: 'الطالب التالي', done: 'سُجّل الصعود', undone: 'تم التراجع',
+  board: 'تسجيل الصعود', undo: 'تراجع عن آخر تسجيل', next: 'الطالب التالي', done: 'سُجّل الصعود', undone: 'تم التراجع', undoLocked: 'لا يمكنك التراجع الآن (آخر تسجيل لك وخلال دقيقتين فقط). اطلب من المشرف العام.', undoRow: 'تراجع', confirmUndo: 'التراجع عن صعود هذا الطالب؟',
   dup: t => 'مسجَّل صعوده مسبقاً' + (t ? ' الساعة ' + t : '') + '. لا يُسجَّل مرتين.', other: (b, s) => 'ليس من باصك. هو في باص ' + b + (s ? ' (المشرف: ' + s + ')' : '') + '. يمكنك الاطلاع فقط.', withdrawn: 'الطالب منسحب.', notFound: 'الطالب غير موجود.',
   otherOffline: 'هذا الطالب ليس في باصك، والبحث في بقية الباصات يحتاج اتصالاً.', bags: 'الأغراض', load: 'تحميل', unload: 'تنزيل', bagCount: 'عدد الحقائب', expected: n => 'المتوقع: ' + n, saveBags: 'تسجيل الأغراض', bagsSaved: 'سُجّلت الأغراض', bagShort: n => 'ينقص ' + n + ' من الحقائب المتوقعة.',
   missing: 'لم يصعدوا بعد', boardedList: 'صعدوا (الأحدث أولاً)', noneBoarded: 'لم يصعد أحد بعد', allIn: 'اكتمل الباص', trip: 'حالة الرحلة', st_boarding: 'الصعود', st_departed: 'انطلق', st_onway: 'في الطريق', st_arrived: 'وصل', shareLoc: 'مشاركة الموقع مع القائد', locOn: 'الموقع يُرسَل', locOff: 'الموقع متوقف', lastSent: t => 'آخر إرسال ' + t,
@@ -47,7 +49,7 @@ const I = {
  en: { dir: 'ltr', bus: n => 'Bus ' + n, sup: n => 'Supervisor: ' + n, boarded: 'Boarded', remaining: n => n > 0 ? n + ' remaining' : 'Bus full', how: 'How do you want to identify the student?',
   m_qr: 'Wristband', m_face: 'Face', m_name: 'Name', m_num: 'Number', soon: 'Soon', scanQr: 'Point the camera at the wristband', startCam: 'Start camera', stopCam: 'Stop camera', noCam: 'Camera unavailable. Use name or number.',
   nameLbl: "Type the student's name", numLbl: "Type the student's number", none: 'No result', student: 'Student', team: 'Team', cls: 'Grade',
-  board: 'Mark as boarded', undo: 'Undo last record', next: 'Next student', done: 'Boarding recorded', undone: 'Undone',
+  board: 'Mark as boarded', undo: 'Undo last record', next: 'Next student', done: 'Boarding recorded', undone: 'Undone', undoLocked: 'You can no longer undo (only your last record, within 2 minutes). Ask the general supervisor.', undoRow: 'Undo', confirmUndo: 'Undo this student’s boarding?',
   dup: t => 'Already boarded' + (t ? ' at ' + t : '') + '. Cannot be recorded twice.', other: (b, s) => 'Not on your bus. Student is on bus ' + b + (s ? ' (supervisor: ' + s + ')' : '') + '. View only.', withdrawn: 'Student has withdrawn.', notFound: 'Student not found.',
   otherOffline: 'This student is not on your bus, and searching other buses needs a connection.', bags: 'Belongings', load: 'Loading', unload: 'Unloading', bagCount: 'Number of bags', expected: n => 'Expected: ' + n, saveBags: 'Save belongings', bagsSaved: 'Belongings saved', bagShort: n => n + ' of the expected bags missing.',
   missing: 'Not boarded yet', boardedList: 'Boarded (latest first)', noneBoarded: 'No one has boarded yet', allIn: 'Bus full', trip: 'Trip status', st_boarding: 'Boarding', st_departed: 'Departed', st_onway: 'On the way', st_arrived: 'Arrived', shareLoc: 'Share location with the leader', locOn: 'Location is being sent', locOff: 'Location sharing off', lastSent: t => 'Last sent ' + t,
@@ -87,6 +89,10 @@ async function flush() {
 }
 function applyServerResult(op, r) {
   if (!r) return;
+  if (op.kind === 'scan' && op.body.op === 'undo' && !r.success && (r.code === 'UNDO_EXPIRED' || r.code === 'NOT_LAST')) {
+    st.banner = { cls: 'bad', msg: L().undoLocked }; // the roster is refreshed right after the flush, so the student shows as boarded again
+    return;
+  }
   if (op.kind === 'scan' && !r.success && (r.code === 'OTHER_BUS' || r.code === 'NOT_FOUND')) {
     const s = rosterFind(op.body.studentId); if (s) { s.state = 'none'; s.at = ''; s.pending = false; }
     st.banner = { cls: 'bad', msg: (r.code === 'OTHER_BUS' ? L().other(r.student ? r.student.bus : '', r.student ? r.student.supervisor : '') : L().notFound) };
@@ -126,7 +132,7 @@ function board() {
   s.state = 'boarded'; s.at = new Date().toTimeString().slice(0, 5); s.pending = true; store.set('roster', st.roster);
   enqueue('scan', { action: 'scan', op: 'board', studentId: c.id, method: st.method });
   if (st.bagN > 0 || (s.bagsExpected || 0) > 0) enqueue('bag', { action: 'bag', studentId: c.id, mode: st.bagMode, count: st.bagN });
-  st.last = { id: c.id, name: c.name, canUndo: true }; st.cur = null; st.q = ''; st.remote = [];
+  st.last = { id: c.id, name: c.name, canUndo: true, at: Date.now() }; st.cur = null; st.q = ''; st.remote = [];
   render();
 }
 function undo() {
@@ -135,6 +141,13 @@ function undo() {
   enqueue('scan', { action: 'scan', op: 'undo', studentId: l.id, method: 'undo' });
   st.last = null; st.banner = { cls: 'ok', msg: L().undone }; render();
 }
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('[data-undoid]'); if (!b || !canUndoAny()) return;
+  if (!confirm(L().confirmUndo)) return;
+  const id = b.dataset.undoid, r = rosterFind(id); if (r) { r.state = 'none'; r.at = ''; }
+  enqueue('scan', { action: 'scan', op: 'undo', studentId: id, method: 'undo' });
+  st.banner = { cls: 'ok', msg: L().undone }; render();
+});
 function resetCur() { st.cur = null; st.banner = null; st.q = ''; st.remote = []; render(); }
 window.__onScanText = identify; // used by the camera decoder (and by tests)
 
@@ -188,7 +201,7 @@ function render() {
   else { const num = st.method === 'num'; body = `<label for="q" class="lbl">${num ? l.numLbl : l.nameLbl}</label><input id="q" type="${num ? 'search' : 'text'}" ${num ? 'inputmode="numeric"' : ''} value="${esc(st.q)}" oninput="onQ(this.value)" autocomplete="off"><div id="qres">${resList()}</div>`; }
   let card = '';
   if (st.cur) card = curCard();
-  else if (st.last) card = `<div class="card ok-b"><span class="pill ok">${l.done}</span><div class="big2">${esc(st.last.name)}</div><div style="display:flex;gap:8px;margin-top:12px"><button class="btn" style="flex:1" onclick="resetCur(); st.last=null; render()">${l.next}</button><button class="btn alt" style="flex:1" onclick="undo()">${l.undo}</button></div></div>`;
+  else if (st.last) card = `<div class="card ok-b"><span class="pill ok">${l.done}</span><div class="big2">${esc(st.last.name)}</div><div style="display:flex;gap:8px;margin-top:12px"><button class="btn" style="flex:1" onclick="resetCur(); st.last=null; render()">${l.next}</button>${(canUndoAny() || Date.now() - (st.last.at || 0) < UNDO_MS) ? `<button class="btn alt" style="flex:1" onclick="undo()">${l.undo}</button>` : ''}</div></div>`;
   const miss = R.students.filter(s => s.state !== 'boarded' && s.state !== 'withdrawn');
   const done = R.students.filter(s => s.state === 'boarded').sort((a, b) => String(b.at).localeCompare(String(a.at)));
   const stats = ['boarding', 'departed', 'onway', 'arrived'];
@@ -197,7 +210,7 @@ function render() {
   <section class="card"><div class="kl" style="margin-bottom:8px">${l.how}</div><div class="methods">${methods.map(m => `<button class="m ${st.method === m[0] ? 'on' : ''}" ${m[0] === 'face' ? '' : ''} onclick="setMethod('${m[0]}')"><span aria-hidden="true" style="font-size:16px">${m[2]}</span>${m[1]}</button>`).join('')}</div><div style="margin-top:12px">${body}</div></section>
   ${card}
   <section class="card"><div style="display:flex;justify-content:space-between;margin-bottom:6px"><h2 class="h2">${l.missing}</h2><span class="pill ${miss.length ? 'warn' : 'ok'}">${miss.length}</span></div>${miss.length ? miss.map(s => `<div class="row"><span>${l.student} <b>${esc(s.id)}</b> · ${esc(s.team)}</span><span class="muted">${esc(s.name)}</span></div>`).join('') : `<div class="muted">${l.allIn}</div>`}</section>
-  <section class="card"><div style="display:flex;justify-content:space-between;margin-bottom:6px"><h2 class="h2">${l.boardedList}</h2><span class="pill ok">${done.length}</span></div>${done.length ? done.map(s => `<div class="row"><span>${esc(s.name)}</span><span class="muted">${esc(s.at || '')}${s.pending ? ' ⏳' : ''}</span></div>`).join('') : `<div class="muted">${l.noneBoarded}</div>`}</section>
+  <section class="card"><div style="display:flex;justify-content:space-between;margin-bottom:6px"><h2 class="h2">${l.boardedList}</h2><span class="pill ok">${done.length}</span></div>${done.length ? done.map(s => `<div class="row"><span>${esc(s.name)}</span><span class="muted">${esc(s.at || '')}${s.pending ? ' ⏳' : ''}${canUndoAny() ? ` <button class="chip" data-undoid="${esc(s.id)}">${l.undoRow}</button>` : ''}</span></div>`).join('') : `<div class="muted">${l.noneBoarded}</div>`}</section>
   <section class="card"><h2 class="h2" style="margin-bottom:8px">${l.trip}</h2><div class="stats">${stats.map(x => `<button class="chip ${st.status === x ? 'on' : ''}" onclick="${x === 'departed' ? 'st.confirm=true;render()' : "setStatus('" + x + "')"}">${l['st_' + x]}</button>`).join('')}</div>${st.confirm ? `<div class="banner warn">${l.confirmDepart(left)}<div style="display:flex;gap:8px;margin-top:8px"><button class="btn" style="flex:1" onclick="setStatus('departed')">${l.yes}</button><button class="btn alt" style="flex:1" onclick="st.confirm=false;render()">${l.cancel}</button></div></div>` : ''}
   <button class="tick ${st.loc ? 'on' : ''}" style="margin-top:10px" onclick="toggleLoc()"><span class="sq">✓</span><span style="flex:1">${l.shareLoc}</span><span class="pill ${st.loc ? 'ok' : ''}">${st.loc ? l.locOn : l.locOff}</span></button>${st.lastSent ? `<div class="muted" style="font-size:12.5px;margin-top:6px">${l.lastSent(st.lastSent)}</div>` : ''}</section>
   <div class="muted" style="font-size:12.5px;text-align:center;padding:4px 0 16px">${l.paper}</div>

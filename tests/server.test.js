@@ -247,6 +247,21 @@ post({action:'createUser',token:T,username:'old1',password:'oldpass-12345',fullN
  r=post({action:'login',username:'old1',password:'wrong-pass-1'});assert(!r.success,'wrong password still refused after upgrade');}
 // ---- editor recovery function exists and refuses the placeholder
 {let threw=false;try{run('ADMIN_resetPassword')();}catch(e){threw=true;}assert(threw,'ADMIN_resetPassword refuses the placeholder password');}
+book.Bus.rows.push(['6','طالب ت1','1','3001','أزرق','99990009','','','']);book.Bus.rows.push(['6','طالب ت2','1','3002','أحمر','99990010','','','']);for(const k of Object.keys(cache))delete cache[k];
+// ---- undo policy: supervisor = last own record within 2 minutes; 'undo' permission = any student, any time
+post({action:'createUser',token:T,username:'u1',password:'u1-12345',fullName:'مشرف تراجع',role:'supervisor',permissions:['checkin'],assignedBus:'1',committees:[]});
+post({action:'createUser',token:T,username:'gen',password:'gen-12345',fullName:'مشرف عام',role:'supervisor',permissions:['checkin','undo','allbuses'],assignedBus:'1',committees:[]});
+const tu1=post({action:'login',username:'u1',password:'u1-12345'}).token, tgen=post({action:'login',username:'gen',password:'gen-12345'}).token;
+r=post({action:'scan',token:tu1,studentId:'3001',op:'board'});assert(r.success,'u1 boards a student');
+{const row=book.Scans.rows.filter(x=>x[1]==='3001'&&x[2]==='board').pop();row[0]=new Date(Date.now()-30e3);}
+r=post({action:'scan',token:tu1,studentId:'3002',op:'board'});assert(r.success,'u1 boards another');
+r=post({action:'scan',token:tu1,studentId:'3001',op:'undo'});assert(!r.success&&r.code==='NOT_LAST','supervisor cannot undo an older record (only the last)');
+r=post({action:'scan',token:tu1,studentId:'3002',op:'undo'});assert(r.success,'supervisor undoes his last record');
+r=post({action:'scan',token:tu1,studentId:'3002',op:'board'});
+{const row=book.Scans.rows.filter(x=>x[1]==='3002'&&x[2]==='board').pop();row[0]=new Date(Date.now()-3*60e3);}
+r=post({action:'scan',token:tu1,studentId:'3002',op:'undo'});assert(!r.success&&r.code==='UNDO_EXPIRED','supervisor cannot undo after 2 minutes');
+r=post({action:'scan',token:tgen,studentId:'3002',op:'undo'});assert(r.success,"holder of 'undo' undoes any student, any time");
+r=post({action:'scan',token:tgen,studentId:'3001',op:'undo'});assert(r.success,"holder of 'undo' undoes an older record too");
 // ---- sheet check
-r=post({action:'checkStudentSheet',token:T});assert(r.success&&r.report.ok&&r.report.total===4,'student sheet check passes');
+r=post({action:'checkStudentSheet',token:T});assert(r.success&&r.report.ok&&r.report.total===6,'student sheet check passes');
 console.log(fails?`\n${fails} FAILED`:'\nALL PASSED');

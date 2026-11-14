@@ -8,7 +8,7 @@
 const SHEET_ID = 'PUT_YOUR_MAIN_SHEET_ID_HERE'; // المعرّف بين /d/ و /edit في رابط شيت المنصة الرئيسي
 const SHEET_NAME = 'Bus';
 const API_VERSION = '2.0.0';
-const UNDO_WINDOW_MS = 15 * 60 * 1000;
+const UNDO_WINDOW_MS = 2 * 60 * 1000; // a bus supervisor may correct only his LAST record, within 2 minutes
 const MAX_BAGS = 20;
 const BUS_STATUSES = ['boarding', 'departed', 'onway', 'arrived'];
 
@@ -278,7 +278,12 @@ function handleScan_(data) {
       }
       if (action === 'undo') {
         if (!cur || cur.state !== 'boarded') return { success: false, code: 'NOTHING_TO_UNDO', error: 'لا يوجد تسجيل للتراجع عنه' };
-        if (!hasPerm_(user, 'allbuses') && (Date.now() - cur.at.getTime()) > UNDO_WINDOW_MS) return { success: false, code: 'UNDO_EXPIRED', error: 'انتهت مهلة التراجع' };
+        if (!hasPerm_(user, 'undo')) { // only holders of the 'undo' permission may undo any student at any time
+          if (Date.now() - cur.at.getTime() > UNDO_WINDOW_MS) return { success: false, code: 'UNDO_EXPIRED', error: 'انتهت مهلة التراجع. اطلب من المشرف العام' };
+          let lastMine = 0;
+          Object.keys(sc.states).forEach(function(k) { const x = sc.states[k]; if (x.state === 'boarded' && x.by === user.Username && x.at.getTime() > lastMine) lastMine = x.at.getTime(); });
+          if (cur.by !== user.Username || cur.at.getTime() !== lastMine) return { success: false, code: 'NOT_LAST', error: 'يمكنك التراجع عن آخر تسجيل لك فقط. اطلب من المشرف العام' };
+        }
       }
       if (action === 'withdraw' && cur && cur.state === 'withdrawn') return { success: false, code: 'ALREADY_WITHDRAWN', error: 'منسحب مسبقاً' };
       scansSheet_().appendRow([new Date(), student.id, action, student.bus, user.Username, String(data.method || '').slice(0, 20), clientId, String(data.notes || '').slice(0, 200)]);
