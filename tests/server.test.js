@@ -283,6 +283,9 @@ post({action:'setUserActive',token:T,targetUsername:'u1',active:true});
 r=post({action:'busState',token:tu1});assert(r.success,'re-enabling applies at once');
 post({action:'updateUserAccess',token:T,targetUsername:'u1',permissions:['print'],committees:[]});
 r=post({action:'busState',token:tu1});assert(!r.success,'permission change applies at once (checkin removed)');
+// ---- usernames are not case-sensitive
+r=post({action:'login',username:'  ADMIN  ',password:'pw-12345'});assert(r.success,'login ignores case and surrounding spaces in the username');
+r=post({action:'createUser',token:T,username:'SUP1',password:'dup-12345',fullName:'مكرر',role:'supervisor',permissions:['checkin'],committees:[]});assert(!r.success,'cannot create a username that differs only by case');
 // ---- sheet check
 r=post({action:'checkStudentSheet',token:T});assert(r.success&&r.report.ok&&r.report.total===6,'student sheet check passes');
 console.log(fails?`\n${fails} FAILED`:'\nALL PASSED');

@@ -267,9 +267,11 @@ function writeAudit_(actor, action, target, details) {
   sheet.appendRow([new Date(), actor, action, target || '', details || '']);
 }
 
+// Usernames are NOT case-sensitive ("Admin_test" = "admin_test"): phones capitalise the first letter automatically.
+function sameUsername_(a, b) { return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase(); }
 function findUserRow_(username) {
   const { rows } = readSheetAsObjects_(USERS_SHEET);
-  return rows.find(r => r.Username === username);
+  return rows.find(r => sameUsername_(r.Username, username));
 }
 
 // Batched write of FailedAttempts, LockedUntil, TokenEpoch, LastActivityAt,
@@ -289,7 +291,7 @@ function writeLoginSuccessRow_(sheet, headers, user, now) {
 
 function handleLogin_(data) {
   const { headers, sheet, rows } = readSheetAsObjects_(USERS_SHEET);
-  const user = rows.find(r => r.Username === data.username);
+  const user = rows.find(r => sameUsername_(r.Username, data.username));
   if (!user) return { success: false, error: 'Invalid username or password' };
 
   const now = new Date();
