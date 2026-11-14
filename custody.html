@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>الأمانات — MUKHAYYAM</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.4/html5-qrcode.min.js"></script>
 <link rel="stylesheet" href="theme.css">
 <script src="ui.js" defer></script>
 <style>
@@ -115,9 +114,16 @@ function setTab(t) { st.tab = t; st.msg = null; if (st.cam) stopCam(); if (t ===
 
 /* ---------- camera ---------- */
 let scanner = null;
+const H5_URL = 'https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.4/html5-qrcode.min.js';
+let h5Promise = null;
+function loadScanner() { // the QR library is only downloaded when the camera is first used (faster page load)
+  if (typeof Html5Qrcode !== 'undefined') return Promise.resolve();
+  if (!h5Promise) h5Promise = new Promise((res, rej) => { const s = document.createElement('script'); s.src = H5_URL; s.onload = res; s.onerror = () => { h5Promise = null; rej(new Error('library')); }; document.head.appendChild(s); });
+  return h5Promise;
+}
 async function startCam() {
-  if (typeof Html5Qrcode === 'undefined') { say('warn', L().noCam + ' (library)'); return render(); }
   st.cam = true; st.msg = null; render();
+  try { await loadScanner(); } catch (e) { st.cam = false; say('warn', L().noCam + ' (library)'); return render(); }
   try {
     scanner = new Html5Qrcode('reader');
     await scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 220, height: 220 } }, text => { stopCam(); identify(text); }, () => {});

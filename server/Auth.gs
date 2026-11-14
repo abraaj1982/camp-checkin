@@ -51,10 +51,15 @@ function requireAnyPerm_(keys) {
   return function(user) { return keys.some(function(k) { return hasPerm_(user, k); }); };
 }
 
+// Speed: opening the spreadsheet costs ~0.3 s and a request touches 5-10 tabs, so open it ONCE per request and reuse the tab handles.
+let SS_MEMO_ = null;
+const SHEET_MEMO_ = {};
 function getSheetByName_(name) {
-  const ss = SpreadsheetApp.openById(SHEET_ID);
-  const sheet = ss.getSheetByName(name);
+  if (SHEET_MEMO_[name]) return SHEET_MEMO_[name];
+  if (!SS_MEMO_) SS_MEMO_ = SpreadsheetApp.openById(SHEET_ID);
+  const sheet = SS_MEMO_.getSheetByName(name);
   if (!sheet) throw new Error('Sheet not found: ' + name);
+  SHEET_MEMO_[name] = sheet;
   return sheet;
 }
 
@@ -83,13 +88,21 @@ function setCellByColumnName_(sheet, headers, rowNumber, columnName, value) {
   sheet.getRange(rowNumber, colIndexByName_(headers, columnName)).setValue(value);
 }
 
+// Settings rarely change: cache them for 2 minutes (setSetting_ clears the cache).
 function getSetting_(key) {
-  const { rows } = readSheetAsObjects_(SETTINGS_SHEET);
-  const row = rows.find(r => r.Key === key);
-  return row ? row.Value : null;
+  const cache = CacheService.getScriptCache();
+  let all = null;
+  try { const hit = cache.get('settings_v1'); if (hit) all = JSON.parse(hit); } catch (e) { all = null; }
+  if (!all) {
+    all = {};
+    readSheetAsObjects_(SETTINGS_SHEET).rows.forEach(function(r) { if (r.Key) all[r.Key] = r.Value === undefined ? '' : r.Value; });
+    try { cache.put('settings_v1', JSON.stringify(all), 120); } catch (e) { /* ignore */ }
+  }
+  return Object.prototype.hasOwnProperty.call(all, key) ? all[key] : null;
 }
 
 function setSetting_(key, value) {
+  try { CacheService.getScriptCache().remove('settings_v1'); } catch (e) { /* ignore */ }
   const { rows, headers, sheet } = readSheetAsObjects_(SETTINGS_SHEET);
   const existing = rows.find(r => r.Key === key);
   if (existing) {
@@ -674,6 +687,7 @@ function ensureSheetWithHeaders_(ss, name, headers, log) {
 
 function SETUP_createTabs() {
   const ss = SpreadsheetApp.openById(SHEET_ID);
+  Object.keys(SHEET_MEMO_).forEach(function(k) { delete SHEET_MEMO_[k]; });
   const log = [];
 
   ensureSheetWithHeaders_(ss, 'Users', ['Committees', 'Permissions'], log);
@@ -735,4 +749,14 @@ function ADMIN_resetPassword() {
   setCellByColumnName_(sheet, headers, target._rowNumber, 'TokenEpoch', (Number(target.TokenEpoch) || 0) + 1);
   writeAudit_('EDITOR_OWNER', 'RESET_PASSWORD', USERNAME, 'from the script editor');
   Logger.log('تم تغيير كلمة مرور ' + USERNAME + '. احذف كلمة المرور من الكود الآن.');
+}
+
+
+// Optional speed-up: Apps Script "goes to sleep" when idle and the first request after a pause is slow.
+// Run ADMIN_installKeepWarm ONCE from the editor to create a trigger that pings the service every 5 minutes.
+function keepWarm_() { SpreadsheetApp.openById(SHEET_ID).getName(); }
+function ADMIN_installKeepWarm() {
+  ScriptApp.getProjectTriggers().forEach(function(t) { if (t.getHandlerFunction() === 'keepWarm_') ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('keepWarm_').timeBased().everyMinutes(5).create();
+  Logger.log('تم تفعيل التسخين الدوري كل 5 دقائق');
 }
