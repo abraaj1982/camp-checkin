@@ -7,16 +7,15 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.4/html5-qrcode.min.js"></script>
 <link rel="stylesheet" href="theme.css">
+<script src="ui.js" defer></script>
 </head>
 <body>
 <div class="wrap">
   <header class="hdr">
-    <div class="logo">م</div>
-    <div style="flex:1;min-width:0"><div class="t" id="busTitle">—</div><div class="s" id="supName"></div></div>
-    <button class="tool" id="langBtn" aria-label="Language"></button>
-    <button class="tool" id="themeBtn"></button>
-    <button class="tool" id="logoutBtn"></button>
+    <div class="brand"><div class="logo">م</div><div style="min-width:0"><div class="t" id="campT"></div><div class="s" id="campS"></div></div></div>
+    <div class="tools"><button class="tool" id="langBtn" aria-label="Language"></button><button class="tool" id="themeBtn"></button><button class="tool" id="logoutBtn"></button></div>
   </header>
+  <section class="hero compact"><div class="ic" aria-hidden="true">🚌</div><div><h1 id="busTitle">—</h1><p id="supName"></p></div></section>
   <div id="netbar" class="netbar" hidden></div>
   <main id="app"></main>
 </div>
@@ -44,7 +43,7 @@ const I = {
   otherOffline: 'هذا الطالب ليس في باصك، والبحث في بقية الباصات يحتاج اتصالاً.', bags: 'الأغراض', load: 'تحميل', unload: 'تنزيل', bagCount: 'عدد الحقائب', expected: n => 'المتوقع: ' + n, saveBags: 'تسجيل الأغراض', bagsSaved: 'سُجّلت الأغراض', bagShort: n => 'ينقص ' + n + ' من الحقائب المتوقعة.',
   missing: 'لم يصعدوا بعد', allIn: 'اكتمل الباص', trip: 'حالة الرحلة', st_boarding: 'الصعود', st_departed: 'انطلق', st_onway: 'في الطريق', st_arrived: 'وصل', shareLoc: 'مشاركة الموقع مع القائد', locOn: 'الموقع يُرسَل', locOff: 'الموقع متوقف', lastSent: t => 'آخر إرسال ' + t,
   confirmDepart: n => n > 0 ? 'ينقص ' + n + ' طالباً. هل تؤكد الانطلاق؟' : 'اكتمل الباص. تأكيد الانطلاق؟', yes: 'نعم', cancel: 'إلغاء',
-  offline: 'غير متصل. ما تسجّله يُحفظ ويُرسَل تلقائياً.', pending: n => n + ' بانتظار الإرسال', synced: 'تم الإرسال', loading: 'جارٍ التحميل...', report: 'إبلاغ الإدارة', reportAsk: 'اكتب المشكلة باختصار (طالب، باص، مفقود...)', reportSent: 'أُرسل البلاغ إلى الإدارة', logout: 'خروج', lang: 'English', dark: '🌙', light: '☀', err: 'حدث خطأ. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.', paper: 'عند انقطاع الإنترنت يُستخدم الكشف الورقي.' },
+  offline: 'غير متصل. ما تسجّله يُحفظ ويُرسَل تلقائياً.', pending: n => n + ' بانتظار الإرسال', synced: 'تم الإرسال', loading: 'جارٍ التحميل...', report: 'إبلاغ الإدارة', reportAsk: 'اكتب المشكلة باختصار (طالب، باص، مفقود...)', reportSent: 'أُرسل البلاغ إلى الإدارة', logout: 'خروج', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح', err: 'حدث خطأ. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.', paper: 'عند انقطاع الإنترنت يُستخدم الكشف الورقي.' },
  en: { dir: 'ltr', bus: n => 'Bus ' + n, sup: n => 'Supervisor: ' + n, boarded: 'Boarded', remaining: n => n > 0 ? n + ' remaining' : 'Bus full', how: 'How do you want to identify the student?',
   m_qr: 'Wristband', m_face: 'Face', m_name: 'Name', m_num: 'Number', soon: 'Soon', scanQr: 'Point the camera at the wristband', startCam: 'Start camera', stopCam: 'Stop camera', noCam: 'Camera unavailable. Use name or number.',
   nameLbl: "Type the student's name", numLbl: "Type the student's number", none: 'No result', student: 'Student', team: 'Team', cls: 'Grade',
@@ -53,7 +52,7 @@ const I = {
   otherOffline: 'This student is not on your bus, and searching other buses needs a connection.', bags: 'Belongings', load: 'Loading', unload: 'Unloading', bagCount: 'Number of bags', expected: n => 'Expected: ' + n, saveBags: 'Save belongings', bagsSaved: 'Belongings saved', bagShort: n => n + ' of the expected bags missing.',
   missing: 'Not boarded yet', allIn: 'Bus full', trip: 'Trip status', st_boarding: 'Boarding', st_departed: 'Departed', st_onway: 'On the way', st_arrived: 'Arrived', shareLoc: 'Share location with the leader', locOn: 'Location is being sent', locOff: 'Location sharing off', lastSent: t => 'Last sent ' + t,
   confirmDepart: n => n > 0 ? n + ' student(s) missing. Confirm departure?' : 'Bus is full. Confirm departure?', yes: 'Yes', cancel: 'Cancel',
-  offline: 'Offline. What you record is saved and sent automatically.', pending: n => n + ' waiting to send', synced: 'Synced', loading: 'Loading...', report: 'Report to administration', reportAsk: 'Describe the problem briefly (student, bus, lost item...)', reportSent: 'Report sent to the administration', logout: 'Log out', lang: 'العربية', dark: '🌙', light: '☀', err: 'Something went wrong. Try again.', sessionEnd: 'Session ended. Please sign in again.', paper: 'Use the paper list if the internet is down.' }
+  offline: 'Offline. What you record is saved and sent automatically.', pending: n => n + ' waiting to send', synced: 'Synced', loading: 'Loading...', report: 'Report to administration', reportAsk: 'Describe the problem briefly (student, bus, lost item...)', reportSent: 'Report sent to the administration', logout: 'Log out', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light', err: 'Something went wrong. Try again.', sessionEnd: 'Session ended. Please sign in again.', paper: 'Use the paper list if the internet is down.' }
 };
 const st = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), method: 'qr', roster: store.get('roster', null), q: '', remote: [], cur: null, banner: null, last: null, bagMode: 'load', bagN: 0, cam: false, status: store.get('status', 'boarding'), loc: false, lastSent: '', confirm: false, online: navigator.onLine, busy: false };
 const L = () => I[st.lang];

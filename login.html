@@ -6,27 +6,45 @@
 <title>تسجيل الدخول — MUKHAYYAM</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="theme.css">
-<style>.box{max-width:400px;margin:8vh auto 0;padding:0 16px}.card{padding:28px 22px}</style>
+<script src="ui.js" defer></script>
+<style>
+.login{padding:16px;flex:1;display:flex;flex-direction:column}
+.login .card{padding:30px 22px 26px}
+.login .ic{width:72px;height:72px;border-radius:18px;background:var(--gold);color:var(--logoink);display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:700;margin:0 auto 14px}
+.login h1{font-size:24px;text-align:center}
+.login .sub{text-align:center;color:var(--muted);margin:6px 0 18px}
+.field{margin-top:18px}
+.pw{position:relative}.pw input{padding-inline-end:60px}
+.pw button{position:absolute;inset-inline-end:8px;top:50%;transform:translateY(-50%);border:0;background:transparent;color:var(--brand);font:inherit;font-weight:600;font-size:13.5px;cursor:pointer;min-height:40px;padding:0 8px}
+.foot{text-align:center;color:var(--muted);font-size:12.5px;margin-top:18px}
+</style>
 </head>
 <body>
-<div class="wrap" style="max-width:none">
-  <header class="hdr" style="justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><div class="logo">م</div><div><div class="t" id="hT"></div></div></div><div style="display:flex;gap:6px"><button class="tool" id="langBtn" aria-label="Language"></button><button class="tool" id="themeBtn"></button></div></header>
-  <div class="box"><div class="card">
-    <div style="text-align:center;margin-bottom:22px"><div class="logo" style="margin:0 auto 12px;width:56px;height:56px;font-size:28px;border-radius:16px">م</div><h1 style="font-size:22px" id="title"></h1></div>
+<div class="wrap">
+  <header class="hdr">
+    <div class="brand"><div class="logo">م</div><div style="min-width:0"><div class="t" id="campT"></div><div class="s" id="campS"></div></div></div>
+    <div class="tools"><button class="tool" id="langBtn" aria-label="Language"></button><button class="tool" id="themeBtn"></button></div>
+  </header>
+  <div class="login"><div class="card">
+    <div class="ic" aria-hidden="true">م</div>
+    <h1 id="title"></h1>
+    <p class="sub" id="sub"></p>
+    <div class="note" id="note"></div>
     <form id="form" autocomplete="on">
-      <label class="lbl" for="username" id="lblU"></label><input id="username" type="text" autocomplete="username" required style="margin-bottom:14px">
-      <label class="lbl" for="password" id="lblP"></label><input id="password" type="password" autocomplete="current-password" required>
+      <div class="field"><label class="lbl" for="username"><span id="lblU"></span><span class="req">*</span></label><input id="username" type="text" autocomplete="username" autocapitalize="off" spellcheck="false" required></div>
+      <div class="field"><label class="lbl" for="password"><span id="lblP"></span><span class="req">*</span></label><div class="pw"><input id="password" type="password" autocomplete="current-password" required><button type="button" id="showPw"></button></div></div>
       <div id="msg" role="alert"></div>
-      <button type="submit" class="btn full" id="btn" style="margin-top:18px"></button>
+      <button type="submit" class="btn full" id="btn" style="margin-top:22px"></button>
     </form>
+    <p class="foot" id="foot"></p>
   </div></div>
 </div>
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4lEBGPNxghwq9UmK0iljI5QdS-8iCvC-K09dDtbZCXGvGZyA4repTE3rFVVRp5zS4yw/exec';
 const T = {
-  ar: { dir: 'rtl', hT: 'مِخيَم', title: 'تسجيل الدخول', u: 'اسم المستخدم', p: 'كلمة المرور', go: 'دخول', going: 'جارٍ الدخول...', lang: 'English', dark: '🌙', light: '☀',
+  ar: { dir: 'rtl', title: 'تسجيل الدخول', sub: 'منصة إدارة المخيم', note: '🔒 أدخل اسم المستخدم وكلمة المرور التي استلمتها من السكرتارية', show: 'إظهار', hide: 'إخفاء', foot: 'نسيت كلمة المرور؟ تواصل مع السكرتارية.', u: 'اسم المستخدم', p: 'كلمة المرور', go: 'دخول', going: 'جارٍ الدخول...', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
         bad: 'اسم المستخدم أو كلمة المرور غير صحيحة.', locked: 'الحساب مقفل مؤقتاً. تواصل مع السكرتارية.', disabled: 'الحساب معطَّل. تواصل مع السكرتارية.', net: 'تعذّر الاتصال. تحقق من الإنترنت وأعد المحاولة.', ok: 'تم الدخول...' },
-  en: { dir: 'ltr', hT: 'MUKHAYYAM', title: 'Sign in', u: 'Username', p: 'Password', go: 'Sign in', going: 'Signing in...', lang: 'العربية', dark: '🌙', light: '☀',
+  en: { dir: 'ltr', title: 'Sign in', sub: 'Camp management platform', note: '🔒 Enter the username and password you received from the secretariat', show: 'Show', hide: 'Hide', foot: 'Forgot your password? Contact the secretariat.', u: 'Username', p: 'Password', go: 'Sign in', going: 'Signing in...', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
         bad: 'Wrong username or password.', locked: 'Account temporarily locked. Contact the secretariat.', disabled: 'Account disabled. Contact the secretariat.', net: 'Could not connect. Check the internet and try again.', ok: 'Signed in...' }
 };
 const pref = { get(k, d) { try { return localStorage.getItem('mk_pref_' + k) || d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('mk_pref_' + k, v); } catch (e) {} } };
@@ -34,12 +52,13 @@ const S = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light') };
 const $ = id => document.getElementById(id);
 function paint() {
   const t = T[S.lang]; document.documentElement.lang = S.lang; document.documentElement.dir = t.dir; document.documentElement.dataset.theme = S.theme;
-  $('hT').textContent = t.hT; $('title').textContent = t.title; $('lblU').textContent = t.u; $('lblP').textContent = t.p; $('btn').textContent = t.go;
+  $('title').textContent = t.title; $('sub').textContent = t.sub; $('note').textContent = t.note; $('foot').textContent = t.foot; $('showPw').textContent = $('password').type === 'password' ? t.show : t.hide; $('lblU').textContent = t.u; $('lblP').textContent = t.p; $('btn').textContent = t.go;
   $('langBtn').textContent = t.lang; $('themeBtn').textContent = S.theme === 'light' ? t.dark : t.light; document.title = t.title + ' — MUKHAYYAM';
 }
 function msg(cls, text) { $('msg').innerHTML = text ? '<div class="banner ' + cls + '"></div>' : ''; if (text) $('msg').firstChild.textContent = text; }
 $('langBtn').onclick = () => { S.lang = S.lang === 'ar' ? 'en' : 'ar'; pref.set('lang', S.lang); paint(); };
 $('themeBtn').onclick = () => { S.theme = S.theme === 'light' ? 'dark' : 'light'; pref.set('theme', S.theme); paint(); };
+$('showPw').onclick = () => { const p = $('password'); p.type = p.type === 'password' ? 'text' : 'password'; paint(); p.focus(); };
 paint();
 
 $('form').addEventListener('submit', async e => {

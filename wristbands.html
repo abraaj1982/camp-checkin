@@ -7,11 +7,11 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <link rel="stylesheet" href="theme.css">
+<script src="ui.js" defer></script>
 <style>
-.page{max-width:1000px;margin:0 auto;padding:16px;display:flex;flex-direction:column;gap:14px}
+.page{padding:16px;display:flex;flex-direction:column;gap:14px}
 .ctl{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}
 .ctl label{font-size:13px;font-weight:600;display:block;margin-bottom:4px}
-select,input[type=number]{width:100%;border:1px solid var(--line);border-radius:10px;min-height:44px;padding:0 10px;font-size:15px;background:var(--input);color:var(--ink)}
 .teams{display:flex;flex-wrap:wrap;gap:10px}.tm{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:10px;padding:6px 10px;background:var(--card)}
 .tm input[type=color]{width:34px;height:34px;border:0;padding:0;background:none;cursor:pointer}
 #sheet{background:#fff;color:#000;border:1px solid var(--line);border-radius:12px;padding:10px}
@@ -39,13 +39,16 @@ select,input[type=number]{width:100%;border:1px solid var(--line);border-radius:
   body{background:#fff}
   .noprint,.hdr,#netmsg{display:none!important}
   .page{max-width:none;padding:0}
+  .wrap{display:block}
   #sheet{border:0;padding:0;border-radius:0}
 }
 </style>
 </head>
 <body>
-<header class="hdr noprint"><div class="logo">م</div><div style="flex:1"><div class="t">طباعة الأساور والكشوف</div><div class="s">للسكرتارية فقط</div></div><a class="tool" href="hub.html" style="text-decoration:none;display:flex;align-items:center">الرئيسية</a></header>
-<div class="page">
+<div class="wrap wide">
+<header class="hdr noprint"><div class="brand"><div class="logo">م</div><div style="min-width:0"><div class="t" id="campT"></div><div class="s" id="campS"></div></div></div><div class="tools"><a class="tool" href="hub.html">الرئيسية</a><button class="tool" id="themeBtn"></button></div></header>
+<section class="hero compact noprint"><div class="ic" aria-hidden="true">🖨️</div><div><h1>طباعة الأساور والكشوف</h1><p>للسكرتارية فقط · أساور QR، كشف ورقي لكل باص، ورقة QR احتياطية</p></div></section>
+<main class="page">
   <section class="card noprint">
     <div class="ctl">
       <div><label for="mode">ماذا تريد أن تطبع؟</label><select id="mode"><option value="wb">أساور الطلاب (QR)</option><option value="list">كشف حضور ورقي لكل باص</option><option value="qrs">ورقة QR احتياطية لكل باص</option></select></div>
@@ -62,8 +65,16 @@ select,input[type=number]{width:100%;border:1px solid var(--line);border-radius:
   </section>
   <section id="netmsg"></section>
   <section id="sheet" aria-live="polite"></section>
+</main>
 </div>
 <script>
+(function themeInit() {
+  let th = 'light'; try { th = localStorage.getItem('mk_pref_theme') || 'light'; } catch (e) {}
+  const btn = document.getElementById('themeBtn');
+  const paint = () => { document.documentElement.dataset.theme = th; btn.textContent = th === 'light' ? '🌙 داكن' : '☀ فاتح'; };
+  btn.addEventListener('click', () => { th = th === 'light' ? 'dark' : 'light'; try { localStorage.setItem('mk_pref_theme', th); } catch (e) {} paint(); });
+  paint();
+})();
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4lEBGPNxghwq9UmK0iljI5QdS-8iCvC-K09dDtbZCXGvGZyA4repTE3rFVVRp5zS4yw/exec';
 const token = sessionStorage.getItem('mukhayyam_token');
 let perms = [];

@@ -8,9 +8,9 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <link rel="stylesheet" href="theme.css">
+<script src="ui.js" defer></script>
 <style>
-.page{max-width:1100px;margin:0 auto;padding:16px;display:flex;flex-direction:column;gap:14px}
-.kpis{display:flex;flex-wrap:wrap;gap:12px}.kpi{flex:1 1 160px;padding:14px 16px}
+.kpi{flex:1 1 160px;padding:14px 16px}
 #map{height:380px;border-radius:12px;background:var(--soft);z-index:0}
 .cols{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start}.c1{flex:1 1 280px;min-width:0}.c2{flex:2 1 420px;min-width:0}
 .bus{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--card)}
@@ -20,9 +20,12 @@
 </style>
 </head>
 <body>
-<header class="hdr"><div class="logo">م</div><div style="flex:1;min-width:0"><div class="t" id="hT"></div><div class="s" id="hS"></div></div><a class="tool" href="hub.html" id="homeBtn" style="text-decoration:none;display:flex;align-items:center"></a><button class="tool" id="langBtn" aria-label="Language"></button><button class="tool" id="themeBtn"></button></header>
+<div class="wrap wide">
+<header class="hdr"><div class="brand"><div class="logo">م</div><div style="min-width:0"><div class="t" id="campT"></div><div class="s" id="campS"></div></div></div><div class="tools"><a class="tool" href="hub.html" id="homeBtn" style="text-decoration:none;display:flex;align-items:center"></a><button class="tool" id="langBtn" aria-label="Language"></button><button class="tool" id="themeBtn"></button></div></header>
+<section class="hero compact"><div class="ic" aria-hidden="true">📍</div><div><h1 id="hT"></h1><p id="hS"></p></div></section>
 <div id="netbar" class="netbar" hidden></div>
-<main class="page" id="app"></main>
+<main id="app"></main>
+</div>
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4lEBGPNxghwq9UmK0iljI5QdS-8iCvC-K09dDtbZCXGvGZyA4repTE3rFVVRp5zS4yw/exec';
 const POLL_MS = 15000;
@@ -34,10 +37,10 @@ if (!token) location.href = 'login.html'; else if (!can('dashboard') && !can('li
 
 const pref = { get(k, d) { try { return localStorage.getItem('mk_pref_' + k) || d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('mk_pref_' + k, v); } catch (e) {} } };
 const T = {
- ar: { dir: 'rtl', title: 'القائد', sub: 'متابعة المخيم مباشرة', home: 'الرئيسية', lang: 'English', dark: '🌙', light: '☀', boarded: 'صعدوا', total: 'إجمالي الطلاب', remaining: 'لم يصعدوا بعد', withdrawn: 'منسحبون', bagsIn: 'حقائب محمّلة', bagsOut: 'حقائب منزّلة', of: 'من', map: 'تتبع الباصات مباشرة', live: 'مباشر', byBus: 'الحضور حسب الباص', bus: n => 'باص ' + n,
+ ar: { dir: 'rtl', title: 'القائد', sub: 'متابعة المخيم مباشرة', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح', boarded: 'صعدوا', total: 'إجمالي الطلاب', remaining: 'لم يصعدوا بعد', withdrawn: 'منسحبون', bagsIn: 'حقائب محمّلة', bagsOut: 'حقائب منزّلة', of: 'من', map: 'تتبع الباصات مباشرة', live: 'مباشر', byBus: 'الحضور حسب الباص', bus: n => 'باص ' + n,
   st: { boarding: 'يصعدون', departed: 'انطلق', onway: 'في الطريق', arrived: 'وصل' }, noLoc: 'لا يوجد موقع بعد', ago: s => s < 90 ? 'منذ ' + s + ' ث' : 'منذ ' + Math.round(s / 60) + ' د', lastSeen: s => 'آخر موقع ' + (s < 90 ? 'منذ ' + s + ' ث' : 'منذ ' + Math.round(s / 60) + ' د'),
   noMap: 'تعذّر تحميل الخريطة. تظهر الحالة في القائمة.', offline: 'غير متصل. تُعرض آخر بيانات.', supervisor: 'المشرف', err: 'تعذّر تحميل البيانات.', note: 'الموقع من هاتف المشرف، ويتحدّث ما دامت شاشته مفتوحة.' },
- en: { dir: 'ltr', title: 'Camp leader', sub: 'Live camp overview', home: 'Home', lang: 'العربية', dark: '🌙', light: '☀', boarded: 'Boarded', total: 'Total students', remaining: 'Not boarded yet', withdrawn: 'Withdrawn', bagsIn: 'Bags loaded', bagsOut: 'Bags unloaded', of: 'of', map: 'Live bus tracking', live: 'Live', byBus: 'Attendance by bus', bus: n => 'Bus ' + n,
+ en: { dir: 'ltr', title: 'Camp leader', sub: 'Live camp overview', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light', boarded: 'Boarded', total: 'Total students', remaining: 'Not boarded yet', withdrawn: 'Withdrawn', bagsIn: 'Bags loaded', bagsOut: 'Bags unloaded', of: 'of', map: 'Live bus tracking', live: 'Live', byBus: 'Attendance by bus', bus: n => 'Bus ' + n,
   st: { boarding: 'Boarding', departed: 'Departed', onway: 'On the way', arrived: 'Arrived' }, noLoc: 'No location yet', ago: s => s < 90 ? s + 's ago' : Math.round(s / 60) + ' min ago', lastSeen: s => 'Last seen ' + (s < 90 ? s + 's ago' : Math.round(s / 60) + ' min ago'),
   noMap: 'Could not load the map. Status is shown in the list.', offline: 'Offline. Showing the latest data.', supervisor: 'Supervisor', err: 'Could not load data.', note: 'Location comes from the supervisor’s phone and updates while his screen is open.' }
 };

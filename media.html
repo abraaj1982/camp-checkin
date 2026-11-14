@@ -6,31 +6,20 @@
 <title>الإعلامية — MUKHAYYAM</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="theme.css">
+<script src="ui.js" defer></script>
 <style>
-.page{max-width:720px;margin:0 auto;padding:14px;display:flex;flex-direction:column;gap:12px}
-.tabs{display:flex;gap:6px}.tabs button{flex:1;min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-weight:600;cursor:pointer}
-.tabs button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
-input[type=text],input[type=search]{width:100%;box-sizing:border-box}
-.two{display:flex;gap:8px}.two>*{flex:1}
-.item{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--card)}
-.kpis{display:flex;gap:10px;flex-wrap:wrap}.kpis .card{flex:1 1 130px;padding:12px}
-.chk{display:flex;align-items:center;gap:8px;padding:6px 0}
 .brow2{display:grid;grid-template-columns:1fr 60px 60px;gap:8px;align-items:center;padding:5px 0;font-size:14px}
-textarea{width:100%;box-sizing:border-box;min-height:84px;font:inherit;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
-select{width:100%;box-sizing:border-box;min-height:44px;font:inherit;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:0 8px}
 .cd{font-size:28px;font-weight:700}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header class="hdr">
-    <div class="logo">م</div>
-    <div style="flex:1;min-width:0"><div class="t" id="hT"></div><div class="s" id="hS"></div></div>
-    <a class="tool" href="hub.html" id="homeBtn" style="text-decoration:none;display:flex;align-items:center"></a>
-    <button class="tool" id="langBtn"></button>
-    <button class="tool" id="themeBtn"></button>
+    <div class="brand"><div class="logo">م</div><div style="min-width:0"><div class="t" id="campT"></div><div class="s" id="campS"></div></div></div>
+    <div class="tools"><a class="tool" href="hub.html" id="homeBtn"></a><button class="tool" id="langBtn"></button><button class="tool" id="themeBtn"></button></div>
   </header>
-  <main class="page" id="app"></main>
+  <section class="hero compact"><div class="ic" aria-hidden="true">📣</div><div><h1 id="hT"></h1><p id="hS"></p></div></section>
+  <main id="app"></main>
 </div>
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4lEBGPNxghwq9UmK0iljI5QdS-8iCvC-K09dDtbZCXGvGZyA4repTE3rFVVRp5zS4yw/exec';
@@ -50,13 +39,13 @@ async function api(payload) {
   return r;
 }
 const T = {
- ar: { dir: 'rtl', title: 'الإعلامية', sub: 'الإعلانات والفعاليات والنتائج', home: 'الرئيسية', lang: 'English', dark: '🌙', light: '☀',
+ ar: { dir: 'rtl', title: 'الإعلامية', sub: 'الإعلانات والفعاليات والنتائج', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
   tAnn: 'الإعلانات', tRes: 'النتائج', countdown: 'العد التنازلي لبداية المخيم', days: 'يوم', hours: 'ساعة', mins: 'دقيقة', started: 'بدأ المخيم',
   newAnn: 'إعلان / فعالية جديدة', title_: 'العنوان', body: 'النص', kind: 'النوع', announce: 'إعلان', event: 'فعالية (بعدّ تنازلي)', other: 'أخرى', when: 'موعد الفعالية', audience: 'الجمهور', public: 'شاشات العرض والجميع', staff: 'فريق العمل فقط', pinned: 'تثبيت في الأعلى',
   saveDraft: 'حفظ كمسودة', update: 'تحديث', cancelEdit: 'إلغاء التعديل', publish: 'نشر', unpublish: 'إعادة لمسودة', archive: 'أرشفة', edit: 'تعديل', draft: 'مسودة', published: 'منشور', archived: 'مؤرشف',
   noAnn: 'لا توجد إعلانات.', newRes: 'إدخال نتيجة', comp: 'المسابقة', team: 'الفريق', place: 'المركز', points: 'النقاط', addRes: 'إضافة', needVerify: 'النشر يحتاج صلاحية «التحقق من النتائج».',
   publishAll: 'نشر مسابقة', noRes: 'لا توجد نتائج.', done: 'تم', error: 'تعذّر الاتصال. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.', confirmPub: 'نشر هذا العنصر؟', feedNote: 'المنشور للجمهور يظهر في شاشات العرض خلال ثوانٍ.' },
- en: { dir: 'ltr', title: 'Media', sub: 'Announcements, events and results', home: 'Home', lang: 'العربية', dark: '🌙', light: '☀',
+ en: { dir: 'ltr', title: 'Media', sub: 'Announcements, events and results', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
   tAnn: 'Announcements', tRes: 'Results', countdown: 'Countdown to camp', days: 'days', hours: 'hours', mins: 'min', started: 'Camp has started',
   newAnn: 'New announcement / event', title_: 'Title', body: 'Text', kind: 'Type', announce: 'Announcement', event: 'Event (countdown)', other: 'Other', when: 'Event time', audience: 'Audience', public: 'Display screens and everyone', staff: 'Staff only', pinned: 'Pin to top',
   saveDraft: 'Save draft', update: 'Update', cancelEdit: 'Cancel edit', publish: 'Publish', unpublish: 'Back to draft', archive: 'Archive', edit: 'Edit', draft: 'Draft', published: 'Published', archived: 'Archived',

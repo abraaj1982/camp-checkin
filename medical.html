@@ -6,28 +6,19 @@
 <title>الطبيب — MUKHAYYAM</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="theme.css">
+<script src="ui.js" defer></script>
 <style>
-.page{max-width:720px;margin:0 auto;padding:14px;display:flex;flex-direction:column;gap:12px}
-.tabs{display:flex;gap:6px}.tabs button{flex:1;min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-weight:600;cursor:pointer}
-.tabs button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
-input[type=text],input[type=search]{width:100%;box-sizing:border-box}
-.two{display:flex;gap:8px}.two>*{flex:1}
-.item{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--card)}
-.kpis{display:flex;gap:10px;flex-wrap:wrap}.kpis .card{flex:1 1 130px;padding:12px}
-.chk{display:flex;align-items:center;gap:8px;padding:6px 0}
 .brow2{display:grid;grid-template-columns:90px 1fr 36px;gap:8px;align-items:center;padding:5px 0;font-size:14px}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header class="hdr">
-    <div class="logo">م</div>
-    <div style="flex:1;min-width:0"><div class="t" id="hT"></div><div class="s" id="hS"></div></div>
-    <a class="tool" href="hub.html" id="homeBtn" style="text-decoration:none;display:flex;align-items:center"></a>
-    <button class="tool" id="langBtn"></button>
-    <button class="tool" id="themeBtn"></button>
+    <div class="brand"><div class="logo">م</div><div style="min-width:0"><div class="t" id="campT"></div><div class="s" id="campS"></div></div></div>
+    <div class="tools"><a class="tool" href="hub.html" id="homeBtn"></a><button class="tool" id="langBtn"></button><button class="tool" id="themeBtn"></button></div>
   </header>
-  <main class="page" id="app"></main>
+  <section class="hero compact"><div class="ic" aria-hidden="true">⚕️</div><div><h1 id="hT"></h1><p id="hS"></p></div></section>
+  <main id="app"></main>
 </div>
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4lEBGPNxghwq9UmK0iljI5QdS-8iCvC-K09dDtbZCXGvGZyA4repTE3rFVVRp5zS4yw/exec';
@@ -51,7 +42,7 @@ const errText = r => (r && L().codes && L().codes[r.code]) || (r && r.error) || 
 
 if (!token) location.href = 'login.html'; else if (!can('medical')) location.href = 'hub.html';
 const T = {
- ar: { dir: 'rtl', title: 'الطبيب', sub: 'الحالات الطبية (بيانات محمية)', home: 'الرئيسية', lang: 'English', dark: '🌙', light: '☀',
+ ar: { dir: 'rtl', title: 'الطبيب', sub: 'الحالات الطبية (بيانات محمية)', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
   tCases: 'الحالات', tStats: 'الإحصاءات', search: 'ابحث عن طالب بالاسم أو الرقم', bus: n => 'باص ' + n, none: 'لا نتائج',
   showNotes: 'عرض الملاحظات الطبية', hideNotes: 'إخفاء', notesWarn: 'يُسجَّل اطّلاعك على هذه البيانات. لا تشاركها خارج الفريق الطبي.', noNotes: 'لا توجد ملاحظات مسجّلة', foodAl: 'حساسية غذائية',
   complaint: 'الشكوى', urgent: 'عاجلة', normal: 'عادية', openCase: 'فتح ملف حالة', hasOpen: 'يوجد ملف مفتوح لهذا الطالب', open: 'مفتوحة', closed: 'مغلقة',
@@ -59,7 +50,7 @@ const T = {
   total: 'إجمالي الحالات', openN: 'مفتوحة', closedN: 'مغلقة', urgentN: 'عاجلة', avg: 'متوسط وقت الإغلاق (د)', byDay: 'حسب اليوم', byTeam: 'حسب الفريق', byBus: 'حسب الباص',
   done: 'تم', error: 'تعذّر الاتصال. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.',
   codes: { ALREADY_OPEN: 'يوجد ملف مفتوح لهذا الطالب', NOT_OPEN: 'الملف مغلق', TREATMENT_REQUIRED: 'اكتب العلاج أو الإجراء قبل الإغلاق', NOT_FOUND: 'الطالب غير موجود' } },
- en: { dir: 'ltr', title: 'Doctor', sub: 'Medical cases (protected data)', home: 'Home', lang: 'العربية', dark: '🌙', light: '☀',
+ en: { dir: 'ltr', title: 'Doctor', sub: 'Medical cases (protected data)', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
   tCases: 'Cases', tStats: 'Statistics', search: 'Search a student by name or number', bus: n => 'Bus ' + n, none: 'No results',
   showNotes: 'Show medical notes', hideNotes: 'Hide', notesWarn: 'Your access to this data is logged. Do not share it outside the medical team.', noNotes: 'No notes on record', foodAl: 'Food allergy',
   complaint: 'Complaint', urgent: 'Urgent', normal: 'Normal', openCase: 'Open a case', hasOpen: 'This student already has an open case', open: 'Open', closed: 'Closed',

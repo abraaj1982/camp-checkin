@@ -7,27 +7,18 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.4/html5-qrcode.min.js"></script>
 <link rel="stylesheet" href="theme.css">
+<script src="ui.js" defer></script>
 <style>
-.page{max-width:720px;margin:0 auto;padding:14px;display:flex;flex-direction:column;gap:12px}
-.tabs{display:flex;gap:6px}.tabs button{flex:1;min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-weight:600;cursor:pointer}
-.tabs button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
-input[type=text],input[type=search]{width:100%;box-sizing:border-box}
-.two{display:flex;gap:8px}.two>*{flex:1}
-.item{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--card)}
-.kpis{display:flex;gap:10px;flex-wrap:wrap}.kpis .card{flex:1 1 130px;padding:12px}
-.chk{display:flex;align-items:center;gap:8px;padding:6px 0}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header class="hdr">
-    <div class="logo">م</div>
-    <div style="flex:1;min-width:0"><div class="t" id="hT"></div><div class="s" id="hS"></div></div>
-    <a class="tool" href="hub.html" id="homeBtn" style="text-decoration:none;display:flex;align-items:center"></a>
-    <button class="tool" id="langBtn"></button>
-    <button class="tool" id="themeBtn"></button>
+    <div class="brand"><div class="logo">م</div><div style="min-width:0"><div class="t" id="campT"></div><div class="s" id="campS"></div></div></div>
+    <div class="tools"><a class="tool" href="hub.html" id="homeBtn"></a><button class="tool" id="langBtn"></button><button class="tool" id="themeBtn"></button></div>
   </header>
-  <main class="page" id="app"></main>
+  <section class="hero compact"><div class="ic" aria-hidden="true">🔐</div><div><h1 id="hT"></h1><p id="hS"></p></div></section>
+  <main id="app"></main>
 </div>
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4lEBGPNxghwq9UmK0iljI5QdS-8iCvC-K09dDtbZCXGvGZyA4repTE3rFVVRp5zS4yw/exec';
@@ -44,7 +35,7 @@ const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + 
 const AUTH_ERR = /EXPIRED|IDLE_TIMEOUT|REVOKED|BAD_SIGNATURE|MALFORMED|USER_NOT_FOUND|ACCOUNT_DISABLED|BAD_PAYLOAD/;
 
 const T = {
- ar: { dir: 'rtl', title: 'الأمانات', sub: 'الهواتف والحقائب والانسحاب المبكر', home: 'الرئيسية', lang: 'English', dark: '🌙', light: '☀',
+ ar: { dir: 'rtl', title: 'الأمانات', sub: 'الهواتف والحقائب والانسحاب المبكر', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
   tHandover: 'استلام وتسليم', tWithdraw: 'الانسحاب', tSummary: 'الملخص',
   search: 'ابحث بالاسم أو الرقم', scan: 'مسح السوار', stopScan: 'إيقاف الكاميرا', noCam: 'تعذّر تشغيل الكاميرا. ابحث بالاسم أو الرقم.', none: 'لا نتائج', team: 'الفريق', bus: n => 'باص ' + n,
   phone: 'الهاتف', held: 'مستلَم', notHeld: 'غير مستلَم', tag: 'رقم الكيس (اختياري)', recvPhone: 'استلام الهاتف', retPhone: 'تسليم الهاتف',
@@ -55,7 +46,7 @@ const T = {
   open: 'مفتوح', closed: 'مغلق', cancelled: 'ملغى', noWd: 'لا توجد طلبات انسحاب.', recvBy: 'المستلِم',
   sPhones: 'هواتف لدى الأمانات', sBags: 'حقائب لدى الأمانات', sOpen: 'انسحاب مفتوح', sClosed: 'انسحاب مكتمل', holders: 'من لديهم أغراض', noHolders: 'لا توجد أغراض لدى الأمانات.', confirmClose: 'تأكيد إغلاق الانسحاب؟', confirmCancel: 'إلغاء طلب الانسحاب؟',
   codes: { ALREADY_HELD: 'الهاتف مستلَم مسبقاً', NOT_HELD: 'لا يوجد هاتف مستلَم لهذا الطالب', EXCEEDS_HELD: 'المُسلَّم أكثر من المستلَم', ALREADY_OPEN: 'يوجد طلب انسحاب مفتوح لهذا الطالب', ALREADY_WITHDRAWN: 'هذا الطالب منسحب مسبقاً', ITEMS_NOT_RETURNED: 'لا يُغلق الانسحاب قبل تسليم الهاتف والحقائب', NOT_FOUND: 'الطالب غير موجود', NOT_OPEN: 'الطلب ليس مفتوحاً' } },
- en: { dir: 'ltr', title: 'Custody', sub: 'Phones, luggage and early withdrawal', home: 'Home', lang: 'العربية', dark: '🌙', light: '☀',
+ en: { dir: 'ltr', title: 'Custody', sub: 'Phones, luggage and early withdrawal', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
   tHandover: 'Handover', tWithdraw: 'Withdrawals', tSummary: 'Summary',
   search: 'Search by name or number', scan: 'Scan wristband', stopScan: 'Stop camera', noCam: 'Could not start the camera. Search by name or number.', none: 'No results', team: 'Team', bus: n => 'Bus ' + n,
   phone: 'Phone', held: 'In custody', notHeld: 'Not received', tag: 'Bag number (optional)', recvPhone: 'Receive phone', retPhone: 'Return phone',
