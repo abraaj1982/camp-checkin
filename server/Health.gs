@@ -167,8 +167,18 @@ function handleNutritionSummary_(data) {
     const byTeam = {};
     present.forEach(function(s) { byTeam[s.team || '—'] = (byTeam[s.team || '—'] || 0) + 1; });
     const users = readSheetAsObjects_(USERS_SHEET).rows.filter(function(r) { return r.Active === true && String(r.AssignedBus).trim() !== ''; });
+    // Staff (cooks, committees, supervisors...) is typed by hand by the secretariat/nutrition; until then we use the bus-supervisor accounts.
+    const staffSetting = getSetting_('StaffCount');
+    const staffManual = staffSetting !== null && String(staffSetting).trim() !== '' && isFinite(Number(staffSetting));
+    const staff = staffManual ? Math.max(0, Math.round(Number(staffSetting))) : users.length;
+    const withAllergyAll = students.filter(function(s) { return s.foodAllergy; });
+    const sig = allergySig_(withAllergyAll);
+    let ack = null;
+    try { ack = JSON.parse(String(getSetting_('NutritionAck') || '')); } catch (e) { ack = null; }
     const out = { success: true, studentsTotal: students.length, studentsPresent: present.length, supervisors: users.length,
-      mealsToPrepare: present.length + users.length,
+      staff: staff, staffManual: staffManual, mealsToPrepare: present.length + staff, mealsExpected: students.length + staff,
+      allergyCount: withAllergyAll.length,
+      ack: ack ? { by: ack.by, at: ack.at, current: ack.sig === sig } : null,
       byTeam: Object.keys(byTeam).sort().map(function(k) { return { team: k, count: byTeam[k] }; }) };
     if (hasPerm_(user, 'nutrition')) {
       const withAllergy = students.filter(function(s) { return s.foodAllergy; });
@@ -180,5 +190,33 @@ function handleNutritionSummary_(data) {
       writeAudit_(user.Username, 'NUTRITION_VIEW', '', 'allergies=' + withAllergy.length);
     }
     return out;
+  });
+}
+
+function allergySig_(list) {
+  const str = list.map(function(s) { return s.id + '|' + s.foodAllergy; }).sort().join(';');
+  let h = 5381; for (let i = 0; i < str.length; i++) h = ((h * 33) ^ str.charCodeAt(i)) >>> 0;
+  return String(h) + ':' + list.length;
+}
+
+// The nutrition committee confirms it received the current allergy list. If the list changes later, the confirmation is no longer "current".
+function handleNutritionAck_(data) {
+  return withAuth_(data, requirePerm_('nutrition'), function(user) {
+    const list = readStudents_().students.filter(function(s) { return s.foodAllergy; });
+    const at = new Date().toISOString();
+    setSetting_('NutritionAck', JSON.stringify({ by: user.FullName || user.Username, at: at, sig: allergySig_(list) }));
+    writeAudit_(user.Username, 'NUTRITION_ACK', '', 'allergies=' + list.length);
+    return { success: true, ack: { by: user.FullName || user.Username, at: at, current: true } };
+  });
+}
+
+// Number of staff (not students): typed by hand.
+function handleNutritionSetStaff_(data) {
+  return withAuth_(data, requireAnyPerm_(['nutrition', 'manage']), function(user) {
+    const n = Number(data.count);
+    if (!isFinite(n) || n < 0 || n > 5000) return { success: false, error: 'رقم غير صالح' };
+    setSetting_('StaffCount', Math.round(n));
+    writeAudit_(user.Username, 'STAFF_COUNT_SET', '', String(Math.round(n)));
+    return { success: true, staff: Math.round(n) };
   });
 }

@@ -181,6 +181,15 @@ r=post({action:'nutritionSummary',token:tn});
 assert(r.success&&r.studentsTotal===4&&r.studentsPresent>=1&&r.supervisors>=1&&r.mealsToPrepare===r.studentsPresent+r.supervisors,'nutrition counts: students present + supervisors');
 assert(r.allergies.length===2&&r.allergies.some(a=>a.name==='أحمد'&&a.allergy==='فول سوداني')&&!JSON.stringify(r).includes('ربو')&&!JSON.stringify(r).includes('سكري'),'nutrition sees FOOD allergies by name only, no medical notes');
 r=post({action:'nutritionSummary',token:tl});assert(r.success&&!r.allergies&&r.studentsPresent>=1,'leader sees meal counts only (no allergy names)');
+r=post({action:'nutritionSummary',token:tn});assert(r.staffManual===false&&r.staff===r.supervisors&&r.ack===null&&r.mealsExpected===4+r.staff,'staff defaults to supervisor accounts; no ack yet');
+r=post({action:'nutritionSetStaff',token:t1,count:30});assert(!r.success,'supervisor cannot set the staff count');
+r=post({action:'nutritionSetStaff',token:tn,count:-2});assert(!r.success,'bad staff count rejected');
+r=post({action:'nutritionSetStaff',token:tn,count:30});assert(r.success&&r.staff===30,'nutrition sets the staff count by hand');
+r=post({action:'nutritionSummary',token:tl});assert(r.staff===30&&r.staffManual===true&&r.mealsToPrepare===r.studentsPresent+30&&r.mealsExpected===34,'everyone sees the typed staff number in the meals');
+r=post({action:'nutritionAck',token:tl});assert(!r.success,'leader cannot confirm the nutrition list');
+r=post({action:'nutritionAck',token:tn});assert(r.success&&r.ack.current,'nutrition confirms receiving the allergy list');
+r=post({action:'nutritionSummary',token:tl});assert(r.ack&&r.ack.current&&r.ack.by==='تغذية'&&!r.allergies,'leader sees WHO confirmed and when, never the names');
+
 for(const a of ['roster','lookup','printList','leaderSummary','history','custodySummary']){const rr=JSON.stringify(post({action:a,token:T,q:'أحمد',studentId:'1001'}));assert(!rr.includes('ربو')&&!rr.includes('سكري')&&!rr.includes('فول سوداني'),'no medical/allergy data leaks via '+a);}
 // ---- enable/disable accounts from the app
 post({action:'createUser',token:T,username:'tmp1',password:'p9-12345',fullName:'مؤقت',role:'supervisor',permissions:['checkin'],assignedBus:'1',committees:[]});
