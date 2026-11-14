@@ -86,7 +86,7 @@ function doPost(e) {
     const fn = Object.prototype.hasOwnProperty.call(ACTIONS_, data.action) ? ACTIONS_[data.action] : null;
     if (!fn) return json_({ success: false, error: 'Invalid action' });
     const out = fn(data);
-    if (data.action !== 'leaderSummary') { try { CacheService.getScriptCache().remove('leader_v1'); } catch (e) { /* ignore */ } }
+    if (data.action !== 'leaderSummary' && data.action !== 'leaderAll') { try { CacheService.getScriptCache().removeAll(['leader_v1', 'leader_x1']); } catch (e) { /* ignore */ } }
     return json_(out);
   } catch (error) {
     Logger.log('doPost error: ' + error + '\n' + (error && error.stack));
@@ -457,7 +457,12 @@ function handleLeaderAll_(data) {
     if (hasPerm_(user, 'dashboard') || hasPerm_(user, 'livemap')) out.buses = liveBuses_();
     if (hasPerm_(user, 'dashboard') || hasPerm_(user, 'stats') || hasPerm_(user, 'manage')) out.cases = casesForList_();
     out.camp = campLocation_();
-    if (hasPerm_(user, 'dashboard')) out.extra = leaderExtra_();
+    if (hasPerm_(user, 'dashboard')) {
+      const cache = CacheService.getScriptCache(); let ex = null;
+      try { const hit = cache.get('leader_x1'); if (hit) ex = JSON.parse(hit); } catch (e) { ex = null; }
+      if (!ex) { ex = leaderExtra_(); try { cache.put('leader_x1', JSON.stringify(ex), 10); } catch (e) { /* too large: skip */ } }
+      out.extra = ex;
+    }
     out.canSetCamp = hasPerm_(user, 'manage');
     return out;
   });
