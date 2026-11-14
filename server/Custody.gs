@@ -127,6 +127,28 @@ function handleCustodySummary_(data) {
 }
 
 // ---------------- Early withdrawal ----------------
+// Undo a CLOSED withdrawal (closed by mistake): the student goes back to the state he had before (boarded / not yet).
+function handleWithdrawReopen_(data) {
+  return withAuth_(data, requireAnyPerm_(['custody', 'manage']), function(user) {
+    const lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    try {
+      const w = readWithdrawals_().filter(function(x) { return x.id === String(data.id); })[0];
+      if (!w) return { success: false, error: 'غير موجود' };
+      if (w.status !== 'closed') return { success: false, code: 'NOT_CLOSED', error: 'لا يمكن إعادة طالب لم يُغلق انسحابه' };
+      const student = findStudent_(w.studentId);
+      const cur = scanStates_().states[w.studentId];
+      if (!cur || cur.state !== 'withdrawn') return { success: false, code: 'NOT_WITHDRAWN', error: 'الطالب ليس منسحباً الآن' };
+      setWithdrawalStatus_(w._row, 'reversed', user);
+      scansSheet_().appendRow([new Date(), w.studentId, 'readmit', student ? student.bus : '', user.Username, 'custody', '', 'reverses withdrawal ' + w.id]);
+      writeAudit_(user.Username, 'WITHDRAW_REVERSED', w.studentId, w.id);
+      return { success: true };
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+
 function handleWithdrawStart_(data) {
   return withAuth_(data, requirePerm_('custody'), function(user) {
     const student = findStudent_(data.studentId);
@@ -207,7 +229,7 @@ function handleWithdrawList_(data) {
     const cs = custodyStates_().states;
     const byId = {};
     readStudents_().students.forEach(function(s) { byId[s.id] = s; });
-    const rank = { open: 0, closed: 1, cancelled: 2 };
+    const rank = { open: 0, closed: 1, reversed: 2, cancelled: 3 };
     const list = readWithdrawals_().sort(function(a, b) { return (rank[a.status] - rank[b.status]) || (a.time < b.time ? 1 : -1); }).slice(0, 100).map(function(w) {
       const s = byId[w.studentId] || {}, c = custodyOf_(cs, w.studentId);
       return { id: w.id, studentId: w.studentId, name: s.name || '', team: s.team || '', bus: s.bus || '', time: w.time, guardian: w.guardian, reason: w.reason,

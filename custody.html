@@ -42,9 +42,9 @@ const T = {
   wd: 'الانسحاب المبكر', guardian: 'اسم المستلِم (ولي الأمر أو من ينوب)', reason: 'سبب الانسحاب', openWd: 'فتح طلب انسحاب', openNow: 'طلب انسحاب مفتوح',
   closeWd: 'إغلاق الانسحاب', cancelWd: 'إلغاء الطلب', needBack: 'يُغلق الانسحاب بعد تسليم:', phoneBack: 'الهاتف', bagsBack: n => n + ' حقيبة', allBack: '✓ كل الأغراض سُلّمت',
   done: 'تم', error: 'تعذّر الاتصال. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.',
-  open: 'مفتوح', closed: 'مغلق', cancelled: 'ملغى', noWd: 'لا توجد طلبات انسحاب.', recvBy: 'المستلِم',
+  open: 'مفتوح', closed: 'مغلق', cancelled: 'ملغى', reversed: 'أُعيد الطالب', readmit: 'إعادة الطالب (أُغلق بالخطأ)', confirmReadmit: 'إعادة هذا الطالب إلى المخيم وإلغاء انسحابه؟', noWd: 'لا توجد طلبات انسحاب.', recvBy: 'المستلِم',
   sPhones: 'هواتف لدى الأمانات', sBags: 'حقائب لدى الأمانات', sOpen: 'انسحاب مفتوح', sClosed: 'انسحاب مكتمل', holders: 'من لديهم أغراض', noHolders: 'لا توجد أغراض لدى الأمانات.', confirmClose: 'تأكيد إغلاق الانسحاب؟', confirmCancel: 'إلغاء طلب الانسحاب؟',
-  codes: { ALREADY_HELD: 'الهاتف مستلَم مسبقاً', NOT_HELD: 'لا يوجد هاتف مستلَم لهذا الطالب', EXCEEDS_HELD: 'المُسلَّم أكثر من المستلَم', ALREADY_OPEN: 'يوجد طلب انسحاب مفتوح لهذا الطالب', ALREADY_WITHDRAWN: 'هذا الطالب منسحب مسبقاً', ITEMS_NOT_RETURNED: 'لا يُغلق الانسحاب قبل تسليم الهاتف والحقائب', NOT_FOUND: 'الطالب غير موجود', NOT_OPEN: 'الطلب ليس مفتوحاً' } },
+  codes: { ALREADY_HELD: 'الهاتف مستلَم مسبقاً', NOT_HELD: 'لا يوجد هاتف مستلَم لهذا الطالب', EXCEEDS_HELD: 'المُسلَّم أكثر من المستلَم', ALREADY_OPEN: 'يوجد طلب انسحاب مفتوح لهذا الطالب', ALREADY_WITHDRAWN: 'هذا الطالب منسحب مسبقاً', ITEMS_NOT_RETURNED: 'لا يُغلق الانسحاب قبل تسليم الهاتف والحقائب', NOT_FOUND: 'الطالب غير موجود', NOT_OPEN: 'الطلب ليس مفتوحاً', NOT_CLOSED: 'لا يمكن إعادة طالب لم يُغلق انسحابه', NOT_WITHDRAWN: 'الطالب ليس منسحباً الآن' } },
  en: { dir: 'ltr', title: 'Custody', sub: 'Phones, luggage and early withdrawal', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
   tHandover: 'Handover', tWithdraw: 'Withdrawals', tSummary: 'Summary',
   search: 'Search by name or number', scan: 'Scan wristband', stopScan: 'Stop camera', noCam: 'Could not start the camera. Search by name or number.', camDenied: 'Camera access was blocked. Allow the camera for this site in the browser settings, then reload.', none: 'No results', team: 'Team', bus: n => 'Bus ' + n,
@@ -53,9 +53,9 @@ const T = {
   wd: 'Early withdrawal', guardian: 'Receiver name (guardian or delegate)', reason: 'Reason', openWd: 'Open withdrawal', openNow: 'Withdrawal open',
   closeWd: 'Close withdrawal', cancelWd: 'Cancel request', needBack: 'Withdrawal closes after returning:', phoneBack: 'Phone', bagsBack: n => n + ' bag(s)', allBack: '✓ Everything returned',
   done: 'Done', error: 'Connection problem. Try again.', sessionEnd: 'Session expired. Please log in again.',
-  open: 'Open', closed: 'Closed', cancelled: 'Cancelled', noWd: 'No withdrawal requests.', recvBy: 'Receiver',
+  open: 'Open', closed: 'Closed', cancelled: 'Cancelled', reversed: 'Re-admitted', readmit: 'Re-admit the student (closed by mistake)', confirmReadmit: 'Bring this student back and cancel his withdrawal?', noWd: 'No withdrawal requests.', recvBy: 'Receiver',
   sPhones: 'Phones in custody', sBags: 'Bags in custody', sOpen: 'Open withdrawals', sClosed: 'Completed withdrawals', holders: 'Holding items', noHolders: 'Nothing in custody.', confirmClose: 'Confirm closing the withdrawal?', confirmCancel: 'Cancel the withdrawal request?',
-  codes: { ALREADY_HELD: 'Phone already received', NOT_HELD: 'No phone received for this student', EXCEEDS_HELD: 'More than was received', ALREADY_OPEN: 'An open withdrawal already exists', ALREADY_WITHDRAWN: 'Student already withdrawn', ITEMS_NOT_RETURNED: 'Cannot close before the phone and bags are returned', NOT_FOUND: 'Student not found', NOT_OPEN: 'Request is not open' } }
+  codes: { ALREADY_HELD: 'Phone already received', NOT_HELD: 'No phone received for this student', EXCEEDS_HELD: 'More than was received', ALREADY_OPEN: 'An open withdrawal already exists', ALREADY_WITHDRAWN: 'Student already withdrawn', ITEMS_NOT_RETURNED: 'Cannot close before the phone and bags are returned', NOT_FOUND: 'Student not found', NOT_OPEN: 'Request is not open', NOT_CLOSED: 'Only a closed withdrawal can be reversed', NOT_WITHDRAWN: 'The student is not withdrawn now' } }
 };
 const st = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), tab: 'handover', q: '', results: [], cur: null, bagN: 1, tag: '', guardian: '', reason: '', msg: null, cam: false, sum: null, wds: [] };
 const L = () => T[st.lang];
@@ -101,6 +101,11 @@ async function closeWd(id) {
     const r = await api({ action: 'withdrawClose', id: id });
     if (r.success) { say('ok', L().done); st.cur = null; } else say('bad', errText(r));
   } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
+  await loadSummary(); await loadWds(); render();
+}
+async function readmit(id) {
+  if (!confirm(L().confirmReadmit)) return;
+  try { const r = await api({ action: 'withdrawReopen', id: id }); say(r.success ? 'ok' : 'bad', r.success ? L().done : errText(r)); } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
   await loadSummary(); await loadWds(); render();
 }
 async function cancelWd(id) {
@@ -178,7 +183,7 @@ function withdrawView() {
   if (!st.wds.length) return `<div class="card muted">${l.noWd}</div>`;
   return st.wds.map(w => `<div class="item"><div style="display:flex;justify-content:space-between;align-items:center"><b>${esc(w.name)}</b><span class="pill ${w.status === 'open' ? 'warn' : w.status === 'closed' ? 'ok' : ''}">${l[w.status] || esc(w.status)}</span></div>
     <div class="muted" style="font-size:13px">${esc(w.studentId)} · ${esc(w.team)} · ${l.bus(esc(w.bus))}</div><div style="margin:6px 0">${l.recvBy}: ${esc(w.guardian)} · ${esc(w.reason)}</div>
-    ${w.status === 'open' ? `<div class="two"><button class="btn" data-closewd="${esc(w.id)}" ${w.outstanding.phone || w.outstanding.bags ? 'disabled style="opacity:.5"' : ''}>${l.closeWd}</button><button class="btn alt" data-cancelwd="${esc(w.id)}">${l.cancelWd}</button></div>` : ''}</div>`).join('');
+    ${w.status === 'open' ? `<div class="two"><button class="btn" data-closewd="${esc(w.id)}" ${w.outstanding.phone || w.outstanding.bags ? 'disabled style="opacity:.5"' : ''}>${l.closeWd}</button><button class="btn alt" data-cancelwd="${esc(w.id)}">${l.cancelWd}</button></div>` : w.status === 'closed' ? `<button class="btn alt full" style="min-height:46px" data-readmit="${esc(w.id)}">↩ ${l.readmit}</button>` : ''}</div>`).join('');
 }
 function summaryView() {
   const l = L(), s = st.sum; if (!s) return `<div class="card muted">...</div>`;
@@ -211,6 +216,7 @@ document.addEventListener('click', e => {
   else if (d.openwd) openWd();
   else if (d.closewd) closeWd(d.closewd);
   else if (d.cancelwd) cancelWd(d.cancelwd);
+  else if (d.readmit) readmit(d.readmit);
 });
 $('langBtn').onclick = () => { st.lang = st.lang === 'ar' ? 'en' : 'ar'; pref.set('lang', st.lang); render(); };
 $('themeBtn').onclick = () => { st.theme = st.theme === 'light' ? 'dark' : 'light'; pref.set('theme', st.theme); render(); };

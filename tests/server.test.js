@@ -313,6 +313,24 @@ assert(Array.isArray(r.extra.feed)&&r.extra.feed.length>0&&r.extra.feed[0].name,
 assert(!JSON.stringify(r).includes('9999000'),'leaderAll has no student phone numbers');
 assert(r.canSetCamp===false,'leader (no manage) cannot set camp');
 r=post({action:'leaderAll',token:T});assert(r.canSetCamp===true,'admin can set camp');
+// ---- re-admit a student whose withdrawal was closed by mistake
+r=post({action:'scan',token:tgen,studentId:'3001',op:'board'});
+r=post({action:'withdrawStart',token:ts,studentId:'3001',guardian:'والد الطالب',reason:'ظرف'});const wr=r.id;
+r=post({action:'withdrawReopen',token:ts,id:wr});assert(!r.success&&r.code==='NOT_CLOSED','cannot re-admit while the withdrawal is still open');
+r=post({action:'withdrawClose',token:ts,id:wr});assert(r.success,'withdrawal closed');
+r=post({action:'roster',token:tgen,bus:'1'});assert(r.students.find(x=>x.id==='3001').state==='withdrawn','student shows as withdrawn');
+r=post({action:'withdrawReopen',token:t1,id:wr});assert(!r.success,'supervisor cannot re-admit');
+r=post({action:'withdrawReopen',token:ts,id:wr});assert(r.success,'secretariat re-admits the student');
+r=post({action:'roster',token:tgen,bus:'1'});assert(r.students.find(x=>x.id==='3001').state==='boarded','student is back to BOARDED (his state before the withdrawal)');
+r=post({action:'withdrawReopen',token:ts,id:wr});assert(!r.success,'cannot re-admit twice');
+r=post({action:'scan',token:tgen,studentId:'3001',op:'undo'});assert(r.success,'normal flow works again after re-admission');
+r=post({action:'withdrawList',token:ts});assert(r.withdrawals.some(x=>x.id===wr&&x.status==='reversed'),'withdrawal kept in the list as reversed');
+assert(book.AuditLog.rows.some(x=>x[2]==='WITHDRAW_REVERSED'),'audit: withdrawal reversed');
+r=post({action:'history',token:tl,studentId:'3001'});assert(r.events.some(e=>e.kind==='readmit'),'history shows the re-admission');
+// ---- leader sees the withdrawals list (no reasons)
+r=post({action:'withdrawStart',token:ts,studentId:'3002',guardian:'والد 3002',reason:'سبب خاص جداً'});
+r=post({action:'leaderAll',token:tl});assert(r.extra.withdrawals.some(w=>w.guardian==='والد 3002'&&w.status==='open'),'leader sees open withdrawals with the receiver name');
+assert(!JSON.stringify(r.extra.withdrawals).includes('سبب خاص جداً'),'the private reason is NOT shown to the leader');
 // ---- sheet check
 r=post({action:'checkStudentSheet',token:T});assert(r.success&&r.report.ok&&r.report.total===6,'student sheet check passes');
 console.log(fails?`\n${fails} FAILED`:'\nALL PASSED');

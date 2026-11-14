@@ -59,6 +59,7 @@ const ACTIONS_ = {
   withdrawStart: function(d) { return handleWithdrawStart_(d); },
   withdrawClose: function(d) { return handleWithdrawClose_(d); },
   withdrawCancel: function(d) { return handleWithdrawCancel_(d); },
+  withdrawReopen: function(d) { return handleWithdrawReopen_(d); },
   withdrawList: function(d) { return handleWithdrawList_(d); },
   medFind: function(d) { return handleMedFind_(d); },
   medInfo: function(d) { return handleMedInfo_(d); },
@@ -202,7 +203,8 @@ function scanStates_() {
     const when = data[r][iT] instanceof Date ? data[r][iT] : new Date(data[r][iT]);
     if (iC !== -1 && data[r][iC]) clients[String(data[r][iC])] = { id: id, act: act };
     if (act === 'board') states[id] = { state: 'boarded', at: when, by: data[r][iU], bus: String(data[r][iB]) };
-    else if (act === 'withdraw') states[id] = { state: 'withdrawn', at: when, by: data[r][iU], bus: String(data[r][iB]) };
+    else if (act === 'withdraw') states[id] = { state: 'withdrawn', at: when, by: data[r][iU], bus: String(data[r][iB]), prev: states[id] || null };
+    else if (act === 'readmit') { const pv = states[id] && states[id].prev; if (pv) states[id] = pv; else delete states[id]; } // back to what he was before the withdrawal
     else if (act === 'undo') delete states[id];
   }
   return { states: states, clients: clients };
@@ -440,13 +442,21 @@ function leaderExtra_() {
     const ev = publicAnnouncements_(['public', 'staff']).filter(function(a) { return a.kind === 'event' && a.startsAt && a.startsAt > now; }).sort(function(a, b) { return a.startsAt < b.startsAt ? -1 : 1; })[0];
     if (ev) nextEvent = { title: ev.title, startsAt: ev.startsAt, body: ev.body };
   } catch (e) { /* tab missing */ }
+  let withdrawals = [];
+  try {
+    withdrawals = readWithdrawals_().filter(function(w) { return w.status === 'open' || w.status === 'closed'; })
+      .sort(function(a, b) { return a.time < b.time ? 1 : -1; }).slice(0, 15).map(function(w) {
+        const st = byId[w.studentId] || {};
+        return { name: st.name || w.studentId, team: st.team || '', bus: st.bus || '', guardian: w.guardian, status: w.status, time: w.status === 'closed' && w.closedAt ? w.closedAt : w.time, by: w.status === 'closed' ? w.closedBy : w.by };
+      });
+  } catch (e) { /* tab missing */ }
   const feed = [];
   const sv = scansSheet_().getDataRange().getValues(), sh = sv[0];
   for (let r = sv.length - 1; r >= 1 && feed.length < 12; r--) {
     const id = String(sv[r][sh.indexOf('StudentID')]), t = sv[r][sh.indexOf('Time')];
     feed.push({ time: t instanceof Date ? t.toISOString() : String(t), action: String(sv[r][sh.indexOf('Action')]), bus: String(sv[r][sh.indexOf('Bus')]), name: byId[id] ? byId[id].name : id, by: String(sv[r][sh.indexOf('Supervisor')]) });
   }
-  return { missingByBus: missingByBus, supervisors: supervisors, byTeam: Object.keys(byTeam).sort().map(function(k) { return byTeam[k]; }), committees: committees, nextEvent: nextEvent, feed: feed, present: present };
+  return { missingByBus: missingByBus, supervisors: supervisors, byTeam: Object.keys(byTeam).sort().map(function(k) { return byTeam[k]; }), committees: committees, nextEvent: nextEvent, feed: feed, present: present, withdrawals: withdrawals };
 }
 
 // ONE round trip for the whole leader screen (summary + buses + cases): authorises once instead of three times.
