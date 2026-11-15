@@ -313,7 +313,7 @@ function handleScan_(data) {
         }
       }
       if (action === 'withdraw' && cur && cur.state === 'withdrawn') return { success: false, code: 'ALREADY_WITHDRAWN', error: 'خرج مسبقاً' };
-      scansSheet_().appendRow([new Date(), student.id, action, student.bus, user.Username, String(data.method || '').slice(0, 20), clientId, String(data.notes || '').slice(0, 200)]);
+      appendSafe_(scansSheet_(), [new Date(), student.id, action, student.bus, user.Username, String(data.method || '').slice(0, 20), clientId, String(data.notes || '').slice(0, 200)]);
       if (action === 'undo') writeAudit_(user.Username, 'SCAN_UNDO', student.id, 'bus=' + student.bus);
       const sc2 = scanStates_();
       const c = busCounts_(student.bus, readStudents_().students, sc2.states);
@@ -402,7 +402,7 @@ function handleBusStatus_(data) {
         UpdatedAt: new Date(), Supervisor: user.FullName, Boarded: c.boarded, Total: c.total, Speed: speed
       };
       const out = h.map(function(n) { return rec.hasOwnProperty(n) ? rec[n] : ''; });
-      if (row === -1) sheet.appendRow(out); else sheet.getRange(row, 1, 1, out.length).setValues([out]);
+      if (row === -1) appendSafe_(sheet, out); else sheet.getRange(row, 1, 1, out.length).setValues([out.map(cellSafe_)]);
       if (status === 'departed') writeAudit_(user.Username, 'BUS_DEPARTED', bus, 'boarded=' + c.boarded + '/' + c.total);
     } finally {
       lock.releaseLock();
@@ -520,7 +520,7 @@ function handleBag_(data) {
       const h = vals[0];
       const iC = h.indexOf('ClientId');
       if (clientId) for (let r = 1; r < vals.length; r++) if (String(vals[r][iC]) === clientId) return { success: true, repeated: true };
-      sheet.appendRow([new Date(), student.id, student.bus, mode, count, student.bags, user.Username, clientId]);
+      appendSafe_(sheet, [new Date(), student.id, student.bus, mode, count, student.bags, user.Username, clientId]);
     } finally {
       lock.releaseLock();
     }
@@ -632,7 +632,7 @@ function handleCreateCase_(data) {
       const v = sheet.getDataRange().getValues(), h = v[0];
       if (clientId) for (let r = 1; r < v.length; r++) if (String(v[r][h.indexOf('ClientId')]) === clientId) return { success: true, repeated: true, id: String(v[r][h.indexOf('Id')]) };
       const id = newId_('C');
-      sheet.appendRow([id, new Date(), type, bus, String(data.studentId || '').slice(0, 40), text, 'open', user.Username, '', clientId]);
+      appendSafe_(sheet, [id, new Date(), type, bus, String(data.studentId || '').slice(0, 40), text, 'open', user.Username, '', clientId]);
       writeAudit_(user.Username, 'CASE_CREATED', id, type);
       return { success: true, id: id };
     } finally {

@@ -95,9 +95,14 @@ function colIndexByName_(headers, name) {
   return idx + 1;
 }
 
+// Formula-injection guard: text typed by users must never become a Sheets formula.
+// A leading apostrophe makes Sheets store the value as plain text (it is not part of the value read back).
+function cellSafe_(v) { return (typeof v === 'string' && /^[=+\-@\t\r]/.test(v)) ? "'" + v : v; }
+function appendSafe_(sheet, row) { sheet.appendRow(row.map(cellSafe_)); }
+
 function setCellByColumnName_(sheet, headers, rowNumber, columnName, value) {
   if (headers.indexOf('PasswordHash') !== -1) clearUsersCache_(); // a write to the Users tab
-  sheet.getRange(rowNumber, colIndexByName_(headers, columnName)).setValue(value);
+  sheet.getRange(rowNumber, colIndexByName_(headers, columnName)).setValue(cellSafe_(value));
 }
 
 // Settings rarely change: cache them for 2 minutes (setSetting_ clears the cache).
@@ -120,7 +125,7 @@ function setSetting_(key, value) {
   if (existing) {
     setCellByColumnName_(sheet, headers, existing._rowNumber, 'Value', value);
   } else {
-    sheet.appendRow([key, value]);
+    appendSafe_(sheet, [key, value]);
   }
 }
 
@@ -264,7 +269,7 @@ function ADMIN_printBootstrapSecret() {
 
 function writeAudit_(actor, action, target, details) {
   const sheet = getSheetByName_(AUDIT_SHEET);
-  sheet.appendRow([new Date(), actor, action, target || '', details || '']);
+  appendSafe_(sheet, [new Date(), actor, action, target || '', details || '']);
 }
 
 // Usernames are NOT case-sensitive ("Admin_test" = "admin_test"): phones capitalise the first letter automatically.
@@ -444,7 +449,7 @@ function handleCreateUser_(data) {
     Committees: Array.isArray(data.committees) ? data.committees.join(',') : '',
     Permissions: Array.isArray(data.permissions) ? data.permissions.join(',') : ''
   };
-  sheet.appendRow(headers.map(function(h) { return values.hasOwnProperty(h) ? values[h] : ''; }));
+  appendSafe_(sheet, headers.map(function(h) { return values.hasOwnProperty(h) ? values[h] : ''; }));
   clearUsersCache_();
 
   if (isBootstrap) {

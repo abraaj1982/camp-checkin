@@ -64,7 +64,7 @@ function handleMedOpen_(data) {
       if (clientId) { const dup = all.filter(function(c) { return c.clientId === clientId; })[0]; if (dup) return { success: true, repeated: true, id: dup.id }; }
       if (all.some(function(c) { return c.studentId === s.id && c.status === 'open'; })) return { success: false, code: 'ALREADY_OPEN', error: 'يوجد ملف مفتوح لهذا الطالب' };
       const id = newId_('M');
-      medSheet_().appendRow([id, s.id, new Date(), user.Username, severity, complaint, '', 'open', '', '', clientId]);
+      appendSafe_(medSheet_(), [id, s.id, new Date(), user.Username, severity, complaint, '', 'open', '', '', clientId]);
       writeAudit_(user.Username, 'MED_OPENED', s.id, id);
       return { success: true, id: id };
     } finally {
@@ -82,7 +82,7 @@ function handleMedUpdate_(data) {
       if (!c) return { success: false, error: 'غير موجود' };
       if (c.status !== 'open') return { success: false, code: 'NOT_OPEN', error: 'الملف مغلق' };
       const sheet = medSheet_(), h = sheet.getDataRange().getValues()[0];
-      if (data.treatment !== undefined) sheet.getRange(c._row, h.indexOf('Treatment') + 1).setValue(String(data.treatment).trim().slice(0, 800));
+      if (data.treatment !== undefined) sheet.getRange(c._row, h.indexOf('Treatment') + 1).setValue(cellSafe_(String(data.treatment).trim().slice(0, 800)));
       if (data.severity !== undefined && MED_SEVERITY_.indexOf(String(data.severity)) !== -1) sheet.getRange(c._row, h.indexOf('Severity') + 1).setValue(String(data.severity));
       writeAudit_(user.Username, 'MED_UPDATED', c.studentId, c.id);
       return { success: true };
@@ -103,7 +103,7 @@ function handleMedClose_(data) {
       const treatment = String(data.treatment !== undefined ? data.treatment : c.treatment).trim().slice(0, 800);
       if (treatment.length < 2) return { success: false, code: 'TREATMENT_REQUIRED', error: 'اكتب العلاج أو الإجراء قبل الإغلاق' };
       const sheet = medSheet_(), h = sheet.getDataRange().getValues()[0];
-      sheet.getRange(c._row, h.indexOf('Treatment') + 1).setValue(treatment);
+      sheet.getRange(c._row, h.indexOf('Treatment') + 1).setValue(cellSafe_(treatment));
       sheet.getRange(c._row, h.indexOf('Status') + 1).setValue('closed');
       sheet.getRange(c._row, h.indexOf('ClosedAt') + 1).setValue(new Date());
       sheet.getRange(c._row, h.indexOf('ClosedBy') + 1).setValue(user.Username);

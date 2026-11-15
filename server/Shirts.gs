@@ -94,7 +94,7 @@ function handleShirtGive_(data) {
       if (!t || t.total === 0) return { success: false, code: 'NO_STOCK_ROW', error: 'لم يُسجَّل مخزون لهذا المقاس', size: size };
       if (t.remaining <= 0) return { success: false, code: 'OUT_OF_STOCK', error: 'نفد المقاس ' + size, size: size };
       const lid = newId_('SH');
-      getSheetByName_(SHIRT_LOG_).appendRow([lid, new Date(), kind, id, person.name, size, user.Username, 'given', '', clientId]);
+      appendSafe_(getSheetByName_(SHIRT_LOG_), [lid, new Date(), kind, id, person.name, size, user.Username, 'given', '', clientId]);
       writeAudit_(user.Username, 'SHIRT_GIVEN', id, kind + ' ' + size);
       return { success: true, id: lid, size: size, remaining: t.remaining - 1, changedSize: size !== person.size };
     } finally {
@@ -131,7 +131,7 @@ function handleShirtStockSet_(data) {
     try {
       const cur = readShirtStock_()[size], sh = getSheetByName_(SHIRT_STOCK_);
       if (cur) { const h = sh.getDataRange().getValues()[0]; sh.getRange(cur._row, h.indexOf('Total') + 1).setValue(total); sh.getRange(cur._row, h.indexOf('LowAt') + 1).setValue(lowAt); }
-      else sh.appendRow([size, total, lowAt]);
+      else appendSafe_(sh, [size, total, lowAt]);
       writeAudit_(user.Username, 'SHIRT_STOCK_SET', size, String(total));
       return { success: true };
     } finally {

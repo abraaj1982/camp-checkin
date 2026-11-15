@@ -43,7 +43,7 @@ function readResults_() {
 
 function setCell_(sheet, rowNum, colName, value) {
   const h = sheet.getDataRange().getValues()[0];
-  sheet.getRange(rowNum, h.indexOf(colName) + 1).setValue(value);
+  sheet.getRange(rowNum, h.indexOf(colName) + 1).setValue(cellSafe_(value));
 }
 
 function handleMediaList_(data) {
@@ -85,7 +85,7 @@ function handleAnnSave_(data) {
       }
       if (clientId) { const dup = all.filter(function(x) { return x.clientId === clientId; })[0]; if (dup) return { success: true, repeated: true, id: dup.id }; }
       const id = newId_('A');
-      annSheet_().appendRow([id, new Date(), title, body, kind, startsAt, audience, pinned, 'draft', user.Username, '', clientId]);
+      appendSafe_(annSheet_(), [id, new Date(), title, body, kind, startsAt, audience, pinned, 'draft', user.Username, '', clientId]);
       writeAudit_(user.Username, 'ANN_CREATED', id, kind);
       return { success: true, id: id };
     } finally {
@@ -131,7 +131,7 @@ function handleResSave_(data) {
       const all = readResults_();
       if (clientId) { const dup = all.filter(function(x) { return x.clientId === clientId; })[0]; if (dup) return { success: true, repeated: true, id: dup.id }; }
       const id = newId_('R');
-      resultsSheet_().appendRow([id, new Date(), competition, team, place, points, 'draft', user.Username, '', clientId]);
+      appendSafe_(resultsSheet_(), [id, new Date(), competition, team, place, points, 'draft', user.Username, '', clientId]);
       writeAudit_(user.Username, 'RESULT_ENTERED', id, competition);
       return { success: true, id: id };
     } finally {

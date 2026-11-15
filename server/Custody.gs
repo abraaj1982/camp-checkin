@@ -88,7 +88,7 @@ function handleCustodyRecord_(data) {
       if (item === 'phone' && op === 'receive' && cur.phone) return { success: false, code: 'ALREADY_HELD', error: 'الهاتف مستلَم مسبقاً', custody: custodyView_(student, cs.states, readWithdrawals_()) };
       if (item === 'phone' && op === 'return' && !cur.phone) return { success: false, code: 'NOT_HELD', error: 'لا يوجد هاتف مستلَم لهذا الطالب' };
       if (item === 'bags' && op === 'return' && count > cur.bags) return { success: false, code: 'EXCEEDS_HELD', error: 'المُسلَّم أكثر من المستلَم (' + cur.bags + ')', held: cur.bags };
-      custodySheet_().appendRow([new Date(), student.id, item, op, count, tag, user.Username, clientId, String(data.notes || '').slice(0, 200)]);
+      appendSafe_(custodySheet_(), [new Date(), student.id, item, op, count, tag, user.Username, clientId, String(data.notes || '').slice(0, 200)]);
       const cs2 = custodyStates_();
       return { success: true, custody: custodyView_(student, cs2.states, readWithdrawals_()) };
     } finally {
@@ -140,7 +140,7 @@ function handleWithdrawReopen_(data) {
       const cur = scanStates_().states[w.studentId];
       if (!cur || cur.state !== 'withdrawn') return { success: false, code: 'NOT_WITHDRAWN', error: 'الطالب ليس خارجاً الآن' };
       setWithdrawalStatus_(w._row, 'reversed', user);
-      scansSheet_().appendRow([new Date(), w.studentId, 'readmit', student ? student.bus : '', user.Username, 'custody', '', 'reverses withdrawal ' + w.id]);
+      appendSafe_(scansSheet_(), [new Date(), w.studentId, 'readmit', student ? student.bus : '', user.Username, 'custody', '', 'reverses withdrawal ' + w.id]);
       writeAudit_(user.Username, 'WITHDRAW_REVERSED', w.studentId, w.id);
       return { success: true };
     } finally {
@@ -166,7 +166,7 @@ function handleWithdrawStart_(data) {
       if (all.some(function(w) { return w.studentId === student.id && w.status === 'open'; })) return { success: false, code: 'ALREADY_OPEN', error: 'يوجد استئذان خروج مفتوح لهذا الطالب' };
       if (scanStates_().states[student.id] && scanStates_().states[student.id].state === 'withdrawn') return { success: false, code: 'ALREADY_WITHDRAWN', error: 'خرج مسبقاً' };
       const id = newId_('W');
-      withdrawalsSheet_().appendRow([id, student.id, new Date(), guardian, reason, 'open', user.Username, '', '', clientId]);
+      appendSafe_(withdrawalsSheet_(), [id, student.id, new Date(), guardian, reason, 'open', user.Username, '', '', clientId]);
       writeAudit_(user.Username, 'WITHDRAW_OPENED', student.id, id);
       return { success: true, id: id, custody: custodyView_(student, custodyStates_().states, readWithdrawals_()) };
     } finally {
@@ -192,7 +192,7 @@ function closeWithdrawalCore_(w, user, method) {
       outstanding: { phone: c.phone, phoneTag: c.phoneTag, bags: c.bags } };
   }
   setWithdrawalStatus_(w._row, 'closed', user);
-  scansSheet_().appendRow([new Date(), w.studentId, 'withdraw', student ? student.bus : '', user.Username, method, '', 'withdrawal ' + w.id]);
+  appendSafe_(scansSheet_(), [new Date(), w.studentId, 'withdraw', student ? student.bus : '', user.Username, method, '', 'withdrawal ' + w.id]);
   writeAudit_(user.Username, method === 'gate' ? 'GATE_EXIT' : 'WITHDRAW_CLOSED', w.studentId, w.id);
   return { success: true };
 }
