@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="ar" dir="rtl" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>القمصان — MUKHAYYAM</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="theme.css">
+<script src="ui.js" defer></script>
+<style>
+.sz{display:inline-grid;place-items:center;min-width:92px;height:92px;border-radius:22px;background:var(--soft);border:2px solid var(--line);font-size:38px;font-weight:700}
+.sz.none{font-size:15px;color:var(--bad);border-color:#E07A8A}
+.verdict{border-radius:20px;padding:16px;text-align:center;font-weight:700}
+.verdict.go{background:var(--okbg);color:var(--ok);border:2px solid #4CC38A}
+.btn.go{background:#1F7A45;min-height:64px;font-size:19px}
+.strip{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.strip .kv2{font-size:24px;font-weight:700;text-align:center}.strip .kl2{font-size:12px;text-align:center;color:var(--muted,#667)}
+.stk{border:2px solid var(--line);border-radius:16px;padding:12px;display:grid;grid-template-columns:70px 1fr auto;gap:10px;align-items:center;margin-top:8px}
+.stk .s{font-size:28px;font-weight:700;text-align:center}.stk.ok{border-color:#4CC38A}.stk.low{border-color:#E8A33A}.stk.out,.stk.nostock{border-color:#E07A8A}
+.stk .rem{font-size:26px;font-weight:700}.stk .barw{height:8px;border-radius:9px;background:var(--soft);overflow:hidden;margin-top:6px}.stk .barw i{display:block;height:100%;background:#4CC38A}.stk.low .barw i{background:#E8A33A}.stk.out .barw i,.stk.nostock .barw i{background:#E07A8A}
+.sel{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hdr">
+    <div class="brand"><div class="logo">م</div><div style="min-width:0"><div class="t" id="campT"></div><div class="s" id="campS"></div></div></div>
+    <div class="tools"><a class="tool" href="hub.html" id="homeBtn"></a><button class="tool" id="langBtn"></button><button class="tool" id="themeBtn"></button></div>
+  </header>
+  <section class="hero compact"><div class="ic" aria-hidden="true">👕</div><div><h1 id="hT"></h1><p id="hS"></p></div></section>
+  <main id="app"></main>
+</div>
+<script>
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4lEBGPNxghwq9UmK0iljI5QdS-8iCvC-K09dDtbZCXGvGZyA4repTE3rFVVRp5zS4yw/exec';
+const token = sessionStorage.getItem('mukhayyam_token');
+let perms = [];
+try { perms = JSON.parse(sessionStorage.getItem('mukhayyam_permissions') || '[]'); } catch (e) {}
+const can = k => perms.indexOf('*') !== -1 || perms.indexOf(k) !== -1;
+if (!token) location.href = 'login.html'; else if (!can('shirts') && !can('manage')) location.href = 'hub.html';
+
+const pref = { get(k, d) { try { return localStorage.getItem('mk_pref_' + k) || d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('mk_pref_' + k, v); } catch (e) {} } };
+const $ = id => document.getElementById(id);
+const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const AUTH_ERR = /EXPIRED|IDLE_TIMEOUT|REVOKED|BAD_SIGNATURE|MALFORMED|USER_NOT_FOUND|ACCOUNT_DISABLED|BAD_PAYLOAD/;
+const T = {
+ ar: { dir: 'rtl', title: 'القمصان', sub: 'توزيع القمصان والمخزون', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
+  tGive: 'التوزيع', tStock: 'المخزون', search: 'اسم الشخص أو رقمه', scan: '▣ مسح سوار الطالب', stopScan: 'إيقاف الكاميرا', none: 'لا نتائج', bus: n => 'باص ' + n,
+  kStudents: 'طلاب استلموا', kStaff: 'كادر استلموا', kLeft: 'بدون مقاس مسجّل', size: 'المقاس', noSize: 'لا يوجد مقاس مسجّل', give: s => 'تسليم قميص ' + s, giveOther: 'تسليم بمقاس آخر', chooseSize: 'اختر المقاس',
+  got: 'استلم القميص', by: 'بواسطة', at: 'الساعة', undo: 'تراجع عن التسليم', confirmUndo: 'التراجع عن هذا التسليم؟', student: 'طالب', staff: 'كادر', done: 'تم التسليم ✓', undone: 'تم التراجع',
+  total: 'المخزون', demand: 'المطلوب', given: 'سُلّم', remain: 'المتبقي', edit: 'تعديل الكمية', addSize: '＋ مقاس جديد', askSize: 'اكتب المقاس (مثل M أو XL)', askTotal: 'الكمية الإجمالية لهذا المقاس', ok: 'متوفر', low: 'يقارب النفاد', out: 'نفد', nostock: 'بلا مخزون', note: 'المطلوب = عدد من سجّلوا هذا المقاس (طلاب وكادر).',
+  error: 'تعذّر الاتصال. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.', noCam: 'تعذّر تشغيل الكاميرا. اكتب الاسم أو الرقم.', camDenied: 'لم يُسمح بالكاميرا. اسمح بها من إعدادات المتصفح.',
+  codes: { ALREADY_GIVEN: 'استلم القميص مسبقاً', NO_SIZE: 'لا يوجد مقاس مسجّل. اختر المقاس', NO_STOCK_ROW: 'لم يُسجَّل مخزون لهذا المقاس. اختر مقاساً آخر', OUT_OF_STOCK: 'نفد هذا المقاس. اختر مقاساً آخر', NOT_FOUND: 'غير موجود' } },
+ en: { dir: 'ltr', title: 'Shirts', sub: 'Shirt distribution and stock', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
+  tGive: 'Give', tStock: 'Stock', search: 'Name or number', scan: '▣ Scan student wristband', stopScan: 'Stop camera', none: 'No results', bus: n => 'Bus ' + n,
+  kStudents: 'Students received', kStaff: 'Staff received', kLeft: 'No size on record', size: 'Size', noSize: 'No size on record', give: s => 'Give shirt ' + s, giveOther: 'Give another size', chooseSize: 'Choose size',
+  got: 'Shirt received', by: 'by', at: 'at', undo: 'Undo hand-over', confirmUndo: 'Undo this hand-over?', student: 'Student', staff: 'Staff', done: 'Given ✓', undone: 'Undone',
+  total: 'Stock', demand: 'Needed', given: 'Given', remain: 'Left', edit: 'Edit quantity', addSize: '＋ New size', askSize: 'Type the size (e.g. M or XL)', askTotal: 'Total quantity for this size', ok: 'In stock', low: 'Running low', out: 'Out', nostock: 'No stock', note: 'Needed = people who registered this size (students and staff).',
+  error: 'Connection problem. Try again.', sessionEnd: 'Session expired. Please log in again.', noCam: 'Could not start the camera. Type the name or number.', camDenied: 'Camera not allowed. Allow it in the browser settings.',
+  codes: { ALREADY_GIVEN: 'Already received a shirt', NO_SIZE: 'No size on record. Choose a size', NO_STOCK_ROW: 'No stock recorded for this size. Choose another', OUT_OF_STOCK: 'This size is out. Choose another', NOT_FOUND: 'Not found' } }
+};
+const st = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), tab: 'give', q: '', results: [], cur: null, pickSize: false, table: [], sum: null, msg: null, cam: false };
+const L = () => T[st.lang];
+async function api(action, extra) {
+  const r = await (await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(Object.assign({ action: action, token: token }, extra || {})) })).json();
+  if (r && r.code && AUTH_ERR.test(r.code)) { st.msg = { cls: 'bad', t: L().sessionEnd }; render(); setTimeout(() => { sessionStorage.clear(); location.href = 'login.html'; }, 1500); throw new Error('auth'); }
+  return r;
+}
+const say = (cls, t) => { st.msg = { cls: cls, t: t }; };
+const errText = r => (r && L().codes[r.code]) || (r && r.error) || L().error;
+const hhmm = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toTimeString().slice(0, 5); };
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2));
+
+async function load() { try { const r = await api('shirtStock'); if (r.success) { st.table = r.table; st.sum = r.summary; } } catch (e) {} render(); }
+let qTimer = null;
+function onQ(v) {
+  st.q = v; st.cur = null; clearTimeout(qTimer);
+  if (!v.trim()) { st.results = []; return renderResults(); }
+  qTimer = setTimeout(async () => { try { const r = await api('shirtFind', { q: v.trim() }); if (r.success && st.q === v) { st.results = r.results; if (r.results.length === 1) st.cur = r.results[0]; render(); } } catch (e) {} }, 300);
+}
+async function identify(text) {
+  const m = String(text || '').trim().match(/^MKH:(.+)$/i); const id = m ? m[1].trim() : String(text || '').trim();
+  st.q = id;
+  try { const r = await api('shirtFind', { q: id }); st.results = r.success ? r.results.filter(x => x.id === id) : []; st.cur = st.results[0] || null; } catch (e) {}
+  render();
+}
+window.__onScanText = identify;
+async function refreshCur() { if (!st.cur) return; try { const r = await api('shirtFind', { q: st.cur.id }); const x = r.success && r.results.find(y => y.id === st.cur.id && y.kind === st.cur.kind); if (x) st.cur = x; } catch (e) {} }
+async function give(size) {
+  const c = st.cur; if (!c) return;
+  try { const r = await api('shirtGive', { kind: c.kind, id: c.id, size: size || undefined, clientId: uid() });
+    if (r.success) { say('ok', L().done + ' ' + (r.size || '') + ' · ' + L().remain + ' ' + r.remaining); st.pickSize = false; await refreshCur(); await load(); return; }
+    say('bad', errText(r)); if (/OUT_OF_STOCK|NO_STOCK_ROW|NO_SIZE/.test(r.code)) st.pickSize = true; if (r.code === 'ALREADY_GIVEN') await refreshCur();
+  } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
+  render();
+}
+async function undo() {
+  const c = st.cur; if (!c || !confirm(L().confirmUndo)) return;
+  try { const r = await api('shirtUndo', { kind: c.kind, id: c.id }); say(r.success ? 'ok' : 'bad', r.success ? L().undone : errText(r)); if (r.success) { await refreshCur(); await load(); return; } } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
+  render();
+}
+async function editStock(size) {
+  const l = L(); let sz = size; if (!sz) { sz = (prompt(l.askSize) || '').trim(); if (!sz) return; }
+  const cur = st.table.find(x => x.size === sz.toUpperCase()); const v = prompt(l.askTotal + ' (' + sz.toUpperCase() + ')', cur ? cur.total : ''); if (v === null || v.trim() === '') return;
+  try { const r = await api('shirtStockSet', { size: sz, total: Number(v) }); say(r.success ? 'ok' : 'bad', r.success ? l.done : errText(r)); } catch (e) { if (e.message !== 'auth') say('bad', l.error); }
+  await load();
+}
+
+/* camera (library downloaded only when first used) */
+let scanner = null, h5Promise = null;
+function loadScanner() {
+  if (typeof Html5Qrcode !== 'undefined') return Promise.resolve();
+  if (!h5Promise) h5Promise = new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.4/html5-qrcode.min.js'; s.onload = res; s.onerror = () => { h5Promise = null; rej(new Error('library')); }; document.head.appendChild(s); });
+  return h5Promise;
+}
+async function startCam() {
+  st.cam = true; st.msg = null; render();
+  try { await loadScanner(); } catch (e) { st.cam = false; say('warn', L().noCam); return render(); }
+  try { scanner = new Html5Qrcode('reader'); await scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 220, height: 220 } }, text => { stopCam(); identify(text); }, () => {}); }
+  catch (e) { const m = String(e && (e.message || e)); scanner = null; st.cam = false; say('warn', /NotAllowed|Permission|denied/i.test(m) ? L().camDenied : L().noCam); render(); }
+}
+async function stopCam() { try { if (scanner) { await scanner.stop(); scanner.clear(); } } catch (e) {} scanner = null; st.cam = false; render(); }
+
+/* views */
+function personCard() {
+  const l = L(), c = st.cur; if (!c) return '';
+  const left = (st.table.find(x => x.size === c.size) || {}).remaining;
+  const sizes = st.table.map(x => x.size);
+  let act;
+  if (c.given) act = `<div class="verdict go"><div>✅</div><div style="font-size:19px">${l.got} · ${esc(c.givenSize)}</div><div style="font-weight:500;font-size:14px;margin-top:4px">${l.by} ${esc(c.givenBy)} ${l.at} ${esc(hhmm(c.givenAt))}</div></div><button class="btn alt full" style="margin-top:10px;min-height:46px" data-undo="1">${l.undo}</button>`;
+  else act = `${c.size && !st.pickSize ? `<button class="btn go full" style="margin-top:12px" data-give="${esc(c.size)}">${l.give(esc(c.size))}</button><button class="btn alt full" style="margin-top:8px;min-height:46px" data-other="1">${l.giveOther}</button>`
+    : `<div class="lbl" style="margin-top:12px">${l.chooseSize}</div><div class="sel">${sizes.map(z => `<button class="chip" data-give="${esc(z)}">${esc(z)}</button>`).join('')}</div>`}`;
+  return `<section class="card"><div style="display:flex;gap:14px;align-items:center"><div class="sz ${c.size ? '' : 'none'}">${c.size ? esc(c.size) : l.noSize}</div><div style="flex:1;min-width:0"><div class="big2">${esc(c.name)}</div><div class="muted" style="font-size:13px">${c.kind === 'staff' ? '' : esc(c.id)}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><span class="pill">${c.kind === 'staff' ? l.staff : l.student}</span>${c.team ? `<span class="pill">${esc(c.team)}</span>` : ''}${c.bus ? `<span class="pill">${l.bus(esc(c.bus))}</span>` : ''}${!c.given && c.size && left !== undefined ? `<span class="pill ${left <= 0 ? 'bad' : ''}">${l.remain} ${left}</span>` : ''}</div></div></div>${act}</section>`;
+}
+function resultsHtml() {
+  const l = L(); if (!st.q.trim()) return '';
+  if (!st.results.length) return `<div class="muted" style="padding:8px">${l.none}</div>`;
+  if (st.cur) return '';
+  return st.results.map(s => `<button class="res" data-pick="${esc(s.kind + ':' + s.id)}"><span><b>${esc(s.name)}</b> <span class="muted">· ${s.kind === 'staff' ? l.staff : esc(s.id)}</span></span><span class="pill ${s.given ? 'ok' : ''}">${s.given ? '✓' : esc(s.size || '—')}</span></button>`).join('');
+}
+function renderResults() { const e = $('qres'); if (e) e.innerHTML = resultsHtml(); }
+function giveView() {
+  const l = L(), s = st.sum;
+  const strip = s ? `<section class="card"><div class="strip"><div><div class="kv2">${s.studentsGiven}<span class="muted" style="font-size:14px"> / ${s.students}</span></div><div class="kl2">${l.kStudents}</div></div><div><div class="kv2">${s.staffGiven}<span class="muted" style="font-size:14px"> / ${s.staff}</span></div><div class="kl2">${l.kStaff}</div></div><div><div class="kv2">${s.noSize}</div><div class="kl2">${l.kLeft}</div></div></div></section>` : '';
+  const scan = `${st.cam ? '<div class="scan"><div id="reader" style="width:100%"></div></div>' : ''}<button class="btn alt full" style="margin-top:8px" data-cam="1">${st.cam ? l.stopScan : l.scan}</button>`;
+  return `${strip}<section class="card"><label class="lbl" for="q">${l.search}</label><input id="q" type="search" value="${esc(st.q)}" autocomplete="off">${scan}<div id="qres" style="margin-top:6px">${resultsHtml()}</div></section>${personCard()}`;
+}
+function stockView() {
+  const l = L(), lab = { ok: l.ok, low: l.low, out: l.out, nostock: l.nostock };
+  return `<div class="muted" style="font-size:12.5px;margin:2px 4px">${l.note}</div>` + (st.table.length ? st.table.map(r => `<div class="stk ${r.status}"><div class="s">${esc(r.size)}</div>
+    <div><div style="font-size:13px" class="muted">${l.total} ${r.total} · ${l.demand} ${r.demand} · ${l.given} ${r.given}</div><div class="barw"><i style="width:${r.total ? Math.max(0, Math.round(r.remaining / r.total * 100)) : 0}%"></i></div><span class="pill ${r.status === 'ok' ? 'ok' : 'bad'}" style="margin-top:6px;display:inline-block">${lab[r.status]}</span></div>
+    <div style="text-align:center"><div class="rem">${r.remaining}</div><div class="muted" style="font-size:11px">${l.remain}</div><button class="chip" style="margin-top:4px" data-edit="${esc(r.size)}">${l.edit}</button></div></div>`).join('') : '') + `<button class="btn alt full" style="margin-top:12px" data-edit="">${l.addSize}</button>`;
+}
+function render() {
+  const l = L(); document.documentElement.lang = st.lang; document.documentElement.dir = l.dir; document.documentElement.dataset.theme = st.theme; document.title = l.title + ' — MUKHAYYAM';
+  $('hT').textContent = l.title; $('hS').textContent = l.sub; $('homeBtn').textContent = l.home; $('langBtn').textContent = l.lang; $('themeBtn').textContent = st.theme === 'light' ? l.dark : l.light;
+  const keepReader = st.cam ? $('reader') : null; if (keepReader) keepReader.remove();
+  const ae = document.activeElement, keep = ae && ae.id === 'q' ? ae.selectionStart : null;
+  const tabs = [['give', l.tGive], ['stock', l.tStock]];
+  $('app').innerHTML = `${st.msg ? `<div class="banner ${st.msg.cls}" role="alert">${esc(st.msg.t)}</div>` : ''}<div class="tabs">${tabs.map(t => `<button class="${st.tab === t[0] ? 'on' : ''}" data-tab="${t[0]}">${t[1]}</button>`).join('')}</div>${st.tab === 'give' ? giveView() : stockView()}`;
+  if (keepReader) { const ph = $('reader'); if (ph) ph.replaceWith(keepReader); }
+  if (keep !== null && $('q')) { const q = $('q'); q.focus(); try { q.setSelectionRange(keep, keep); } catch (e) {} }
+}
+document.addEventListener('input', e => { if (e.target.id === 'q') onQ(e.target.value); });
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('button'); if (!b) return; const d = b.dataset;
+  if (d.tab) { st.tab = d.tab; st.msg = null; if (st.cam) stopCam(); else render(); if (d.tab === 'stock') load(); }
+  else if (d.cam !== undefined) { st.cam ? stopCam() : startCam(); }
+  else if (d.give) give(d.give); else if (d.other) { st.pickSize = true; render(); }
+  else if (d.undo) undo(); else if (d.edit !== undefined) editStock(d.edit);
+  else if (d.pick) { const [k, i] = [d.pick.split(':')[0], d.pick.split(':').slice(1).join(':')]; st.cur = st.results.find(x => x.kind === k && x.id === i) || null; st.pickSize = false; st.msg = null; render(); }
+});
+$('langBtn').onclick = () => { st.lang = st.lang === 'ar' ? 'en' : 'ar'; pref.set('lang', st.lang); render(); };
+$('themeBtn').onclick = () => { st.theme = st.theme === 'light' ? 'dark' : 'light'; pref.set('theme', st.theme); render(); };
+render(); load();
+</script>
+</body></html>

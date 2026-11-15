@@ -17,7 +17,7 @@ const ctx={console,Logger:{log:()=>{}},Date,
   computeDigest:(a,seed)=>[...crypto.createHash('sha256').update(seed).digest()],DigestAlgorithm:{SHA_256:1},getUuid:()=>crypto.randomUUID(),
   formatDate:(d,tz,f)=>{const x=new Date(d.getTime()+4*3600e3);return String(x.getUTCHours()).padStart(2,'0')+':'+String(x.getUTCMinutes()).padStart(2,'0')}}};
 vm.createContext(ctx);
-vm.runInContext(fs.readFileSync(__dirname+'/../server/Auth.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Code.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Custody.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Health.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Media.gs','utf8'),ctx);
+vm.runInContext(fs.readFileSync(__dirname+'/../server/Auth.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Code.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Custody.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Health.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Media.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Shirts.gs','utf8'),ctx);
 const U=['Username','PasswordHash','Salt','FullName','Role','AssignedBus','Active','FailedAttempts','LockedUntil','TokenEpoch','LastActivityAt','CreatedAt','LastLogin'];
 book.Users=mkSheet([U]);book.Settings=mkSheet([['Key','Value']]);book.AuditLog=mkSheet([['Timestamp','ActorUsername','Action','TargetUsername','Details']]);
 // student sheet: reordered columns, includes Photo URL + Contact number which must never leak
@@ -192,6 +192,34 @@ r=post({action:'nutritionAck',token:tn});assert(r.success&&r.ack.current,'nutrit
 r=post({action:'nutritionSummary',token:tl});assert(r.ack&&r.ack.current&&r.ack.by==='تغذية'&&!r.allergies,'leader sees WHO confirmed and when, never the names');
 
 for(const a of ['roster','lookup','printList','leaderSummary','history','custodySummary']){const rr=JSON.stringify(post({action:a,token:T,q:'أحمد',studentId:'1001'}));assert(!rr.includes('ربو')&&!rr.includes('سكري')&&!rr.includes('فول سوداني'),'no medical/allergy data leaks via '+a);}
+// ---- shirts: sizes from registration, stock per size, one shirt per person, undo
+book.Bus.rows[0].push('Shirt size');['M','L','M','xl'].forEach((v,i)=>book.Bus.rows[i+1][book.Bus.rows[0].length-1]=v);
+for(const k of Object.keys(cache))delete cache[k];
+book.Staff.rows.push(['أستاذ تجريبي','L','مشرف'],['أستاذ ثانٍ','',''],['أستاذ ثالث','M','']);
+post({action:'createUser',token:T,username:'shirt1',password:'p5-12345',fullName:'مسؤول القمصان',role:'supervisor',permissions:['shirts'],committees:[]});
+const tsh=post({action:'login',username:'shirt1',password:'p5-12345'}).token;
+r=post({action:'shirtStock',token:t1});assert(!r.success,'supervisor cannot open the shirts screen');
+r=post({action:'shirtStockSet',token:tsh,size:'M',total:3});assert(r.success,'stock typed for M');
+r=post({action:'shirtStockSet',token:tsh,size:'l',total:1,lowAt:1});assert(r.success,'size is normalised (l -> L)');
+r=post({action:'shirtStockSet',token:tsh,size:'M',total:-1});assert(!r.success,'bad stock rejected');
+r=post({action:'shirtStock',token:tsh});const M=r.table.find(x=>x.size==='M'),X=r.table.find(x=>x.size==='XL');
+assert(M.total===3&&M.demand===3&&M.given===0&&M.remaining===3&&M.status==='ok','table: M stock 3, demand 3 (2 students + 1 staff)');
+assert(X&&X.total===0&&X.demand===1&&X.status==='nostock','size with demand but no stock is flagged');
+assert(r.summary.students===4&&r.summary.staff===3&&r.summary.noSize===1,'summary counts students/staff and people without size');
+r=post({action:'shirtFind',token:tsh,q:'أحمد'});assert(r.results.length===1&&r.results[0].size==='M'&&r.results[0].given===false&&!JSON.stringify(r).includes('9999000'),'find student: size shown, no phone');
+r=post({action:'shirtFind',token:tsh,q:'أستاذ'});assert(r.results.length===3&&r.results.every(x=>x.kind==='staff'),'find staff by name');
+r=post({action:'shirtGive',token:tsh,kind:'student',id:'1001',clientId:'sg1'});assert(r.success&&r.size==='M'&&r.remaining===2,'give registered size, stock goes down');
+r=post({action:'shirtGive',token:tsh,kind:'student',id:'1001',clientId:'sg1'});assert(r.success&&r.repeated,'retry with same clientId is idempotent');
+r=post({action:'shirtGive',token:tsh,kind:'student',id:'1001'});assert(!r.success&&r.code==='ALREADY_GIVEN'&&r.givenBy==='shirt1','second shirt for the same student blocked');
+r=post({action:'shirtGive',token:tsh,kind:'staff',id:'ST3'});assert(!r.success&&r.code==='NO_SIZE','person without size must pick one');
+r=post({action:'shirtGive',token:tsh,kind:'student',id:'2002'});assert(!r.success&&r.code==='NO_STOCK_ROW','size without stock row is refused');
+r=post({action:'shirtGive',token:tsh,kind:'staff',id:'ST2',size:'L'});assert(r.success&&r.remaining===0,'staff shirt (size taken from the staff list)');
+r=post({action:'shirtGive',token:tsh,kind:'student',id:'1002',size:'L'});assert(!r.success&&r.code==='OUT_OF_STOCK','out of stock blocked');
+r=post({action:'shirtGive',token:tsh,kind:'student',id:'1002',size:'M'});assert(r.success&&r.changedSize===true&&r.remaining===1,'a different size can be chosen when needed');
+r=post({action:'shirtUndo',token:tsh,kind:'student',id:'1002'});assert(r.success,'undo a hand-over');
+r=post({action:'shirtStock',token:tsh});assert(r.table.find(x=>x.size==='M').given===1&&r.summary.studentsGiven===1&&r.summary.staffGiven===1,'undo returns the shirt to stock; counters correct');
+r=post({action:'shirtUndo',token:tsh,kind:'student',id:'1002'});assert(!r.success&&r.code==='NOT_GIVEN','cannot undo twice');
+assert(book.AuditLog.rows.some(x=>x[2]==='SHIRT_GIVEN')&&book.AuditLog.rows.some(x=>x[2]==='SHIRT_UNDONE'),'audit: shirts');
 // ---- enable/disable accounts from the app
 post({action:'createUser',token:T,username:'tmp1',password:'p9-12345',fullName:'مؤقت',role:'supervisor',permissions:['checkin'],assignedBus:'1',committees:[]});
 let tt=post({action:'login',username:'tmp1',password:'p9-12345'}).token;
