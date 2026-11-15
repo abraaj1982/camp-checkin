@@ -11,7 +11,15 @@
 .rp-group{margin-top:14px}.rp-group h2{font-size:15px;margin:0 4px 8px;color:var(--muted,#667)}
 .rp-card{display:flex;align-items:center;gap:12px;width:100%;text-align:start;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-top:8px;cursor:pointer;font:inherit;color:inherit}
 .rp-card .ic{width:42px;height:42px;border-radius:12px;background:var(--soft);display:grid;place-items:center;font-size:20px;flex:none}.rp-card b{font-size:16px}
-.bar{display:flex;gap:8px;flex-wrap:wrap}.bar .btn{flex:1;min-width:130px}
+.rpact{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.rpact .btn{flex:1 1 140px;min-height:48px}
+.sticky{position:sticky;top:0;z-index:15;background:var(--bg,var(--card));padding:8px 0;margin-top:4px}
+.sticky .box{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:10px;box-shadow:0 6px 18px rgba(0,0,0,.12)}
+.sw{display:flex;gap:8px;align-items:center;margin-bottom:8px}.sw select{flex:1;min-height:44px;font-weight:600}
+.sw .back{min-height:44px;white-space:nowrap}
+details.fold{margin-top:10px;border:1px solid var(--line);border-radius:14px;background:var(--card);padding:0 12px}
+details.fold>summary{cursor:pointer;padding:12px 0;font-weight:600;list-style:none}details.fold>summary::-webkit-details-marker{display:none}
+details.fold>summary:before{content:'▸ ';color:var(--muted,#667)}details.fold[open]>summary:before{content:'▾ '}
+details.fold .in{padding-bottom:12px}
 .flt{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 .cols{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 /* the "paper" = exactly what is printed */
@@ -109,7 +117,7 @@ function filtersView() {
     else if (k === 'from') out.push(`<div><label class="lbl" for="f-from">من تاريخ</label><input id="f-from" type="date" data-f="from" value="${esc(st.f.from || '')}"></div>`);
     else if (k === 'to') out.push(`<div><label class="lbl" for="f-to">إلى تاريخ</label><input id="f-to" type="date" data-f="to" value="${esc(st.f.to || '')}"></div>`);
   });
-  return out.length ? `<section class="card noprint"><div class="flt">${out.join('')}</div></section>` : '';
+  return out.length ? `<div class="flt">${out.join('')}</div>` : '';
 }
 function visibleCols(d) { return d.columns.filter(c => !st.hide[c.key]); }
 function sortedRows(d) {
@@ -136,10 +144,15 @@ function paper() {
   return `<section class="paper" id="paper">${head}${body}<div class="pfoot"><span>${esc(camp)} — ${esc(d.title)}</span><span>${d.confidential ? 'سري — للاستخدام الإداري' : ''}</span></div></section>`;
 }
 function reportView() {
-  const d = st.data, tools = d && d.kind === 'table' ? `<section class="card noprint"><div class="bar"><input id="q" type="search" placeholder="بحث داخل التقرير" value="${esc(st.q)}" style="flex:2;min-width:160px"></div>
-    <div class="lbl" style="margin-top:10px">الأعمدة (اضغط للإظهار أو الإخفاء)</div><div class="cols">${d.columns.map(c => `<button class="chip ${st.hide[c.key] ? '' : 'on'}" data-col="${esc(c.key)}">${esc(c.label)}</button>`).join('')}</div></section>` : '';
-  return `<div class="noprint"><button class="btn alt" data-back="1" style="min-height:42px">← كل التقارير</button></div>${filtersView()}${tools}
-    <div class="bar noprint" style="margin-top:12px"><button class="btn" data-print="1" ${d ? '' : 'disabled'}>🖨️ طباعة / حفظ PDF</button><button class="btn alt" data-csv="1" ${d && d.kind === 'table' ? '' : 'disabled'}>⬇️ تصدير Excel (CSV)</button></div>${paper()}`;
+  const d = st.data, tbl = d && d.kind === 'table';
+  const sw = `<select id="rsel" aria-label="التقرير">${(() => { const g = {}; st.cat.forEach(r => (g[r.group] = g[r.group] || []).push(r)); return Object.keys(g).map(k => `<optgroup label="${esc(k)}">${g[k].map(r => `<option value="${esc(r.id)}" ${st.cur.id === r.id ? 'selected' : ''}>${esc(r.title)}</option>`).join('')}</optgroup>`).join(''); })()}</select>`;
+  const top = `<div class="sticky noprint"><div class="box"><div class="sw"><button class="btn alt back" data-back="1">← القائمة</button>${sw}</div>
+    <div class="rpact"><button class="btn" data-print="1" ${d ? '' : 'disabled'}>🖨️ طباعة / PDF</button><button class="btn alt" data-csv="1" ${tbl ? '' : 'disabled'}>⬇️ Excel (CSV)</button></div></div></div>`;
+  const f = filtersView();
+  const flt = f ? `<details class="fold noprint" open><summary>الفلاتر</summary><div class="in">${f}</div></details>` : '';
+  const cols = tbl ? `<details class="fold noprint"><summary>الأعمدة والبحث</summary><div class="in"><input id="q" type="search" placeholder="بحث داخل التقرير" value="${esc(st.q)}">
+    <div class="lbl" style="margin-top:10px">اضغط لإظهار أو إخفاء عمود</div><div class="cols">${d.columns.map(c => `<button class="chip ${st.hide[c.key] ? '' : 'on'}" data-col="${esc(c.key)}">${esc(c.label)}</button>`).join('')}</div></div></details>` : '';
+  return `${top}${flt}${cols}${paper()}`;
 }
 function render() {
   document.documentElement.dataset.theme = st.theme; $('themeBtn').textContent = st.theme === 'light' ? '🌙 داكن' : '☀ فاتح';
@@ -166,7 +179,7 @@ function exportCsv() {
 }
 
 document.addEventListener('input', e => { if (e.target.id === 'q') { st.q = e.target.value; render(); } });
-document.addEventListener('change', e => { const k = e.target.dataset && e.target.dataset.f; if (k) { if (e.target.value) st.f[k] = e.target.value; else delete st.f[k]; schedule(); } });
+document.addEventListener('change', e => { if (e.target.id === 'rsel') { open_(e.target.value); return; } const k = e.target.dataset && e.target.dataset.f; if (k) { if (e.target.value) st.f[k] = e.target.value; else delete st.f[k]; schedule(); } });
 document.addEventListener('click', e => {
   const th = e.target.closest && e.target.closest('th[data-sort]'); if (th) { const k = th.dataset.sort; st.sort = st.sort && st.sort.key === k ? { key: k, dir: -st.sort.dir } : { key: k, dir: 1 }; render(); return; }
   const b = e.target.closest && e.target.closest('button'); if (!b) return; const d = b.dataset;
