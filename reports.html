@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="ar" dir="rtl" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>التقارير — MUKHAYYAM</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="theme.css">
+<script src="ui.js" defer></script>
+<style>
+.rp-group{margin-top:14px}.rp-group h2{font-size:15px;margin:0 4px 8px;color:var(--muted,#667)}
+.rp-card{display:flex;align-items:center;gap:12px;width:100%;text-align:start;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-top:8px;cursor:pointer;font:inherit;color:inherit}
+.rp-card .ic{width:42px;height:42px;border-radius:12px;background:var(--soft);display:grid;place-items:center;font-size:20px;flex:none}.rp-card b{font-size:16px}
+.bar{display:flex;gap:8px;flex-wrap:wrap}.bar .btn{flex:1;min-width:130px}
+.flt{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.cols{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+/* the "paper" = exactly what is printed */
+.paper{background:#fff;color:#111;border:1px solid var(--line);border-radius:14px;padding:18px;margin-top:12px;overflow-x:auto}
+.ph{display:flex;align-items:center;gap:14px;border-bottom:3px solid #1F5E3B;padding-bottom:10px;margin-bottom:10px}
+.ph .lg{width:54px;height:54px;border-radius:12px;background:#E8B04B;color:#1b2a1b;display:grid;place-items:center;font-size:30px;font-weight:700;flex:none}
+.ph .nm{font-size:20px;font-weight:700}.ph .sb{font-size:13px;color:#555}.ph .mt{margin-inline-start:auto;text-align:end;font-size:12px;color:#444;line-height:1.6}
+.pt{font-size:22px;font-weight:700;margin:6px 0 2px}.pf{font-size:13px;color:#444;margin-bottom:10px}
+.conf{display:inline-block;border:2px solid #B3261E;color:#B3261E;border-radius:6px;padding:0 10px;font-weight:700;font-size:13px;margin-inline-start:8px}
+table.rt{width:100%;border-collapse:collapse;font-size:13.5px}
+table.rt th{background:#1F5E3B;color:#fff;padding:7px 8px;text-align:start;font-weight:600;white-space:nowrap}
+table.rt td{padding:6px 8px;border-bottom:1px solid #e1e1e1}
+table.rt tr:nth-child(even) td{background:#f5f8f6}
+table.rt .num{text-align:center;font-variant-numeric:tabular-nums}
+table.rt tr.tot td{font-weight:700;background:#e8f0ea;border-top:2px solid #1F5E3B}
+th.sortable{cursor:pointer}
+.kp{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:8px 0 12px}.kp div{border:1px solid #cfd8d2;border-radius:10px;padding:10px;text-align:center}.kp b{display:block;font-size:22px;color:#1F5E3B}.kp span{font-size:12px;color:#555}
+.sec h3{font-size:16px;margin:16px 0 4px;border-inline-start:5px solid #E8B04B;padding-inline-start:8px}
+.pfoot{margin-top:14px;font-size:11px;color:#666;display:flex;justify-content:space-between;border-top:1px solid #ddd;padding-top:6px}
+.empty{padding:20px;text-align:center;color:#666}
+@media (max-width:640px){.kp{grid-template-columns:repeat(2,1fr)}}
+@media print{
+  html,body{background:#fff!important}
+  .hdr,.hero,.noprint,.tabs{display:none!important}
+  .wrap{max-width:none!important;width:100%!important;margin:0!important;padding:0!important;box-shadow:none!important;border-radius:0!important;background:#fff!important}
+  main{padding:0!important}
+  .paper{border:0;border-radius:0;padding:0;margin:0;overflow:visible}
+  table.rt thead{display:table-header-group}table.rt tr{break-inside:avoid}
+  .sec{break-inside:avoid-page}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hdr">
+    <div class="brand"><div class="logo">م</div><div style="min-width:0"><div class="t" id="campT"></div><div class="s" id="campS"></div></div></div>
+    <div class="tools"><a class="tool" href="hub.html" id="homeBtn">الرئيسية</a><button class="tool" id="themeBtn"></button></div>
+  </header>
+  <section class="hero compact"><div class="ic" aria-hidden="true">📑</div><div><h1>التقارير</h1><p>استخراج وطباعة وتصدير</p></div></section>
+  <main id="app"></main>
+</div>
+<script>
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4lEBGPNxghwq9UmK0iljI5QdS-8iCvC-K09dDtbZCXGvGZyA4repTE3rFVVRp5zS4yw/exec';
+const token = sessionStorage.getItem('mukhayyam_token');
+let perms = [];
+try { perms = JSON.parse(sessionStorage.getItem('mukhayyam_permissions') || '[]'); } catch (e) {}
+const can = k => perms.indexOf('*') !== -1 || perms.indexOf(k) !== -1;
+if (!token) location.href = 'login.html'; else if (!can('reports')) location.href = 'hub.html';
+const pref = { get(k, d) { try { return localStorage.getItem('mk_pref_' + k) || d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('mk_pref_' + k, v); } catch (e) {} } };
+const $ = id => document.getElementById(id);
+const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const AUTH_ERR = /EXPIRED|IDLE_TIMEOUT|REVOKED|BAD_SIGNATURE|MALFORMED|USER_NOT_FOUND|ACCOUNT_DISABLED|BAD_PAYLOAD/;
+const ICONS = { 'الحضور والباصات': '🚌', 'الخروج': '🚪', 'القمصان': '👕', 'الفعاليات والنتائج': '🏆', 'ملخصات': '📋' };
+const FL = { bus: 'الباص', team: 'الفريق', cls: 'الصف', size: 'المقاس' };
+const st = { theme: pref.get('theme', 'light'), cat: null, opts: null, cur: null, f: {}, data: null, hide: {}, sort: null, q: '', msg: null, busy: false };
+async function api(action, extra) {
+  const r = await (await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(Object.assign({ action: action, token: token }, extra || {})) })).json();
+  if (r && r.code && AUTH_ERR.test(r.code)) { st.msg = { cls: 'bad', t: 'انتهت الجلسة. سجّل الدخول من جديد.' }; render(); setTimeout(() => { sessionStorage.clear(); location.href = 'login.html'; }, 1500); throw new Error('auth'); }
+  return r;
+}
+const fmtTime = iso => { if (!iso) return ''; const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleTimeString('en-GB', { timeZone: 'Asia/Muscat', hour: '2-digit', minute: '2-digit' }); };
+const fmtDT = iso => { if (!iso) return ''; const d = new Date(iso); if (isNaN(d)) return ''; return d.toLocaleDateString('en-GB', { timeZone: 'Asia/Muscat', day: '2-digit', month: '2-digit' }) + ' ' + fmtTime(iso); };
+const cell = (c, v) => c.type === 'time' ? fmtTime(v) : c.type === 'datetime' ? fmtDT(v) : (v === undefined || v === null ? '' : v);
+
+async function init() { try { const r = await api('reportOptions'); if (r.success) { st.cat = r.reports; st.opts = r; } else st.msg = { cls: 'bad', t: r.error || 'تعذّر التحميل' }; } catch (e) { if (e.message !== 'auth') st.msg = { cls: 'bad', t: 'تعذّر الاتصال. حاول مرة أخرى.' }; } render(); }
+let runT = null;
+function schedule() { clearTimeout(runT); runT = setTimeout(run, 250); }
+async function run() {
+  if (!st.cur) return; st.busy = true; st.msg = null;
+  try { const r = await api('reportData', { report: st.cur.id, filters: st.f }); if (r.success) { st.data = r; } else { st.data = null; st.msg = { cls: 'bad', t: r.error || 'تعذّر إنشاء التقرير' }; } } catch (e) { if (e.message !== 'auth') st.msg = { cls: 'bad', t: 'تعذّر الاتصال. حاول مرة أخرى.' }; }
+  st.busy = false; render();
+}
+function open_(id) { st.cur = st.cat.find(r => r.id === id); st.f = {}; st.data = null; st.hide = {}; st.sort = null; st.q = ''; if (st.cur.id === 'boardingSummary') st.f.groupBy = 'bus'; render(); run(); }
+
+/* ---------- views ---------- */
+function listView() {
+  const groups = {}; st.cat.forEach(r => (groups[r.group] = groups[r.group] || []).push(r));
+  return Object.keys(groups).map(g => `<div class="rp-group"><h2>${ICONS[g] || '📄'} ${esc(g)}</h2>${groups[g].map(r => `<button class="rp-card" data-open="${esc(r.id)}"><span class="ic">${ICONS[g] || '📄'}</span><b>${esc(r.title)}</b></button>`).join('')}</div>`).join('');
+}
+function sel(key, label, options, withAll) {
+  return `<div><label class="lbl" for="f-${key}">${label}</label><select id="f-${key}" data-f="${key}">${withAll ? '<option value="">الكل</option>' : ''}${options.map(o => `<option value="${esc(o[0])}" ${String(st.f[key] || '') === String(o[0]) ? 'selected' : ''}>${esc(o[1])}</option>`).join('')}</select></div>`;
+}
+function filtersView() {
+  const d = st.cur, o = st.opts, p = x => x.map(v => [v, v]); const out = [];
+  d.filters.forEach(k => {
+    if (k === 'bus') out.push(sel('bus', 'الباص', p(o.buses), true));
+    else if (k === 'team') out.push(sel('team', 'الفريق', p(o.teams), true));
+    else if (k === 'cls') out.push(sel('cls', 'الصف', p(o.classes), true));
+    else if (k === 'size') out.push(sel('size', 'المقاس', p(o.sizes), true));
+    else if (k === 'status') out.push(sel('status', 'الحالة', [['boarded', 'صعدوا'], ['missing', 'لم يصعدوا'], ['withdrawn', 'خرجوا بإذن']], true));
+    else if (k === 'groupBy') out.push(sel('groupBy', 'التجميع حسب', [['bus', 'الباص'], ['team', 'الفريق'], ['cls', 'الصف']], false));
+    else if (k === 'exitStatus') out.push(sel('exitStatus', 'الحالة', [['open', 'معتمد (بانتظار الخروج)'], ['closed', 'خرج'], ['cancelled', 'مُلغى'], ['reversed', 'أُعيد الطالب']], true));
+    else if (k === 'kind') out.push(sel('kind', 'النوع', [['student', 'طلاب'], ['staff', 'كادر']], true));
+    else if (k === 'from') out.push(`<div><label class="lbl" for="f-from">من تاريخ</label><input id="f-from" type="date" data-f="from" value="${esc(st.f.from || '')}"></div>`);
+    else if (k === 'to') out.push(`<div><label class="lbl" for="f-to">إلى تاريخ</label><input id="f-to" type="date" data-f="to" value="${esc(st.f.to || '')}"></div>`);
+  });
+  return out.length ? `<section class="card noprint"><div class="flt">${out.join('')}</div></section>` : '';
+}
+function visibleCols(d) { return d.columns.filter(c => !st.hide[c.key]); }
+function sortedRows(d) {
+  let rows = d.rows.slice(); const q = st.q.trim().toLowerCase();
+  if (q) rows = rows.filter(r => d.columns.some(c => String(cell(c, r[c.key])).toLowerCase().indexOf(q) !== -1));
+  if (st.sort) { const c = d.columns.find(x => x.key === st.sort.key); const dir = st.sort.dir; rows.sort((a, b) => { const x = a[c.key], y = b[c.key]; const r = (typeof x === 'number' && typeof y === 'number') ? x - y : String(x === undefined ? '' : x).localeCompare(String(y === undefined ? '' : y), 'ar', { numeric: true }); return r * dir; }); }
+  return rows;
+}
+function tableHtml(columns, rows, totalRow, sortable) {
+  if (!rows.length) return `<div class="empty">لا توجد بيانات لهذه الفلاتر.</div>`;
+  const th = columns.map(c => `<th class="${sortable ? 'sortable' : ''} ${c.type === 'num' ? 'num' : ''}" ${sortable ? `data-sort="${esc(c.key)}"` : ''}>${esc(c.label)}${sortable && st.sort && st.sort.key === c.key ? (st.sort.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('');
+  const tr = r => `<tr>${columns.map(c => `<td class="${c.type === 'num' ? 'num' : ''}">${esc(cell(c, r[c.key]))}</td>`).join('')}</tr>`;
+  return `<table class="rt"><thead><tr>${th}</tr></thead><tbody>${rows.map(tr).join('')}${totalRow ? `<tr class="tot">${columns.map(c => `<td class="${c.type === 'num' ? 'num' : ''}">${esc(cell(c, totalRow[c.key]))}</td>`).join('')}</tr>` : ''}</tbody></table>`;
+}
+function paper() {
+  const d = st.data; if (!d) return st.busy ? `<div class="card muted">جارٍ إنشاء التقرير…</div>` : '';
+  const camp = ($('campT') && $('campT').textContent) || '', now = new Date();
+  const when = now.toLocaleDateString('ar-u-nu-latn', { timeZone: 'Asia/Muscat', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) + ' · ' + fmtTime(now.toISOString());
+  const head = `<div class="ph"><div class="lg">م</div><div><div class="nm">${esc(camp)}</div><div class="sb">${esc(d.group)}</div></div><div class="mt">${esc(when)}<br>أعدّه: ${esc(d.generatedBy)}</div></div>
+    <div class="pt">${esc(d.title)}${d.confidential ? '<span class="conf">سري</span>' : ''}</div><div class="pf">${esc(d.filtersText || '')}${d.kind === 'table' ? (d.filtersText ? ' · ' : '') + d.rows.length + ' سجل' : ''}</div>`;
+  let body = '';
+  if (d.kind === 'summary') body = d.sections.map(s => `<div class="sec"><h3>${esc(s.title)}</h3>${s.kpis && s.kpis.length ? `<div class="kp">${s.kpis.map(k => `<div><b>${esc(k.value)}</b><span>${esc(k.label)}</span></div>`).join('')}</div>` : ''}${s.table ? tableHtml(s.table.columns, s.table.rows, s.table.totalRow, false) : ''}</div>`).join('');
+  else body = tableHtml(visibleCols(d), sortedRows(d), st.q.trim() ? null : d.totalRow, true);
+  return `<section class="paper" id="paper">${head}${body}<div class="pfoot"><span>${esc(camp)} — ${esc(d.title)}</span><span>${d.confidential ? 'سري — للاستخدام الإداري' : ''}</span></div></section>`;
+}
+function reportView() {
+  const d = st.data, tools = d && d.kind === 'table' ? `<section class="card noprint"><div class="bar"><input id="q" type="search" placeholder="بحث داخل التقرير" value="${esc(st.q)}" style="flex:2;min-width:160px"></div>
+    <div class="lbl" style="margin-top:10px">الأعمدة (اضغط للإظهار أو الإخفاء)</div><div class="cols">${d.columns.map(c => `<button class="chip ${st.hide[c.key] ? '' : 'on'}" data-col="${esc(c.key)}">${esc(c.label)}</button>`).join('')}</div></section>` : '';
+  return `<div class="noprint"><button class="btn alt" data-back="1" style="min-height:42px">← كل التقارير</button></div>${filtersView()}${tools}
+    <div class="bar noprint" style="margin-top:12px"><button class="btn" data-print="1" ${d ? '' : 'disabled'}>🖨️ طباعة / حفظ PDF</button><button class="btn alt" data-csv="1" ${d && d.kind === 'table' ? '' : 'disabled'}>⬇️ تصدير Excel (CSV)</button></div>${paper()}`;
+}
+function render() {
+  document.documentElement.dataset.theme = st.theme; $('themeBtn').textContent = st.theme === 'light' ? '🌙 داكن' : '☀ فاتح';
+  const ae = document.activeElement, keep = ae && ae.id === 'q' ? ae.selectionStart : null;
+  $('app').innerHTML = `${st.msg ? `<div class="banner ${st.msg.cls} noprint" role="alert">${esc(st.msg.t)}</div>` : ''}${!st.cat ? '<div class="card muted">...</div>' : st.cur ? reportView() : listView()}`;
+  if (keep !== null && $('q')) { const q = $('q'); q.focus(); try { q.setSelectionRange(keep, keep); } catch (e) {} }
+}
+
+/* ---------- print + export ---------- */
+function printNow() {
+  const d = st.data; if (!d) return;
+  let s = document.getElementById('pageStyle'); if (!s) { s = document.createElement('style'); s.id = 'pageStyle'; document.head.appendChild(s); }
+  s.textContent = `@page{size:A4 ${d.landscape ? 'landscape' : 'portrait'};margin:14mm 12mm 16mm;@bottom-center{content:"صفحة " counter(page) " من " counter(pages);font-size:10px;color:#555}}`;
+  const old = document.title; document.title = d.title + ' — ' + new Date().toISOString().slice(0, 10); window.print(); setTimeout(() => { document.title = old; }, 500);
+}
+// A spreadsheet would run a cell starting with = + - @ as a formula: prefix an apostrophe.
+const csvCell = v => { let t = String(v === undefined || v === null ? '' : v); if (/^[=+\-@\t\r]/.test(t)) t = "'" + t; return '"' + t.replace(/"/g, '""') + '"'; };
+function exportCsv() {
+  const d = st.data; if (!d || d.kind !== 'table') return; const cols = visibleCols(d), rows = sortedRows(d);
+  const lines = [cols.map(c => csvCell(c.label)).join(',')].concat(rows.map(r => cols.map(c => csvCell(cell(c, r[c.key]))).join(',')));
+  if (d.totalRow && !st.q.trim()) lines.push(cols.map(c => csvCell(cell(c, d.totalRow[c.key]))).join(','));
+  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }); const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = d.title + '-' + new Date().toISOString().slice(0, 10) + '.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+document.addEventListener('input', e => { if (e.target.id === 'q') { st.q = e.target.value; render(); } });
+document.addEventListener('change', e => { const k = e.target.dataset && e.target.dataset.f; if (k) { if (e.target.value) st.f[k] = e.target.value; else delete st.f[k]; schedule(); } });
+document.addEventListener('click', e => {
+  const th = e.target.closest && e.target.closest('th[data-sort]'); if (th) { const k = th.dataset.sort; st.sort = st.sort && st.sort.key === k ? { key: k, dir: -st.sort.dir } : { key: k, dir: 1 }; render(); return; }
+  const b = e.target.closest && e.target.closest('button'); if (!b) return; const d = b.dataset;
+  if (d.open) open_(d.open); else if (d.back) { st.cur = null; st.data = null; st.msg = null; render(); }
+  else if (d.col) { st.hide[d.col] = !st.hide[d.col]; render(); } else if (d.print) printNow(); else if (d.csv) exportCsv();
+});
+$('themeBtn').onclick = () => { st.theme = st.theme === 'light' ? 'dark' : 'light'; pref.set('theme', st.theme); render(); };
+render(); init();
+</script>
+</body></html>

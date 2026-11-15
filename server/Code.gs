@@ -76,6 +76,8 @@ const ACTIONS_ = {
   prayerList: function(d) { return handlePrayerList_(d); },
   prayerSave: function(d) { return handlePrayerSave_(d); },
   displayTheme: function(d) { return handleDisplayTheme_(d); },
+  reportOptions: function(d) { return handleReportOptions_(d); },
+  reportData: function(d) { return handleReportData_(d); },
   shirtStock: function(d) { return handleShirtStock_(d); },
   shirtFind: function(d) { return handleShirtFind_(d); },
   shirtGive: function(d) { return handleShirtGive_(d); },

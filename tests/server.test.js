@@ -21,7 +21,7 @@ const ctx={console,Logger:{log:()=>{}},Date,
   computeDigest:(a,seed)=>[...crypto.createHash('sha256').update(seed).digest()],DigestAlgorithm:{SHA_256:1},getUuid:()=>crypto.randomUUID(),
   formatDate:(d,tz,f)=>{const x=new Date(d.getTime()+4*3600e3);return String(x.getUTCHours()).padStart(2,'0')+':'+String(x.getUTCMinutes()).padStart(2,'0')}}};
 vm.createContext(ctx);
-vm.runInContext(fs.readFileSync(__dirname+'/../server/Auth.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Code.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Custody.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Health.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Media.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Shirts.gs','utf8'),ctx);
+vm.runInContext(fs.readFileSync(__dirname+'/../server/Auth.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Code.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Custody.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Health.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Media.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Shirts.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Reports.gs','utf8'),ctx);
 const U=['Username','PasswordHash','Salt','FullName','Role','AssignedBus','Active','FailedAttempts','LockedUntil','TokenEpoch','LastActivityAt','CreatedAt','LastLogin'];
 book.Users=mkSheet([U]);book.Settings=mkSheet([['Key','Value']]);book.AuditLog=mkSheet([['Timestamp','ActorUsername','Action','TargetUsername','Details']]);
 // student sheet: reordered columns, includes Photo URL + Contact number which must never leak
@@ -273,6 +273,25 @@ r=post({action:'shirtUndo',token:tsh,kind:'student',id:'1002'});assert(r.success
 r=post({action:'shirtStock',token:tsh});assert(r.table.find(x=>x.size==='M').given===1&&r.summary.studentsGiven===1&&r.summary.staffGiven===1,'undo returns the shirt to stock; counters correct');
 r=post({action:'shirtUndo',token:tsh,kind:'student',id:'1002'});assert(!r.success&&r.code==='NOT_GIVEN','cannot undo twice');
 assert(book.AuditLog.rows.some(x=>x[2]==='SHIRT_GIVEN')&&book.AuditLog.rows.some(x=>x[2]==='SHIRT_UNDONE'),'audit: shirts');
+// ---- reports (secretariat only; no phones; audited)
+{post({action:'createUser',token:T,username:'secr',password:'pr-12345',fullName:'السكرتارية',role:'supervisor',permissions:['reports'],committees:[]});
+ const trp=post({action:'login',username:'secr',password:'pr-12345'}).token;
+ for(const [nm,tk] of [['supervisor',t1],['leader',tl],['doctor',td],['nutrition',tn]]){assert(!post({action:'reportData',token:tk,report:'busAttendance'}).success,nm+' cannot open reports');assert(!post({action:'reportOptions',token:tk}).success,nm+' cannot read report options');}
+ let r=post({action:'reportOptions',token:trp});assert(r.success&&r.reports.length>=8&&r.buses.includes('1')&&r.teams.length>0,'secretariat gets the report list and filter options');
+ r=post({action:'reportData',token:trp,report:'nope'});assert(!r.success&&r.code==='BAD_REQUEST','unknown report rejected');
+ r=post({action:'reportData',token:trp,report:'busAttendance',filters:{bus:'1'}});assert(r.success&&r.kind==='table'&&r.rows.length>0&&r.rows.every(x=>x.bus==='1')&&r.columns.length>=6,'attendance sheet filtered by bus');
+ const all=post({action:'reportData',token:trp,report:'busAttendance'});assert(all.rows.length===4,'attendance sheet: all students');
+ r=post({action:'reportData',token:trp,report:'busAttendance',filters:{status:'boarded'}});assert(r.rows.every(x=>x.state==='صعد')&&r.rows.length>=1,'attendance filter: boarded only');
+ r=post({action:'reportData',token:trp,report:'boardingSummary',filters:{groupBy:'team'}});assert(r.success&&r.rows.length>=2&&r.totalRow.total===4&&r.rows.reduce((a,x)=>a+x.total,0)===4,'boarding summary by team adds up to the total');
+ r=post({action:'reportData',token:trp,report:'exits'});assert(r.success&&r.confidential===true&&Array.isArray(r.rows),'exits report is marked confidential');
+ r=post({action:'reportData',token:trp,report:'shirtsStock'});assert(r.success&&r.totalRow.size==='الإجمالي'&&r.rows.length>=1,'shirts stock report with totals');
+ r=post({action:'reportData',token:trp,report:'shirtsPending'});assert(r.success&&r.rows.length>=1,'shirts pending report');
+ r=post({action:'reportData',token:trp,report:'results'});assert(r.success,'results report');
+ r=post({action:'reportData',token:trp,report:'teamRanking'});assert(r.success&&(r.rows.length===0||r.rows[0].rank===1),'team ranking');
+ r=post({action:'reportData',token:trp,report:'campSummary'});assert(r.success&&r.kind==='summary'&&r.sections.length>=5&&r.sections[0].kpis[0].value===4,'camp summary has sections and the right total');
+ for(const rep of ['busAttendance','boardingSummary','exits','shirtsStock','shirtsPending','results','teamRanking','campSummary']){const j=JSON.stringify(post({action:'reportData',token:trp,report:rep}));assert(!/9999000|Contact|PasswordHash|\"Salt\"|ربو|سكري/.test(j),'no phone, hash or medical notes in report: '+rep);}
+ assert(book.AuditLog.rows.filter(x=>x[2]==='REPORT_RUN').length>=10,'every report run is in the audit log');
+ r=post({action:'reportData',token:T,report:'campSummary'});assert(r.success,'admin can open reports');}
 // ---- enable/disable accounts from the app
 post({action:'createUser',token:T,username:'tmp1',password:'p9-12345',fullName:'مؤقت',role:'supervisor',permissions:['checkin'],assignedBus:'1',committees:[]});
 let tt=post({action:'login',username:'tmp1',password:'p9-12345'}).token;

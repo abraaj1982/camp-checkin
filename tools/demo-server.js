@@ -17,15 +17,16 @@ const ctx={console,Logger:{log:()=>{}},Date,
   computeDigest:(a,seed)=>[...crypto.createHash('sha256').update(seed).digest()],DigestAlgorithm:{SHA_256:1},getUuid:()=>crypto.randomUUID(),
   formatDate:(d,tz,f)=>{const x=new Date(d.getTime()+4*3600e3);return String(x.getUTCHours()).padStart(2,'0')+':'+String(x.getUTCMinutes()).padStart(2,'0')}}};
 vm.createContext(ctx);
-vm.runInContext(fs.readFileSync(__dirname+'/../server/Auth.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Code.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Custody.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Health.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Media.gs','utf8'),ctx);
+vm.runInContext(fs.readFileSync(__dirname+'/../server/Auth.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Code.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Custody.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Health.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Media.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Shirts.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Reports.gs','utf8'),ctx);
 // ---------- DEMO SERVER: the REAL server code + invented data. Never touches any real sheet. ----------
 const U=['Username','PasswordHash','Salt','FullName','Role','AssignedBus','Active','FailedAttempts','LockedUntil','TokenEpoch','LastActivityAt','CreatedAt','LastLogin'];
 book.Users=mkSheet([U]);book.Settings=mkSheet([['Key','Value']]);book.AuditLog=mkSheet([['Timestamp','ActorUsername','Action','TargetUsername','Details']]);
 const first=['محمد','أحمد','علي','حسن','حسين','يوسف','إبراهيم','عبدالله','خالد','سالم','سعيد','ناصر','مصطفى','مهدي','صادق','جعفر','باقر','عباس','زيد','عمر','هلال','راشد','مازن','طارق','فهد'];
 const mid=['سالم','ناصر','خالد','حمد','سعيد','علي','محمد','راشد'];
 const teams=['الأزرق','الأحمر','الأخضر','الأصفر'],allergies={4:'فول سوداني',11:'حليب، بيض',17:'مكسرات',23:'فول سوداني',31:'سمك',38:'بيض'};
-const rows=[['Class','Name','Bus number','Student ID','Team name','Contact number','Photo URL','Food allergy']];
-for(let i=0;i<48;i++){rows.push([String(5+(i%4)),first[i%first.length]+' '+mid[(i*3)%mid.length]+' '+first[(i*7+3)%first.length],String(1+(i%4)),String(751+i*3),teams[(i*5)%4],'9999'+String(1000+i),'',allergies[i]||'']);}
+const rows=[['Class','Name','Bus number','Student ID','Team name','Contact number','Photo URL','Food allergy','Shirt size']];
+const sizes=['S','M','M','L','XL','M','L','S'];
+for(let i=0;i<48;i++){rows.push([String(5+(i%4)),first[i%first.length]+' '+mid[(i*3)%mid.length]+' '+first[(i*7+3)%first.length],String(1+(i%4)),String(751+i*3),teams[(i*5)%4],'9999'+String(1000+i),'',allergies[i]||'',sizes[i%sizes.length]]);}
 book.Bus=mkSheet(rows);
 const run=(c)=>vm.runInContext(c,ctx);
 const post=(o)=>JSON.parse(run('doPost')({postData:{contents:JSON.stringify(o)}}).t);
@@ -34,7 +35,7 @@ post({action:'createUser',username:'admin',password:'demo-1234',fullName:'مدي
 const T=post({action:'login',username:'admin',password:'demo-1234'}).token;
 const mk=(u,n,role,bus,perms)=>post({action:'createUser',token:T,username:u,password:'demo-1234',fullName:n,role:role,assignedBus:bus||'',permissions:perms||undefined,committees:[]});
 mk('sup1','مشرف الباص 1','supervisor','1');mk('sup2','مشرف الباص 2','supervisor','2');mk('sup3','مشرف الباص 3','supervisor','3');mk('sup4','مشرف الباص 4','supervisor','4');
-mk('leader','قائد المخيم','camp_leader','',['dashboard','stats','allbuses']);
+mk('leader','قائد المخيم','camp_leader','',['dashboard','stats','allbuses']);mk('secr','السكرتارية','supervisor','',['reports','custody','print']);
 mk('doctor','الطبيب','supervisor','',['medical']);mk('nutri','لجنة التغذية','supervisor','',['nutrition']);mk('scout','لجنة الكشافة','supervisor','',['gate']);mk('media','اللجنة الإعلامية','supervisor','',['announce','results','verify']);
 const tok=u=>post({action:'login',username:u,password:'demo-1234'}).token;
 const tokS=[1,2,3,4].map(i=>tok('sup'+i));
@@ -47,6 +48,9 @@ rows.slice(1).forEach((r,i)=>{ if(i%9===5) return; post({action:'scan',token:tok
 [[1,23.612,58.31,'onway',17],[2,23.640,58.15,'onway',20],[3,23.668,58.02,'arrived',2],[4,23.55,58.45,'departed',0]].forEach(b=>post({action:'busStatus',token:tokS[b[0]-1],status:b[3],lat:b[1],lng:b[2],acc:10,speed:b[4]}));
 // nutrition / medical / custody-withdrawal / media
 post({action:'nutritionSetStaff',token:T,count:34});
+book.Staff.rows.push(['مشرف أول','L',''],['مشرف ثانٍ','M',''],['منسق الفعاليات','XL',''],['مسؤول التغذية','M','']);
+[['S',12,3],['M',24,4],['L',14,3],['XL',6,2]].forEach(x=>post({action:'shirtStockSet',token:T,size:x[0],total:x[1],lowAt:x[2]}));
+[0,1,2,3,4,5,6,7,8,9,10,11,12,13].forEach(i=>post({action:'shirtGive',token:T,kind:'student',id:ids[i],clientId:'sh'+i}));
 const tm=tok('media'),td=tok('doctor'),tn=tok('nutri');
 let r=post({action:'medOpen',token:td,studentId:ids[7],complaint:'صداع وحرارة خفيفة',severity:'normal',clientId:'m1'});
 r=post({action:'medOpen',token:td,studentId:ids[20],complaint:'التواء بسيط في القدم',severity:'urgent',clientId:'m2'});
