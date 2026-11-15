@@ -73,6 +73,8 @@ const ACTIONS_ = {
   medStats: function(d) { return handleMedStats_(d); },
   nutritionSummary: function(d) { return handleNutritionSummary_(d); },
   nutritionAck: function(d) { return handleNutritionAck_(d); },
+  prayerList: function(d) { return handlePrayerList_(d); },
+  prayerSave: function(d) { return handlePrayerSave_(d); },
   nutritionSetStaff: function(d) { return handleNutritionSetStaff_(d); },
   mediaList: function(d) { return handleMediaList_(d); },
   annSave: function(d) { return handleAnnSave_(d); },

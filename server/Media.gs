@@ -6,7 +6,9 @@
 // Workflow: announcements need 'announce'; results are entered with 'results' and published with 'verify'.
 // =============================================================
 
-const ANN_KINDS_ = ['announce', 'event', 'other'];
+// announce = ticker/slide, event = countdown, urgent = full-screen emergency message, wisdom = حكمة اليوم,
+// kudos = موقف اليوم, quote = قالوا عن المخيم, call = استدعاء طالب (by number only), other.
+const ANN_KINDS_ = ['announce', 'event', 'urgent', 'wisdom', 'kudos', 'quote', 'call', 'other'];
 const ANN_AUDIENCE_ = ['public', 'staff'];
 function annSheet_() { return getSheetByName_('Announcements'); }
 function resultsSheet_() { return getSheetByName_('Results'); }
@@ -198,7 +200,56 @@ function handleFeed_(data) {
   if (same) { let diff = 0; for (let i = 0; i < key.length; i++) diff |= key.charCodeAt(i) ^ given.charCodeAt(i); same = diff === 0; }
   if (!same) return { success: false, error: 'Invalid key' };
   return { success: true, serverTime: new Date().toISOString(), campStart: String(getSetting_('CampStart') || '2026-12-27'),
-    announcements: publicAnnouncements_(['public']).slice(0, 30), results: groupResults_() };
+    announcements: publicAnnouncements_(['public']).slice(0, 30), results: groupResults_(),
+    prayers: allPrayers_(), iqamaMinutes: iqamaMinutes_(), totals: teamTotals_(),
+    campName: String(getSetting_('CampName') || ''), campSlogan: String(getSetting_('CampSlogan') || ''), campDays: Number(getSetting_('CampDays')) || 4 };
+}
+
+// ---------------- Prayer times (typed by the committee, one row per day in Settings) ----------------
+// Settings key "Prayer_YYYY-MM-DD" = "HH:MM|HH:MM|HH:MM|HH:MM|HH:MM" (Fajr|Dhuhr|Asr|Maghrib|Isha; empty = not shown).
+const PRAYER_NAMES_ = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
+function allPrayers_() {
+  const out = {};
+  readSheetAsObjects_(SETTINGS_SHEET).rows.forEach(function(r) {
+    const k = String(r.Key || '');
+    if (k.indexOf('Prayer_') !== 0) return;
+    const parts = String(r.Value || '').split('|'), day = {};
+    PRAYER_NAMES_.forEach(function(n, i) { if (/^\d{2}:\d{2}$/.test(parts[i] || '')) day[n] = parts[i]; });
+    out[k.slice(7)] = day;
+  });
+  return out;
+}
+function iqamaMinutes_() { const v = Number(getSetting_('IqamaMinutes')); return isFinite(v) && v > 0 && v <= 60 ? v : 15; }
+
+function handlePrayerList_(data) {
+  return withAuth_(data, requirePerm_('announce'), function() {
+    return { success: true, prayers: allPrayers_(), iqamaMinutes: iqamaMinutes_() };
+  });
+}
+
+function handlePrayerSave_(data) {
+  return withAuth_(data, requirePerm_('announce'), function(user) {
+    const date = String(data.date || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { success: false, error: 'اختر التاريخ' };
+    const t = data.times || {};
+    const vals = PRAYER_NAMES_.map(function(n) { const v = String(t[n] || '').trim(); return /^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? v : ''; });
+    if (!vals.some(Boolean)) return { success: false, error: 'أدخل وقتاً واحداً على الأقل' };
+    setSetting_('Prayer_' + date, vals.join('|'));
+    if (data.iqamaMinutes !== undefined && data.iqamaMinutes !== '') {
+      const m = Math.round(Number(data.iqamaMinutes));
+      if (!isFinite(m) || m < 1 || m > 60) return { success: false, error: 'دقائق الإقامة بين 1 و 60' };
+      setSetting_('IqamaMinutes', m);
+    }
+    writeAudit_(user.Username, 'PRAYER_SAVED', date, vals.join('|'));
+    return { success: true };
+  });
+}
+
+// Overall team ranking = sum of published points.
+function teamTotals_() {
+  const sum = {};
+  readResults_().filter(function(r) { return r.status === 'published' && r.points !== null; }).forEach(function(r) { sum[r.team] = (sum[r.team] || 0) + r.points; });
+  return Object.keys(sum).map(function(k) { return { team: k, points: sum[k] }; }).sort(function(a, b) { return b.points - a.points; });
 }
 
 // Run once from the Apps Script editor; copy the key from the log into the display-screen project. Run again to rotate.

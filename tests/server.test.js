@@ -238,6 +238,17 @@ r=post({action:'resStatus',token:tv,id:r2,status:'archived'});r=post({action:'fe
 r=post({action:'annStatus',token:tm,id:a2,status:'archived'});r=post({action:'feed',key:fk});assert(r.announcements.length===0,'archived announcement leaves the feed');
 assert(!JSON.stringify(post({action:'feed',key:fk})).match(/9999000|أحمد|ربو/),'feed has no student data');
 assert(book.AuditLog.rows.some(x=>x[2]==='RESULT_PUBLISHED'),'audit: results published');
+// ---- display screen: prayer times typed by the committee, team totals, new kinds
+r=post({action:'prayerSave',token:t1,date:'2026-12-28',times:{fajr:'05:28'}});assert(!r.success,'supervisor cannot set prayer times');
+r=post({action:'prayerSave',token:tm,date:'2026-12-28',times:{fajr:'25:00'}});assert(!r.success,'bad time rejected (nothing valid)');
+r=post({action:'prayerSave',token:tm,date:'2026-12-28',times:{fajr:'05:28',dhuhr:'12:10',maghrib:'17:30'},iqamaMinutes:20});assert(r.success,'committee saves fajr/dhuhr/maghrib');
+r=post({action:'prayerSave',token:tm,date:'2026-12-28',times:{fajr:'05:29',dhuhr:'12:10',maghrib:'17:30'}});assert(r.success,'same day saved again (update, no duplicate)');
+r=post({action:'prayerList',token:tm});assert(r.prayers['2026-12-28'].fajr==='05:29'&&!r.prayers['2026-12-28'].asr&&r.iqamaMinutes===20,'prayer list: updated, empty ones left out, iqama minutes');
+r=post({action:'annSave',token:tm,title:'تجمّع الجميع في الساحة',kind:'urgent',audience:'public'});assert(r.success,'urgent message kind accepted');
+r=post({action:'annSave',token:tm,title:'x y z',kind:'hack'});assert(!r.success,'unknown kind rejected');
+r=post({action:'resSave',token:tm,competition:'مسابقة ثقافية',team:'الأزرق',points:15});post({action:'resStatus',token:tv,id:r.id,status:'published'});
+r=post({action:'feed',key:fk});assert(r.prayers['2026-12-28'].maghrib==='17:30'&&r.iqamaMinutes===20&&r.totals[0].team==='الأزرق'&&r.totals[0].points===45&&r.campDays===4,'feed: prayers, iqama, team totals');
+
 // ---- password policy + profile edit
 r=post({action:'createUser',token:T,username:'weak',password:'12345',fullName:'ضعيف',role:'supervisor',permissions:['checkin'],committees:[]});assert(!r.success&&r.code==='WEAK_PASSWORD','short password refused on create');
 r=post({action:'resetPassword',token:T,targetUsername:'tmp1',newPassword:'abc'});assert(!r.success&&r.code==='WEAK_PASSWORD','short password refused on reset');

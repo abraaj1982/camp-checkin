@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>شاشة العرض — MUKHAYYAM</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Amiri:wght@700&display=swap">
+<style>
+/* Landscape TV (16:9). All sizes in vw so it scales with the screen. */
+:root{--gold:#E8B04B;--gold2:#F6D58E;--ink:#F4F1E8;--mute:rgba(244,241,232,.68);--glass:rgba(10,22,38,.55);--line:rgba(246,213,142,.28);--ok:#4CC38A;--bad:#E5484D}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#071321;color:var(--ink);font-family:'IBM Plex Sans Arabic',system-ui,sans-serif;overflow:hidden;cursor:none}
+.bg{position:fixed;inset:0;background-size:cover;background-position:center;opacity:0;transition:opacity 2.5s ease;animation:kb 40s ease-in-out infinite alternate}
+.bg.on{opacity:1}
+.bg.none{background:radial-gradient(ellipse at 20% 0%,#1d3b5c 0,transparent 55%),radial-gradient(ellipse at 90% 100%,#3b2a12 0,transparent 50%),linear-gradient(160deg,#0b1d33,#071321 60%,#0e1a12)}
+@keyframes kb{from{transform:scale(1)}to{transform:scale(1.08) translate(-1%,-1%)}}
+.shade{position:fixed;inset:0;background:linear-gradient(180deg,rgba(4,12,22,.78) 0,rgba(4,12,22,.45) 30%,rgba(4,12,22,.55) 70%,rgba(4,12,22,.9) 100%)}
+.pattern{position:fixed;inset:0;opacity:.06;background-image:radial-gradient(circle at 1.5vw 1.5vw,var(--gold2) .12vw,transparent .14vw);background-size:3vw 3vw}
+.top{position:fixed;top:0;inset-inline:0;padding:1.6vw 2.4vw 0;display:flex;justify-content:space-between;align-items:flex-start;gap:2vw;z-index:5}
+.brand{display:flex;align-items:center;gap:1.1vw}
+.logo{width:4.6vw;height:4.6vw;border-radius:1vw;background:var(--gold);color:#1b2a1b;display:grid;place-items:center;font:700 2.6vw 'IBM Plex Sans Arabic';overflow:hidden;box-shadow:0 .4vw 1.4vw rgba(0,0,0,.35)}
+.logo img{width:100%;height:100%;object-fit:contain;background:#fff}
+.cname{font-size:2vw;font-weight:700;line-height:1.2}.slogan{font-size:1.15vw;color:var(--gold2)}
+.dates{font-size:1vw;color:var(--mute);margin-top:.3vw}
+.clock{text-align:left;direction:ltr}
+.clock .t{font-size:3.6vw;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.clock .ap{font-size:1.6vw;margin-inline-start:.4vw;color:var(--gold2)}
+.chips{display:flex;gap:.6vw;justify-content:flex-end;margin-top:.6vw;direction:rtl}
+.chip{background:var(--glass);border:1px solid var(--line);border-radius:99px;padding:.3vw .9vw;font-size:1vw;white-space:nowrap;backdrop-filter:blur(6px)}
+.chip b{color:var(--gold2);font-variant-numeric:tabular-nums}
+.dot{display:inline-block;width:.6vw;height:.6vw;border-radius:50%;background:var(--ok);margin-inline-end:.4vw;animation:pulse 2s infinite}
+.dot.off{background:#888;animation:none}
+@keyframes pulse{50%{opacity:.35}}
+.stage{position:fixed;top:10.5vw;bottom:6.2vw;inset-inline:3vw;display:grid;place-items:center;z-index:4}
+.slide{width:100%;max-height:100%;animation:in .9s cubic-bezier(.2,.8,.2,1)}
+@keyframes in{from{opacity:0;transform:translateY(1.5vw) scale(.985)}to{opacity:1;transform:none}}
+.glass{background:var(--glass);border:1px solid var(--line);border-radius:1.6vw;backdrop-filter:blur(10px);box-shadow:0 1.5vw 4vw rgba(0,0,0,.35)}
+.kicker{color:var(--gold2);font-size:1.3vw;font-weight:600;letter-spacing:.02em}
+.h1{font-size:3.4vw;font-weight:700;line-height:1.25}
+.h2{font-size:2.3vw;font-weight:700;margin-bottom:1.4vw;display:flex;align-items:center;gap:.8vw;justify-content:center}
+.center{text-align:center}
+.big{font-size:9vw;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;direction:ltr}
+.cd{font-size:7vw;font-weight:700;color:var(--gold);font-variant-numeric:tabular-nums;direction:ltr;line-height:1.1;text-shadow:0 0 2.5vw rgba(232,176,75,.35)}
+.list{max-width:62vw;margin:0 auto;display:grid;gap:.9vw}
+.ev{display:flex;justify-content:space-between;align-items:center;padding:1.1vw 1.6vw}
+.ev .n{font-size:1.9vw;font-weight:600}.ev .w{font-size:1.15vw;color:var(--mute)}
+.ev .tm{font-size:1.6vw;color:var(--gold2);font-weight:600;white-space:nowrap}
+.ev.soon{border-color:var(--gold);box-shadow:0 0 0 .15vw rgba(232,176,75,.35)}
+.rank{max-width:66vw;margin:0 auto;display:grid;gap:1vw}
+.rrow{display:grid;grid-template-columns:3vw 14vw 1fr 6vw;align-items:center;gap:1.2vw;padding:.9vw 1.6vw;font-size:1.9vw}
+.bar{height:1.1vw;border-radius:99px;background:rgba(255,255,255,.12);overflow:hidden}.bar i{display:block;height:100%;border-radius:99px;transition:width 1.4s ease}
+.pts{font-weight:700;font-variant-numeric:tabular-nums;direction:ltr;text-align:left}
+.pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.2vw;max-width:62vw;margin:0 auto}
+.pcell{padding:1.4vw;text-align:center}.pcell .pn{font-size:1.6vw;color:var(--mute)}.pcell .pt{font-size:3.2vw;font-weight:700;direction:ltr}.pcell .iq{font-size:1vw;color:var(--mute)}
+.pcell.next{border-color:var(--gold);box-shadow:0 0 0 .15vw rgba(232,176,75,.45)}.pcell.past{opacity:.5}
+.card{padding:3vw 4vw;max-width:70vw;margin:0 auto;text-align:center}
+.icon{font-size:4.5vw;line-height:1;margin-bottom:1vw}
+.verse{font-family:'Amiri',serif;font-size:3.6vw;line-height:1.7;color:#fff}
+.src{color:var(--gold2);font-size:1.4vw;margin-top:1vw}
+.podium{display:flex;justify-content:center;align-items:flex-end;gap:2vw;height:30vw}
+.pod{width:16vw;text-align:center}.pod .blk{border-radius:1vw 1vw 0 0;display:grid;place-items:center;font-size:3vw;font-weight:700;color:#10151c}
+.pod .tn{font-size:1.9vw;font-weight:700;margin:.6vw 0}.pod .md{font-size:3vw}
+.full{position:fixed;inset:0;z-index:20;display:grid;place-items:center;background:radial-gradient(ellipse at center,rgba(14,40,30,.97),rgba(4,12,22,.99));text-align:center;padding:4vw}
+.full.urgent{background:radial-gradient(ellipse at center,#5c1114,#1a0507)}
+.full .ttl{font-size:5vw;font-weight:700;line-height:1.3}
+.full .sub{font-size:2.2vw;color:var(--gold2);margin-top:1.4vw}
+.mosque{font-size:7vw}
+.ticker{position:fixed;bottom:2.2vw;inset-inline:2.4vw;height:3vw;overflow:hidden;border-radius:99px;background:var(--glass);border:1px solid var(--line);display:flex;align-items:center;z-index:6}
+.ticker .lb{flex:none;background:var(--gold);color:#1b1b1b;font-weight:700;font-size:1.1vw;padding:0 1.2vw;height:100%;display:grid;place-items:center}
+.ticker .tr{flex:1;overflow:hidden;white-space:nowrap;position:relative;height:100%}
+.ticker .tr span{position:absolute;top:50%;font-size:1.3vw;white-space:nowrap;animation:tick linear infinite}
+@keyframes tick{from{left:0;transform:translate(-100%,-50%)}to{left:100%;transform:translate(0,-50%)}}
+.dots{position:fixed;bottom:.8vw;inset-inline:0;display:flex;justify-content:center;gap:.4vw;z-index:6}
+.dots i{width:.5vw;height:.5vw;border-radius:99px;background:rgba(255,255,255,.25);transition:all .4s}.dots i.on{width:1.6vw;background:var(--gold)}
+.badge{display:inline-block;background:var(--gold);color:#1b1b1b;border-radius:99px;padding:.15vw .8vw;font-size:1vw;font-weight:700;vertical-align:middle}
+.setup{position:fixed;inset:0;display:grid;place-items:center;z-index:50;cursor:auto;background:#071321}
+.setup .box{width:min(560px,90vw);padding:28px;border-radius:18px;background:#0f2238;border:1px solid var(--line);font-size:16px}
+.setup input{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:#071321;color:var(--ink);font-size:16px;margin:10px 0;direction:ltr}
+.setup button{width:100%;padding:12px;border-radius:10px;border:0;background:var(--gold);font-weight:700;font-size:16px;cursor:pointer}
+.fs{position:fixed;bottom:5.6vw;left:1vw;z-index:30;cursor:pointer;background:var(--glass);color:var(--ink);border:1px solid var(--line);border-radius:99px;padding:.4vw 1vw;font-size:1vw;opacity:.7}
+</style>
+</head>
+<body>
+<div class="bg none on" id="bgA"></div><div class="bg none" id="bgB"></div>
+<div class="shade"></div><div class="pattern"></div>
+<header class="top">
+  <div class="brand"><div class="logo" id="logo">م</div><div><div class="cname" id="cname"></div><div class="slogan" id="slogan"></div><div class="dates" id="dates"></div></div></div>
+  <div><div class="clock"><span class="t" id="clk">--:--</span><span class="ap" id="ap"></span></div><div class="chips" id="chips"></div></div>
+</header>
+<main class="stage" id="stage"></main>
+<div class="ticker" id="ticker" style="display:none"><div class="lb">📣 إعلانات</div><div class="tr" id="tick"></div></div>
+<div class="dots" id="dots"></div>
+<div id="over"></div>
+<button class="fs" id="fsBtn">⛶ ملء الشاشة</button>
+<script>
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4lEBGPNxghwq9UmK0iljI5QdS-8iCvC-K09dDtbZCXGvGZyA4repTE3rFVVRp5zS4yw/exec';
+// Edit here: camp name/slogan (until set from the system), logo file and background photos (put files next to this page).
+const CONFIG = {
+  name: 'المخيّم الطلابي', slogan: 'في الخير محفلًا',
+  logo: '',                     // e.g. 'display/logo.png'
+  backgrounds: [],              // e.g. ['display/bg1.jpg', 'display/bg2.jpg']
+  slideSeconds: 10, prayingMinutes: 10, eventAlertMinutes: 15, nightFrom: 22, nightTo: 4
+};
+const $ = id => document.getElementById(id);
+const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+const PR = { fajr: 'الفجر', dhuhr: 'الظهر', asr: 'العصر', maghrib: 'المغرب', isha: 'العشاء' };
+const TEAM_COLORS = ['#E5484D', '#4CC38A', '#3E8BFF', '#E8B04B', '#A06CF0', '#F07E3A', '#2EC4C4', '#E86BA7'];
+
+let D = null, offset = 0, online = false, idx = 0, seen = {}, lastSlideKey = '';
+try { D = JSON.parse(store.get('mk_display_cache') || 'null'); } catch (e) {}
+const now = () => new Date(Date.now() + offset);
+const p2 = n => String(n).padStart(2, '0');
+const ymd = d => d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate());
+const hms = ms => { ms = Math.max(0, ms); const s = Math.floor(ms / 1000); return p2(Math.floor(s / 3600)) + ':' + p2(Math.floor(s % 3600 / 60)) + ':' + p2(s % 60); };
+const t12 = hhmm => { const [h, m] = hhmm.split(':').map(Number); return ((h % 12) || 12) + ':' + p2(m) + ' ' + (h < 12 ? 'ص' : 'م'); };
+const atTime = (day, hhmm) => { const [h, m] = hhmm.split(':').map(Number); const d = new Date(day); d.setHours(h, m, 0, 0); return d; };
+const timeOf = iso => { const d = new Date(iso); return t12(p2(d.getHours()) + ':' + p2(d.getMinutes())); };
+
+/* ---------- data ---------- */
+async function load() {
+  const key = store.get('mk_feed_key'); if (!key) return;
+  try {
+    const r = await (await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'feed', key: key }) })).json();
+    if (r.success) { D = r; const so = new Date(r.serverTime).getTime() - Date.now(); offset = isFinite(so) ? so : 0; online = true; store.set('mk_display_cache', JSON.stringify(r)); }
+    else { online = false; if (/key/i.test(r.error || '')) { store.set('mk_feed_key', ''); setup('المفتاح غير صحيح. أدخله من جديد.'); } }
+  } catch (e) { online = false; }
+}
+
+/* ---------- prayers ---------- */
+function prayerEvents() { // adhan times for yesterday, today, tomorrow
+  if (!D || !D.prayers) return [];
+  const out = [], base = now();
+  for (const k of [-1, 0, 1]) { const day = new Date(base); day.setDate(day.getDate() + k); const p = D.prayers[ymd(day)]; if (!p) continue;
+    for (const n of Object.keys(PR)) if (p[n]) out.push({ n: n, at: atTime(day, p[n]) }); }
+  return out.sort((a, b) => a.at - b.at);
+}
+const iqMs = () => (D && D.iqamaMinutes || 15) * 60000;
+function prayerState() {
+  const t = now().getTime(), ev = prayerEvents();
+  const cur = ev.filter(e => e.at.getTime() <= t && t < e.at.getTime() + iqMs() + CONFIG.prayingMinutes * 60000).pop();
+  const next = ev.find(e => e.at.getTime() > t);
+  return { cur: cur, next: next };
+}
+
+/* ---------- content ---------- */
+const ann = k => (D && D.announcements || []).filter(a => a.kind === k);
+function upcomingEvents() { const t = now().getTime(); return ann('event').filter(a => a.startsAt && new Date(a.startsAt).getTime() > t - 30 * 60000).sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt)); }
+function whenText(iso) {
+  const d = new Date(iso), t = now(), ms = d - t;
+  if (ms < 0) return 'جارية الآن';
+  if (ms < 60 * 60000) return 'بعد ' + Math.ceil(ms / 60000) + ' دقيقة';
+  const day = ymd(d) === ymd(t) ? 'اليوم' : ymd(d) === ymd(new Date(t.getTime() + 864e5)) ? 'غداً' : d.toLocaleDateString('ar-u-nu-latn', { weekday: 'long' });
+  return day + ' ' + timeOf(iso);
+}
+function slides() {
+  const s = [], t = now();
+  s.push({ key: 'welcome', html: welcomeSlide() });
+  const evs = upcomingEvents(); if (evs.length) s.push({ key: 'events', html: eventsSlide(evs.slice(0, 5)) });
+  if (D && D.totals && D.totals.length) s.push({ key: 'rank', html: rankSlide() });
+  if (D && D.prayers && D.prayers[ymd(t)]) s.push({ key: 'prayers', html: prayersSlide() });
+  ann('wisdom').slice(0, 1).forEach(a => s.push({ key: a.id, at: a.publishedAt, html: textSlide('📖', 'حكمة اليوم', a.title, a.body, true) }));
+  ann('announce').slice(0, 5).forEach(a => s.push({ key: a.id, at: a.publishedAt, html: textSlide('📣', 'إعلان', a.title, a.body) }));
+  ann('kudos').slice(0, 3).forEach(a => s.push({ key: a.id, at: a.publishedAt, html: textSlide('🤝', 'موقف اليوم', a.title, a.body) }));
+  ann('quote').slice(0, 3).forEach(a => s.push({ key: a.id, at: a.publishedAt, html: textSlide('💬', 'قالوا عن المخيم', '«' + a.body + '»', a.title) }));
+  ann('call').slice(0, 3).forEach(a => s.push({ key: a.id, at: a.publishedAt, html: textSlide('🔔', 'استدعاء', a.title, a.body || 'يُرجى المراجعة') }));
+  const res = D && D.results || []; if (res.length) s.push({ key: 'pod-' + res[res.length - 1].competition, html: podiumSlide(res[res.length - 1]) });
+  return s;
+}
+function welcomeSlide() {
+  const t = now(), h = t.getHours(), greet = h < 12 ? 'صباح الخير' : h < 18 ? 'طاب يومكم' : 'مساء النور';
+  const start = D && D.campStart ? new Date(D.campStart + 'T00:00:00') : null, days = D && D.campDays || 4;
+  const n = start ? Math.floor((new Date(ymd(t) + 'T00:00:00') - start) / 864e5) + 1 : 0;
+  const dayLine = n >= 1 && n <= days ? `اليوم <b style="color:var(--gold)">${n}</b> من ${days}` : n < 1 && start ? `يبدأ المخيم بعد <b style="color:var(--gold)">${Math.ceil((start - t) / 864e5)}</b> يوم` : '';
+  return `<div class="center"><div class="kicker">${greet}</div><div class="h1" style="font-size:4.6vw;margin:.6vw 0">${esc(campName())}</div><div class="slogan" style="font-size:2vw">${esc(campSlogan())}</div>${dayLine ? `<div class="chip" style="display:inline-block;font-size:1.6vw;margin-top:2vw;padding:.6vw 1.8vw">${dayLine}</div>` : ''}</div>`;
+}
+function eventsSlide(evs) {
+  const t = now().getTime();
+  return `<div><div class="h2">📅 الفعاليات القادمة</div><div class="list">${evs.map(a => { const ms = new Date(a.startsAt) - t;
+    return `<div class="glass ev ${ms > 0 && ms < 60 * 60000 ? 'soon' : ''}"><div><div class="n">${esc(a.title)}</div>${a.body ? `<div class="w">📍 ${esc(a.body)}</div>` : ''}</div><div class="tm">${esc(whenText(a.startsAt))}</div></div>`; }).join('')}</div></div>`;
+}
+function rankSlide() {
+  const tt = D.totals, mx = Math.max(1, ...tt.map(x => x.points)), medal = ['🥇', '🥈', '🥉'];
+  return `<div><div class="h2">🏆 الترتيب العام للفرق</div><div class="rank">${tt.slice(0, 8).map((x, i) => `<div class="glass rrow"><span>${medal[i] || (i + 1)}</span><b>${esc(x.team)}</b><div class="bar"><i style="width:${Math.round(x.points / mx * 100)}%;background:${TEAM_COLORS[i % TEAM_COLORS.length]}"></i></div><span class="pts">${x.points}</span></div>`).join('')}</div></div>`;
+}
+function prayersSlide() {
+  const t = now(), p = D.prayers[ymd(t)], st = prayerState(), iq = D.iqamaMinutes || 15;
+  const names = Object.keys(PR).filter(n => p[n]);
+  return `<div><div class="h2">🕌 أوقات الصلاة</div>${st.next ? `<div class="center kicker" style="margin:-.6vw 0 1.2vw">الصلاة القادمة: ${PR[st.next.n]} بعد <b>${hms(st.next.at - t)}</b></div>` : ''}
+    <div class="pgrid" style="grid-template-columns:repeat(${Math.min(names.length, 5)},1fr)">${names.map(n => { const at = atTime(t, p[n]); const isNext = st.next && st.next.n === n && ymd(st.next.at) === ymd(t);
+      return `<div class="glass pcell ${isNext ? 'next' : at < t ? 'past' : ''}"><div class="pn">${PR[n]}</div><div class="pt">${t12(p[n])}</div><div class="iq">الإقامة +${iq} د</div></div>`; }).join('')}</div></div>`;
+}
+function textSlide(icon, kicker, title, body, verse) {
+  return `<div class="glass card"><div class="icon">${icon}</div><div class="kicker">${esc(kicker)}</div>${verse ? `<div class="verse" style="margin-top:1vw">${esc(title)}</div>${body ? `<div class="src">${esc(body)}</div>` : ''}` : `<div class="h1" style="margin-top:.8vw">${esc(title)}</div>${body ? `<div class="src" style="color:var(--ink);font-size:1.8vw">${esc(body)}</div>` : ''}`}</div>`;
+}
+function podiumSlide(g) {
+  const rows = g.rows.slice(0, 3), order = [rows[1], rows[0], rows[2]].filter(Boolean), h = { 0: 24, 1: 18, 2: 13 }, col = ['#E8B04B', '#C0C7D0', '#C98A4B'], md = ['🥇', '🥈', '🥉'];
+  return `<div><div class="h2">🎯 ${esc(g.competition)} <span class="badge">النتيجة</span></div><div class="podium">${order.map(r => { const i = rows.indexOf(r);
+    return `<div class="pod"><div class="md">${md[i]}</div><div class="tn">${esc(r.team)}</div><div class="blk" style="height:${h[i]}vw;background:${col[i]}">${r.points !== null ? r.points : '#' + (i + 1)}</div></div>`; }).join('')}</div></div>`;
+}
+
+/* ---------- full-screen overrides (priority order) ---------- */
+function override() {
+  const t = now(), u = ann('urgent')[0];
+  if (u) return `<div class="full urgent"><div><div class="icon">🚨</div><div class="ttl">${esc(u.title)}</div>${u.body ? `<div class="sub" style="color:#fff">${esc(u.body)}</div>` : ''}</div></div>`;
+  const ps = prayerState();
+  if (ps.cur) {
+    const adhan = ps.cur.at.getTime(), iqama = adhan + iqMs();
+    if (t < iqama) return `<div class="full"><div><div class="mosque">🕌</div><div class="kicker" style="font-size:1.8vw">حان الآن موعد</div><div class="ttl">أذان ${PR[ps.cur.n]}</div><div class="sub">الإقامة بعد <b class="cd" style="font-size:5vw;display:block;margin-top:.6vw">${hms(iqama - t)}</b></div></div></div>`;
+    return `<div class="full"><div><div class="mosque">🤲</div><div class="ttl">صلاة ${PR[ps.cur.n]} قائمة</div><div class="sub">نسألكم الدعاء · نرجو الهدوء</div></div></div>`;
+  }
+  const soon = upcomingEvents().find(a => { const ms = new Date(a.startsAt) - t; return ms > 0 && ms <= CONFIG.eventAlertMinutes * 60000; });
+  if (soon) return `<div class="full" style="background:radial-gradient(ellipse at center,rgba(40,30,8,.9),rgba(4,12,22,.97))"><div><div class="icon">⏰</div><div class="kicker" style="font-size:1.8vw">تبدأ بعد قليل</div><div class="ttl">${esc(soon.title)}</div><div class="cd" style="margin:1vw 0">${hms(new Date(soon.startsAt) - t)}</div>${soon.body ? `<div class="sub">📍 ${esc(soon.body)}</div>` : ''}</div></div>`;
+  const h = t.getHours();
+  if (h >= CONFIG.nightFrom || h < CONFIG.nightTo) { const n = ps.next;
+    return `<div class="full" style="background:radial-gradient(ellipse at center,#0b1a2e,#02060c)"><div><div class="icon">🌙</div><div class="big">${esc(t12(p2(h) + ':' + p2(t.getMinutes())))}</div>${n ? `<div class="sub">الصلاة القادمة: ${PR[n.n]} بعد ${hms(n.at - t)}</div>` : ''}<div class="kicker" style="margin-top:1vw">تصبحون على خير</div></div></div>`; }
+  return '';
+}
+
+/* ---------- painting ---------- */
+const campName = () => (D && D.campName) || CONFIG.name;
+const campSlogan = () => (D && D.campSlogan) || CONFIG.slogan;
+function paintHeader() {
+  const t = now();
+  $('cname').textContent = campName(); $('slogan').textContent = campSlogan();
+  const h = t.getHours(); $('clk').textContent = ((h % 12) || 12) + ':' + p2(t.getMinutes()); $('ap').textContent = h < 12 ? 'ص' : 'م';
+  let hij = ''; try { hij = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura-nu-latn', { day: 'numeric', month: 'long', year: 'numeric' }).format(t); } catch (e) {}
+  $('dates').textContent = t.toLocaleDateString('ar-u-nu-latn', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) + (hij ? ' · ' + hij : '');
+  const n = prayerState().next;
+  $('chips').innerHTML = `<span class="chip"><span class="dot ${online ? '' : 'off'}"></span>${online ? 'مباشر' : 'غير متصل'}</span>${n ? `<span class="chip">🕌 ${PR[n.n]} بعد <b>${hms(n.at - t)}</b></span>` : ''}`;
+}
+function paintTicker() {
+  const items = ann('announce').concat(ann('call')).map(a => a.title + (a.body ? ' — ' + a.body : ''));
+  const el = $('tick'), txt = items.join('   ✦   ');
+  $('ticker').style.display = items.length ? '' : 'none';
+  if (el.dataset.txt !== txt) { el.dataset.txt = txt; el.innerHTML = `<span style="animation-duration:${Math.max(20, txt.length * 0.25)}s">${esc(txt)}</span>`; }
+}
+let bgI = 0, bgFlip = false;
+function nextBg() {
+  if (!CONFIG.backgrounds.length) return;
+  bgI = (bgI + 1) % CONFIG.backgrounds.length; bgFlip = !bgFlip;
+  const on = bgFlip ? $('bgB') : $('bgA'), off = bgFlip ? $('bgA') : $('bgB');
+  on.classList.remove('none'); on.style.backgroundImage = `url("${CONFIG.backgrounds[bgI]}")`; on.classList.add('on'); off.classList.remove('on');
+}
+function showSlide() {
+  const ov = override();
+  $('over').innerHTML = ov;
+  if (ov) return;
+  const s = slides(); if (!s.length) return;
+  // something new (published in the last 3 minutes, not shown yet) jumps the queue
+  const t = now().getTime(), fresh = s.find(x => x.at && !seen[x.key] && t - new Date(x.at).getTime() < 3 * 60000);
+  let cur;
+  if (fresh) cur = fresh; else { idx = (idx + 1) % s.length; cur = s[idx]; }
+  seen[cur.key] = true;
+  if (cur.key !== lastSlideKey || cur.key === 'prayers' || cur.key === 'events') $('stage').innerHTML = `<div class="slide">${fresh ? '<div class="center" style="margin-bottom:1vw"><span class="badge">جديد</span></div>' : ''}${cur.html}</div>`;
+  lastSlideKey = cur.key;
+  $('dots').innerHTML = s.map(x => `<i class="${x.key === cur.key ? 'on' : ''}"></i>`).join('');
+  nextBg();
+}
+function tick() { paintHeader(); const ov = override(); if (ov || $('over').innerHTML) $('over').innerHTML = ov; }
+
+/* ---------- setup (key typed once on the TV, never in the URL) ---------- */
+function setup(msg) {
+  const d = document.createElement('div'); d.className = 'setup';
+  d.innerHTML = `<div class="box"><h2 style="margin-bottom:8px">إعداد شاشة العرض</h2><div style="color:var(--mute)">أدخل «مفتاح العرض» مرة واحدة على هذا الجهاز. تحصل عليه من مسؤول النظام.</div>${msg ? `<div style="color:#ff8a8a;margin-top:8px">${esc(msg)}</div>` : ''}<input id="kIn" type="password" autocomplete="off" placeholder="FEED KEY"><button id="kBtn">حفظ وبدء العرض</button></div>`;
+  document.body.appendChild(d);
+  d.querySelector('#kBtn').onclick = async () => { const v = d.querySelector('#kIn').value.trim(); if (!v) return; store.set('mk_feed_key', v); d.remove(); await load(); showSlide(); };
+}
+
+$('fsBtn').onclick = () => { (document.documentElement.requestFullscreen || function () {}).call(document.documentElement); $('fsBtn').style.display = 'none'; try { navigator.wakeLock && navigator.wakeLock.request('screen'); } catch (e) {} };
+if (CONFIG.logo) $('logo').innerHTML = `<img src="${esc(CONFIG.logo)}" alt="">`;
+if (!store.get('mk_feed_key')) setup();
+paintHeader(); paintTicker(); showSlide();
+load().then(() => { paintHeader(); paintTicker(); showSlide(); });
+setInterval(tick, 1000);
+setInterval(showSlide, CONFIG.slideSeconds * 1000);
+setInterval(() => load().then(paintTicker), 20000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) load().then(() => { paintTicker(); showSlide(); }); });
+</script>
+</body>
+</html>
