@@ -41,28 +41,31 @@ async function api(payload) {
 const T = {
  ar: { dir: 'rtl', title: 'الإعلامية', sub: 'الإعلانات والفعاليات والنتائج', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
   tAnn: 'الإعلانات', tRes: 'النتائج', countdown: 'العد التنازلي لبداية المخيم', days: 'يوم', hours: 'ساعة', mins: 'دقيقة', started: 'بدأ المخيم',
-  newAnn: 'إعلان / فعالية جديدة', title_: 'العنوان', body: 'النص', kind: 'النوع', announce: 'إعلان (الشريط والشرائح)', event: 'فعالية (بعدّ تنازلي)', urgent: '🚨 رسالة طارئة (تملأ الشاشة)', wisdom: 'حكمة اليوم', kudos: 'موقف اليوم (لفتة طيبة)', quote: 'قالوا عن المخيم', call: 'استدعاء طالب (بالرقم فقط)', other: 'أخرى', tPr: 'أوقات الصلاة', prDate: 'التاريخ', fajr: 'الفجر', dhuhr: 'الظهر', asr: 'العصر', maghrib: 'المغرب', isha: 'العشاء', iqama: 'الإقامة بعد الأذان (دقائق)', prSave: 'حفظ أوقات هذا اليوم', prNote: 'اكتب أوقات اليوم من تقويم الوزارة. اترك الفارغ ليُخفى من الشاشة.', prSaved: 'الأيام المحفوظة', urgentNote: 'تظهر بملء شاشة العرض حتى تؤرشفها.', callNote: 'اكتب رقم الطالب فقط، بدون الاسم.', when: 'موعد الفعالية', audience: 'الجمهور', public: 'شاشات العرض والجميع', staff: 'فريق العمل فقط', pinned: 'تثبيت في الأعلى',
+  newAnn: 'إعلان / فعالية جديدة', title_: 'العنوان', body: 'النص', kind: 'النوع', announce: 'إعلان (الشريط والشرائح)', event: 'فعالية (بعدّ تنازلي)', urgent: '🚨 رسالة طارئة (تملأ الشاشة)', wisdom: 'حكمة اليوم', kudos: 'موقف اليوم (لفتة طيبة)', quote: 'قالوا عن المخيم', call: 'استدعاء طالب (بالرقم فقط)', greeting: 'عبارة الترحيب (على شاشة البداية)', finale: '🎉 الحفل الختامي (عدّ تنازلي وثيم احتفالي)', thTitle: 'ثيم شاشة العرض', thNote: '«تلقائي» يغيّر الثيم حسب الوقت: الشروق، النهار، العصر، الغروب، المساء، الليل، وليلة الجمعة، ويوم الحفل الختامي.', thSave: 'تطبيق الثيم', th_auto: 'تلقائي (حسب الوقت) — موصى به', th_dawn: 'الشروق', th_day: 'النهار', th_noon: 'العصر', th_sunset: 'الغروب', th_evening: 'المساء', th_night: 'الليل', th_jumuah: 'ليلة الجمعة', th_festive: 'احتفالي (الختام)', preview: 'معاينة الشاشة', other: 'أخرى', tPr: 'الصلاة والشاشة', prDate: 'التاريخ', fajr: 'الفجر', dhuhr: 'الظهر', asr: 'العصر', maghrib: 'المغرب', isha: 'العشاء', iqama: 'الإقامة بعد الأذان (دقائق)', prSave: 'حفظ أوقات هذا اليوم', prNote: 'اكتب أوقات اليوم من تقويم الوزارة. اترك الفارغ ليُخفى من الشاشة.', prSaved: 'الأيام المحفوظة', urgentNote: 'تظهر بملء شاشة العرض حتى تؤرشفها.', callNote: 'اكتب رقم الطالب فقط، بدون الاسم.', when: 'موعد الفعالية', audience: 'الجمهور', public: 'شاشات العرض والجميع', staff: 'فريق العمل فقط', pinned: 'تثبيت في الأعلى',
   saveDraft: 'حفظ كمسودة', update: 'تحديث', cancelEdit: 'إلغاء التعديل', publish: 'نشر', unpublish: 'إعادة لمسودة', archive: 'أرشفة', edit: 'تعديل', draft: 'مسودة', published: 'منشور', archived: 'مؤرشف',
   noAnn: 'لا توجد إعلانات.', newRes: 'إدخال نتيجة', comp: 'المسابقة', team: 'الفريق', place: 'المركز', points: 'النقاط', addRes: 'إضافة', needVerify: 'النشر يحتاج صلاحية «التحقق من النتائج».',
   publishAll: 'نشر مسابقة', noRes: 'لا توجد نتائج.', done: 'تم', error: 'تعذّر الاتصال. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.', confirmPub: 'نشر هذا العنصر؟', feedNote: 'المنشور للجمهور يظهر في شاشات العرض خلال ثوانٍ.' },
  en: { dir: 'ltr', title: 'Media', sub: 'Announcements, events and results', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
   tAnn: 'Announcements', tRes: 'Results', countdown: 'Countdown to camp', days: 'days', hours: 'hours', mins: 'min', started: 'Camp has started',
-  newAnn: 'New announcement / event', title_: 'Title', body: 'Text', kind: 'Type', announce: 'Announcement (ticker + slides)', event: 'Event (countdown)', urgent: '🚨 Urgent (full screen)', wisdom: 'Wisdom of the day', kudos: 'Kind act of the day', quote: 'They said about the camp', call: 'Call a student (number only)', other: 'Other', tPr: 'Prayer times', prDate: 'Date', fajr: 'Fajr', dhuhr: 'Dhuhr', asr: 'Asr', maghrib: 'Maghrib', isha: 'Isha', iqama: 'Iqama after adhan (minutes)', prSave: 'Save this day', prNote: 'Type the day’s times from the ministry calendar. Leave empty to hide.', prSaved: 'Saved days', urgentNote: 'Fills the display screen until you archive it.', callNote: 'Student number only, no name.', when: 'Event time', audience: 'Audience', public: 'Display screens and everyone', staff: 'Staff only', pinned: 'Pin to top',
+  newAnn: 'New announcement / event', title_: 'Title', body: 'Text', kind: 'Type', announce: 'Announcement (ticker + slides)', event: 'Event (countdown)', urgent: '🚨 Urgent (full screen)', wisdom: 'Wisdom of the day', kudos: 'Kind act of the day', quote: 'They said about the camp', call: 'Call a student (number only)', greeting: 'Welcome line (start slide)', finale: '🎉 Closing ceremony (countdown + festive theme)', thTitle: 'Display theme', thNote: '“Automatic” follows the time of day, Thursday night and the closing day.', thSave: 'Apply theme', th_auto: 'Automatic (recommended)', th_dawn: 'Dawn', th_day: 'Day', th_noon: 'Afternoon', th_sunset: 'Sunset', th_evening: 'Evening', th_night: 'Night', th_jumuah: 'Thursday night', th_festive: 'Festive (closing)', preview: 'Preview display', other: 'Other', tPr: 'Prayers & screen', prDate: 'Date', fajr: 'Fajr', dhuhr: 'Dhuhr', asr: 'Asr', maghrib: 'Maghrib', isha: 'Isha', iqama: 'Iqama after adhan (minutes)', prSave: 'Save this day', prNote: 'Type the day’s times from the ministry calendar. Leave empty to hide.', prSaved: 'Saved days', urgentNote: 'Fills the display screen until you archive it.', callNote: 'Student number only, no name.', when: 'Event time', audience: 'Audience', public: 'Display screens and everyone', staff: 'Staff only', pinned: 'Pin to top',
   saveDraft: 'Save draft', update: 'Update', cancelEdit: 'Cancel edit', publish: 'Publish', unpublish: 'Back to draft', archive: 'Archive', edit: 'Edit', draft: 'Draft', published: 'Published', archived: 'Archived',
   noAnn: 'No announcements.', newRes: 'Enter a result', comp: 'Competition', team: 'Team', place: 'Place', points: 'Points', addRes: 'Add', needVerify: 'Publishing needs the “verify results” permission.',
   publishAll: 'Publish competition', noRes: 'No results.', done: 'Done', error: 'Connection problem. Try again.', sessionEnd: 'Session expired. Please log in again.', confirmPub: 'Publish this item?', feedNote: 'Public items appear on the display screens within seconds.' }
 };
 const L = () => T[st.lang];
-const KINDS = ['announce', 'event', 'urgent', 'wisdom', 'kudos', 'quote', 'call', 'other'];
+const KINDS = ['announce', 'event', 'finale', 'urgent', 'wisdom', 'kudos', 'quote', 'call', 'greeting', 'other'];
+const THEMES = ['auto', 'dawn', 'day', 'noon', 'sunset', 'evening', 'night', 'jumuah', 'festive'];
+const timed = k => k === 'event' || k === 'finale';
 const PR = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
 const blank = () => ({ id: '', title: '', body: '', kind: 'announce', startsAt: '', audience: 'public', pinned: false });
-const st = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), tab: can('announce') ? 'ann' : 'res', anns: [], results: [], campStart: '2026-12-27', form: blank(), pr: { date: new Date().toISOString().slice(0, 10), t: {}, iq: '' }, prayers: {}, iqama: 15, rf: { competition: '', team: '', place: '', points: '' }, msg: null };
+const st = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), tab: can('announce') ? 'ann' : 'res', anns: [], results: [], campStart: '2026-12-27', form: blank(), pr: { date: new Date().toISOString().slice(0, 10), t: {}, iq: '' }, prayers: {}, iqama: 15, theme: 'auto', rf: { competition: '', team: '', place: '', points: '' }, msg: null };
 const say = (cls, t) => { st.msg = { cls: cls, t: t }; };
 const errText = r => (r && r.code === 'NEEDS_VERIFY' ? L().needVerify : (r && r.error) || L().error);
 
 async function load() { try { const r = await api({ action: 'mediaList' }); if (r.success) { st.anns = r.announcements; st.results = r.results; st.campStart = r.campStart; } } catch (e) {} render(); }
-async function loadPr() { try { const r = await api({ action: 'prayerList' }); if (r.success) { st.prayers = r.prayers; st.iqama = r.iqamaMinutes; st.pr.t = Object.assign({}, st.prayers[st.pr.date] || {}); } } catch (e) {} render(); }
+async function loadPr() { try { const r = await api({ action: 'prayerList' }); if (r.success) { st.prayers = r.prayers; st.iqama = r.iqamaMinutes; st.theme = r.displayTheme || 'auto'; st.pr.t = Object.assign({}, st.prayers[st.pr.date] || {}); } } catch (e) {} render(); }
 async function savePr() { const r = await call({ action: 'prayerSave', date: st.pr.date, times: st.pr.t, iqamaMinutes: st.pr.iq }); if (r.success) { st.pr.iq = ''; await loadPr(); } else render(); }
+async function saveTheme() { const v = $('thSel').value; const r = await call({ action: 'displayTheme', theme: v }); if (r.success) st.theme = v; render(); }
 function prView() {
   const l = L(), p = st.pr, days = Object.keys(st.prayers).sort();
   return `<section class="card"><h2 class="h2" style="margin-bottom:6px">${l.tPr}</h2><div class="muted" style="font-size:13px;margin-bottom:8px">${l.prNote}</div>
@@ -70,11 +73,14 @@ function prView() {
     <div class="two" style="margin-top:8px">${PR.map(n => `<div><label class="lbl" for="p-${n}">${l[n]}</label><input id="p-${n}" data-pr="${n}" type="time" value="${esc(p.t[n] || '')}"></div>`).join('')}</div>
     <label class="lbl" for="piq" style="margin-top:8px">${l.iqama}</label><input id="piq" type="number" min="1" max="60" placeholder="${st.iqama}" value="${esc(p.iq)}">
     <button class="btn full" style="margin-top:10px" data-savepr="1">${l.prSave}</button></section>
+    <section class="card"><h2 class="h2" style="margin-bottom:6px">${l.thTitle}</h2><div class="muted" style="font-size:13px;margin-bottom:8px">${l.thNote}</div>
+      <select id="thSel">${THEMES.map(t => `<option value="${t}" ${st.theme === t ? 'selected' : ''}>${l['th_' + t]}</option>`).join('')}</select>
+      <div class="two" style="margin-top:10px"><button class="btn" data-savetheme="1">${l.thSave}</button><a class="btn alt" href="display.html" target="_blank" rel="noopener" style="text-align:center;text-decoration:none">${l.preview}</a></div></section>
     ${days.length ? `<section class="card"><h2 class="h2" style="margin-bottom:6px">${l.prSaved}</h2>${days.map(d => `<div class="row"><b>${esc(d)}</b><span class="muted">${PR.filter(n => st.prayers[d][n]).map(n => l[n] + ' ' + st.prayers[d][n]).join(' · ')}</span></div>`).join('')}</section>` : ''}`;
 }
 async function call(body, okMsg) { try { const r = await api(body); say(r.success ? 'ok' : 'bad', r.success ? (okMsg || L().done) : errText(r)); return r; } catch (e) { if (e.message !== 'auth') say('bad', L().error); return { success: false }; } }
 async function saveAnn() {
-  const f = st.form, body = { action: 'annSave', id: f.id || undefined, title: f.title, body: f.body, kind: f.kind, startsAt: f.kind === 'event' && f.startsAt ? new Date(f.startsAt).toISOString() : '', audience: f.audience, pinned: f.pinned, clientId: f.id ? undefined : uid() };
+  const f = st.form, body = { action: 'annSave', id: f.id || undefined, title: f.title, body: f.body, kind: f.kind, startsAt: timed(f.kind) && f.startsAt ? new Date(f.startsAt).toISOString() : '', audience: f.audience, pinned: f.pinned, clientId: f.id ? undefined : uid() };
   const r = await call(body); if (r.success) st.form = blank(); await load();
 }
 async function annStatus(id, status) { if (status === 'published' && !confirm(L().confirmPub)) return; await call({ action: 'annStatus', id: id, status: status }); await load(); }
@@ -99,12 +105,12 @@ function annView() {
     <label class="lbl" for="fb" style="margin-top:8px">${l.body}</label><textarea id="fb" maxlength="600">${esc(f.body)}</textarea>
     <div class="two" style="margin-top:8px"><div><label class="lbl" for="fk">${l.kind}</label><select id="fk">${KINDS.map(k => `<option value="${k}" ${f.kind === k ? 'selected' : ''}>${l[k]}</option>`).join('')}</select></div>
       <div><label class="lbl" for="fa">${l.audience}</label><select id="fa"><option value="public" ${f.audience === 'public' ? 'selected' : ''}>${l.public}</option><option value="staff" ${f.audience === 'staff' ? 'selected' : ''}>${l.staff}</option></select></div></div>
-    ${f.kind === 'event' ? `<label class="lbl" for="fw" style="margin-top:8px">${l.when}</label><input id="fw" type="datetime-local" value="${esc(f.startsAt)}">` : ''}
+    ${timed(f.kind) ? `<label class="lbl" for="fw" style="margin-top:8px">${l.when}</label><input id="fw" type="datetime-local" value="${esc(f.startsAt)}">` : ''}
     ${f.kind === 'urgent' ? `<div class="banner warn">${l.urgentNote}</div>` : f.kind === 'call' ? `<div class="banner warn">${l.callNote}</div>` : ''}
     <label class="chk" style="margin-top:8px"><input id="fp" type="checkbox" ${f.pinned ? 'checked' : ''}> ${l.pinned}</label>
     <div class="two" style="margin-top:10px"><button class="btn" data-saveann="1">${f.id ? l.update : l.saveDraft}</button>${f.id ? `<button class="btn alt" data-canceledit="1">${l.cancelEdit}</button>` : ''}</div></section>`;
   const list = st.anns.length ? st.anns.map(a => `<div class="item"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>${a.pinned ? '📌 ' : ''}${esc(a.title)}</b><span>${pill(a.status)} <span class="pill">${esc(l[a.kind] || a.kind)}</span> <span class="pill">${esc(l[a.audience])}</span></span></div>
-    ${a.kind === 'event' && a.startsAt ? `<div class="muted" style="font-size:13px">🕒 ${esc(new Date(a.startsAt).toLocaleString(st.lang === 'ar' ? 'ar' : 'en'))}</div>` : ''}<div style="margin:6px 0">${esc(a.body)}</div>
+    ${timed(a.kind) && a.startsAt ? `<div class="muted" style="font-size:13px">🕒 ${esc(new Date(a.startsAt).toLocaleString(st.lang === 'ar' ? 'ar' : 'en'))}</div>` : ''}<div style="margin:6px 0">${esc(a.body)}</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="chip" data-edit="${esc(a.id)}">${l.edit}</button>${a.status !== 'published' ? `<button class="chip on" data-annst="${esc(a.id)}:published">${l.publish}</button>` : `<button class="chip" data-annst="${esc(a.id)}:draft">${l.unpublish}</button>`}${a.status !== 'archived' ? `<button class="chip" data-annst="${esc(a.id)}:archived">${l.archive}</button>` : ''}</div></div>`).join('') : `<div class="card muted">${l.noAnn}</div>`;
   return (can('announce') ? form : '') + list;
 }
@@ -142,7 +148,7 @@ document.addEventListener('click', e => {
   const b = e.target.closest && e.target.closest('button'); if (!b) return; const d = b.dataset;
   if (d.tab) setTab(d.tab); else if (d.saveann) saveAnn(); else if (d.canceledit) { st.form = blank(); render(); }
   else if (d.edit) editAnn(d.edit); else if (d.annst) { const p = d.annst.split(':'); annStatus(p[0], p[1]); }
-  else if (d.savepr) savePr(); else if (d.addres) addRes(); else if (d.respub) resStatus(d.respub.split(','), 'published');
+  else if (d.savepr) savePr(); else if (d.savetheme) saveTheme(); else if (d.addres) addRes(); else if (d.respub) resStatus(d.respub.split(','), 'published');
 });
 $('langBtn').onclick = () => { st.lang = st.lang === 'ar' ? 'en' : 'ar'; pref.set('lang', st.lang); render(); };
 $('themeBtn').onclick = () => { st.theme = st.theme === 'light' ? 'dark' : 'light'; pref.set('theme', st.theme); render(); };

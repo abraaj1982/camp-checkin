@@ -7,8 +7,10 @@
 // =============================================================
 
 // announce = ticker/slide, event = countdown, urgent = full-screen emergency message, wisdom = حكمة اليوم,
-// kudos = موقف اليوم, quote = قالوا عن المخيم, call = استدعاء طالب (by number only), other.
-const ANN_KINDS_ = ['announce', 'event', 'urgent', 'wisdom', 'kudos', 'quote', 'call', 'other'];
+// kudos = موقف اليوم, quote = قالوا عن المخيم, call = استدعاء طالب (by number only), greeting = عبارة الترحيب,
+// finale = الحفل الختامي (countdown + festive theme on its day), other.
+const ANN_KINDS_ = ['announce', 'event', 'finale', 'urgent', 'wisdom', 'kudos', 'quote', 'call', 'greeting', 'other'];
+const DISPLAY_THEMES_ = ['auto', 'dawn', 'day', 'noon', 'sunset', 'evening', 'night', 'jumuah', 'festive'];
 const ANN_AUDIENCE_ = ['public', 'staff'];
 function annSheet_() { return getSheetByName_('Announcements'); }
 function resultsSheet_() { return getSheetByName_('Results'); }
@@ -61,7 +63,7 @@ function handleAnnSave_(data) {
     if (title.length < 3) return { success: false, error: 'اكتب عنواناً' };
     if (ANN_KINDS_.indexOf(kind) === -1 || ANN_AUDIENCE_.indexOf(audience) === -1) return { success: false, error: 'Invalid request' };
     let startsAt = '';
-    if (kind === 'event') {
+    if (kind === 'event' || kind === 'finale') {
       const d = new Date(String(data.startsAt || ''));
       if (isNaN(d.getTime())) return { success: false, error: 'حدّد موعد الفعالية' };
       startsAt = d;
@@ -201,7 +203,7 @@ function handleFeed_(data) {
   if (!same) return { success: false, error: 'Invalid key' };
   return { success: true, serverTime: new Date().toISOString(), campStart: String(getSetting_('CampStart') || '2026-12-27'),
     announcements: publicAnnouncements_(['public']).slice(0, 30), results: groupResults_(),
-    prayers: allPrayers_(), iqamaMinutes: iqamaMinutes_(), totals: teamTotals_(),
+    prayers: allPrayers_(), iqamaMinutes: iqamaMinutes_(), totals: teamTotals_(), displayTheme: displayTheme_(),
     campName: String(getSetting_('CampName') || ''), campSlogan: String(getSetting_('CampSlogan') || ''), campDays: Number(getSetting_('CampDays')) || 4 };
 }
 
@@ -223,7 +225,7 @@ function iqamaMinutes_() { const v = Number(getSetting_('IqamaMinutes')); return
 
 function handlePrayerList_(data) {
   return withAuth_(data, requirePerm_('announce'), function() {
-    return { success: true, prayers: allPrayers_(), iqamaMinutes: iqamaMinutes_() };
+    return { success: true, prayers: allPrayers_(), iqamaMinutes: iqamaMinutes_(), displayTheme: displayTheme_() };
   });
 }
 
@@ -242,6 +244,18 @@ function handlePrayerSave_(data) {
     }
     writeAudit_(user.Username, 'PRAYER_SAVED', date, vals.join('|'));
     return { success: true };
+  });
+}
+
+// The media committee can pin a theme on the display screen ('auto' = follows the time of day).
+function displayTheme_() { const v = String(getSetting_('DisplayTheme') || 'auto'); return DISPLAY_THEMES_.indexOf(v) === -1 ? 'auto' : v; }
+function handleDisplayTheme_(data) {
+  return withAuth_(data, requirePerm_('announce'), function(user) {
+    const v = String(data.theme || '');
+    if (DISPLAY_THEMES_.indexOf(v) === -1) return { success: false, error: 'Invalid theme' };
+    setSetting_('DisplayTheme', v);
+    writeAudit_(user.Username, 'DISPLAY_THEME', '', v);
+    return { success: true, theme: v };
   });
 }
 

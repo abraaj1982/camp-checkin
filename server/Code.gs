@@ -75,6 +75,7 @@ const ACTIONS_ = {
   nutritionAck: function(d) { return handleNutritionAck_(d); },
   prayerList: function(d) { return handlePrayerList_(d); },
   prayerSave: function(d) { return handlePrayerSave_(d); },
+  displayTheme: function(d) { return handleDisplayTheme_(d); },
   nutritionSetStaff: function(d) { return handleNutritionSetStaff_(d); },
   mediaList: function(d) { return handleMediaList_(d); },
   annSave: function(d) { return handleAnnSave_(d); },

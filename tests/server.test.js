@@ -247,6 +247,12 @@ r=post({action:'prayerList',token:tm});assert(r.prayers['2026-12-28'].fajr==='05
 r=post({action:'annSave',token:tm,title:'تجمّع الجميع في الساحة',kind:'urgent',audience:'public'});assert(r.success,'urgent message kind accepted');
 r=post({action:'annSave',token:tm,title:'x y z',kind:'hack'});assert(!r.success,'unknown kind rejected');
 r=post({action:'resSave',token:tm,competition:'مسابقة ثقافية',team:'الأزرق',points:15});post({action:'resStatus',token:tv,id:r.id,status:'published'});
+r=post({action:'annSave',token:tm,title:'الحفل الختامي',kind:'finale'});assert(!r.success,'finale needs a date like an event');
+r=post({action:'annSave',token:tm,title:'الحفل الختامي',kind:'finale',startsAt:'2026-12-30T19:00:00Z'});assert(r.success,'finale accepted');
+r=post({action:'displayTheme',token:t1,theme:'night'});assert(!r.success,'supervisor cannot change the display theme');
+r=post({action:'displayTheme',token:tm,theme:'disco'});assert(!r.success,'unknown theme rejected');
+r=post({action:'feed',key:fk});assert(r.displayTheme==='auto','theme is automatic by default');
+r=post({action:'displayTheme',token:tm,theme:'jumuah'});assert(r.success&&post({action:'feed',key:fk}).displayTheme==='jumuah','committee pins a theme');
 r=post({action:'feed',key:fk});assert(r.prayers['2026-12-28'].maghrib==='17:30'&&r.iqamaMinutes===20&&r.totals[0].team==='الأزرق'&&r.totals[0].points===45&&r.campDays===4,'feed: prayers, iqama, team totals');
 
 // ---- password policy + profile edit

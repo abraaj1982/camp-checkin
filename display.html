@@ -20,6 +20,12 @@ body[data-t="sunset"]{--gold:#FF8A3D;--gold2:#FFC27A;--ink:#FFF5EC;--mute:rgba(2
   --shade:linear-gradient(180deg,rgba(42,12,40,.82) 0,rgba(130,45,45,.32) 35%,rgba(160,60,40,.35) 65%,rgba(26,8,24,.92) 100%);--tint:linear-gradient(180deg,rgba(120,40,120,.35),rgba(255,120,50,.35));--photo:brightness(.85) saturate(1.2);--sky:linear-gradient(180deg,#2a0f3a,#8c2f5a 40%,#ff8a3d 75%,#ffc27a)}
 body[data-t="night"]{--gold:#C9B37E;--gold2:#E2D3A8;--ink:#ECEAE4;--mute:rgba(236,234,228,.6);--glass:rgba(0,0,0,.55);--line:rgba(201,179,126,.22);
   --shade:linear-gradient(180deg,rgba(0,0,0,.9) 0,rgba(0,0,0,.7) 30%,rgba(0,0,0,.72) 70%,rgba(0,0,0,.95) 100%);--photo:brightness(.5) saturate(.6);--sky:linear-gradient(180deg,#05070c,#000)}
+ body[data-t="jumuah"]{--gold:#D9C27A;--gold2:#EADBA6;--ink:#F2F5EE;--mute:rgba(236,242,230,.7);--glass:rgba(8,40,30,.55);--line:rgba(217,194,122,.32);
+  --shade:linear-gradient(180deg,rgba(4,28,20,.88) 0,rgba(6,40,28,.55) 30%,rgba(6,40,28,.6) 70%,rgba(3,20,14,.94) 100%);--tint:linear-gradient(180deg,rgba(40,140,90,.3),rgba(20,80,60,.25));--photo:brightness(.7) saturate(.9);--sky:linear-gradient(180deg,#032016,#0b3b2a 60%,#14503a)}
+body[data-t="festive"]{--gold:#F5C542;--gold2:#FFE08A;--ink:#FFFBEF;--mute:rgba(255,248,225,.75);--glass:rgba(40,22,6,.5);--line:rgba(255,224,138,.45);
+  --shade:linear-gradient(180deg,rgba(30,16,4,.85) 0,rgba(90,55,10,.35) 30%,rgba(90,55,10,.4) 70%,rgba(24,12,2,.94) 100%);--tint:linear-gradient(135deg,rgba(255,200,60,.35),rgba(255,120,80,.2));--photo:brightness(.85) saturate(1.2);--sky:linear-gradient(160deg,#2a1604,#6b3d0a 60%,#b27b1c)}
+body[data-t="festive"] .pattern{opacity:.16;animation:twinkle 6s ease-in-out infinite}
+@keyframes twinkle{50%{opacity:.05}}
 .tint{position:fixed;inset:0;background:var(--tint);mix-blend-mode:soft-light;pointer-events:none}
 #fader{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;z-index:40;transition:opacity 1.2s ease}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -112,7 +118,12 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4lEBGPNxghwq9
 const CONFIG = {
   name: 'المخيّم الطلابي', slogan: 'في الخير محفلًا',
   logo: '',                     // e.g. 'display/logo.png'
-  backgrounds: ['display/bg1.jpg', 'display/bg2.jpg', 'display/bg3.jpg'],
+  // each photo can be limited to some themes (leave "themes" out = all themes)
+  backgrounds: [
+    { src: 'display/bg1.jpg' },
+    { src: 'display/bg2.jpg', themes: ['dawn', 'day', 'noon', 'sunset', 'festive'] },
+    { src: 'display/bg3.jpg', themes: ['dawn', 'day', 'noon', 'sunset', 'jumuah', 'festive'] }
+  ],
   slideSeconds: 10, prayingMinutes: 10, eventAlertMinutes: 15, nightFrom: 22, nightTo: 4
 };
 const $ = id => document.getElementById(id);
@@ -159,7 +170,7 @@ function prayerState() {
 
 /* ---------- content ---------- */
 const ann = k => (D && D.announcements || []).filter(a => a.kind === k);
-function upcomingEvents() { const t = now().getTime(); return ann('event').filter(a => a.startsAt && new Date(a.startsAt).getTime() > t - 30 * 60000).sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt)); }
+function upcomingEvents() { const t = now().getTime(); return ann('event').concat(ann('finale')).filter(a => a.startsAt && new Date(a.startsAt).getTime() > t - 30 * 60000).sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt)); }
 function whenText(iso) {
   const d = new Date(iso), t = now(), ms = d - t;
   if (ms < 0) return 'جارية الآن';
@@ -170,6 +181,8 @@ function whenText(iso) {
 function slides() {
   const s = [], t = now();
   s.push({ key: 'welcome', html: welcomeSlide() });
+  const fin = ann('finale')[0];
+  if (fin && fin.startsAt && new Date(fin.startsAt) - t > 60 * 60000) s.push({ key: 'finale', html: finaleSlide(fin) });
   const evs = upcomingEvents(); if (evs.length) s.push({ key: 'events', html: eventsSlide(evs.slice(0, 5)) });
   if (D && D.totals && D.totals.length) s.push({ key: 'rank', html: rankSlide() });
   if (D && D.prayers && D.prayers[ymd(t)]) s.push({ key: 'prayers', html: prayersSlide() });
@@ -182,11 +195,18 @@ function slides() {
   return s;
 }
 function welcomeSlide() {
-  const t = now(), h = t.getHours(), greet = h < 12 ? 'صباح الخير' : h < 18 ? 'طاب يومكم' : 'مساء النور';
+  const t = now(), h = t.getHours(), th = document.body.dataset.t, g = ann('greeting')[0];
+  const greet = th === 'jumuah' ? 'ليلة الجمعة المباركة' : th === 'festive' ? 'يوم الختام 🎉' : h < 12 ? 'صباح الخير' : h < 18 ? 'طاب يومكم' : 'مساء النور';
   const start = D && D.campStart ? new Date(D.campStart + 'T00:00:00') : null, days = D && D.campDays || 4;
   const n = start ? Math.floor((new Date(ymd(t) + 'T00:00:00') - start) / 864e5) + 1 : 0;
   const dayLine = n >= 1 && n <= days ? `اليوم <b style="color:var(--gold)">${n}</b> من ${days}` : n < 1 && start ? `يبدأ المخيم بعد <b style="color:var(--gold)">${Math.ceil((start - t) / 864e5)}</b> يوم` : '';
-  return `<div class="center"><div class="kicker">${greet}</div><div class="h1" style="font-size:4.6vw;margin:.6vw 0">${esc(campName())}</div><div class="slogan" style="font-size:2vw">${esc(campSlogan())}</div>${dayLine ? `<div class="chip" style="display:inline-block;font-size:1.6vw;margin-top:2vw;padding:.6vw 1.8vw">${dayLine}</div>` : ''}</div>`;
+  return `<div class="center"><div class="kicker">${greet}</div><div class="h1" style="font-size:4.6vw;margin:.6vw 0">${esc(campName())}</div><div class="slogan" style="font-size:2vw">${esc(campSlogan())}</div>${g ? `<div style="font-size:2.2vw;margin-top:1.6vw;font-weight:600">${esc(g.title)}</div>${g.body ? `<div style="font-size:1.5vw;color:var(--mute);margin-top:.4vw">${esc(g.body)}</div>` : ''}` : ''}${dayLine ? `<div class="chip" style="display:inline-block;font-size:1.6vw;margin-top:2vw;padding:.6vw 1.8vw">${dayLine}</div>` : ''}</div>`;
+}
+function finaleSlide(a) {
+  const ms = new Date(a.startsAt) - now(), d = Math.floor(ms / 864e5), h = Math.floor(ms % 864e5 / 36e5), m = Math.floor(ms % 36e5 / 6e4);
+  const box = (v, l) => `<div class="glass" style="padding:1.4vw 2vw;min-width:12vw"><div class="cd" style="font-size:6vw">${v}</div><div class="kicker">${l}</div></div>`;
+  return `<div class="center"><div class="icon">🎉</div><div class="kicker">العدّ التنازلي</div><div class="h1" style="margin:.4vw 0 1.6vw">${esc(a.title)}</div>
+    <div style="display:flex;gap:1.4vw;justify-content:center">${d > 0 ? box(d, 'يوم') : ''}${box(h, 'ساعة')}${box(m, 'دقيقة')}</div>${a.body ? `<div class="src" style="margin-top:1.4vw">📍 ${esc(a.body)} · ${esc(whenText(a.startsAt))}</div>` : ''}</div>`;
 }
 function eventsSlide(evs) {
   const t = now().getTime();
@@ -233,13 +253,17 @@ function override() {
 
 /* ---------- themes by time of day ---------- */
 // dawn (after Fajr, sunrise) -> day -> noon (afternoon) -> sunset (around Maghrib) -> evening -> night.
-const THEME_NAMES = { dawn: 'الشروق', day: 'النهار', noon: 'العصر', sunset: 'الغروب', evening: 'المساء', night: 'الليل' };
+const THEME_NAMES = { dawn: 'الشروق', day: 'النهار', noon: 'العصر', sunset: 'الغروب', evening: 'المساء', night: 'الليل', jumuah: 'ليلة الجمعة', festive: 'احتفالي' };
 function themeNow() {
   const forced = new URLSearchParams(location.search).get('theme'); if (forced && THEME_NAMES[forced]) return forced; // preview only
+  if (D && D.displayTheme && THEME_NAMES[D.displayTheme]) return D.displayTheme;   // pinned by the media committee
   const t = now(), p = (D && D.prayers && D.prayers[ymd(t)]) || {};
   const at = (hhmm, def) => atTime(t, hhmm || def).getTime();
   const fajr = at(p.fajr, '05:30'), dhuhr = at(p.dhuhr, '12:10'), maghrib = at(p.maghrib, '17:30'), x = t.getTime(), m = 60000;
   const night = new Date(t); night.setHours(CONFIG.nightFrom, 0, 0, 0);
+  const fin = ann('finale')[0];
+  if (fin && fin.startsAt && ymd(new Date(fin.startsAt)) === ymd(t) && x >= fajr && t.getHours() < CONFIG.nightFrom) return 'festive';  // closing day
+  if ((t.getDay() === 4 && x >= maghrib + 40 * m) || (t.getDay() === 5 && x < fajr)) return 'jumuah';                       // Thursday night
   if (x >= fajr && x < fajr + 150 * m) return 'dawn';
   if (x >= fajr && x < dhuhr + 150 * m) return 'day';
   if (x >= fajr && x < maghrib - 50 * m) return 'noon';
@@ -275,10 +299,12 @@ function paintTicker() {
 }
 let bgI = -1, bgFlip = false;
 function nextBg() {
-  if (!CONFIG.backgrounds.length) return;
-  bgI = (bgI + 1) % CONFIG.backgrounds.length; bgFlip = !bgFlip;
+  const th = document.body.dataset.t, all = CONFIG.backgrounds.map(b => typeof b === 'string' ? { src: b } : b);
+  const list = all.filter(b => !b.themes || b.themes.indexOf(th) !== -1);
+  const use = list.length ? list : all; if (!use.length) return;
+  bgI = (bgI + 1) % use.length; bgFlip = !bgFlip;
   const on = bgFlip ? $('bgB') : $('bgA'), off = bgFlip ? $('bgA') : $('bgB');
-  on.classList.remove('none'); on.style.backgroundImage = `url("${CONFIG.backgrounds[bgI]}")`; on.classList.add('on'); off.classList.remove('on');
+  on.classList.remove('none'); on.style.backgroundImage = `url("${use[bgI].src}")`; on.classList.add('on'); off.classList.remove('on');
 }
 function showSlide() {
   const ov = override();
