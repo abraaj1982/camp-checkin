@@ -11,10 +11,10 @@
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;background:#071321;color:var(--ink);font-family:'IBM Plex Sans Arabic',system-ui,sans-serif;overflow:hidden;cursor:none}
 .bg{position:fixed;inset:0;background-size:cover;background-position:center;opacity:0;transition:opacity 2.5s ease;animation:kb 40s ease-in-out infinite alternate}
-.bg.on{opacity:1}
+.bg.on{opacity:1}.bg:not(.none){filter:brightness(.78) saturate(1.05)}
 .bg.none{background:radial-gradient(ellipse at 20% 0%,#1d3b5c 0,transparent 55%),radial-gradient(ellipse at 90% 100%,#3b2a12 0,transparent 50%),linear-gradient(160deg,#0b1d33,#071321 60%,#0e1a12)}
 @keyframes kb{from{transform:scale(1)}to{transform:scale(1.08) translate(-1%,-1%)}}
-.shade{position:fixed;inset:0;background:linear-gradient(180deg,rgba(4,12,22,.78) 0,rgba(4,12,22,.45) 30%,rgba(4,12,22,.55) 70%,rgba(4,12,22,.9) 100%)}
+.shade{position:fixed;inset:0;background:linear-gradient(180deg,rgba(4,12,22,.85) 0,rgba(4,12,22,.55) 28%,rgba(4,12,22,.6) 70%,rgba(4,12,22,.92) 100%)}
 .pattern{position:fixed;inset:0;opacity:.06;background-image:radial-gradient(circle at 1.5vw 1.5vw,var(--gold2) .12vw,transparent .14vw);background-size:3vw 3vw}
 .top{position:fixed;top:0;inset-inline:0;padding:1.6vw 2.4vw 0;display:flex;justify-content:space-between;align-items:flex-start;gap:2vw;z-index:5}
 .brand{display:flex;align-items:center;gap:1.1vw}
@@ -98,7 +98,7 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4lEBGPNxghwq9
 const CONFIG = {
   name: 'المخيّم الطلابي', slogan: 'في الخير محفلًا',
   logo: '',                     // e.g. 'display/logo.png'
-  backgrounds: [],              // e.g. ['display/bg1.jpg', 'display/bg2.jpg']
+  backgrounds: ['display/bg1.jpg', 'display/bg2.jpg', 'display/bg3.jpg'],
   slideSeconds: 10, prayingMinutes: 10, eventAlertMinutes: 15, nightFrom: 22, nightTo: 4
 };
 const $ = id => document.getElementById(id);
@@ -235,7 +235,7 @@ function paintTicker() {
   $('ticker').style.display = items.length ? '' : 'none';
   if (el.dataset.txt !== txt) { el.dataset.txt = txt; el.innerHTML = `<span style="animation-duration:${Math.max(20, txt.length * 0.25)}s">${esc(txt)}</span>`; }
 }
-let bgI = 0, bgFlip = false;
+let bgI = -1, bgFlip = false;
 function nextBg() {
   if (!CONFIG.backgrounds.length) return;
   bgI = (bgI + 1) % CONFIG.backgrounds.length; bgFlip = !bgFlip;
