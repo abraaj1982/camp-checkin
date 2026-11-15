@@ -202,6 +202,21 @@ assert(post({action:'scan',token:tk,studentId:'1001',op:'fly'}).code==='BAD_REQU
 assert(post({action:'bag',token:tk,studentId:'1001',mode:'x',count:1}).code==='BAD_REQUEST','bad bag mode has a code');
 assert(post({action:'bag',token:tk,studentId:'1001',mode:'load',count:-3}).code==='BAD_REQUEST','bad bag count has a code');
 assert(post({action:'createCase',token:tk,type:'other',text:'x'}).code==='BAD_REQUEST','too-short report has a code');}
+// ---- sessions: 12 h login; idle limit 2 h for normal accounts, 30 min for sensitive ones (medical, custody, manage, support, admin)
+{const decode=t=>JSON.parse(Buffer.from(t.split('.')[1],'base64url').toString());
+ const mkU=(u,perms)=>post({action:'createUser',token:T,username:u,password:'ps-12345',fullName:u,role:'supervisor',permissions:perms,assignedBus:'1',committees:[]});
+ mkU('sess_op',['checkin']);mkU('sess_med',['medical']);mkU('sess_cus',['custody']);
+ const tOp=post({action:'login',username:'sess_op',password:'ps-12345'}).token,tMed=post({action:'login',username:'sess_med',password:'ps-12345'}).token,tCus=post({action:'login',username:'sess_cus',password:'ps-12345'}).token;
+ const pl=decode(tOp);assert(Math.abs((pl.exp-pl.iat)-12*3600e3)<5000,'token lasts 12 hours');
+ const idle=(u,minAgo)=>{const row=book.Users.rows.find(r=>String(r[0]).toLowerCase()===u);const h=book.Users.rows[0];row[h.indexOf('LastActivityAt')]=new Date(Date.now()-minAgo*60000);for(const k of Object.keys(cache))delete cache[k];};
+ idle('sess_op',90);assert(post({action:'roster',token:tOp}).success,'normal account idle 90 min is still signed in');
+ idle('sess_op',130);assert(post({action:'roster',token:tOp}).code==='IDLE_TIMEOUT','normal account idle 130 min is signed out');
+ idle('sess_med',40);assert(post({action:'medList',token:tMed}).code==='IDLE_TIMEOUT','medical account idle 40 min is signed out');
+ idle('sess_med',20);assert(post({action:'medList',token:tMed}).success,'medical account idle 20 min is still signed in');
+ idle('sess_cus',40);assert(post({action:'withdrawList',token:tCus}).code==='IDLE_TIMEOUT','custody account idle 40 min is signed out');
+ idle('admin',40);assert(/IDLE_TIMEOUT/.test(post({action:'listUsers',token:T}).error),'admin idle 40 min is signed out');
+ const tA=post({action:'login',username:'Admin',password:'pw-12345'});assert(tA.success&&post({action:'listUsers',token:tA.token}).success,'after being idle, signing in again works immediately (no stale-cache rejection)');
+ post({action:'setUserActive',token:tA.token,targetUsername:'sess_op',active:false});assert(post({action:'roster',token:tOp}).code==='ACCOUNT_DISABLED','a disabled account is cut off immediately, whatever the session length');}
 // ---- password length: at least 8 (old shorter passwords keep working until changed)
 {let q=post({action:'createUser',token:T,username:'short7',password:'abc1234',fullName:'قصيرة',role:'supervisor',permissions:['checkin'],committees:[]});assert(!q.success&&q.code==='WEAK_PASSWORD','7-character password rejected');
 q=post({action:'createUser',token:T,username:'len8',password:'abcd1234',fullName:'ثمانية',role:'supervisor',permissions:['checkin'],committees:[]});assert(q.success,'8-character password accepted');

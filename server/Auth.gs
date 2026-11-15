@@ -6,8 +6,16 @@ const USERS_SHEET = 'Users';
 const SETTINGS_SHEET = 'Settings';
 const AUDIT_SHEET = 'AuditLog';
 
-const TOKEN_ABSOLUTE_TTL_MS = 3 * 60 * 60 * 1000;
-const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+// Sessions: one login per camp day (12 h). Accounts that open sensitive data (users, medical, custody/exits) are signed out
+// after 30 min without use; everyone else after 2 h, so volunteers are not logged out in the middle of a shift.
+const TOKEN_ABSOLUTE_TTL_MS = 12 * 60 * 60 * 1000;
+const IDLE_TIMEOUT_MS = 30 * 60 * 1000;          // sensitive accounts
+const IDLE_TIMEOUT_OPERATIONAL_MS = 2 * 60 * 60 * 1000;
+const SENSITIVE_PERMS_ = ['manage', 'support', 'medical', 'custody'];
+function idleLimitFor_(user) {
+  const sensitive = SENSITIVE_PERMS_.some(function(k) { return hasPerm_(user, k); }) || getUserPermissions_(user).indexOf('*') !== -1;
+  return sensitive ? IDLE_TIMEOUT_MS : IDLE_TIMEOUT_OPERATIONAL_MS;
+}
 const ACTIVITY_WRITE_DEBOUNCE_MS = 5 * 60 * 1000;
 const PBKDF2_ITERATIONS = 1000; // used for NEW passwords only — see hashPassword_/verifyPassword_
 const LEGACY_PBKDF2_ITERATIONS = 20000; // iteration count used before this field was stored per-password
@@ -326,6 +334,7 @@ function handleLogin_(data) {
   }
 
   writeLoginSuccessRow_(sheet, headers, user, now);
+  clearUsersCache_(); // otherwise a cached copy still says "idle for 40 min" and the fresh login is rejected for up to a minute
 
   const epoch = Number(user.TokenEpoch) || 0;
   const token = signToken_({
@@ -377,7 +386,7 @@ function authorize_(token, requiredCheckFn) {
   if ((payload.epoch || 0) !== currentEpoch) return { ok: false, reason: 'REVOKED' };
 
   const lastActivity = user.LastActivityAt ? new Date(user.LastActivityAt).getTime() : 0;
-  if (lastActivity && (now - lastActivity) > IDLE_TIMEOUT_MS) return { ok: false, reason: 'IDLE_TIMEOUT' };
+  if (lastActivity && (now - lastActivity) > idleLimitFor_(user)) return { ok: false, reason: 'IDLE_TIMEOUT' };
 
   if (typeof requiredCheckFn === 'function' && !requiredCheckFn(user)) {
     return { ok: false, reason: 'FORBIDDEN' };
