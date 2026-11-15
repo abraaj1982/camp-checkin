@@ -134,7 +134,9 @@ const TEAM_COLORS = ['#E5484D', '#4CC38A', '#3E8BFF', '#E8B04B', '#A06CF0', '#F0
 
 let D = null, offset = 0, online = false, idx = 0, seen = {}, lastSlideKey = '';
 try { D = JSON.parse(store.get('mk_display_cache') || 'null'); } catch (e) {}
-const now = () => new Date(Date.now() + offset);
+// Preview only: display.html?at=2026-12-28T17:20 pretends it is that time (clock keeps running from there).
+const PREVIEW_AT = (() => { const v = new URLSearchParams(location.search).get('at'); const d = v ? new Date(v) : null; return d && !isNaN(d) ? d.getTime() - Date.now() : null; })();
+const now = () => new Date(Date.now() + (PREVIEW_AT !== null ? PREVIEW_AT : offset));
 const p2 = n => String(n).padStart(2, '0');
 const ymd = d => d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate());
 const hms = ms => { ms = Math.max(0, ms); const s = Math.floor(ms / 1000); return p2(Math.floor(s / 3600)) + ':' + p2(Math.floor(s % 3600 / 60)) + ':' + p2(s % 60); };
