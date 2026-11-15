@@ -399,7 +399,7 @@ function authorize_(token, requiredCheckFn) {
   return { ok: true, user: user };
 }
 
-const MIN_PASSWORD_LEN_ = 6;
+const MIN_PASSWORD_LEN_ = 8;
 
 function handleCreateUser_(data) {
   const { headers, sheet } = readSheetAsObjects_(USERS_SHEET);
@@ -768,7 +768,7 @@ function ADMIN_resetPassword() {
   const USERNAME = 'admin_test';
   const NEW_PASSWORD = 'PUT-NEW-PASSWORD-HERE';
   if (NEW_PASSWORD === 'PUT-NEW-PASSWORD-HERE' || String(NEW_PASSWORD).length < MIN_PASSWORD_LEN_) {
-    throw new Error('اكتب كلمة مرور جديدة (6 أحرف على الأقل) في السطر NEW_PASSWORD ثم شغّل الدالة');
+    throw new Error('اكتب كلمة مرور جديدة (8 أحرف على الأقل) في السطر NEW_PASSWORD ثم شغّل الدالة');
   }
   const { headers, sheet, rows } = readSheetAsObjects_(USERS_SHEET);
   const target = rows.find(function(r) { return r.Username === USERNAME; });

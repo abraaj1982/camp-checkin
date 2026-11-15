@@ -196,6 +196,10 @@ r=post({action:'nutritionAck',token:tn});assert(r.success&&r.ack.current,'nutrit
 r=post({action:'nutritionSummary',token:tl});assert(r.ack&&r.ack.current&&r.ack.by==='تغذية'&&!r.allergies,'leader sees WHO confirmed and when, never the names');
 
 for(const a of ['roster','lookup','printList','leaderSummary','history','custodySummary']){const rr=JSON.stringify(post({action:a,token:T,q:'أحمد',studentId:'1001'}));assert(!rr.includes('ربو')&&!rr.includes('سكري')&&!rr.includes('فول سوداني'),'no medical/allergy data leaks via '+a);}
+// ---- password length: at least 8 (old shorter passwords keep working until changed)
+{let q=post({action:'createUser',token:T,username:'short7',password:'abc1234',fullName:'قصيرة',role:'supervisor',permissions:['checkin'],committees:[]});assert(!q.success&&q.code==='WEAK_PASSWORD','7-character password rejected');
+q=post({action:'createUser',token:T,username:'len8',password:'abcd1234',fullName:'ثمانية',role:'supervisor',permissions:['checkin'],committees:[]});assert(q.success,'8-character password accepted');
+q=post({action:'resetPassword',token:T,targetUsername:'len8',newPassword:'1234567'});assert(!q.success&&q.code==='WEAK_PASSWORD','reset to 7 characters rejected');}
 // ---- privilege escalation: a non-admin manager cannot become (or take over) an admin
 {post({action:'createUser',token:T,username:'mgr1',password:'pm-12345',fullName:'مدير مستخدمين',role:'supervisor',permissions:['manage'],committees:[]});
 const tm1=post({action:'login',username:'mgr1',password:'pm-12345'}).token;

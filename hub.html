@@ -89,7 +89,7 @@ html[dir=rtl] #usersListCard td:nth-child(2){text-align:right}
 
         <label class="field">كلمة المرور <span class="req">*</span></label>
         <div id="newPasswordBox"></div>
-        <div class="hint">6 أحرف على الأقل. «توليد» يقترح كلمة سهلة القراءة. تُشفَّر عند الحفظ ولا يمكن استرجاعها، فاحفظها قبل تسليمها.</div>
+        <div class="hint">8 أحرف على الأقل. «توليد» يقترح كلمة سهلة القراءة. تُشفَّر عند الحفظ ولا يمكن استرجاعها، فاحفظها قبل تسليمها.</div>
 
         <label class="field">الاسم الكامل <span class="req">*</span></label>
         <input type="text" id="newFullName" required>
@@ -351,8 +351,8 @@ form.addEventListener('submit', async (e) => {
   createBtn.textContent = 'جاري الإنشاء...';
 
   const isAdminRole = roleSelect.value === 'admin';
-  if (document.getElementById('newPassword').value.length < 6) {
-    setMsg(createMsg, '❌ كلمة المرور 6 أحرف على الأقل', 'error');
+  if (document.getElementById('newPassword').value.length < 8) {
+    setMsg(createMsg, '❌ كلمة المرور 8 أحرف على الأقل', 'error');
     createBtn.disabled = false; createBtn.textContent = 'إنشاء الحساب'; return;
   }
   const payload = {
@@ -470,7 +470,7 @@ async function loadUsersList() {
 function passwordField(id, withGenerate) {
   const wrap = document.createElement('div'); wrap.className = 'pwrow';
   const inp = document.createElement('input'); inp.type = 'password'; inp.autocomplete = 'new-password'; if (id) inp.id = id;
-  inp.placeholder = '6 أحرف على الأقل';
+  inp.placeholder = '8 أحرف على الأقل';
   const show = document.createElement('button'); show.type = 'button'; show.className = 'pwbtn'; show.textContent = '👁 إظهار';
   show.addEventListener('click', () => { inp.type = inp.type === 'password' ? 'text' : 'password'; show.textContent = inp.type === 'password' ? '👁 إظهار' : '🙈 إخفاء'; });
   wrap.appendChild(inp); wrap.appendChild(show);
@@ -513,7 +513,7 @@ async function openEditor(u, passwordOnly) {
   const pBtn = document.createElement('button'); pBtn.type = 'button'; pBtn.className = 'btn secondary'; pBtn.textContent = 'تغيير كلمة المرور';
   pBtn.addEventListener('click', async () => {
     const v = pf.input.value;
-    if (v.length < 6) { flash('كلمة المرور 6 أحرف على الأقل', true); return; }
+    if (v.length < 8) { flash('كلمة المرور 8 أحرف على الأقل', true); return; }
     pBtn.disabled = true;
     try {
       const d = await api({ action: 'resetPassword', targetUsername: u.username, newPassword: v });
