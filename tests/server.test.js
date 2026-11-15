@@ -196,6 +196,12 @@ r=post({action:'nutritionAck',token:tn});assert(r.success&&r.ack.current,'nutrit
 r=post({action:'nutritionSummary',token:tl});assert(r.ack&&r.ack.current&&r.ack.by==='تغذية'&&!r.allergies,'leader sees WHO confirmed and when, never the names');
 
 for(const a of ['roster','lookup','printList','leaderSummary','history','custodySummary']){const rr=JSON.stringify(post({action:a,token:T,q:'أحمد',studentId:'1001'}));assert(!rr.includes('ربو')&&!rr.includes('سكري')&&!rr.includes('فول سوداني'),'no medical/allergy data leaks via '+a);}
+// ---- offline queue safety: every rejection has a code, so the phone knows "rejected" from "try again"
+{const tk=post({action:'login',username:'sup1',password:'p1-12345'}).token;
+assert(post({action:'scan',token:tk,studentId:'1001',op:'fly'}).code==='BAD_REQUEST','bad scan op has a code');
+assert(post({action:'bag',token:tk,studentId:'1001',mode:'x',count:1}).code==='BAD_REQUEST','bad bag mode has a code');
+assert(post({action:'bag',token:tk,studentId:'1001',mode:'load',count:-3}).code==='BAD_REQUEST','bad bag count has a code');
+assert(post({action:'createCase',token:tk,type:'other',text:'x'}).code==='BAD_REQUEST','too-short report has a code');}
 // ---- password length: at least 8 (old shorter passwords keep working until changed)
 {let q=post({action:'createUser',token:T,username:'short7',password:'abc1234',fullName:'قصيرة',role:'supervisor',permissions:['checkin'],committees:[]});assert(!q.success&&q.code==='WEAK_PASSWORD','7-character password rejected');
 q=post({action:'createUser',token:T,username:'len8',password:'abcd1234',fullName:'ثمانية',role:'supervisor',permissions:['checkin'],committees:[]});assert(q.success,'8-character password accepted');

@@ -282,7 +282,7 @@ function handleLookup_(data) {
 function handleScan_(data) {
   return withAuth_(data, requirePerm_('checkin'), function(user) {
     const action = String(data.op); // sub-operation (data.action is the API route)
-    if (['board', 'undo', 'withdraw'].indexOf(action) === -1) return { success: false, error: 'Invalid scan action' };
+    if (['board', 'undo', 'withdraw'].indexOf(action) === -1) return { success: false, code: 'BAD_REQUEST', error: 'Invalid scan action' };
     const student = findStudent_(data.studentId);
     if (!student) return { success: false, code: 'NOT_FOUND', error: 'الطالب غير موجود' };
     // Scope comes from the SHEET's bus for this student, never from the client.
@@ -505,9 +505,9 @@ function bagsSheet_() { return getSheetByName_('Bags'); }
 function handleBag_(data) {
   return withAuth_(data, requirePerm_('checkin'), function(user) {
     const mode = String(data.mode);
-    if (['load', 'unload'].indexOf(mode) === -1) return { success: false, error: 'Invalid mode' };
+    if (['load', 'unload'].indexOf(mode) === -1) return { success: false, code: 'BAD_REQUEST', error: 'Invalid mode' };
     const count = Math.floor(Number(data.count));
-    if (!isFinite(count) || count < 0 || count > MAX_BAGS) return { success: false, error: 'عدد غير صالح' };
+    if (!isFinite(count) || count < 0 || count > MAX_BAGS) return { success: false, code: 'BAD_REQUEST', error: 'عدد غير صالح' };
     const student = findStudent_(data.studentId);
     if (!student) return { success: false, code: 'NOT_FOUND', error: 'الطالب غير موجود' };
     if (!canRecordFor_(user, student)) return { success: false, code: 'OTHER_BUS', error: 'هذا الطالب ليس في باصك' };
@@ -619,9 +619,9 @@ function readCases_() {
 function handleCreateCase_(data) {
   return withAuth_(data, requireAnyPerm_(['checkin', 'dashboard', 'manage', 'gate']), function(user) {
     const type = String(data.type || 'other');
-    if (CASE_TYPES.indexOf(type) === -1) return { success: false, error: 'Invalid type' };
+    if (CASE_TYPES.indexOf(type) === -1) return { success: false, code: 'BAD_REQUEST', error: 'Invalid type' };
     const text = String(data.text || '').trim().slice(0, 300);
-    if (text.length < 3) return { success: false, error: 'اكتب وصفاً مختصراً' };
+    if (text.length < 3) return { success: false, code: 'BAD_REQUEST', error: 'اكتب وصفاً مختصراً' };
     const clientId = String(data.clientId || '').slice(0, 60);
     let bus = String(data.bus || '').slice(0, 10);
     if (!hasPerm_(user, 'allbuses') && hasPerm_(user, 'checkin')) bus = String(user.AssignedBus || '');
