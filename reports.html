@@ -8,58 +8,97 @@
 <link rel="stylesheet" href="theme.css">
 <script src="ui.js" defer></script>
 <style>
-.rp-group{margin-top:14px}.rp-group h2{font-size:15px;margin:0 4px 8px;color:var(--muted,#667)}
-.rp-card{display:flex;align-items:center;gap:12px;width:100%;text-align:start;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-top:8px;cursor:pointer;font:inherit;color:inherit}
-.rp-card .ic{width:42px;height:42px;border-radius:12px;background:var(--soft);display:grid;place-items:center;font-size:20px;flex:none}.rp-card b{font-size:16px}
-.rpact{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.rpact .btn{flex:1 1 140px;min-height:48px}
-.sticky{position:sticky;top:0;z-index:15;background:var(--bg,var(--card));padding:8px 0;margin-top:4px}
-.sticky .box{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:10px;box-shadow:0 6px 18px rgba(0,0,0,.12)}
-.sw{display:flex;gap:8px;align-items:center;margin-bottom:8px}.sw select{flex:1;min-height:44px;font-weight:600}
-.sw .back{min-height:44px;white-space:nowrap}
-details.fold{margin-top:10px;border:1px solid var(--line);border-radius:14px;background:var(--card);padding:0 12px}
-details.fold>summary{cursor:pointer;padding:12px 0;font-weight:600;list-style:none}details.fold>summary::-webkit-details-marker{display:none}
-details.fold>summary:before{content:'▸ ';color:var(--muted,#667)}details.fold[open]>summary:before{content:'▾ '}
-details.fold .in{padding-bottom:12px}
-.flt{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+:root{--g-att:#2B6B3A;--g-exit:#B3261E;--g-shirt:#2F6FB0;--g-res:#B7791F;--g-sum:#6B46C1}
+.wrap.wide main{padding-bottom:32px}
+/* ---------- catalogue ---------- */
+.rc-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin:6px 2px 4px}
+.rc-head h2{font-size:22px;margin:0}.rc-head p{margin:4px 0 0;color:var(--muted);font-size:13.5px}
+.rc-count{background:var(--soft);border:1px solid var(--line);border-radius:99px;padding:6px 14px;font-weight:700;white-space:nowrap}
+.rc-group{margin-top:18px}.rc-group>h3{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);margin:0 2px 10px;text-transform:none}
+.rc-group>h3:after{content:'';flex:1;height:1px;background:var(--line)}
+.rc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.rc-card{position:relative;display:flex;flex-direction:column;gap:8px;text-align:start;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;cursor:pointer;font:inherit;color:inherit;transition:transform .15s,box-shadow .15s,border-color .15s;min-height:150px}
+.rc-card:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(0,0,0,.10);border-color:var(--gc)}
+.rc-card:before{content:'';position:absolute;inset-inline-start:0;top:16px;bottom:16px;width:4px;border-radius:4px;background:var(--gc)}
+.rc-ic{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;font-size:22px;background:color-mix(in srgb,var(--gc) 14%,transparent)}
+.rc-card b{font-size:16.5px;line-height:1.35}.rc-card .d{font-size:13px;color:var(--muted);line-height:1.5;flex:1}
+.rc-meta{display:flex;gap:6px;flex-wrap:wrap}.rc-meta span{font-size:11.5px;border:1px solid var(--line);border-radius:99px;padding:2px 9px;color:var(--muted)}
+.rc-meta .sec{border-color:#E07A8A;color:#B3261E;font-weight:700}
+/* ---------- report workspace ---------- */
+.ws{display:grid;grid-template-columns:1fr;gap:14px}
+@media(min-width:960px){.ws{grid-template-columns:290px 1fr;align-items:start}.side{position:sticky;top:12px;max-height:calc(100vh - 24px);overflow:auto}}
+.side{display:flex;flex-direction:column;gap:12px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px}
+.panel>h4{margin:0 0 8px;font-size:12.5px;color:var(--muted);font-weight:700;letter-spacing:.02em}
+.nav button{display:flex;align-items:center;gap:8px;width:100%;text-align:start;background:none;border:0;border-radius:10px;padding:8px 10px;font:inherit;color:inherit;cursor:pointer}
+.nav button:hover{background:var(--soft)}.nav button.on{background:color-mix(in srgb,var(--gc) 16%,transparent);font-weight:700}
+.nav .gl{font-size:11.5px;color:var(--muted);margin:8px 10px 2px;font-weight:700}
+.nav i{width:8px;height:8px;border-radius:50%;background:var(--gc);flex:none;font-style:normal}
+.side .back{width:100%;min-height:42px}
+.flt{display:grid;grid-template-columns:1fr;gap:10px}
+@media(min-width:600px) and (max-width:959px){.flt{grid-template-columns:repeat(2,1fr)}}
 .cols{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
-/* the "paper" = exactly what is printed */
-.paper{background:#fff;color:#111;border:1px solid var(--line);border-radius:14px;padding:18px;margin-top:12px;overflow-x:auto}
-.ph{display:flex;align-items:center;gap:14px;border-bottom:3px solid #1F5E3B;padding-bottom:10px;margin-bottom:10px}
-.ph .lg{width:54px;height:54px;border-radius:12px;background:#E8B04B;color:#1b2a1b;display:grid;place-items:center;font-size:30px;font-weight:700;flex:none}
-.ph .nm{font-size:20px;font-weight:700}.ph .sb{font-size:13px;color:#555}.ph .mt{margin-inline-start:auto;text-align:end;font-size:12px;color:#444;line-height:1.6}
-.pt{font-size:22px;font-weight:700;margin:6px 0 2px}.pf{font-size:13px;color:#444;margin-bottom:10px}
-.conf{display:inline-block;border:2px solid #B3261E;color:#B3261E;border-radius:6px;padding:0 10px;font-weight:700;font-size:13px;margin-inline-start:8px}
-table.rt{width:100%;border-collapse:collapse;font-size:13.5px}
-table.rt th{background:#1F5E3B;color:#fff;padding:7px 8px;text-align:start;font-weight:600;white-space:nowrap}
-table.rt td{padding:6px 8px;border-bottom:1px solid #e1e1e1}
-table.rt tr:nth-child(even) td{background:#f5f8f6}
+.mobsel{display:block}@media(min-width:960px){.mobsel{display:none}.nav{display:block}}@media(max-width:959px){.nav{display:none}}
+.tb{position:sticky;top:0;z-index:15;display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:10px 12px;box-shadow:0 6px 18px rgba(0,0,0,.08)}
+.tb .ti{flex:1;min-width:160px}.tb .ti b{display:block;font-size:16px}.tb .ti span{font-size:12.5px;color:var(--muted)}
+.tb .btn{min-height:44px;flex:0 0 auto;padding-inline:16px}
+@media(max-width:640px){.tb .btn{flex:1 1 0;padding-inline:8px}.canvas{padding:10px 6px}.ph .doc{display:none}}
+.ws>div{min-width:0}
+@media screen{.tw{overflow-x:auto}.paper.land{max-width:1123px}}
+.canvas{background:#d9ded6;border-radius:16px;padding:22px 14px;margin-top:12px}
+[data-theme="dark"] .canvas{background:#0a120c}
+/* ---------- the A4 sheet (what is printed) ---------- */
+.paper{--pb:#1F5E3B;background:#fff;color:#16201a;max-width:794px;margin:0 auto;border-radius:4px;box-shadow:0 18px 40px rgba(0,0,0,.18);padding:0 0 18px;overflow:hidden;font-size:13px}
+.band{height:8px;background:linear-gradient(90deg,var(--pb),#2f8a55 60%,#E8B04B)}
+.ph{display:flex;align-items:center;gap:14px;padding:16px 26px 12px}
+.ph .lg{width:52px;height:52px;border-radius:12px;background:#E8B04B;color:#1b2a1b;display:grid;place-items:center;font-size:28px;font-weight:700;flex:none}
+.ph .nm{font-size:18px;font-weight:700}.ph .sb{font-size:12.5px;color:#5b6a60}
+.ph .doc{margin-inline-start:auto;text-align:end;font-size:11px;color:#5b6a60;letter-spacing:.04em}
+.tblock{padding:4px 26px 0}.tblock .pt{font-size:24px;font-weight:800;color:#13261a;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.conf{display:inline-block;border:2px solid #B3261E;color:#B3261E;border-radius:6px;padding:1px 10px;font-weight:800;font-size:12px;letter-spacing:.05em}
+.meta{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin:12px 26px 0;border:1px solid #dfe5e0;border-radius:10px;overflow:hidden}
+.meta div{padding:8px 10px;border-inline-start:1px solid #dfe5e0}.meta div:first-child{border-inline-start:0}
+.meta span{display:block;font-size:10.5px;color:#6b7a70;font-weight:600}.meta b{font-size:12.5px;font-weight:700;color:#16201a;word-break:break-word}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin:12px 26px 0}
+.chips div{border-radius:10px;padding:6px 12px;background:#f1f5f2;border:1px solid #dfe5e0;font-size:12px}.chips b{font-size:16px;margin-inline-end:6px;color:var(--pb)}
+.tw{padding:14px 26px 0}
+table.rt{width:100%;border-collapse:separate;border-spacing:0;font-size:12.5px}
+table.rt th{background:var(--pb);color:#fff;padding:8px 9px;text-align:start;font-weight:700;white-space:nowrap;font-size:12px}
+table.rt th:first-child{border-start-start-radius:8px}table.rt th:last-child{border-start-end-radius:8px}
+table.rt td{padding:7px 9px;border-bottom:1px solid #e6ebe7;vertical-align:middle}
+table.rt tbody tr:nth-child(even) td{background:#f6f9f7}
+@media screen{table.rt tbody tr:hover td{background:#eaf3ec}}
 table.rt .num{text-align:center;font-variant-numeric:tabular-nums}
-table.rt tr.tot td{font-weight:700;background:#e8f0ea;border-top:2px solid #1F5E3B}
-th.sortable{cursor:pointer}
-.kp{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:8px 0 12px}.kp div{border:1px solid #cfd8d2;border-radius:10px;padding:10px;text-align:center}.kp b{display:block;font-size:22px;color:#1F5E3B}.kp span{font-size:12px;color:#555}
-.sec h3{font-size:16px;margin:16px 0 4px;border-inline-start:5px solid #E8B04B;padding-inline-start:8px}
-.pfoot{margin-top:14px;font-size:11px;color:#666;display:flex;justify-content:space-between;border-top:1px solid #ddd;padding-top:6px}
-.empty{padding:20px;text-align:center;color:#666}
-@media (max-width:640px){.kp{grid-template-columns:repeat(2,1fr)}}
+table.rt tr.tot td{font-weight:800;background:#e3eee6!important;border-top:2px solid var(--pb);border-bottom:0}
+th.sortable{cursor:pointer;user-select:none}
+.pill2{display:inline-block;border-radius:99px;padding:2px 10px;font-size:11.5px;font-weight:700;white-space:nowrap;background:#eef1ef;color:#3d4a42}
+.pill2.ok{background:#dcf2e3;color:#1d6b3b}.pill2.warn{background:#fdf0d5;color:#8a5a00}.pill2.bad{background:#fbe2e2;color:#9c1f1f}.pill2.mute{background:#eceff1;color:#5a6670}
+.kp{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:8px 0 12px}
+.kp div{border:1px solid #dfe5e0;border-radius:12px;padding:10px 8px;text-align:center;background:linear-gradient(180deg,#fff,#f6f9f7)}
+.kp b{display:block;font-size:22px;color:var(--pb);font-variant-numeric:tabular-nums}.kp span{font-size:11.5px;color:#5b6a60}
+.sec{padding:6px 26px 0}.sec h3{font-size:15px;margin:14px 0 6px;display:flex;align-items:center;gap:8px}.sec h3:before{content:'';width:5px;height:18px;border-radius:3px;background:#E8B04B}
+.pfoot{margin:18px 26px 0;font-size:10.5px;color:#6b7a70;display:flex;justify-content:space-between;gap:10px;border-top:1px solid #dfe5e0;padding-top:8px}
+.empty{padding:34px 10px;text-align:center;color:#6b7a70}.empty div{font-size:34px}
+@media(max-width:640px){.kp{grid-template-columns:repeat(2,1fr)}.meta{grid-template-columns:repeat(2,1fr)}.meta div:nth-child(3){border-inline-start:0}.ph,.tblock,.tw,.sec{padding-inline:14px}.meta,.chips,.pfoot{margin-inline:14px}}
 @media print{
   html,body{background:#fff!important}
-  .hdr,.hero,.noprint,.tabs{display:none!important}
-  .wrap{max-width:none!important;width:100%!important;margin:0!important;padding:0!important;box-shadow:none!important;border-radius:0!important;background:#fff!important}
-  main{padding:0!important}
-  .paper{border:0;border-radius:0;padding:0;margin:0;overflow:visible}
-  table.rt thead{display:table-header-group}table.rt tr{break-inside:avoid}
-  .sec{break-inside:avoid-page}
+  .hdr,.hero,.noprint{display:none!important}
+  .wrap{max-width:none!important;width:100%!important;margin:0!important;box-shadow:none!important;border-radius:0!important;background:#fff!important;overflow:visible!important}
+  main{padding:0!important}.ws{display:block}.canvas{background:none!important;padding:0!important;margin:0!important}
+  .paper{max-width:none;box-shadow:none;border-radius:0;padding:0;overflow:visible}
+  .ph,.tblock,.tw,.sec{padding-inline:0}.meta,.chips,.pfoot{margin-inline:0}
+  table.rt thead{display:table-header-group}table.rt tr{break-inside:avoid}.sec{break-inside:avoid-page}
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
 </style>
 </head>
 <body>
-<div class="wrap">
+<div class="wrap wide">
   <header class="hdr">
     <div class="brand"><div class="logo">م</div><div style="min-width:0"><div class="t" id="campT"></div><div class="s" id="campS"></div></div></div>
-    <div class="tools"><a class="tool" href="hub.html" id="homeBtn">الرئيسية</a><button class="tool" id="themeBtn"></button></div>
+    <div class="tools"><a class="tool" href="hub.html" id="homeBtn"></a><button class="tool" id="langBtn"></button><button class="tool" id="themeBtn"></button></div>
   </header>
-  <section class="hero compact"><div class="ic" aria-hidden="true">📑</div><div><h1>التقارير</h1><p>استخراج وطباعة وتصدير</p></div></section>
+  <section class="hero compact"><div class="ic" aria-hidden="true">📑</div><div><h1 id="hT"></h1><p id="hS"></p></div></section>
   <main id="app"></main>
 </div>
 <script>
@@ -73,35 +112,45 @@ const pref = { get(k, d) { try { return localStorage.getItem('mk_pref_' + k) || 
 const $ = id => document.getElementById(id);
 const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const AUTH_ERR = /EXPIRED|IDLE_TIMEOUT|REVOKED|BAD_SIGNATURE|MALFORMED|USER_NOT_FOUND|ACCOUNT_DISABLED|BAD_PAYLOAD/;
+const EN = {"أعدّه": "Prepared by", "أكّد الخروج": "Exit confirmed by", "أُعيد الطالب": "Student re-admitted", "إجمالي الاستئذانات": "Total exit permissions", "إجمالي الحالات": "Total cases", "إلى": "to", "إلى تاريخ": "To date", "استئذانات الخروج": "Exit permissions", "استخراج وطباعة وتصدير": "Extract, print and export", "اضغط لإظهار أو إخفاء عمود": "Tap to show or hide a column", "اعتمده": "Approved by", "الأعمدة والبحث": "Columns and search", "الإجمالي": "Total", "الاسم": "Name", "الباص": "Bus", "التجميع حسب": "Group by", "الترتيب": "Rank", "الترتيب العام للفرق": "Overall team ranking", "التغذية والقمصان": "Nutrition and shirts", "التقارير": "Reports", "التقرير": "Report", "الحالة": "Status", "الحضور": "Attendance", "الحضور والباصات": "Attendance and buses", "الخروج": "Exits", "الرئيسية": "Home", "الرقم": "No.", "السبب": "Reason", "الصحة (أعداد فقط)": "Health (counts only)", "الصف": "Class", "العدد": "Count", "الفريق": "Team", "الفعاليات والنتائج": "Events and results", "الفلاتر": "Filters", "القائمة": "List", "القمصان": "Shirts", "القمصان: المسلَّم والمتبقي": "Shirts: given and remaining", "القمصان: من لم يستلم": "Shirts: not yet received", "الكادر": "Staff", "الكل": "All", "المتبقي": "Remaining", "المخزون": "Stock", "المركز": "Place", "المسابقة": "Competition", "المستلِم": "Receiver", "المطلوب (المسجَّل)": "Needed (registered)", "المقاس": "Size", "النتائج المنشورة فقط": "Published results only", "النقاط": "Points", "النوع": "Type", "الوقت": "Time", "انتهت الجلسة. سجّل الدخول من جديد.": "Session expired. Please log in again.", "بانتظار الخروج": "Waiting to leave", "بحث داخل التقرير": "Search inside the report", "بلا مخزون": "No stock", "ترتيب الفرق": "Team ranking", "تعذّر إنشاء التقرير": "Could not create the report", "تعذّر الاتصال. حاول مرة أخرى.": "Connection problem. Try again.", "تعذّر التحميل": "Could not load", "تقرير غير معروف": "Unknown report", "جارٍ إنشاء التقرير…": "Creating the report…", "حساسية غذائية مسجّلة": "Food allergies on record", "حسب": "By", "خرج": "Left", "خرج بإذن": "Left with permission", "خرجوا بإذن": "Left with permission", "خرجوا فعلًا": "Actually left", "داكن": "Dark", "سجل": "records", "سري": "Confidential", "سُلِّم": "Given", "صعد": "Boarded", "صعدوا": "Boarded", "صفحة": "Page", "طالب": "Student", "طلاب": "Students", "عاجلة": "Urgent", "عدد الطلاب": "Number of students", "غير محدد": "Not set", "فاتح": "Light", "قمصان سُلِّمت (طلاب)": "Shirts given (students)", "قمصان سُلِّمت (كادر)": "Shirts given (staff)", "كادر": "Staff", "كشف حضور الباص": "Bus attendance sheet", "لا توجد بيانات لهذه الفلاتر.": "No data for these filters.", "للاستخدام الإداري": "For administrative use", "لم يصعد": "Not boarded", "لم يصعدوا": "Not boarded", "متوفر": "In stock", "مجموع النقاط": "Total points", "معتمد (بانتظار الخروج)": "Approved (waiting to leave)", "مغلقة": "Closed", "مفتوحة": "Open", "ملخص الصعود": "Boarding summary", "ملخص المخيم": "Camp summary", "ملخصات": "Summaries", "من": "from", "من تاريخ": "From date", "مُلغى": "Cancelled", "نتائج المسابقات": "Competition results", "نسبة الصعود %": "Boarded %", "نفد": "Out", "وقت الاعتماد": "Approved at", "وقت الخروج": "Left at", "يقارب النفاد": "Running low", "تقرير": "Report", "استخراج": "Extract", "طباعة / PDF": "Print / PDF", "← القائمة": "← List", "كل التقارير": "All reports", "الكل (الأعمدة)": "All", "مركز التقارير": "Report centre", "تقارير جاهزة للطباعة والتصدير. كل تشغيل يُسجَّل في سجل التدقيق.": "Ready-to-print reports. Every run is recorded in the audit log.", "تقارير": "reports", "اختر تقريرًا": "Choose a report", "طباعة": "Print", "عدد السجلات": "Records", "التاريخ": "Date", "الفلاتر المطبّقة": "Filters", "بدون فلاتر": "No filters", "تحديث": "Refresh", "ملخص سريع": "Quick summary", "كشف بأسماء الطلاب وحالة الصعود ووقته، حسب الباص أو الفريق أو الصف.": "Students with boarding status and time, by bus, team or class.", "أعداد الصعود ونسبه مجمّعة حسب الباص أو الفريق أو الصف.": "Boarding counts and rates grouped by bus, team or class.", "من استأذن، ومن استلمه، ومن اعتمد وأكّد الخروج ومتى.": "Who left, who collected them, who approved and confirmed, and when.", "لكل مقاس: المخزون والمطلوب والمسلَّم والمتبقي.": "Per size: stock, needed, given and remaining.", "قائمة من لم يستلم قميصه بعد، طلابًا وكادرًا.": "Everyone still waiting for a shirt, students and staff.", "النتائج المنشورة لكل مسابقة بالمراكز والنقاط.": "Published results per competition with places and points.", "مجموع نقاط الفرق من النتائج المنشورة.": "Team totals from published results.", "صفحة واحدة للقيادة: الحضور والخروج والصحة والتغذية والقمصان والترتيب.": "One page for leadership: attendance, exits, health, nutrition, shirts and ranking."};
+const tr = s => (st.lang === 'en' && Object.prototype.hasOwnProperty.call(EN, s)) ? EN[s] : s;
 const ICONS = { 'الحضور والباصات': '🚌', 'الخروج': '🚪', 'القمصان': '👕', 'الفعاليات والنتائج': '🏆', 'ملخصات': '📋' };
 const FL = { bus: 'الباص', team: 'الفريق', cls: 'الصف', size: 'المقاس' };
-const st = { theme: pref.get('theme', 'light'), cat: null, opts: null, cur: null, f: {}, data: null, hide: {}, sort: null, q: '', msg: null, busy: false };
+const st = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), cat: null, opts: null, cur: null, f: {}, data: null, hide: {}, sort: null, q: '', msg: null, busy: false };
 async function api(action, extra) {
   const r = await (await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(Object.assign({ action: action, token: token }, extra || {})) })).json();
-  if (r && r.code && AUTH_ERR.test(r.code)) { st.msg = { cls: 'bad', t: 'انتهت الجلسة. سجّل الدخول من جديد.' }; render(); setTimeout(() => { sessionStorage.clear(); location.href = 'login.html'; }, 1500); throw new Error('auth'); }
+  if (r && r.code && AUTH_ERR.test(r.code)) { st.msg = { cls: 'bad', t: tr('انتهت الجلسة. سجّل الدخول من جديد.') }; render(); setTimeout(() => { sessionStorage.clear(); location.href = 'login.html'; }, 1500); throw new Error('auth'); }
   return r;
 }
 const fmtTime = iso => { if (!iso) return ''; const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleTimeString('en-GB', { timeZone: 'Asia/Muscat', hour: '2-digit', minute: '2-digit' }); };
 const fmtDT = iso => { if (!iso) return ''; const d = new Date(iso); if (isNaN(d)) return ''; return d.toLocaleDateString('en-GB', { timeZone: 'Asia/Muscat', day: '2-digit', month: '2-digit' }) + ' ' + fmtTime(iso); };
-const cell = (c, v) => c.type === 'time' ? fmtTime(v) : c.type === 'datetime' ? fmtDT(v) : (v === undefined || v === null ? '' : v);
+const cell = (c, v) => c.type === 'time' ? fmtTime(v) : c.type === 'datetime' ? fmtDT(v) : (v === undefined || v === null ? '' : (typeof v === 'string' ? tr(v) : v));
 
-async function init() { try { const r = await api('reportOptions'); if (r.success) { st.cat = r.reports; st.opts = r; } else st.msg = { cls: 'bad', t: r.error || 'تعذّر التحميل' }; } catch (e) { if (e.message !== 'auth') st.msg = { cls: 'bad', t: 'تعذّر الاتصال. حاول مرة أخرى.' }; } render(); }
+async function init() { try { const r = await api('reportOptions'); if (r.success) { st.cat = r.reports; st.opts = r; } else st.msg = { cls: 'bad', t: r.error || tr('تعذّر التحميل') }; } catch (e) { if (e.message !== 'auth') st.msg = { cls: 'bad', t: tr('تعذّر الاتصال. حاول مرة أخرى.') }; } render(); }
 let runT = null;
 function schedule() { clearTimeout(runT); runT = setTimeout(run, 250); }
 async function run() {
   if (!st.cur) return; st.busy = true; st.msg = null;
-  try { const r = await api('reportData', { report: st.cur.id, filters: st.f }); if (r.success) { st.data = r; } else { st.data = null; st.msg = { cls: 'bad', t: r.error || 'تعذّر إنشاء التقرير' }; } } catch (e) { if (e.message !== 'auth') st.msg = { cls: 'bad', t: 'تعذّر الاتصال. حاول مرة أخرى.' }; }
+  try { const r = await api('reportData', { report: st.cur.id, filters: st.f }); if (r.success) { st.data = r; } else { st.data = null; st.msg = { cls: 'bad', t: r.error || tr('تعذّر إنشاء التقرير') }; } } catch (e) { if (e.message !== 'auth') st.msg = { cls: 'bad', t: tr('تعذّر الاتصال. حاول مرة أخرى.') }; }
   st.busy = false; render();
 }
 function open_(id) { st.cur = st.cat.find(r => r.id === id); st.f = {}; st.data = null; st.hide = {}; st.sort = null; st.q = ''; if (st.cur.id === 'boardingSummary') st.f.groupBy = 'bus'; render(); run(); }
 
 /* ---------- views ---------- */
+const GC = { 'الحضور والباصات': 'var(--g-att)', 'الخروج': 'var(--g-exit)', 'القمصان': 'var(--g-shirt)', 'الفعاليات والنتائج': 'var(--g-res)', 'ملخصات': 'var(--g-sum)' };
+const DESC = { busAttendance: 'كشف بأسماء الطلاب وحالة الصعود ووقته، حسب الباص أو الفريق أو الصف.', boardingSummary: 'أعداد الصعود ونسبه مجمّعة حسب الباص أو الفريق أو الصف.', exits: 'من استأذن، ومن استلمه، ومن اعتمد وأكّد الخروج ومتى.',
+  shirtsStock: 'لكل مقاس: المخزون والمطلوب والمسلَّم والمتبقي.', shirtsPending: 'قائمة من لم يستلم قميصه بعد، طلابًا وكادرًا.', results: 'النتائج المنشورة لكل مسابقة بالمراكز والنقاط.', teamRanking: 'مجموع نقاط الفرق من النتائج المنشورة.',
+  campSummary: 'صفحة واحدة للقيادة: الحضور والخروج والصحة والتغذية والقمصان والترتيب.' };
+const groupsOf = () => { const g = {}; st.cat.forEach(r => (g[r.group] = g[r.group] || []).push(r)); return g; };
 function listView() {
-  const groups = {}; st.cat.forEach(r => (groups[r.group] = groups[r.group] || []).push(r));
-  return Object.keys(groups).map(g => `<div class="rp-group"><h2>${ICONS[g] || '📄'} ${esc(g)}</h2>${groups[g].map(r => `<button class="rp-card" data-open="${esc(r.id)}"><span class="ic">${ICONS[g] || '📄'}</span><b>${esc(r.title)}</b></button>`).join('')}</div>`).join('');
+  const g = groupsOf();
+  return `<div class="rc-head"><div><h2>${esc(tr('مركز التقارير'))}</h2><p>${esc(tr('تقارير جاهزة للطباعة والتصدير. كل تشغيل يُسجَّل في سجل التدقيق.'))}</p></div><span class="rc-count">${st.cat.length} ${esc(tr('تقارير'))}</span></div>` +
+    Object.keys(g).map(k => `<section class="rc-group"><h3>${ICONS[k] || '📄'} ${esc(tr(k))}</h3><div class="rc-grid">${g[k].map(r => `<button class="rc-card" style="--gc:${GC[k] || 'var(--brand)'}" data-open="${esc(r.id)}">
+      <span class="rc-ic">${ICONS[k] || '📄'}</span><b>${esc(tr(r.title))}</b><span class="d">${esc(tr(DESC[r.id] || ''))}</span>
+      <span class="rc-meta"><span>🖨️ PDF</span>${r.id === 'campSummary' ? '' : '<span>⬇️ Excel</span>'}${r.id === 'exits' ? `<span class="sec">🔒 ${esc(tr('سري'))}</span>` : ''}</span></button>`).join('')}</div></section>`).join('');
 }
 function sel(key, label, options, withAll) {
-  return `<div><label class="lbl" for="f-${key}">${label}</label><select id="f-${key}" data-f="${key}">${withAll ? '<option value="">الكل</option>' : ''}${options.map(o => `<option value="${esc(o[0])}" ${String(st.f[key] || '') === String(o[0]) ? 'selected' : ''}>${esc(o[1])}</option>`).join('')}</select></div>`;
+  return `<div><label class="lbl" for="f-${key}">${esc(tr(label))}</label><select id="f-${key}" data-f="${key}">${withAll ? `<option value="">${esc(tr('الكل'))}</option>` : ''}${options.map(o => `<option value="${esc(o[0])}" ${String(st.f[key] || '') === String(o[0]) ? 'selected' : ''}>${esc(tr(o[1]))}</option>`).join('')}</select></div>`;
 }
 function filtersView() {
   const d = st.cur, o = st.opts, p = x => x.map(v => [v, v]); const out = [];
@@ -114,8 +163,8 @@ function filtersView() {
     else if (k === 'groupBy') out.push(sel('groupBy', 'التجميع حسب', [['bus', 'الباص'], ['team', 'الفريق'], ['cls', 'الصف']], false));
     else if (k === 'exitStatus') out.push(sel('exitStatus', 'الحالة', [['open', 'معتمد (بانتظار الخروج)'], ['closed', 'خرج'], ['cancelled', 'مُلغى'], ['reversed', 'أُعيد الطالب']], true));
     else if (k === 'kind') out.push(sel('kind', 'النوع', [['student', 'طلاب'], ['staff', 'كادر']], true));
-    else if (k === 'from') out.push(`<div><label class="lbl" for="f-from">من تاريخ</label><input id="f-from" type="date" data-f="from" value="${esc(st.f.from || '')}"></div>`);
-    else if (k === 'to') out.push(`<div><label class="lbl" for="f-to">إلى تاريخ</label><input id="f-to" type="date" data-f="to" value="${esc(st.f.to || '')}"></div>`);
+    else if (k === 'from') out.push(`<div><label class="lbl" for="f-from">${esc(tr('من تاريخ'))}</label><input id="f-from" type="date" data-f="from" value="${esc(st.f.from || '')}"></div>`);
+    else if (k === 'to') out.push(`<div><label class="lbl" for="f-to">${esc(tr('إلى تاريخ'))}</label><input id="f-to" type="date" data-f="to" value="${esc(st.f.to || '')}"></div>`);
   });
   return out.length ? `<div class="flt">${out.join('')}</div>` : '';
 }
@@ -126,38 +175,67 @@ function sortedRows(d) {
   if (st.sort) { const c = d.columns.find(x => x.key === st.sort.key); const dir = st.sort.dir; rows.sort((a, b) => { const x = a[c.key], y = b[c.key]; const r = (typeof x === 'number' && typeof y === 'number') ? x - y : String(x === undefined ? '' : x).localeCompare(String(y === undefined ? '' : y), 'ar', { numeric: true }); return r * dir; }); }
   return rows;
 }
+// Status words get a coloured pill (on screen and on paper).
+const TONE = { 'صعد': 'ok', 'خرج': 'mute', 'خرج بإذن': 'bad', 'لم يصعد': 'warn', 'معتمد (بانتظار الخروج)': 'warn', 'مُلغى': 'mute', 'أُعيد الطالب': 'ok', 'متوفر': 'ok', 'يقارب النفاد': 'warn', 'نفد': 'bad', 'بلا مخزون': 'bad', 'غير محدد': 'warn' };
+const PILL_COLS = { state: 1, status: 1, size: 1 };
+function td(c, v) { const t = cell(c, v); return PILL_COLS[c.key] && TONE[v] ? `<span class="pill2 ${TONE[v]}">${esc(t)}</span>` : esc(t); }
 function tableHtml(columns, rows, totalRow, sortable) {
-  if (!rows.length) return `<div class="empty">لا توجد بيانات لهذه الفلاتر.</div>`;
-  const th = columns.map(c => `<th class="${sortable ? 'sortable' : ''} ${c.type === 'num' ? 'num' : ''}" ${sortable ? `data-sort="${esc(c.key)}"` : ''}>${esc(c.label)}${sortable && st.sort && st.sort.key === c.key ? (st.sort.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('');
-  const tr = r => `<tr>${columns.map(c => `<td class="${c.type === 'num' ? 'num' : ''}">${esc(cell(c, r[c.key]))}</td>`).join('')}</tr>`;
-  return `<table class="rt"><thead><tr>${th}</tr></thead><tbody>${rows.map(tr).join('')}${totalRow ? `<tr class="tot">${columns.map(c => `<td class="${c.type === 'num' ? 'num' : ''}">${esc(cell(c, totalRow[c.key]))}</td>`).join('')}</tr>` : ''}</tbody></table>`;
+  if (!rows.length) return `<div class="empty"><div>🗂️</div>${esc(tr('لا توجد بيانات لهذه الفلاتر.'))}</div>`;
+  const th = columns.map(c => `<th class="${sortable ? 'sortable' : ''} ${c.type === 'num' ? 'num' : ''}" ${sortable ? `data-sort="${esc(c.key)}"` : ''}>${esc(tr(c.label))}${sortable && st.sort && st.sort.key === c.key ? (st.sort.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('');
+  const tr_ = r => `<tr>${columns.map(c => `<td class="${c.type === 'num' ? 'num' : ''}">${td(c, r[c.key])}</td>`).join('')}</tr>`;
+  return `<table class="rt"><thead><tr>${th}</tr></thead><tbody>${rows.map(tr_).join('')}${totalRow ? `<tr class="tot">${columns.map(c => `<td class="${c.type === 'num' ? 'num' : ''}">${esc(cell(c, totalRow[c.key]))}</td>`).join('')}</tr>` : ''}</tbody></table>`;
+}
+const VAL = { status: { boarded: 'صعدوا', missing: 'لم يصعدوا', withdrawn: 'خرجوا بإذن' }, exitStatus: { open: 'معتمد (بانتظار الخروج)', closed: 'خرج', cancelled: 'مُلغى', reversed: 'أُعيد الطالب' }, kind: { student: 'طلاب', staff: 'كادر' }, groupBy: { bus: 'الباص', team: 'الفريق', cls: 'الصف' } };
+// The filter line, built here so it follows the page language.
+function ftext(d) {
+  const f = st.f, p = [];
+  if (f.groupBy) p.push(tr('حسب') + ' ' + tr(VAL.groupBy[f.groupBy]));
+  if (f.bus) p.push(tr('الباص') + ' ' + f.bus); if (f.team) p.push(tr('الفريق') + ' ' + f.team); if (f.cls) p.push(tr('الصف') + ' ' + f.cls);
+  if (f.status) p.push(tr(VAL.status[f.status])); if (f.exitStatus) p.push(tr(VAL.exitStatus[f.exitStatus])); if (f.kind) p.push(tr(VAL.kind[f.kind])); if (f.size) p.push(tr('المقاس') + ' ' + f.size);
+  if (f.from) p.push(tr('من') + ' ' + f.from); if (f.to) p.push(tr('إلى') + ' ' + f.to);
+  if (d.report === 'results' || d.report === 'teamRanking') p.push(tr('النتائج المنشورة فقط'));
+  return p.join(' · ');
+}
+// Quick counts above a table: how many rows per status (only for tables that have a status column).
+function chipsHtml(d, rows) {
+  const c = d.columns.find(x => x.key === 'state' || (x.key === 'status' && d.report === 'exits') || (x.key === 'kind' && d.report === 'shirtsPending')); if (!c) return '';
+  const n = {}; rows.forEach(r => { const v = r[c.key]; n[v] = (n[v] || 0) + 1; });
+  return `<div class="chips">${Object.keys(n).map(k => `<div><b>${n[k]}</b>${esc(tr(k))}</div>`).join('')}</div>`;
 }
 function paper() {
-  const d = st.data; if (!d) return st.busy ? `<div class="card muted">جارٍ إنشاء التقرير…</div>` : '';
+  const d = st.data; if (!d) return st.busy ? `<div class="paper"><div class="empty"><div>⏳</div>${esc(tr('جارٍ إنشاء التقرير…'))}</div></div>` : '';
   const camp = ($('campT') && $('campT').textContent) || '', now = new Date();
-  const when = now.toLocaleDateString('ar-u-nu-latn', { timeZone: 'Asia/Muscat', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) + ' · ' + fmtTime(now.toISOString());
-  const head = `<div class="ph"><div class="lg">م</div><div><div class="nm">${esc(camp)}</div><div class="sb">${esc(d.group)}</div></div><div class="mt">${esc(when)}<br>أعدّه: ${esc(d.generatedBy)}</div></div>
-    <div class="pt">${esc(d.title)}${d.confidential ? '<span class="conf">سري</span>' : ''}</div><div class="pf">${esc(d.filtersText || '')}${d.kind === 'table' ? (d.filtersText ? ' · ' : '') + d.rows.length + ' سجل' : ''}</div>`;
+  const when = now.toLocaleDateString(st.lang === 'en' ? 'en-GB' : 'ar-u-nu-latn', { timeZone: 'Asia/Muscat', day: 'numeric', month: 'long', year: 'numeric' }) + ' · ' + fmtTime(now.toISOString());
+  const rows = d.kind === 'table' ? sortedRows(d) : [], ft = ftext(d);
+  const head = `<div class="band"></div><div class="ph"><div class="lg">م</div><div><div class="nm">${esc(camp)}</div><div class="sb">${esc(tr(d.group))}</div></div><div class="doc">${esc(tr('تقرير'))} · ${esc(d.report.toUpperCase())}</div></div>
+    <div class="tblock"><div class="pt">${esc(tr(d.title))}${d.confidential ? `<span class="conf">${esc(tr('سري'))}</span>` : ''}</div></div>
+    <div class="meta"><div><span>${esc(tr('التاريخ'))}</span><b>${esc(when)}</b></div><div><span>${esc(tr('أعدّه'))}</span><b>${esc(d.generatedBy)}</b></div><div><span>${esc(tr('الفلاتر المطبّقة'))}</span><b>${esc(ft || tr('بدون فلاتر'))}</b></div><div><span>${esc(tr('عدد السجلات'))}</span><b>${d.kind === 'table' ? rows.length : '—'}</b></div></div>`;
   let body = '';
-  if (d.kind === 'summary') body = d.sections.map(s => `<div class="sec"><h3>${esc(s.title)}</h3>${s.kpis && s.kpis.length ? `<div class="kp">${s.kpis.map(k => `<div><b>${esc(k.value)}</b><span>${esc(k.label)}</span></div>`).join('')}</div>` : ''}${s.table ? tableHtml(s.table.columns, s.table.rows, s.table.totalRow, false) : ''}</div>`).join('');
-  else body = tableHtml(visibleCols(d), sortedRows(d), st.q.trim() ? null : d.totalRow, true);
-  return `<section class="paper" id="paper">${head}${body}<div class="pfoot"><span>${esc(camp)} — ${esc(d.title)}</span><span>${d.confidential ? 'سري — للاستخدام الإداري' : ''}</span></div></section>`;
+  if (d.kind === 'summary') body = d.sections.map(s => `<div class="sec"><h3>${esc(tr(s.title))}</h3>${s.kpis && s.kpis.length ? `<div class="kp">${s.kpis.map(k => `<div><b>${esc(k.value)}</b><span>${esc(tr(k.label))}</span></div>`).join('')}</div>` : ''}${s.table ? tableHtml(s.table.columns, s.table.rows, s.table.totalRow, false) : ''}</div>`).join('');
+  else body = chipsHtml(d, rows) + `<div class="tw">${tableHtml(visibleCols(d), rows, st.q.trim() ? null : d.totalRow, true)}</div>`;
+  return `<section class="paper ${d.landscape ? 'land' : ''}" id="paper">${head}${body}<div class="pfoot"><span>${esc(camp)} — ${esc(tr(d.title))}</span><span>${d.confidential ? esc(tr('سري') + ' — ' + tr('للاستخدام الإداري')) : ''}</span></div></section>`;
 }
 function reportView() {
-  const d = st.data, tbl = d && d.kind === 'table';
-  const sw = `<select id="rsel" aria-label="التقرير">${(() => { const g = {}; st.cat.forEach(r => (g[r.group] = g[r.group] || []).push(r)); return Object.keys(g).map(k => `<optgroup label="${esc(k)}">${g[k].map(r => `<option value="${esc(r.id)}" ${st.cur.id === r.id ? 'selected' : ''}>${esc(r.title)}</option>`).join('')}</optgroup>`).join(''); })()}</select>`;
-  const top = `<div class="sticky noprint"><div class="box"><div class="sw"><button class="btn alt back" data-back="1">← القائمة</button>${sw}</div>
-    <div class="rpact"><button class="btn" data-print="1" ${d ? '' : 'disabled'}>🖨️ طباعة / PDF</button><button class="btn alt" data-csv="1" ${tbl ? '' : 'disabled'}>⬇️ Excel (CSV)</button></div></div></div>`;
+  const d = st.data, tbl = d && d.kind === 'table', g = groupsOf();
+  const nav = `<div class="panel nav"><h4>${esc(tr('التقارير'))}</h4>${Object.keys(g).map(k => `<div class="gl">${esc(tr(k))}</div>${g[k].map(r => `<button style="--gc:${GC[k] || 'var(--brand)'}" class="${st.cur.id === r.id ? 'on' : ''}" data-open="${esc(r.id)}"><i></i>${esc(tr(r.title))}</button>`).join('')}`).join('')}</div>`;
+  const mob = `<div class="panel mobsel"><select id="rsel" aria-label="${esc(tr('اختر تقريرًا'))}">${Object.keys(g).map(k => `<optgroup label="${esc(tr(k))}">${g[k].map(r => `<option value="${esc(r.id)}" ${st.cur.id === r.id ? 'selected' : ''}>${esc(tr(r.title))}</option>`).join('')}</optgroup>`).join('')}</select></div>`;
   const f = filtersView();
-  const flt = f ? `<details class="fold noprint" open><summary>الفلاتر</summary><div class="in">${f}</div></details>` : '';
-  const cols = tbl ? `<details class="fold noprint"><summary>الأعمدة والبحث</summary><div class="in"><input id="q" type="search" placeholder="بحث داخل التقرير" value="${esc(st.q)}">
-    <div class="lbl" style="margin-top:10px">اضغط لإظهار أو إخفاء عمود</div><div class="cols">${d.columns.map(c => `<button class="chip ${st.hide[c.key] ? '' : 'on'}" data-col="${esc(c.key)}">${esc(c.label)}</button>`).join('')}</div></div></details>` : '';
-  return `${top}${flt}${cols}${paper()}`;
+  const flt = f ? `<div class="panel"><h4>${esc(tr('الفلاتر'))}</h4>${f}</div>` : '';
+  const cols = tbl ? `<div class="panel"><h4>${esc(tr('الأعمدة والبحث'))}</h4><input id="q" type="search" placeholder="${esc(tr('بحث داخل التقرير'))}" value="${esc(st.q)}">
+    <div class="cols">${d.columns.map(c => `<button class="chip ${st.hide[c.key] ? '' : 'on'}" data-col="${esc(c.key)}">${esc(tr(c.label))}</button>`).join('')}</div></div>` : '';
+  const side = `<aside class="side noprint"><button class="btn alt back" data-back="1">${esc(tr('← القائمة'))}</button>${mob}${nav}${flt}${cols}</aside>`;
+  const tb = `<div class="tb noprint"><div class="ti"><b>${esc(tr(st.cur.title))}</b><span>${d && tbl ? sortedRows(d).length + ' ' + esc(tr('سجل')) : '&nbsp;'}</span></div>
+    <button class="btn" data-print="1" ${d ? '' : 'disabled'}>🖨️ ${esc(tr('طباعة / PDF'))}</button><button class="btn alt" data-csv="1" ${tbl ? '' : 'disabled'}>⬇️ Excel</button></div>`;
+  return `<div class="ws">${side}<div>${tb}<div class="canvas">${paper()}</div></div></div>`;
 }
 function render() {
-  document.documentElement.dataset.theme = st.theme; $('themeBtn').textContent = st.theme === 'light' ? '🌙 داكن' : '☀ فاتح';
+  document.documentElement.dataset.theme = st.theme; document.documentElement.lang = st.lang; document.documentElement.dir = st.lang === 'en' ? 'ltr' : 'rtl';
+  $('themeBtn').textContent = st.theme === 'light' ? '🌙 ' + tr('داكن') : '☀ ' + tr('فاتح'); $('langBtn').textContent = st.lang === 'en' ? 'العربية' : 'English';
+  $('homeBtn').textContent = tr('الرئيسية'); $('hT').textContent = tr('التقارير'); $('hS').textContent = tr('استخراج وطباعة وتصدير'); document.title = tr('التقارير') + ' — MUKHAYYAM';
   const ae = document.activeElement, keep = ae && ae.id === 'q' ? ae.selectionStart : null;
+  const sideScroll = document.querySelector('.side') ? document.querySelector('.side').scrollTop : 0;
   $('app').innerHTML = `${st.msg ? `<div class="banner ${st.msg.cls} noprint" role="alert">${esc(st.msg.t)}</div>` : ''}${!st.cat ? '<div class="card muted">...</div>' : st.cur ? reportView() : listView()}`;
+  const sd = document.querySelector('.side'); if (sd) sd.scrollTop = sideScroll;
   if (keep !== null && $('q')) { const q = $('q'); q.focus(); try { q.setSelectionRange(keep, keep); } catch (e) {} }
 }
 
@@ -165,17 +243,17 @@ function render() {
 function printNow() {
   const d = st.data; if (!d) return;
   let s = document.getElementById('pageStyle'); if (!s) { s = document.createElement('style'); s.id = 'pageStyle'; document.head.appendChild(s); }
-  s.textContent = `@page{size:A4 ${d.landscape ? 'landscape' : 'portrait'};margin:14mm 12mm 16mm;@bottom-center{content:"صفحة " counter(page) " من " counter(pages);font-size:10px;color:#555}}`;
-  const old = document.title; document.title = d.title + ' — ' + new Date().toISOString().slice(0, 10); window.print(); setTimeout(() => { document.title = old; }, 500);
+  s.textContent = `@page{size:A4 ${d.landscape ? 'landscape' : 'portrait'};margin:14mm 12mm 16mm;@bottom-center{content:"${st.lang === 'en' ? 'Page ' : 'صفحة '}" counter(page) "${st.lang === 'en' ? ' of ' : ' من '}" counter(pages);font-size:10px;color:#555}}`;
+  const old = document.title; document.title = tr(d.title) + ' — ' + new Date().toISOString().slice(0, 10); window.print(); setTimeout(() => { document.title = old; }, 500);
 }
 // A spreadsheet would run a cell starting with = + - @ as a formula: prefix an apostrophe.
 const csvCell = v => { let t = String(v === undefined || v === null ? '' : v); if (/^[=+\-@\t\r]/.test(t)) t = "'" + t; return '"' + t.replace(/"/g, '""') + '"'; };
 function exportCsv() {
   const d = st.data; if (!d || d.kind !== 'table') return; const cols = visibleCols(d), rows = sortedRows(d);
-  const lines = [cols.map(c => csvCell(c.label)).join(',')].concat(rows.map(r => cols.map(c => csvCell(cell(c, r[c.key]))).join(',')));
+  const lines = [cols.map(c => csvCell(tr(c.label))).join(',')].concat(rows.map(r => cols.map(c => csvCell(cell(c, r[c.key]))).join(',')));
   if (d.totalRow && !st.q.trim()) lines.push(cols.map(c => csvCell(cell(c, d.totalRow[c.key]))).join(','));
   const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }); const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob); a.download = d.title + '-' + new Date().toISOString().slice(0, 10) + '.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  a.href = URL.createObjectURL(blob); a.download = tr(d.title) + '-' + new Date().toISOString().slice(0, 10) + '.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
 document.addEventListener('input', e => { if (e.target.id === 'q') { st.q = e.target.value; render(); } });
@@ -186,6 +264,7 @@ document.addEventListener('click', e => {
   if (d.open) open_(d.open); else if (d.back) { st.cur = null; st.data = null; st.msg = null; render(); }
   else if (d.col) { st.hide[d.col] = !st.hide[d.col]; render(); } else if (d.print) printNow(); else if (d.csv) exportCsv();
 });
+$('langBtn').onclick = () => { st.lang = st.lang === 'ar' ? 'en' : 'ar'; pref.set('lang', st.lang); render(); };
 $('themeBtn').onclick = () => { st.theme = st.theme === 'light' ? 'dark' : 'light'; pref.set('theme', st.theme); render(); };
 render(); init();
 </script>
