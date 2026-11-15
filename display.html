@@ -7,14 +7,28 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Amiri:wght@700&display=swap">
 <style>
 /* Landscape TV (16:9). All sizes in vw so it scales with the screen. */
-:root{--gold:#E8B04B;--gold2:#F6D58E;--ink:#F4F1E8;--mute:rgba(244,241,232,.68);--glass:rgba(10,22,38,.55);--line:rgba(246,213,142,.28);--ok:#4CC38A;--bad:#E5484D}
+:root{--gold:#E8B04B;--gold2:#F6D58E;--ink:#F4F1E8;--mute:rgba(244,241,232,.68);--glass:rgba(10,22,38,.55);--line:rgba(246,213,142,.28);--ok:#4CC38A;--bad:#E5484D;--onAccent:#1b1b1b;--track:rgba(255,255,255,.12);
+  --shade:linear-gradient(180deg,rgba(4,12,22,.85) 0,rgba(4,12,22,.55) 28%,rgba(4,12,22,.6) 70%,rgba(4,12,22,.92) 100%);--tint:transparent;--photo:brightness(.78) saturate(1.05);--sky:linear-gradient(160deg,#0b1d33,#071321 60%,#0e1a12);--shadow:rgba(0,0,0,.35)}
+/* Themes follow the time of day (set by the script from the prayer times). evening = the default above. */
+body[data-t="dawn"]{--gold:#F2A65A;--gold2:#FFD3A3;--ink:#FFF8F1;--mute:rgba(255,240,228,.75);--glass:rgba(58,28,52,.42);--line:rgba(255,211,163,.38);
+  --shade:linear-gradient(180deg,rgba(44,22,52,.78) 0,rgba(120,60,80,.25) 35%,rgba(150,80,70,.3) 70%,rgba(36,16,40,.9) 100%);--tint:linear-gradient(180deg,rgba(255,140,120,.28),rgba(255,205,140,.22));--photo:brightness(.9) saturate(1.1);--sky:linear-gradient(180deg,#2b1d3f,#9c5a78 45%,#f2a65a 80%,#ffd3a3)}
+body[data-t="day"]{--gold:#0E8C8C;--gold2:#0B6F6F;--ink:#0E2B33;--mute:rgba(14,43,51,.72);--glass:rgba(255,255,255,.8);--line:rgba(14,140,140,.28);--onAccent:#fff;--track:rgba(14,43,51,.12);--shadow:rgba(14,43,51,.18);
+  --shade:linear-gradient(180deg,rgba(240,250,250,.86) 0,rgba(240,250,250,.35) 30%,rgba(240,250,250,.4) 70%,rgba(240,250,250,.9) 100%);--photo:brightness(1.02) saturate(1.05);--sky:linear-gradient(180deg,#bfe6ee,#eef8f7 60%,#f7f1e3)}
+body[data-t="noon"]{--gold:#B8741A;--gold2:#8A5510;--ink:#3A2410;--mute:rgba(58,36,16,.72);--glass:rgba(255,249,238,.82);--line:rgba(184,116,26,.3);--onAccent:#fff;--track:rgba(58,36,16,.12);--shadow:rgba(58,36,16,.18);
+  --shade:linear-gradient(180deg,rgba(252,243,226,.86) 0,rgba(252,243,226,.35) 30%,rgba(252,243,226,.42) 70%,rgba(252,243,226,.9) 100%);--tint:linear-gradient(180deg,rgba(255,200,120,.12),transparent);--photo:brightness(1) saturate(1.1) sepia(.12);--sky:linear-gradient(180deg,#f3d9a6,#fbf0dc 60%,#f6e7c8)}
+body[data-t="sunset"]{--gold:#FF8A3D;--gold2:#FFC27A;--ink:#FFF5EC;--mute:rgba(255,236,220,.75);--glass:rgba(52,18,42,.5);--line:rgba(255,194,122,.35);
+  --shade:linear-gradient(180deg,rgba(42,12,40,.82) 0,rgba(130,45,45,.32) 35%,rgba(160,60,40,.35) 65%,rgba(26,8,24,.92) 100%);--tint:linear-gradient(180deg,rgba(120,40,120,.35),rgba(255,120,50,.35));--photo:brightness(.85) saturate(1.2);--sky:linear-gradient(180deg,#2a0f3a,#8c2f5a 40%,#ff8a3d 75%,#ffc27a)}
+body[data-t="night"]{--gold:#C9B37E;--gold2:#E2D3A8;--ink:#ECEAE4;--mute:rgba(236,234,228,.6);--glass:rgba(0,0,0,.55);--line:rgba(201,179,126,.22);
+  --shade:linear-gradient(180deg,rgba(0,0,0,.9) 0,rgba(0,0,0,.7) 30%,rgba(0,0,0,.72) 70%,rgba(0,0,0,.95) 100%);--photo:brightness(.5) saturate(.6);--sky:linear-gradient(180deg,#05070c,#000)}
+.tint{position:fixed;inset:0;background:var(--tint);mix-blend-mode:soft-light;pointer-events:none}
+#fader{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;z-index:40;transition:opacity 1.2s ease}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;background:#071321;color:var(--ink);font-family:'IBM Plex Sans Arabic',system-ui,sans-serif;overflow:hidden;cursor:none}
 .bg{position:fixed;inset:0;background-size:cover;background-position:center;opacity:0;transition:opacity 2.5s ease;animation:kb 40s ease-in-out infinite alternate}
-.bg.on{opacity:1}.bg:not(.none){filter:brightness(.78) saturate(1.05)}
-.bg.none{background:radial-gradient(ellipse at 20% 0%,#1d3b5c 0,transparent 55%),radial-gradient(ellipse at 90% 100%,#3b2a12 0,transparent 50%),linear-gradient(160deg,#0b1d33,#071321 60%,#0e1a12)}
+.bg.on{opacity:1}.bg:not(.none){filter:var(--photo)}
+.bg.none{background:var(--sky)}
 @keyframes kb{from{transform:scale(1)}to{transform:scale(1.08) translate(-1%,-1%)}}
-.shade{position:fixed;inset:0;background:linear-gradient(180deg,rgba(4,12,22,.85) 0,rgba(4,12,22,.55) 28%,rgba(4,12,22,.6) 70%,rgba(4,12,22,.92) 100%)}
+.shade{position:fixed;inset:0;background:var(--shade)}
 .pattern{position:fixed;inset:0;opacity:.06;background-image:radial-gradient(circle at 1.5vw 1.5vw,var(--gold2) .12vw,transparent .14vw);background-size:3vw 3vw}
 .top{position:fixed;top:0;inset-inline:0;padding:1.6vw 2.4vw 0;display:flex;justify-content:space-between;align-items:flex-start;gap:2vw;z-index:5}
 .brand{display:flex;align-items:center;gap:1.1vw}
@@ -34,7 +48,7 @@ html,body{height:100%;background:#071321;color:var(--ink);font-family:'IBM Plex 
 .stage{position:fixed;top:10.5vw;bottom:6.2vw;inset-inline:3vw;display:grid;place-items:center;z-index:4}
 .slide{width:100%;max-height:100%;animation:in .9s cubic-bezier(.2,.8,.2,1)}
 @keyframes in{from{opacity:0;transform:translateY(1.5vw) scale(.985)}to{opacity:1;transform:none}}
-.glass{background:var(--glass);border:1px solid var(--line);border-radius:1.6vw;backdrop-filter:blur(10px);box-shadow:0 1.5vw 4vw rgba(0,0,0,.35)}
+.glass{background:var(--glass);border:1px solid var(--line);border-radius:1.6vw;backdrop-filter:blur(10px);box-shadow:0 1.5vw 4vw var(--shadow)}
 .kicker{color:var(--gold2);font-size:1.3vw;font-weight:600;letter-spacing:.02em}
 .h1{font-size:3.4vw;font-weight:700;line-height:1.25}
 .h2{font-size:2.3vw;font-weight:700;margin-bottom:1.4vw;display:flex;align-items:center;gap:.8vw;justify-content:center}
@@ -48,31 +62,31 @@ html,body{height:100%;background:#071321;color:var(--ink);font-family:'IBM Plex 
 .ev.soon{border-color:var(--gold);box-shadow:0 0 0 .15vw rgba(232,176,75,.35)}
 .rank{max-width:66vw;margin:0 auto;display:grid;gap:1vw}
 .rrow{display:grid;grid-template-columns:3vw 14vw 1fr 6vw;align-items:center;gap:1.2vw;padding:.9vw 1.6vw;font-size:1.9vw}
-.bar{height:1.1vw;border-radius:99px;background:rgba(255,255,255,.12);overflow:hidden}.bar i{display:block;height:100%;border-radius:99px;transition:width 1.4s ease}
+.bar{height:1.1vw;border-radius:99px;background:var(--track);overflow:hidden}.bar i{display:block;height:100%;border-radius:99px;transition:width 1.4s ease}
 .pts{font-weight:700;font-variant-numeric:tabular-nums;direction:ltr;text-align:left}
 .pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.2vw;max-width:62vw;margin:0 auto}
 .pcell{padding:1.4vw;text-align:center}.pcell .pn{font-size:1.6vw;color:var(--mute)}.pcell .pt{font-size:3.2vw;font-weight:700;direction:ltr}.pcell .iq{font-size:1vw;color:var(--mute)}
 .pcell.next{border-color:var(--gold);box-shadow:0 0 0 .15vw rgba(232,176,75,.45)}.pcell.past{opacity:.5}
 .card{padding:3vw 4vw;max-width:70vw;margin:0 auto;text-align:center}
 .icon{font-size:4.5vw;line-height:1;margin-bottom:1vw}
-.verse{font-family:'Amiri',serif;font-size:3.6vw;line-height:1.7;color:#fff}
+.verse{font-family:'Amiri',serif;font-size:3.6vw;line-height:1.7;color:var(--ink)}
 .src{color:var(--gold2);font-size:1.4vw;margin-top:1vw}
 .podium{display:flex;justify-content:center;align-items:flex-end;gap:2vw;height:30vw}
 .pod{width:16vw;text-align:center}.pod .blk{border-radius:1vw 1vw 0 0;display:grid;place-items:center;font-size:3vw;font-weight:700;color:#10151c}
 .pod .tn{font-size:1.9vw;font-weight:700;margin:.6vw 0}.pod .md{font-size:3vw}
-.full{position:fixed;inset:0;z-index:20;display:grid;place-items:center;background:radial-gradient(ellipse at center,rgba(14,40,30,.97),rgba(4,12,22,.99));text-align:center;padding:4vw}
+.full{--ink:#F4F1E8;--gold:#E8B04B;--gold2:#F6D58E;--mute:rgba(244,241,232,.7);color:var(--ink);position:fixed;inset:0;z-index:20;display:grid;place-items:center;background:radial-gradient(ellipse at center,rgba(14,40,30,.97),rgba(4,12,22,.99));text-align:center;padding:4vw}
 .full.urgent{background:radial-gradient(ellipse at center,#5c1114,#1a0507)}
 .full .ttl{font-size:5vw;font-weight:700;line-height:1.3}
 .full .sub{font-size:2.2vw;color:var(--gold2);margin-top:1.4vw}
 .mosque{font-size:7vw}
 .ticker{position:fixed;bottom:2.2vw;inset-inline:2.4vw;height:3vw;overflow:hidden;border-radius:99px;background:var(--glass);border:1px solid var(--line);display:flex;align-items:center;z-index:6}
-.ticker .lb{flex:none;background:var(--gold);color:#1b1b1b;font-weight:700;font-size:1.1vw;padding:0 1.2vw;height:100%;display:grid;place-items:center}
+.ticker .lb{flex:none;background:var(--gold);color:var(--onAccent);font-weight:700;font-size:1.1vw;padding:0 1.2vw;height:100%;display:grid;place-items:center}
 .ticker .tr{flex:1;overflow:hidden;white-space:nowrap;position:relative;height:100%}
 .ticker .tr span{position:absolute;top:50%;font-size:1.3vw;white-space:nowrap;animation:tick linear infinite}
 @keyframes tick{from{left:0;transform:translate(-100%,-50%)}to{left:100%;transform:translate(0,-50%)}}
 .dots{position:fixed;bottom:.8vw;inset-inline:0;display:flex;justify-content:center;gap:.4vw;z-index:6}
-.dots i{width:.5vw;height:.5vw;border-radius:99px;background:rgba(255,255,255,.25);transition:all .4s}.dots i.on{width:1.6vw;background:var(--gold)}
-.badge{display:inline-block;background:var(--gold);color:#1b1b1b;border-radius:99px;padding:.15vw .8vw;font-size:1vw;font-weight:700;vertical-align:middle}
+.dots i{width:.5vw;height:.5vw;border-radius:99px;background:var(--track);transition:all .4s}.dots i.on{width:1.6vw;background:var(--gold)}
+.badge{display:inline-block;background:var(--gold);color:var(--onAccent);border-radius:99px;padding:.15vw .8vw;font-size:1vw;font-weight:700;vertical-align:middle}
 .setup{position:fixed;inset:0;display:grid;place-items:center;z-index:50;cursor:auto;background:#071321}
 .setup .box{width:min(560px,90vw);padding:28px;border-radius:18px;background:#0f2238;border:1px solid var(--line);font-size:16px}
 .setup input{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:#071321;color:var(--ink);font-size:16px;margin:10px 0;direction:ltr}
@@ -82,7 +96,7 @@ html,body{height:100%;background:#071321;color:var(--ink);font-family:'IBM Plex 
 </head>
 <body>
 <div class="bg none on" id="bgA"></div><div class="bg none" id="bgB"></div>
-<div class="shade"></div><div class="pattern"></div>
+<div class="shade"></div><div class="tint"></div><div id="fader"></div><div class="pattern"></div>
 <header class="top">
   <div class="brand"><div class="logo" id="logo">م</div><div><div class="cname" id="cname"></div><div class="slogan" id="slogan"></div><div class="dates" id="dates"></div></div></div>
   <div><div class="clock"><span class="t" id="clk">--:--</span><span class="ap" id="ap"></span></div><div class="chips" id="chips"></div></div>
@@ -217,6 +231,30 @@ function override() {
   return '';
 }
 
+/* ---------- themes by time of day ---------- */
+// dawn (after Fajr, sunrise) -> day -> noon (afternoon) -> sunset (around Maghrib) -> evening -> night.
+const THEME_NAMES = { dawn: 'الشروق', day: 'النهار', noon: 'العصر', sunset: 'الغروب', evening: 'المساء', night: 'الليل' };
+function themeNow() {
+  const forced = new URLSearchParams(location.search).get('theme'); if (forced && THEME_NAMES[forced]) return forced; // preview only
+  const t = now(), p = (D && D.prayers && D.prayers[ymd(t)]) || {};
+  const at = (hhmm, def) => atTime(t, hhmm || def).getTime();
+  const fajr = at(p.fajr, '05:30'), dhuhr = at(p.dhuhr, '12:10'), maghrib = at(p.maghrib, '17:30'), x = t.getTime(), m = 60000;
+  const night = new Date(t); night.setHours(CONFIG.nightFrom, 0, 0, 0);
+  if (x >= fajr && x < fajr + 150 * m) return 'dawn';
+  if (x >= fajr && x < dhuhr + 150 * m) return 'day';
+  if (x >= fajr && x < maghrib - 50 * m) return 'noon';
+  if (x >= maghrib - 50 * m && x < maghrib + 40 * m) return 'sunset';
+  if (x >= maghrib && x < night.getTime()) return 'evening';
+  return 'night';
+}
+function applyTheme() {
+  const th = themeNow(), cur = document.body.dataset.t;
+  if (th === cur) return;
+  if (!cur) { document.body.dataset.t = th; return; }
+  $('fader').style.opacity = '1';
+  setTimeout(() => { document.body.dataset.t = th; $('fader').style.opacity = '0'; }, 1200);
+}
+
 /* ---------- painting ---------- */
 const campName = () => (D && D.campName) || CONFIG.name;
 const campSlogan = () => (D && D.campSlogan) || CONFIG.slogan;
@@ -257,7 +295,7 @@ function showSlide() {
   $('dots').innerHTML = s.map(x => `<i class="${x.key === cur.key ? 'on' : ''}"></i>`).join('');
   nextBg();
 }
-function tick() { paintHeader(); const ov = override(); if (ov || $('over').innerHTML) $('over').innerHTML = ov; }
+function tick() { applyTheme(); paintHeader(); const ov = override(); if (ov || $('over').innerHTML) $('over').innerHTML = ov; }
 
 /* ---------- setup (key typed once on the TV, never in the URL) ---------- */
 function setup(msg) {
@@ -270,7 +308,7 @@ function setup(msg) {
 $('fsBtn').onclick = () => { (document.documentElement.requestFullscreen || function () {}).call(document.documentElement); $('fsBtn').style.display = 'none'; try { navigator.wakeLock && navigator.wakeLock.request('screen'); } catch (e) {} };
 if (CONFIG.logo) $('logo').innerHTML = `<img src="${esc(CONFIG.logo)}" alt="">`;
 if (!store.get('mk_feed_key')) setup();
-paintHeader(); paintTicker(); showSlide();
+applyTheme(); paintHeader(); paintTicker(); showSlide();
 load().then(() => { paintHeader(); paintTicker(); showSlide(); });
 setInterval(tick, 1000);
 setInterval(showSlide, CONFIG.slideSeconds * 1000);
