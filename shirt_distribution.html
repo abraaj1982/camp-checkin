@@ -268,11 +268,11 @@ tbody tr:hover { background: #F5FAFD; cursor: pointer; }
     <div class="supervisor-box">
       <select id="supervisorName">
         <option value="">-- Your Name --</option>
-        <option value="Yasser Mustafa">Yasser Mustafa</option>
-        <option value="Mohammed Ismail">Mohammed Ismail</option>
-        <option value="Abbas Abdul Rab">Abbas Abdul Rab</option>
-        <option value="Hussain Mustafa">Hussain Mustafa</option>
-        <option value="Hamza">Hamza</option>
+        <option value="Supervisor 1">Supervisor 1</option>
+        <option value="Supervisor 2">Supervisor 2</option>
+        <option value="Supervisor 3">Supervisor 3</option>
+        <option value="Supervisor 4">Supervisor 4</option>
+        <option value="Supervisor 5">Supervisor 5</option>
       </select>
       <button class="btn-ghost" id="changeSupervisorBtn" style="display:none;">Change</button>
     </div>
@@ -407,7 +407,7 @@ const SETUP_NOT_DONE = SHEET_ID.indexOf('PUT_YOUR') === 0 || APPS_SCRIPT_URL.ind
 // Inventory sheet has loaded. Once it loads, SIZES is replaced with
 // whatever size rows actually exist there, in that order.
 let SIZES = ['S', 'M', 'L', 'XL'];
-const KNOWN_SUPERVISORS = ['Yasser Mustafa', 'Mohammed Ismail', 'Abbas Abdul Rab', 'Hussain Mustafa', 'Hamza'];
+const KNOWN_SUPERVISORS = ['Supervisor 1', 'Supervisor 2', 'Supervisor 3', 'Supervisor 4', 'Supervisor 5'];
 
 let students = [];       // { id, name, group, size, givenAt, givenBy }
 let supervisors = [];    // { name, size, givenAt, givenBy }

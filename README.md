@@ -142,7 +142,7 @@ camp-checkin/
 ├── docs/week2-handoff.md
 ├── docs/display-feed.md           # ربط شاشة العرض (قراءة فقط)          # دليل التجربة والنشر وتفاصيل التغييرات
 ├── shirt_distribution.html + AppsScript_Shirts.gs   # أداة القمصان المستقلة
-├── qr_codes_*.html · face_test/   # أدوات سابقة وتجارب
+├── qr_codes_*.html   # أدوات سابقة
 └── dashboard_*.html · supervisor_app_*.html · AppsScript_Final_v2.gs   # قديمة (متقادمة)
 ```
 
