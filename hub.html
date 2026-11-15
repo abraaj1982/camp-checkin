@@ -212,8 +212,8 @@ const SCREEN_LINKS = {
 };
 const SCREEN_NAMES = {
   checkin: 'تسجيل الحضور', dashboard: 'لوحة المعلومات', committee: 'مصاريف اللجنة',
-  finance: 'اعتماد المصاريف', shirts: 'توزيع القمصان', team: 'الفريق والإعلانات',
-  users: 'المستخدمون', results: 'إدخال النتائج', medical: 'الصفحة الطبية', print: 'طباعة الأساور والكشوف', custody: 'الأمانات واستئذان الخروج', gate: 'البوابة (الكشافة)', nutrition: 'التغذية', announce: 'الإعلامية', verify: 'التحقق من النتائج'
+  finance: 'اعتماد المصاريف', shirts: 'توزيع القمصان',
+  users: 'المستخدمون', results: 'الإعلامية والنتائج', medical: 'الصفحة الطبية', print: 'طباعة الأساور والكشوف', custody: 'الأمانات واستئذان الخروج', gate: 'البوابة (الكشافة)', nutrition: 'التغذية', announce: 'الإعلامية والنتائج', verify: 'التحقق من النتائج'
 };
 
 const SCREEN_ICONS = { checkin: '🚌', dashboard: '📍', stats: '📊', shirts: '👕', print: '🖨️', custody: '🔐', gate: '🚪', medical: '⚕️', nutrition: '🍽️', announce: '📣', results: '🏆', verify: '✅', team: '👥' };
@@ -264,6 +264,12 @@ function renderTiles() {
     a.appendChild(t); a.appendChild(s);
     box.appendChild(a);
   });
+  if (can('announce') || can('results') || can('verify')) {
+    const a = document.createElement('a');
+    a.className = 'tile'; a.href = 'display.html'; a.target = '_blank'; a.rel = 'noopener';
+    a.innerHTML = '<div class="i">📺</div><div class="t">شاشة العرض</div><div class="s">فتح على التلفاز</div>';
+    box.appendChild(a);
+  }
   if (can('manage') || can('support')) {
     const a = document.createElement('a');
     a.className = 'tile'; a.href = '#adminArea';
