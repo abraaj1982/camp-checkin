@@ -11,6 +11,7 @@ const REPORTS_ = [
   { id: 'shirtsPending', group: 'القمصان', title: 'القمصان: من لم يستلم', filters: ['kind', 'size'], landscape: false },
   { id: 'results', group: 'الفعاليات والنتائج', title: 'نتائج المسابقات', filters: [], landscape: false },
   { id: 'teamRanking', group: 'الفعاليات والنتائج', title: 'الترتيب العام للفرق', filters: [], landscape: false },
+  { id: 'studentSheet', group: 'ملخصات', title: 'الكشف الموحّد للطلاب', filters: ['groups', 'bus', 'team', 'cls'], landscape: true },
   { id: 'campSummary', group: 'ملخصات', title: 'ملخص المخيم', filters: [], landscape: false }
 ];
 const REPORT_MAX_ROWS_ = 2000;
@@ -52,6 +53,7 @@ function buildReport_(def, f) {
     case 'shirtsPending': return repShirtsPending_(f);
     case 'results': return repResults_();
     case 'teamRanking': return repTeamRanking_();
+    case 'studentSheet': return repStudentSheet_(f);
     case 'campSummary': return repCampSummary_();
   }
   return null;
@@ -153,4 +155,30 @@ function repCampSummary_() {
     { title: 'التغذية والقمصان', kpis: [{ label: 'حساسية غذائية مسجّلة', value: students.filter(function(s) { return s.foodAllergy; }).length }, { label: 'الكادر', value: staff === null ? '—' : staff }, { label: 'قمصان سُلِّمت (طلاب)', value: sc.studentsGiven + ' / ' + sc.students }, { label: 'قمصان سُلِّمت (كادر)', value: sc.staffGiven + ' / ' + sc.staff }] },
     { title: 'ترتيب الفرق', kpis: [], table: { columns: [{ key: 'rank', label: 'الترتيب', type: 'num' }, { key: 'team', label: 'الفريق' }, { key: 'points', label: 'النقاط', type: 'num' }], rows: top } }
   ] };
+}
+
+// One line per student, with the column groups the secretariat ticks (attendance, exits, shirts). No health data.
+const SHEET_GROUPS_ = ['att', 'exit', 'shirt'];
+function repStudentSheet_(f) {
+  const groups = (Array.isArray(f.groups) ? f.groups : SHEET_GROUPS_).map(String).filter(function(g) { return SHEET_GROUPS_.indexOf(g) !== -1; });
+  const use = groups.length ? groups : SHEET_GROUPS_;
+  const bus = repText_(f.bus, 10), team = repText_(f.team), cls = repText_(f.cls, 10);
+  const states = scanStates_().states;
+  const lastExit = {}; readWithdrawals_().forEach(function(w) { if (w.status !== 'cancelled') lastExit[w.studentId] = w; });
+  const given = activeGiven_(readShirtLog_());
+  const rows = [];
+  readStudents_().students.forEach(function(s) {
+    if (bus && s.bus !== bus) return; if (team && s.team !== team) return; if (cls && s.cls !== cls) return;
+    const r = { id: s.id, name: s.name, team: s.team, cls: s.cls, bus: s.bus };
+    if (use.indexOf('att') !== -1) { const st = states[s.id], state = st ? st.state : 'none'; r.state = STATE_LABEL_[state] || state; r.at = st && st.at && state !== 'none' ? st.at.toISOString() : ''; }
+    if (use.indexOf('exit') !== -1) { const w = lastExit[s.id]; r.exit = w ? (EXIT_LABEL_[w.status] || w.status) : ''; r.exitAt = w ? (w.status === 'closed' ? w.closedAt : w.time) : ''; }
+    if (use.indexOf('shirt') !== -1) { const g = given['student:' + s.id]; r.size = normSize_(s.shirt) || 'غير محدد'; r.shirt = g ? 'استلم' : 'لم يستلم'; }
+    rows.push(r);
+  });
+  rows.sort(function(a, b) { return repNum_(a.bus, b.bus) || repNum_(a.id, b.id); });
+  const cols = [{ key: 'id', label: 'الرقم' }, { key: 'name', label: 'الاسم', wide: true }, { key: 'team', label: 'الفريق' }, { key: 'cls', label: 'الصف' }, { key: 'bus', label: 'الباص' }];
+  if (use.indexOf('att') !== -1) cols.push({ key: 'state', label: 'الحالة' }, { key: 'at', label: 'الوقت', type: 'time' });
+  if (use.indexOf('exit') !== -1) cols.push({ key: 'exit', label: 'الخروج' }, { key: 'exitAt', label: 'وقت الخروج', type: 'datetime' });
+  if (use.indexOf('shirt') !== -1) cols.push({ key: 'size', label: 'المقاس' }, { key: 'shirt', label: 'القميص' });
+  return { kind: 'table', columns: cols, rows: rows, filtersText: '' };
 }

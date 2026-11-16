@@ -291,6 +291,10 @@ assert(book.AuditLog.rows.some(x=>x[2]==='SHIRT_GIVEN')&&book.AuditLog.rows.some
  r=post({action:'reportData',token:trp,report:'campSummary'});assert(r.success&&r.kind==='summary'&&r.sections.length>=5&&r.sections[0].kpis[0].value===4,'camp summary has sections and the right total');
  for(const rep of ['busAttendance','boardingSummary','exits','shirtsStock','shirtsPending','results','teamRanking','campSummary']){const j=JSON.stringify(post({action:'reportData',token:trp,report:rep}));assert(!/9999000|Contact|PasswordHash|\"Salt\"|ربو|سكري/.test(j),'no phone, hash or medical notes in report: '+rep);}
  assert(book.AuditLog.rows.filter(x=>x[2]==='REPORT_RUN').length>=10,'every report run is in the audit log');
+ r=post({action:'reportData',token:trp,report:'studentSheet'});assert(r.success&&r.rows.length===4&&['state','exit','size','shirt'].every(k=>r.columns.some(c=>c.key===k)),'unified sheet: all groups by default');
+ r=post({action:'reportData',token:trp,report:'studentSheet',filters:{groups:['att','shirt'],bus:'1'}});assert(r.success&&r.rows.every(x=>x.bus==='1')&&r.columns.some(c=>c.key==='shirt')&&!r.columns.some(c=>c.key==='exit'),'unified sheet: chosen groups + bus filter');
+ r=post({action:'reportData',token:trp,report:'studentSheet',filters:{groups:['att','hack']}});assert(r.success&&!r.columns.some(c=>c.key==='hack'),'unknown group ignored');
+ assert(!/فول|حساسية|ربو|9999000/.test(JSON.stringify(post({action:'reportData',token:trp,report:'studentSheet'}))),'unified sheet has no allergy, medical or phone data');
  r=post({action:'reportData',token:T,report:'campSummary'});assert(r.success,'admin can open reports');}
 // ---- enable/disable accounts from the app
 post({action:'createUser',token:T,username:'tmp1',password:'p9-12345',fullName:'مؤقت',role:'supervisor',permissions:['checkin'],assignedBus:'1',committees:[]});
