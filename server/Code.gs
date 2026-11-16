@@ -76,6 +76,7 @@ const ACTIONS_ = {
   prayerList: function(d) { return handlePrayerList_(d); },
   prayerSave: function(d) { return handlePrayerSave_(d); },
   displayTheme: function(d) { return handleDisplayTheme_(d); },
+  roundSave: function(d) { return handleRoundSave_(d); },
   reportOptions: function(d) { return handleReportOptions_(d); },
   reportData: function(d) { return handleReportData_(d); },
   shirtStock: function(d) { return handleShirtStock_(d); },
@@ -264,7 +265,7 @@ function handleRoster_(data) {
       const o = publicStudent_(s, states[s.id], false); o.photo = s.photo; o.bagsExpected = s.bags; return o;
     });
     const c = busCounts_(bus, students, states);
-    return { success: true, bus: bus, students: list, total: c.total, boarded: c.boarded };
+    return { success: true, bus: bus, students: list, total: c.total, boarded: c.boarded, lastRound: latestRounds_()[bus] || null };
   });
 }
 
@@ -479,7 +480,8 @@ function leaderExtra_() {
     const id = String(sv[r][sh.indexOf('StudentID')]), t = sv[r][sh.indexOf('Time')];
     feed.push({ time: t instanceof Date ? t.toISOString() : String(t), action: String(sv[r][sh.indexOf('Action')]), bus: String(sv[r][sh.indexOf('Bus')]), name: byId[id] ? byId[id].name : id, by: String(sv[r][sh.indexOf('Supervisor')]) });
   }
-  return { missingByBus: missingByBus, supervisors: supervisors, byTeam: Object.keys(byTeam).sort().map(function(k) { return byTeam[k]; }), committees: committees, nextEvent: nextEvent, feed: feed, present: present, withdrawals: withdrawals };
+  let rounds = {}; try { rounds = latestRounds_(); } catch (e) { /* tab missing */ }
+  return { rounds: rounds, missingByBus: missingByBus, supervisors: supervisors, byTeam: Object.keys(byTeam).sort().map(function(k) { return byTeam[k]; }), committees: committees, nextEvent: nextEvent, feed: feed, present: present, withdrawals: withdrawals };
 }
 
 // ONE round trip for the whole leader screen (summary + buses + cases): authorises once instead of three times.
@@ -593,6 +595,7 @@ function buildAlerts_(perBus, students, lastByKey) {
     if (s.bags > 0 && c !== undefined && c < s.bags) shortBags[s.bus] = (shortBags[s.bus] || 0) + 1;
   });
   Object.keys(shortBags).forEach(function(b) { alerts.push({ type: 'bags', level: 'warn', bus: b, count: shortBags[b] }); });
+  try { const rl = latestRounds_(); Object.keys(rl).forEach(function(b) { if (rl[b].absent > 0) alerts.push({ type: 'round_gap', level: 'bad', bus: b, count: rl[b].absent, phase: rl[b].phase }); }); } catch (e) { /* tab missing */ }
   const open = readCases_().filter(function(c) { return c.status === 'open'; }).length;
   if (open) alerts.push({ type: 'cases_open', level: 'warn', count: open });
   const wOpen = readWithdrawals_().filter(function(w) { return w.status === 'open'; }).length;
@@ -738,4 +741,39 @@ function checkStudentSheet_() {
 
 function ADMIN_checkStudentSheet() {
   Logger.log(JSON.stringify(checkStudentSheet_(), null, 2));
+}
+
+// ---------------- Verification round ("Round check"): the supervisor calls the names on the bus and confirms each one is really there ----------------
+function roundsSheet_() { return getSheetByName_('Rounds'); }
+// Latest round per bus: { bus: { phase, at, checked, absent, total, by } }
+function latestRounds_() {
+  const v = roundsSheet_().getDataRange().getValues(), h = v[0] || [], out = {};
+  for (let r = 1; r < v.length; r++) {
+    const g = function(n) { return v[r][h.indexOf(n)]; }, b = String(g('Bus')); if (!b) continue;
+    const t = g('Time');
+    out[b] = { phase: String(g('Phase')), at: t instanceof Date ? t.toISOString() : String(t), checked: Number(g('Checked')) || 0, absent: Number(g('Absent')) || 0, total: Number(g('Total')) || 0, by: String(g('Supervisor')) };
+  }
+  return out;
+}
+function handleRoundSave_(data) {
+  return withAuth_(data, requirePerm_('checkin'), function(user) {
+    const phase = data.phase === 'arrive' ? 'arrive' : 'depart';
+    const bus = hasPerm_(user, 'allbuses') && data.bus ? String(data.bus) : String(user.AssignedBus || '').trim();
+    if (!bus) return { success: false, code: 'BAD_REQUEST', error: 'لا يوجد باص مخصَّص لحسابك' };
+    const clientId = String(data.clientId || '').slice(0, 60);
+    const students = readStudents_().students, states = scanStates_().states;
+    const boarded = students.filter(function(s) { return s.bus === bus && states[s.id] && states[s.id].state === 'boarded'; }).map(function(s) { return s.id; });
+    const absent = []; (Array.isArray(data.absent) ? data.absent : []).map(String).forEach(function(id) { if (boarded.indexOf(id) !== -1 && absent.indexOf(id) === -1) absent.push(id); });
+    const lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    try {
+      const v = roundsSheet_().getDataRange().getValues(), h = v[0] || [];
+      if (clientId) for (let r = 1; r < v.length; r++) if (String(v[r][h.indexOf('ClientId')]) === clientId) return { success: true, repeated: true };
+      appendSafe_(roundsSheet_(), [new Date(), bus, phase, user.FullName || user.Username, boarded.length - absent.length, absent.length, boarded.length, absent.join(','), clientId]);
+      writeAudit_(user.Username, 'ROUND_SAVED', bus, phase + ' ' + (boarded.length - absent.length) + '/' + boarded.length);
+      return { success: true, bus: bus, phase: phase, checked: boarded.length - absent.length, absent: absent.length, total: boarded.length, matched: absent.length === 0 };
+    } finally {
+      lock.releaseLock();
+    }
+  });
 }

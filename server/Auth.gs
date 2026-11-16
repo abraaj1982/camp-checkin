@@ -763,6 +763,7 @@ function SETUP_createTabs() {
   ensureSheetWithHeaders_(ss, 'Staff', ['Name', 'Size', 'Note'], log);
   ensureSheetWithHeaders_(ss, 'ShirtStock', ['Size', 'Total', 'LowAt'], log);
   ensureSheetWithHeaders_(ss, 'ShirtLog', ['Id', 'Time', 'Kind', 'PersonId', 'Name', 'Size', 'GivenBy', 'Status', 'Note', 'ClientId'], log);
+  ensureSheetWithHeaders_(ss, 'Rounds', ['Time', 'Bus', 'Phase', 'Supervisor', 'Checked', 'Absent', 'Total', 'AbsentIds', 'ClientId'], log);
   ensureSheetWithHeaders_(ss, 'Cases', ['Id', 'Time', 'Type', 'Bus', 'StudentID', 'Text', 'Status', 'CreatedBy', 'UpdatedBy', 'ClientId'], log);
 
   const msg = log.join('\n');

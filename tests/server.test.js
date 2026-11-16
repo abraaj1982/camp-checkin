@@ -217,6 +217,22 @@ assert(post({action:'createCase',token:tk,type:'other',text:'x'}).code==='BAD_RE
  idle('admin',40);assert(/IDLE_TIMEOUT/.test(post({action:'listUsers',token:T}).error),'admin idle 40 min is signed out');
  const tA=post({action:'login',username:'Admin',password:'pw-12345'});assert(tA.success&&post({action:'listUsers',token:tA.token}).success,'after being idle, signing in again works immediately (no stale-cache rejection)');
  post({action:'setUserActive',token:tA.token,targetUsername:'sess_op',active:false});assert(post({action:'roster',token:tOp}).code==='ACCOUNT_DISABLED','a disabled account is cut off immediately, whatever the session length');}
+// ---- verification round: supervisor confirms who is really on the bus; leader is alerted to gaps
+{const tk=post({action:'login',username:'sup2',password:'p2-12345'}).token;
+ const rost=post({action:'roster',token:tk}).students.filter(s=>s.state==='boarded').map(s=>s.id);
+ assert(rost.length>=1,'precondition: someone is boarded on bus 2');
+ let q=post({action:'roundSave',token:tk,phase:'depart',absent:[],clientId:'rd1'});assert(q.success&&q.matched===true&&q.absent===0&&q.total===rost.length,'round with nobody missing: matched');
+ q=post({action:'roundSave',token:tk,phase:'depart',absent:[],clientId:'rd1'});assert(q.success&&q.repeated,'same round sent twice is stored once');
+ q=post({action:'roundSave',token:tk,phase:'depart',absent:[rost[0],'9999','not-on-bus'],clientId:'rd2'});assert(q.success&&q.absent===1&&q.checked===rost.length-1&&q.matched===false,'only real boarded students count as absent (unknown ids ignored)');
+ q=post({action:'roundSave',token:tk,phase:'fly',absent:[],clientId:'rd3'});assert(q.success&&q.phase==='depart','unknown phase falls back to depart');
+ q=post({action:'roundSave',token:tl,phase:'depart',absent:[]});assert(!q.success,'leader cannot record a round');
+ post({action:'roundSave',token:tk,phase:'depart',absent:[rost[0]],clientId:'rd4'});
+ let la=post({action:'leaderAll',token:tl});assert(la.extra.rounds['2']&&la.extra.rounds['2'].absent===1&&la.extra.rounds['2'].phase==='depart','leader sees the latest round of the bus');
+ assert(la.summary.alerts.some(a=>a.type==='round_gap'&&a.bus==='2'&&a.count===1&&a.level==='bad'),'leader gets a red alert when a round finds someone missing');
+ post({action:'roundSave',token:tk,phase:'depart',absent:[],clientId:'rd5'});la=post({action:'leaderAll',token:tl});assert(!la.summary.alerts.some(a=>a.type==='round_gap'),'alert disappears after a clean round');
+ assert(post({action:'roster',token:tk}).lastRound.total===rost.length,'supervisor sees the last round of his bus');
+ assert(!JSON.stringify(la).includes('9999000'),'no phone numbers in the round data');
+ assert(book.AuditLog.rows.some(x=>x[2]==='ROUND_SAVED'),'audit: rounds');}
 // ---- password length: at least 8 (old shorter passwords keep working until changed)
 {let q=post({action:'createUser',token:T,username:'short7',password:'abc1234',fullName:'قصيرة',role:'supervisor',permissions:['checkin'],committees:[]});assert(!q.success&&q.code==='WEAK_PASSWORD','7-character password rejected');
 q=post({action:'createUser',token:T,username:'len8',password:'abcd1234',fullName:'ثمانية',role:'supervisor',permissions:['checkin'],committees:[]});assert(q.success,'8-character password accepted');
