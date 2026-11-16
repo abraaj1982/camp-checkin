@@ -111,6 +111,7 @@ th.sortable{cursor:pointer;user-select:none}
   <section class="hero compact"><div class="ic" aria-hidden="true">📑</div><div><h1 id="hT"></h1><p id="hS"></p></div></section>
   <main id="app"></main>
 </div>
+<script src="xlsx.js"></script>
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4lEBGPNxghwq9UmK0iljI5QdS-8iCvC-K09dDtbZCXGvGZyA4repTE3rFVVRp5zS4yw/exec';
 const token = sessionStorage.getItem('mukhayyam_token');
@@ -161,7 +162,7 @@ function listView() {
     ${st.pack ? `<div class="packbar"><span>📚 <b>${esc(tr('اختر التقارير ثم أنشئ الحزمة'))}</b> · ${st.pack.length} ${esc(tr('محدد'))}</span><span style="display:flex;gap:8px"><button class="btn" data-packgo="1" ${st.pack.length ? '' : 'disabled'}>${esc(tr('إنشاء الحزمة'))}</button><button class="btn alt" data-packmode="1">${esc(tr('إلغاء'))}</button></span></div>` : ''}` +
     Object.keys(g).map(k => `<section class="rc-group"><h3>${ICONS[k] || '📄'} ${esc(tr(k))}</h3><div class="rc-grid">${g[k].map(r => `<button class="rc-card ${st.pack && st.pack.indexOf(r.id) !== -1 ? 'picked' : ''}" style="--gc:${GC[k] || 'var(--brand)'}" ${st.pack ? `data-pick="${esc(r.id)}"` : `data-open="${esc(r.id)}"`}>${st.pack ? `<span class="tick">${st.pack.indexOf(r.id) !== -1 ? '✓' : ''}</span>` : ''}
       <span class="rc-ic">${ICONS[k] || '📄'}</span><b>${esc(tr(r.title))}</b><span class="d">${esc(tr(DESC[r.id] || ''))}</span>
-      <span class="rc-meta"><span>🖨️ PDF</span>${r.id === 'campSummary' ? '' : '<span>⬇️ Excel</span>'}${r.id === 'exits' ? `<span class="sec">🔒 ${esc(tr('سري'))}</span>` : ''}</span></button>`).join('')}</div></section>`).join('');
+      <span class="rc-meta"><span>🖨️ PDF</span><span>⬇️ Excel</span>${r.id === 'exits' ? `<span class="sec">🔒 ${esc(tr('سري'))}</span>` : ''}</span></button>`).join('')}</div></section>`).join('');
 }
 function sel(key, label, options, withAll) {
   return `<div><label class="lbl" for="f-${key}">${esc(tr(label))}</label><select id="f-${key}" data-f="${key}">${withAll ? `<option value="">${esc(tr('الكل'))}</option>` : ''}${options.map(o => `<option value="${esc(o[0])}" ${String(st.f[key] || '') === String(o[0]) ? 'selected' : ''}>${esc(tr(o[1]))}</option>`).join('')}</select></div>`;
@@ -245,7 +246,7 @@ function packView() {
   const when = new Date().toLocaleDateString(st.lang === 'en' ? 'en-GB' : 'ar-u-nu-latn', { timeZone: 'Asia/Muscat', day: 'numeric', month: 'long', year: 'numeric' });
   const cover = `<section class="paper cover"><div class="band"></div><div class="cv"><div class="lg">م</div><div class="cvn">${esc(camp)}</div><div class="cvt">${esc(tr('حزمة تقارير'))}</div><div class="cvd">${esc(when)} · ${esc(tr('أعدّه'))}: ${esc(sessionStorage.getItem('mukhayyam_fullName') || '')}</div>
     <div class="toc"><b>${esc(tr('المحتويات'))}</b>${items.map((x, i) => `<div><span>${i + 1}</span>${esc(tr(x.d.title))}${x.d.confidential ? ` <span class="conf">${esc(tr('سري'))}</span>` : ''}</div>`).join('')}</div></div></section>`;
-  const tb = `<div class="tb noprint"><div class="ti"><b>📚 ${esc(tr('حزمة تقارير'))}</b><span>${items.length} ${esc(tr('تقارير'))}</span></div><button class="btn" data-print="1" ${items.length && !st.packBusy ? '' : 'disabled'}>🖨️ ${esc(tr('طباعة / PDF'))}</button><button class="btn alt" data-packexit="1">${esc(tr('← القائمة'))}</button></div>`;
+  const tb = `<div class="tb noprint"><div class="ti"><b>📚 ${esc(tr('حزمة تقارير'))}</b><span>${items.length} ${esc(tr('تقارير'))}</span></div><button class="btn" data-print="1" ${items.length && !st.packBusy ? '' : 'disabled'}>🖨️ ${esc(tr('طباعة / PDF'))}</button><button class="btn alt" data-csv="1" ${items.length && !st.packBusy ? '' : 'disabled'}>⬇️ Excel</button><button class="btn alt" data-packexit="1">${esc(tr('← القائمة'))}</button></div>`;
   const body = st.packBusy ? `<div class="paper"><div class="empty"><div>⏳</div>${esc(tr('جارٍ تجهيز الحزمة…'))} (${items.length})</div></div>` : cover + items.map(x => paper(x.d, x.f, true)).join('');
   return `${tb}<div class="canvas pack">${body}</div>`;
 }
@@ -259,7 +260,7 @@ function reportView() {
     <div class="cols">${d.columns.map(c => `<button class="chip ${st.hide[c.key] ? '' : 'on'}" data-col="${esc(c.key)}">${esc(tr(c.label))}</button>`).join('')}</div></div>` : '';
   const side = `<aside class="side noprint"><button class="btn alt back" data-back="1">${esc(tr('← القائمة'))}</button>${mob}${nav}${flt}${cols}</aside>`;
   const tb = `<div class="tb noprint"><div class="ti"><b>${esc(tr(st.cur.title))}</b><span>${d && tbl ? sortedRows(d).length + ' ' + esc(tr('سجل')) : '&nbsp;'}</span></div>
-    <button class="btn" data-print="1" ${d ? '' : 'disabled'}>🖨️ ${esc(tr('طباعة / PDF'))}</button><button class="btn alt" data-csv="1" ${tbl ? '' : 'disabled'}>⬇️ Excel</button></div>`;
+    <button class="btn" data-print="1" ${d ? '' : 'disabled'}>🖨️ ${esc(tr('طباعة / PDF'))}</button><button class="btn alt" data-csv="1" ${d ? '' : 'disabled'}>⬇️ Excel</button></div>`;
   return `<div class="ws">${side}<div>${tb}<div class="canvas">${paper()}</div></div></div>`;
 }
 function render() {
@@ -282,15 +283,27 @@ function printNow() {
   s.textContent = `@page{size:A4 ${d.landscape ? 'landscape' : 'portrait'};margin:14mm 12mm 16mm;${foot}}@page land{size:A4 landscape;margin:12mm 12mm 14mm;${foot}}@page port{size:A4 portrait;margin:14mm 12mm 16mm;${foot}}@media print{.paper.land{page:land}.canvas.pack .paper:not(.land){page:port}}`;
   const old = document.title; document.title = tr(d.title) + ' — ' + new Date().toISOString().slice(0, 10); window.print(); setTimeout(() => { document.title = old; }, 500);
 }
-// A spreadsheet would run a cell starting with = + - @ as a formula: prefix an apostrophe.
-const csvCell = v => { let t = String(v === undefined || v === null ? '' : v); if (/^[=+\-@\t\r]/.test(t)) t = "'" + t; return '"' + t.replace(/"/g, '""') + '"'; };
-function exportCsv() {
-  const d = st.data; if (!d || d.kind !== 'table') return; const cols = visibleCols(d), rows = sortedRows(d);
-  const lines = [cols.map(c => csvCell(tr(c.label))).join(',')].concat(rows.map(r => cols.map(c => csvCell(cell(c, r[c.key]))).join(',')));
-  if (d.totalRow && !st.q.trim()) lines.push(cols.map(c => csvCell(cell(c, d.totalRow[c.key]))).join(','));
-  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }); const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob); a.download = tr(d.title) + '-' + new Date().toISOString().slice(0, 10) + '.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+// Real Excel file (.xlsx): colours, widths, frozen header, filters, RTL and print settings. Text is stored as text (never a formula).
+function toneFor(c, rows) { if (!PILL_COLS[c.key]) return null; const t = {}; rows.forEach(r => { const v = r[c.key]; if (TONE[v]) t[String(cell(c, v))] = TONE[v]; }); return t; }
+function tableBlock(columns, rows, totalRow, filter) {
+  return { kind: 'table', filter: filter, columns: columns.map(c => ({ label: tr(c.label), type: c.type === 'num' ? 'num' : 'text', tone: toneFor(c, rows) })),
+    rows: rows.map(r => columns.map(c => (c.type === 'num' && typeof r[c.key] === 'number') ? r[c.key] : cell(c, r[c.key]))), total: totalRow ? columns.map(c => (c.type === 'num' && typeof totalRow[c.key] === 'number') ? totalRow[c.key] : cell(c, totalRow[c.key])) : null };
 }
+function sheetFor(d, f, inPack) {
+  const camp = ($('campT') && $('campT').textContent) || '', now = new Date();
+  const when = now.toLocaleDateString(st.lang === 'en' ? 'en-GB' : 'ar-u-nu-latn', { timeZone: 'Asia/Muscat', day: 'numeric', month: 'long', year: 'numeric' }) + ' · ' + fmtTime(now.toISOString());
+  const rows = d.kind === 'table' ? (inPack ? d.rows : sortedRows(d)) : [], ft = ftext(d, f);
+  const meta = [when, tr('أعدّه') + ': ' + d.generatedBy, ft || tr('بدون فلاتر'), d.kind === 'table' ? rows.length + ' ' + tr('سجل') : ''].filter(Boolean).join('   |   ');
+  let blocks = [];
+  if (d.kind === 'summary') d.sections.forEach(sec => { blocks.push({ kind: 'heading', text: tr(sec.title) }); if (sec.kpis && sec.kpis.length) blocks.push({ kind: 'kpis', items: sec.kpis.map(k => ({ label: tr(k.label), value: k.value })) }); if (sec.table) blocks.push(tableBlock(sec.table.columns, sec.table.rows, sec.table.totalRow, false)); });
+  else blocks.push(tableBlock(inPack ? d.columns : visibleCols(d), rows, (!inPack && st.q.trim()) ? null : d.totalRow, true));
+  return { name: tr(d.title), rtl: st.lang !== 'en', landscape: !!d.landscape, campName: camp, title: tr(d.title), confidential: !!d.confidential, confLabel: tr('سري'), meta: meta, blocks: blocks, footer: camp + ' — ' + tr(d.title) };
+}
+function saveXlsx(sheets, name) {
+  const bytes = window.MKXlsx.build(sheets), blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name + '-' + new Date().toISOString().slice(0, 10) + '.xlsx'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+function exportXlsx() { if (st.packData) { if (!st.packData.length) return; saveXlsx(st.packData.map(x => sheetFor(x.d, x.f, true)), tr('حزمة تقارير')); return; } const d = st.data; if (!d) return; saveXlsx([sheetFor(d, st.f, false)], tr(d.title)); }
 
 document.addEventListener('input', e => { if (e.target.id === 'q') { st.q = e.target.value; render(); } });
 document.addEventListener('change', e => { if (e.target.id === 'rsel') { open_(e.target.value); return; } const k = e.target.dataset && e.target.dataset.f; if (k) { if (e.target.value) st.f[k] = e.target.value; else delete st.f[k]; schedule(); } });
@@ -303,7 +316,7 @@ document.addEventListener('click', e => {
   if (d.packexit) { st.packData = null; render(); return; }
   if (d.grp) { const g = st.f.groups || []; const i = g.indexOf(d.grp); if (i === -1) g.push(d.grp); else if (g.length > 1) g.splice(i, 1); st.f.groups = g; render(); schedule(); return; }
   if (d.open) open_(d.open); else if (d.back) { st.cur = null; st.data = null; st.msg = null; render(); }
-  else if (d.col) { st.hide[d.col] = !st.hide[d.col]; render(); } else if (d.print) printNow(); else if (d.csv) exportCsv();
+  else if (d.col) { st.hide[d.col] = !st.hide[d.col]; render(); } else if (d.print) printNow(); else if (d.csv) exportXlsx();
 });
 $('langBtn').onclick = () => { st.lang = st.lang === 'ar' ? 'en' : 'ar'; pref.set('lang', st.lang); render(); };
 $('themeBtn').onclick = () => { st.theme = st.theme === 'light' ? 'dark' : 'light'; pref.set('theme', st.theme); render(); };
