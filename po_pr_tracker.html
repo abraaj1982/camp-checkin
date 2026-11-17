@@ -4206,6 +4206,34 @@ function toSapDate(iso) {
   return m ? `${m[3]}.${m[2]}.${m[1]}` : iso;
 }
 
+function daysBetween(fromIso, toIso) {
+  if (!fromIso || !toIso) return null;
+  const diff = Math.round((new Date(toIso) - new Date(fromIso)) / 86400000);
+  return diff >= 0 ? diff : null;
+}
+
+// The SAP "Header Note" is a free-text paragraph, not a short label — this
+// spells the request out in full so whoever approves the PR doesn't have to
+// guess who it's for, for how long, or which project it belongs to.
+function buildHeaderNote(req) {
+  const who = req.beneficiary || req.owner || "the traveller";
+  const nights = daysBetween(req.serviceDateFrom, req.serviceDateTo);
+  let duration = "";
+  if (req.serviceDateFrom && req.serviceDateTo) {
+    duration = ` for ${nights > 0 ? nights : 1} day(s) (${toSapDate(req.serviceDateFrom)} to ${toSapDate(req.serviceDateTo)})`;
+  } else if (req.serviceDateFrom) {
+    duration = ` on ${toSapDate(req.serviceDateFrom)}`;
+  }
+  const parts = [
+    `This request requires a ${req.serviceType || "service"} booking for ${who}${duration}.`,
+  ];
+  if (req.department) parts.push(`Project/Department: ${req.department}.`);
+  if (req.vendor) parts.push(`Vendor: ${req.vendor}.`);
+  parts.push(`Requested by: ${req.owner || "—"}.`);
+  if (req.notes && req.notes.trim()) parts.push(`Notes: ${req.notes.trim().slice(0, 300)}`);
+  return parts.join(" ");
+}
+
 const STATUS_LABELS = {
   "Pending": "Pending",
   "Waiting PR approval": "Waiting PR approval",
@@ -7128,7 +7156,7 @@ function SupplierManagerModal({ onClose, sla, onSlaChange }) {
 // One row: a field's ready-to-paste value next to a one-click Copy button.
 // Click-to-copy beats re-typing by hand into SAP, and beats a screenshot
 // annotation this app has no way to draw anyway.
-function CopyRow({ label, value, hint }) {
+function CopyRow({ label, value, hint, multiline }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
@@ -7140,12 +7168,21 @@ function CopyRow({ label, value, hint }) {
     }
   };
   return (
-    <div className="flex items-center gap-3 py-1.5" style={{ borderBottom: "1px solid #F1F2F8" }}>
+    <div className={`flex gap-3 py-1.5 ${multiline ? "items-start" : "items-center"}`} style={{ borderBottom: "1px solid #F1F2F8" }}>
       <div style={{ flex: "0 0 160px" }}>
         <div className="text-xs font-semibold" style={{ color: "var(--sap-gray)" }}>{label}</div>
         {hint && <div className="text-xs" style={{ color: "var(--sap-gray)" }}>{hint}</div>}
       </div>
-      <div className="text-sm flex-1" style={{ color: value ? "var(--sap-text)" : "var(--sap-gray)", fontFamily: "monospace" }}>
+      <div
+        className="text-sm flex-1"
+        style={{
+          color: value ? "var(--sap-text)" : "var(--sap-gray)",
+          fontFamily: multiline ? "inherit" : "monospace",
+          whiteSpace: multiline ? "pre-wrap" : "nowrap",
+          overflow: multiline ? "visible" : "hidden",
+          textOverflow: multiline ? "clip" : "ellipsis",
+        }}
+      >
         {value || "— empty —"}
       </div>
       <button
@@ -7169,6 +7206,7 @@ function CopyForSapModal({ req, onClose }) {
       <p className="text-sm mb-2" style={{ color: "var(--sap-gray)" }}>
         Copy each field below, then paste it into the matching column on the SAP "Create Purchase Requisition" screen.
       </p>
+      <CopyRow label="Header Note" value={buildHeaderNote(req)} hint="Paste into the Texts / Header Note box" multiline />
       <CopyRow label="Short Text" value={shortText} />
       <CopyRow label="Delivery Date" value={toSapDate(req.serviceDateFrom || req.requiredDate)} />
       <CopyRow label="Vendor" value={req.vendor} />
