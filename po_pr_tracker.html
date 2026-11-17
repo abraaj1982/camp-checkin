@@ -5819,6 +5819,7 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
       serviceDateFrom: data.serviceDateFrom,
       serviceDateTo: data.serviceDateTo,
       budget: data.budget,
+      department: "",
       prNumber: data.prNumber,
       notes: text.slice(0, 500),
     });
@@ -5982,6 +5983,7 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
       serviceDateFrom: extracted.serviceDateFrom || "",
       serviceDateTo: extracted.serviceDateTo || "",
       budget: extracted.budget,
+      department: extracted.department || "",
       notes: extracted.notes,
       attachments,
       serviceType: type,
@@ -6157,6 +6159,15 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
               <label className="sap-label">Budget (shared, split it manually per request if needed)</label>
               <input type="number" value={extracted.budget} onChange={(e) => setExtracted({ ...extracted, budget: e.target.value })} className="sap-input" />
             </div>
+            <div>
+              <label className="sap-label">Department / Project</label>
+              <input
+                value={extracted.department || ""}
+                onChange={(e) => setExtracted({ ...extracted, department: e.target.value })}
+                className="sap-input"
+                placeholder="Which department or project this is for"
+              />
+            </div>
           </div>
 
           {selectedTypes.map((type) => {
@@ -6247,6 +6258,52 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
               </div>
             );
           })}
+
+          {(() => {
+            const checks = [
+              { label: "Requester", ok: !!extracted.owner.trim() },
+              { label: "Service duration (dates)", ok: !!(extracted.serviceDateFrom || extracted.requiredDate) },
+              { label: "Department / Project", ok: !!(extracted.department || "").trim() },
+              ...selectedTypes.flatMap((type) => {
+                const entry = typeEntries[type];
+                if (!entry) return [];
+                return [
+                  { label: `${type} — vendor/supplier`, ok: !!entry.vendor.trim() },
+                  { label: `${type} — PR number`, ok: !!entry.prNumber.trim() },
+                ];
+              }),
+            ];
+            const missing = checks.filter((c) => !c.ok);
+            return (
+              <div
+                className="p-3 text-sm"
+                style={{
+                  background: missing.length ? "var(--sap-amber-bg)" : "var(--sap-green-bg)",
+                  border: `1px solid ${missing.length ? "#F5DFA6" : "#BFE3CB"}`,
+                  borderRadius: "10px",
+                }}
+              >
+                <p className="font-semibold mb-1.5" style={{ color: missing.length ? "var(--sap-amber)" : "var(--sap-green)" }}>
+                  {missing.length
+                    ? `⚠️ ${missing.length} field${missing.length === 1 ? "" : "s"} still need${missing.length === 1 ? "s" : ""} filling in`
+                    : "✅ All fields are complete"}
+                </p>
+                <ul className="flex flex-col gap-0.5">
+                  {checks.map((c) => (
+                    <li key={c.label} style={{ color: c.ok ? "var(--sap-green)" : "var(--sap-red)" }}>
+                      {c.ok ? "✓" : "✗"} {c.label}
+                      {!c.ok && c.label === "Requester" ? " — required to save" : ""}
+                    </li>
+                  ))}
+                </ul>
+                {missing.length > 0 && (
+                  <p className="text-xs mt-1.5" style={{ color: "var(--sap-gray)" }}>
+                    A missing PR number is normal before SAP approves it — fill it in once you have it. The rest, fill in above.
+                  </p>
+                )}
+              </div>
+            );
+          })()}
 
           <div>
             <label className="sap-label">Additional Notes (shared)</label>
