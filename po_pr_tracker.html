@@ -4385,26 +4385,159 @@ function speakReminder(text) {
 }
 
 // ---------------------------------------------------------------------------
-// AI assistant — Claude, reached through the Artifact's "sample" capability.
-// It runs on the viewer's own Claude account, so it only exists when the page
-// is opened inside Claude; everywhere else every AI control simply stays
-// hidden and the rule-based features keep working on their own.
+// AI assistant — Claude. Two ways to reach it, tried in this order:
+//  1. Opened inside Claude (the shared link): the Artifact's "sample"
+//     capability, running on the viewer's own Claude account.
+//  2. Opened as a plain HTML file: the viewer's own Anthropic API key, which
+//     they paste in once. The key is kept only in that browser's localStorage
+//     — never written into this file — and usage is billed to their API account.
+// With neither, every AI control stays hidden and the rule-based features
+// keep working on their own.
 // ---------------------------------------------------------------------------
-let _samplePromise = null;
-function getSample() {
+const AI_KEY_STORE = "prpo-anthropic-api-key";
+const AI_MODEL = "claude-opus-5-5";
+const ANTHROPIC_SDK_URL = "https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@1.3.0/+esm";
+const _aiListeners = new Set();
+
+function readApiKey() {
+  try { return localStorage.getItem(AI_KEY_STORE) || ""; } catch (e) { return ""; }
+}
+function saveApiKey(key) {
+  try {
+    if (key) localStorage.setItem(AI_KEY_STORE, key);
+    else localStorage.removeItem(AI_KEY_STORE);
+  } catch (e) { /* storage blocked — the key just won't persist */ }
+  _aiListeners.forEach((fn) => fn());
+}
+
+let _claudeSamplePromise = null;
+function getClaudeSample() {
   if (!window.claude || typeof window.claude.use !== "function") return Promise.resolve(null);
-  if (!_samplePromise) _samplePromise = Promise.resolve(window.claude.use("sample")).catch(() => null);
-  return _samplePromise;
+  if (!_claudeSamplePromise) _claudeSamplePromise = Promise.resolve(window.claude.use("sample")).catch(() => null);
+  return _claudeSamplePromise;
+}
+
+let _apiSample = null; // { key, fn }
+async function getSample() {
+  const viaClaude = await getClaudeSample();
+  if (viaClaude) return viaClaude;
+  const key = readApiKey();
+  if (!key) return null;
+  if (!_apiSample || _apiSample.key !== key) _apiSample = { key, fn: makeApiSample(key) };
+  return _apiSample.fn;
 }
 
 function useSample() {
   const [fn, setFn] = useState(null);
   useEffect(() => {
     let alive = true;
-    getSample().then((s) => { if (alive && s) setFn(() => s); });
-    return () => { alive = false; };
+    const refresh = () => getSample().then((s) => { if (alive) setFn(() => s); });
+    refresh();
+    _aiListeners.add(refresh);
+    return () => { alive = false; _aiListeners.delete(refresh); };
   }, []);
   return fn;
+}
+
+// --- API-key mode: the official Anthropic SDK, loaded only when first used ---
+let _sdkPromise = null;
+function loadAnthropicSdk() {
+  if (!_sdkPromise) {
+    // Function-wrapped so the in-page JSX compiler leaves the dynamic import alone.
+    _sdkPromise = new Function("u", "return import(u)")(ANTHROPIC_SDK_URL)
+      .then((m) => m.default || m.Anthropic)
+      .catch((e) => { _sdkPromise = null; throw e; });
+  }
+  return _sdkPromise;
+}
+
+// The sample capability accepts a string or a list of turns; the API wants
+// alternating turns that start and end with the user.
+function toApiMessages(input) {
+  const turns = typeof input === "string" ? [{ role: "user", content: input }] : input || [];
+  const out = [];
+  for (const t of turns) {
+    const role = t.role === "assistant" ? "assistant" : "user";
+    const content = String(t.content || "").trim();
+    if (!content) continue;
+    const last = out[out.length - 1];
+    if (last && last.role === role) last.content += "\n\n" + content;
+    else out.push({ role, content });
+  }
+  while (out.length && out[0].role !== "user") out.shift();
+  while (out.length && out[out.length - 1].role !== "user") out.pop();
+  return out;
+}
+
+function apiError(e, text) {
+  if (e && e.code && !e.status) return { ...e, text: e.text || text || "" };
+  const name = String((e && e.name) || (e && e.constructor && e.constructor.name) || "");
+  const status = e && e.status;
+  const msg = String((e && e.message) || "");
+  let code = "failed";
+  if (/abort/i.test(name) || /aborted/i.test(msg)) code = "cancelled";
+  else if (status === 401 || status === 403) code = "invalid_key";
+  else if (/credit balance/i.test(msg)) code = "no_credit";
+  else if (status === 429) code = "rate_limited";
+  else if (status === 529 || status === 503 || /overloaded/i.test(msg)) code = "overloaded";
+  else if (status === 413 || (status === 400 && /too long|too large|exceed/i.test(msg))) code = "prompt_too_large";
+  else if (!status) code = "network";
+  return { code, message: msg, text: text || "" };
+}
+
+function parseJsonReply(text) {
+  const t = String(text || "").trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
+  try { return JSON.parse(t); } catch (e) { /* fall through */ }
+  const a = t.indexOf("{"), b = t.lastIndexOf("}");
+  if (a >= 0 && b > a) { try { return JSON.parse(t.slice(a, b + 1)); } catch (e) { /* fall through */ } }
+  return undefined;
+}
+
+function makeApiSample(apiKey) {
+  const run = async (input, opts = {}) => {
+    const { onText, signal } = opts;
+    let text = "";
+    try {
+      const messages = toApiMessages(input);
+      if (!messages.length) throw { code: "failed", message: "Nothing to send." };
+      const Anthropic = await loadAnthropicSdk();
+      const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
+      const stream = client.beta.messages.stream(
+        {
+          model: AI_MODEL,
+          max_tokens: 16000,
+          thinking: { type: "adaptive" },
+          // If Claude declines a request, the API retries it on Anthropic's
+          // recommended fallback model instead of returning a refusal.
+          betas: ["server-side-fallback-2026-07-01"],
+          fallbacks: "default",
+          messages,
+        },
+        { signal }
+      );
+      stream.on("text", (delta) => {
+        text += delta;
+        if (onText) onText({ text, delta });
+      });
+      const msg = await stream.finalMessage();
+      const finalText = (msg.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
+      if (msg.stop_reason === "refusal") throw { code: "refused", text: finalText };
+      if (onText && finalText !== text) onText({ text: finalText, delta: "" });
+      return { text: finalText, truncated: msg.stop_reason === "max_tokens" };
+    } catch (e) {
+      throw apiError(e, text);
+    }
+  };
+  run.json = async (input, opts = {}) => {
+    const turns = typeof input === "string" ? [{ role: "user", content: input }] : [...(input || [])];
+    turns.push({ role: "user", content: "Reply with the JSON value only — no prose, no code fences." });
+    const { text } = await run(turns, opts);
+    const parsed = parseJsonReply(text);
+    if (parsed === undefined) throw { code: "invalid_json", text };
+    return parsed;
+  };
+  run.mode = "api";
+  return run;
 }
 
 function sampleErrorText(e) {
@@ -4418,6 +4551,10 @@ function sampleErrorText(e) {
     case "rate_limited": return "Too many AI requests right now — try again in a minute.";
     case "session_expired": return "Please sign in to Claude again, then retry.";
     case "invalid_json": return "The AI reply couldn't be read — try again.";
+    case "invalid_key": return "Your Anthropic API key was rejected — check it in 🤖 AI Assistant → API key.";
+    case "no_credit": return "Your Anthropic API account has no credit left — add credit at console.anthropic.com.";
+    case "overloaded": return "Claude is busy right now — try again in a moment.";
+    case "network": return "Couldn't reach Claude — check the internet connection and try again.";
     case "refused": return "The AI declined this request.";
     case "prompt_too_large": return "Too much text for one AI request — shorten it and retry.";
     default: return "The AI request failed — try again.";
@@ -7571,6 +7708,79 @@ const ASSISTANT_STARTERS = [
   "Draft a follow-up email for the oldest pending request",
 ];
 
+function AiKeySetup({ onDone }) {
+  const [key, setKey] = useState("");
+  const [err, setErr] = useState("");
+  const hasKey = !!readApiKey();
+  const save = () => {
+    const k = key.trim();
+    if (!/^sk-ant-[A-Za-z0-9_-]{20,}$/.test(k)) {
+      setErr("That doesn't look like an Anthropic API key — it starts with sk-ant-");
+      return;
+    }
+    saveApiKey(k);
+    setKey("");
+    setErr("");
+    appToast("API key saved in this browser — the AI assistant is on.");
+    if (onDone) onDone();
+  };
+  const remove = () => {
+    saveApiKey("");
+    appToast("API key removed from this browser.");
+    if (onDone) onDone();
+  };
+  const step = (n, body) => (
+    <div className="flex gap-3 items-start">
+      <span className="text-xs font-bold flex items-center justify-center" style={{ minWidth: 22, height: 22, borderRadius: 999, background: "#EEF1FF", color: "#3D5AFE" }}>{n}</span>
+      <div className="text-sm" style={{ color: "var(--sap-text)" }}>{body}</div>
+    </div>
+  );
+  return (
+    <div className="flex flex-col gap-4 py-2" style={{ maxWidth: 560, margin: "0 auto" }}>
+      <div className="text-center">
+        <div style={{ fontSize: 34 }}>🔑</div>
+        <h3 className="font-bold text-base mt-1">{hasKey ? "Your Anthropic API key" : "Turn on the AI assistant"}</h3>
+        <p className="text-sm mt-1" style={{ color: "var(--sap-gray)" }}>
+          Outside Claude, the AI features run on your own Anthropic API key. Inside Claude (the shared link) they work without one.
+        </p>
+      </div>
+      {!hasKey && (
+        <div className="flex flex-col gap-2.5 p-4" style={{ background: "#F7F8FD", border: "1px solid var(--sap-border)", borderRadius: 14 }}>
+          {step(1, <span>Sign in at <b>console.anthropic.com</b> and add credit under <b>Billing</b>.</span>)}
+          {step(2, <span>Open <b>API Keys</b> → <b>Create Key</b>, then copy it (it starts with <code>sk-ant-</code>).</span>)}
+          {step(3, <span>Paste it below and press <b>Save</b>. That's it — Read with AI, the AI Header Note and this chat all switch on.</span>)}
+        </div>
+      )}
+      <div className="flex gap-2">
+        <input
+          type="password"
+          value={key}
+          onChange={(e) => { setKey(e.target.value); setErr(""); }}
+          onKeyDown={(e) => { if (e.key === "Enter") save(); }}
+          placeholder={hasKey ? "Paste a new key to replace the saved one" : "sk-ant-…"}
+          className="sap-input"
+          style={{ flex: 1 }}
+          autoComplete="off"
+          spellCheck={false}
+        />
+        <button type="button" onClick={save} disabled={!key.trim()} className="sap-btn sap-btn-blue">Save</button>
+      </div>
+      {err && <p className="text-xs" style={{ color: "#DC2626" }}>{err}</p>}
+      <ul className="text-xs flex flex-col gap-1" style={{ color: "var(--sap-gray)", paddingLeft: 16, listStyle: "disc" }}>
+        <li>The key is saved only in this browser on this device — never inside the HTML file, so sharing the file never shares your key.</li>
+        <li>Each AI request is billed to your Anthropic API account (separate from a Claude subscription).</li>
+        <li>Only save it on your own computer, not a shared one. You can remove it any time here.</li>
+      </ul>
+      {hasKey && (
+        <div className="flex justify-between items-center gap-2">
+          <button type="button" onClick={remove} className="sap-btn sap-btn-outline" style={{ color: "#DC2626" }}>Remove key</button>
+          {onDone && <button type="button" onClick={onDone} className="sap-btn sap-btn-ghost">Back to chat</button>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AssistantChat({ requests }) {
   const sample = useSample();
   const [turns, setTurns] = useState([]); // [{role, content}]
@@ -7582,12 +7792,11 @@ function AssistantChat({ requests }) {
 
   useEffect(() => { if (endRef.current) endRef.current.scrollIntoView({ block: "end" }); }, [turns, live]);
 
-  if (!sample) {
-    return (
-      <p className="text-center py-8 text-sm" style={{ color: "var(--sap-gray)" }}>
-        The AI assistant runs on Claude, so it's available when this tracker is opened inside Claude (the shared link).
-      </p>
-    );
+  const [showKey, setShowKey] = useState(false);
+  const apiMode = !!(sample && sample.mode === "api");
+
+  if (!sample || showKey) {
+    return <AiKeySetup onDone={sample ? () => setShowKey(false) : null} />;
   }
 
   const send = async (text) => {
@@ -7686,7 +7895,14 @@ function AssistantChat({ requests }) {
           <button type="button" onClick={() => setTurns([])} className="sap-btn sap-btn-outline" title="Start a new conversation">New</button>
         )}
       </div>
-      <p className="text-xs mt-1.5" style={{ color: "var(--sap-gray)" }}>Runs on your Claude account. AI answers can be wrong — double-check before acting.</p>
+      <div className="flex justify-between items-center gap-2 mt-1.5">
+        <p className="text-xs" style={{ color: "var(--sap-gray)" }}>
+          {apiMode ? "Runs on your Anthropic API key (billed to your API account)." : "Runs on your Claude account."} AI answers can be wrong — double-check before acting.
+        </p>
+        {apiMode && (
+          <button type="button" onClick={() => setShowKey(true)} className="text-xs" style={{ background: "none", border: "none", color: "#3D5AFE", cursor: "pointer", whiteSpace: "nowrap" }}>🔑 API key</button>
+        )}
+      </div>
     </div>
   );
 }
@@ -7694,7 +7910,6 @@ function AssistantChat({ requests }) {
 function App() {
   const [requests, setRequests] = useState(loadRequests);
   const [showAssistant, setShowAssistant] = useState(false);
-  const sampleAvailable = useSample();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [ownerFilter, setOwnerFilter] = useState("all");
@@ -8030,15 +8245,13 @@ function App() {
                 🔊 Voice reminder
               </button>
             )}
-            {sampleAvailable && (
-              <button
-                onClick={() => setShowAssistant(true)}
-                className="sap-btn"
-                style={{ background: "linear-gradient(135deg, #3D5AFE, #8B5CF6)", color: "#fff", border: "none", boxShadow: "0 8px 20px rgba(61,90,254,.3)" }}
-              >
-                🤖 AI Assistant
-              </button>
-            )}
+            <button
+              onClick={() => setShowAssistant(true)}
+              className="sap-btn"
+              style={{ background: "linear-gradient(135deg, #3D5AFE, #8B5CF6)", color: "#fff", border: "none", boxShadow: "0 8px 20px rgba(61,90,254,.3)" }}
+            >
+              🤖 AI Assistant
+            </button>
             <button onClick={() => setShowImport(true)} className="sap-btn sap-btn-ghost">
               📥 Import Excel
             </button>
