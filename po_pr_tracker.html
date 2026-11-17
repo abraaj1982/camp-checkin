@@ -4139,6 +4139,73 @@ const STORAGE_KEY = "po_pr_tracker_requests_v1";
 const SERVICE_TYPES = ["Hotel", "Car", "Tickets", "Other"];
 const STATUSES = ["Pending", "Waiting PR approval", "Waiting PO approval", "Completed", "Cancelled"];
 
+// SAP Purchasing Group master list (48 codes) — the requester's department
+// decides which one goes on the PR, per how this org's SAP is set up. Kept
+// as one list so the Department field and the "Copy for SAP" panel always
+// agree on the same code for the same department name.
+const PURCHASING_GROUPS = [
+  { code: "D01", label: "Design - Buildings Structural" },
+  { code: "D02", label: "Design - City & Regional Planning" },
+  { code: "D03", label: "Design - Energy and Utilities" },
+  { code: "D04", label: "Design - Power & Renewables" },
+  { code: "D05", label: "Design - Geotechnical & Heavy Civil" },
+  { code: "D06", label: "Design - Transportation" },
+  { code: "D07", label: "Design - Water and Environment" },
+  { code: "D08", label: "Design - PMO & PMC" },
+  { code: "D09", label: "Design - Sustainability" },
+  { code: "D10", label: "Design - Buildings QS" },
+  { code: "D11", label: "Design - Buildings Mechanical" },
+  { code: "D12", label: "Design - Buildings Electrical" },
+  { code: "D13", label: "Design - Buildings Architecture" },
+  { code: "D14", label: "Design - Concept Design" },
+  { code: "D15", label: "Design - Interior Design" },
+  { code: "D16", label: "Design - Landscape" },
+  { code: "D17", label: "Design - Project Management" },
+  { code: "P01", label: "Proposals - Buildings" },
+  { code: "P02", label: "Proposals - City & Regional Planning" },
+  { code: "P03", label: "Proposals - Geotech & Heavy Civil" },
+  { code: "P04", label: "Proposals - Power & Renewables" },
+  { code: "P05", label: "Proposals - Water and Environment" },
+  { code: "P06", label: "Proposals - Transportation" },
+  { code: "P07", label: "Proposals - PMO & PMC" },
+  { code: "P08", label: "Proposals - Sustainability" },
+  { code: "PGS", label: "Proposals - GSI" },
+  { code: "PSV", label: "Proposals - Supervision" },
+  { code: "PTE", label: "Proposals - Energy & Utilities" },
+  { code: "S01", label: "Supervision" },
+  { code: "S02", label: "PMS Program Management Service" },
+  { code: "T01", label: "GSI Geospatial Systems Integration" },
+  { code: "T02", label: "E&U Energy & Utilities" },
+  { code: "T03", label: "ESRI" },
+  { code: "U01", label: "Business Development" },
+  { code: "U02", label: "Stakeholder Management" },
+  { code: "U03", label: "Administration" },
+  { code: "U04", label: "Human Resources" },
+  { code: "U05", label: "Finance" },
+  { code: "U06", label: "Information Technology" },
+  { code: "U07", label: "Legal" },
+  { code: "U08", label: "Quality & HSE" },
+  { code: "U09", label: "Corporate Development" },
+  { code: "U10", label: "Strategy & Communication" },
+  { code: "U11", label: "Operational Excellence" },
+  { code: "U12", label: "Engineering Support Services" },
+  { code: "U13", label: "Infrastructure, Dev. & Advisory" },
+  { code: "U14", label: "Business Travel" },
+  { code: "U99", label: "Undisclosed" },
+];
+
+function purchasingGroupCodeFor(departmentLabel) {
+  const found = PURCHASING_GROUPS.find((g) => g.label === departmentLabel);
+  return found ? found.code : "";
+}
+
+// SAP wants dates as DD.MM.YYYY — this app stores them as ISO (YYYY-MM-DD).
+function toSapDate(iso) {
+  if (!iso) return "";
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  return m ? `${m[3]}.${m[2]}.${m[1]}` : iso;
+}
+
 const STATUS_LABELS = {
   "Pending": "Pending",
   "Waiting PR approval": "Waiting PR approval",
@@ -6161,12 +6228,14 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
             </div>
             <div>
               <label className="sap-label">Department / Project</label>
-              <input
+              <select
                 value={extracted.department || ""}
                 onChange={(e) => setExtracted({ ...extracted, department: e.target.value })}
-                className="sap-input"
-                placeholder="Which department or project this is for"
-              />
+                className="sap-select"
+              >
+                <option value="">— Select —</option>
+                {PURCHASING_GROUPS.map((g) => <option key={g.code} value={g.label}>{g.label} ({g.code})</option>)}
+              </select>
             </div>
           </div>
 
@@ -6441,7 +6510,10 @@ function RequestForm({ initial, onSave, onCancel, requests }) {
       </div>
       <div>
         <label className="sap-label">Department</label>
-        <input value={form.department} onChange={set("department")} className="sap-input" />
+        <select value={form.department} onChange={set("department")} className="sap-select">
+          <option value="">— Select —</option>
+          {PURCHASING_GROUPS.map((g) => <option key={g.code} value={g.label}>{g.label} ({g.code})</option>)}
+        </select>
       </div>
       <div>
         <label className="sap-label">Waiting on</label>
@@ -7053,6 +7125,70 @@ function SupplierManagerModal({ onClose, sla, onSlaChange }) {
   );
 }
 
+// One row: a field's ready-to-paste value next to a one-click Copy button.
+// Click-to-copy beats re-typing by hand into SAP, and beats a screenshot
+// annotation this app has no way to draw anyway.
+function CopyRow({ label, value, hint }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(value || "");
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch (err) {
+      appToast("Could not copy — select and copy the text manually.");
+    }
+  };
+  return (
+    <div className="flex items-center gap-3 py-1.5" style={{ borderBottom: "1px solid #F1F2F8" }}>
+      <div style={{ flex: "0 0 160px" }}>
+        <div className="text-xs font-semibold" style={{ color: "var(--sap-gray)" }}>{label}</div>
+        {hint && <div className="text-xs" style={{ color: "var(--sap-gray)" }}>{hint}</div>}
+      </div>
+      <div className="text-sm flex-1" style={{ color: value ? "var(--sap-text)" : "var(--sap-gray)", fontFamily: "monospace" }}>
+        {value || "— empty —"}
+      </div>
+      <button
+        type="button"
+        onClick={copy}
+        disabled={!value}
+        className="sap-btn sap-btn-outline"
+        style={!value ? { opacity: 0.4, cursor: "not-allowed" } : {}}
+      >
+        {copied ? "✓ Copied" : "Copy"}
+      </button>
+    </div>
+  );
+}
+
+function CopyForSapModal({ req, onClose }) {
+  const shortText = [req.serviceType, req.beneficiary || req.owner, req.vendor].filter(Boolean).join(" - ");
+  const pgrCode = purchasingGroupCodeFor(req.department);
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="text-sm mb-2" style={{ color: "var(--sap-gray)" }}>
+        Copy each field below, then paste it into the matching column on the SAP "Create Purchase Requisition" screen.
+      </p>
+      <CopyRow label="Short Text" value={shortText} />
+      <CopyRow label="Delivery Date" value={toSapDate(req.serviceDateFrom || req.requiredDate)} />
+      <CopyRow label="Vendor" value={req.vendor} />
+      <CopyRow label="Requisnr." value={req.owner} hint="Requester" />
+      <CopyRow label="Quantity" value="1" />
+      <CopyRow
+        label="Purchasing Group"
+        value={pgrCode ? `${pgrCode} — ${req.department}` : ""}
+        hint={!req.department ? "Set the Department field on this request first" : (!pgrCode ? "No matching SAP code for this department" : "")}
+      />
+      <div className="p-3 text-xs mt-3" style={{ background: "#F5F6F7", border: "1px solid var(--sap-border)", borderRadius: "10px", color: "var(--sap-gray)" }}>
+        Fill in manually on the SAP screen (not auto-filled — these vary per request): <strong>Account Assignment Category</strong>, <strong>Item Category</strong>, <strong>Plant</strong>, <strong>Storage Location</strong>, <strong>Cost Center</strong>. Purchasing Organization is always <strong>OM01</strong>.
+      </div>
+      <div className="flex justify-end pt-3">
+        <button type="button" onClick={onClose} className="sap-btn sap-btn-blue">Done</button>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [requests, setRequests] = useState(loadRequests);
   const [search, setSearch] = useState("");
@@ -7081,6 +7217,7 @@ function App() {
   // every row, aimed at whichever row's button was clicked last.
   const [attachPoRowId, setAttachPoRowId] = useState(null);
   const attachPoInputRef = useRef(null);
+  const [copySapReq, setCopySapReq] = useState(null);
 
   // Always keep the private per-browser cache current — a fallback that
   // costs nothing and matters if sharing ever becomes unavailable mid-session.
@@ -7593,6 +7730,7 @@ function App() {
                       <td className="whitespace-nowrap">
                         <button onClick={() => setStatusReq(r)} className="sap-link mr-3">Update Status</button>
                         <button onClick={() => handleAttachPoClick(r)} className="sap-link mr-3" style={{ color: "var(--sap-purple)" }}>📎 Attach PO</button>
+                        <button onClick={() => setCopySapReq(r)} className="sap-link mr-3" style={{ color: "var(--sap-blue)" }}>📋 Copy for SAP</button>
                         <button onClick={() => handleDelete(r.id)} className="sap-link-danger">Delete</button>
                       </td>
                     </tr>
@@ -7718,6 +7856,12 @@ function App() {
       {viewFilesReq && (
         <Modal title="📎 Attachments" onClose={() => setViewFilesReq(null)}>
           <AttachmentsView req={viewFilesReq} />
+        </Modal>
+      )}
+
+      {copySapReq && (
+        <Modal title={`📋 Copy for SAP — ${copySapReq.owner}`} onClose={() => setCopySapReq(null)}>
+          <CopyForSapModal req={copySapReq} onClose={() => setCopySapReq(null)} />
         </Modal>
       )}
 
