@@ -4384,6 +4384,60 @@ function speakReminder(text) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// AI assistant — Claude, reached through the Artifact's "sample" capability.
+// It runs on the viewer's own Claude account, so it only exists when the page
+// is opened inside Claude; everywhere else every AI control simply stays
+// hidden and the rule-based features keep working on their own.
+// ---------------------------------------------------------------------------
+let _samplePromise = null;
+function getSample() {
+  if (!window.claude || typeof window.claude.use !== "function") return Promise.resolve(null);
+  if (!_samplePromise) _samplePromise = Promise.resolve(window.claude.use("sample")).catch(() => null);
+  return _samplePromise;
+}
+
+function useSample() {
+  const [fn, setFn] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    getSample().then((s) => { if (alive && s) setFn(() => s); });
+    return () => { alive = false; };
+  }, []);
+  return fn;
+}
+
+function sampleErrorText(e) {
+  switch (e && e.code) {
+    case "cancelled": return "";
+    case "not_granted":
+    case "sampling_disabled":
+    case "not_declared":
+    case "capability_disabled":
+    case "capability_removed": return "The AI assistant isn't available in this view.";
+    case "rate_limited": return "Too many AI requests right now — try again in a minute.";
+    case "session_expired": return "Please sign in to Claude again, then retry.";
+    case "invalid_json": return "The AI reply couldn't be read — try again.";
+    case "refused": return "The AI declined this request.";
+    case "prompt_too_large": return "Too much text for one AI request — shorten it and retry.";
+    default: return "The AI request failed — try again.";
+  }
+}
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const todayIso = () => new Date().toISOString().slice(0, 10);
+
+function AiBadge({ children }) {
+  return (
+    <span
+      className="text-xs font-bold"
+      style={{ background: "linear-gradient(135deg, #3D5AFE, #8B5CF6)", color: "#fff", borderRadius: 999, padding: "2px 9px", letterSpacing: "0.02em" }}
+    >
+      {children || "✨ AI"}
+    </span>
+  );
+}
+
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
@@ -5888,6 +5942,103 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
   const knownOwners = useMemo(() => getKnownOwners(requests), [requests]);
   const knownBeneficiaries = useMemo(() => getKnownBeneficiaries(requests), [requests]);
 
+  const sample = useSample();
+  const [aiBusy, setAiBusy] = useState(false);
+  const [ai, setAi] = useState(null); // { summary, city, questions[], suggestions[] }
+  const aiCtl = useRef(null);
+
+  // Claude reads the raw email the way a person would — handles any phrasing,
+  // Arabic or English, forwarded chains — and fills the same fields the
+  // rule-based reader does, then says what's still missing and suggests
+  // suppliers. Every value it returns is checked before it touches the form.
+  const aiExtract = async () => {
+    if (!sample || !emailText.trim() || aiBusy) return;
+    if (!extracted) extractAndSetForm(emailText);
+    aiCtl.current = new AbortController();
+    setAiBusy(true);
+    const departments = PURCHASING_GROUPS.map((g) => g.label);
+    const known = {
+      previousRequesters: knownOwners.slice(0, 25),
+      previousTravellers: knownBeneficiaries.slice(0, 25),
+      previousVendors: knownVendorsAll.slice(0, 30),
+      registeredSuppliers: suppliers,
+    };
+    const prompt = [
+      "You help a procurement coordinator log a travel/service request from an email into a tracker, before they raise an SAP Purchase Requisition.",
+      "Read the email below and reply with ONLY one JSON object, exactly this shape:",
+      '{"owner":"","beneficiary":"","serviceTypes":["Hotel"],"serviceDateFrom":"","serviceDateTo":"","requiredDate":"","budget":"","department":"","city":"","vendors":{"Hotel":""},"prNumber":"","summary":"","questionsForSender":[""],"vendorSuggestions":[{"type":"Hotel","name":"","why":"","source":"your list"}]}',
+      "Rules:",
+      "- owner: the person who asked for the service (never a signature footer, disclaimer or company name). beneficiary: who the service is for (traveller/guest names, comma-separated); \"\" if the same person.",
+      '- serviceTypes: every service requested, each one of "Hotel", "Car", "Tickets", "Other".',
+      `- Dates as YYYY-MM-DD. Today is ${todayIso()}; resolve relative dates ("next Sunday") against it. Use "" when a date is not stated — never guess.`,
+      `- department: exactly one of these values, or "" if the email does not make it clear: ${departments.join(" | ")}.`,
+      "- vendors: only suppliers actually named in the email, keyed by service type.",
+      "- budget: digits only, or \"\".",
+      "- summary: one or two plain sentences on what is being requested, for whom, where and when.",
+      "- questionsForSender: short, polite questions for anything missing or ambiguous that only the sender can answer (exact dates, number of nights/rooms, traveller names, city, project/department, preferences). Never ask about PR or PO numbers. Empty array if nothing is missing.",
+      "- vendorSuggestions: up to 3 per requested service that has no vendor yet. Prefer the coordinator's registered or previous suppliers below when they fit the city; set source to \"your list\" for those and \"suggestion\" for general well-known options in that city.",
+      "",
+      "Coordinator's own data: " + JSON.stringify(known),
+      "",
+      "EMAIL:",
+      emailText.slice(0, 24000),
+    ].join("\n");
+    try {
+      const r = await sample.json(prompt, { signal: aiCtl.current.signal });
+      if (!r || typeof r !== "object") throw { code: "invalid_json" };
+      const str = (v) => (typeof v === "string" ? v.trim() : "");
+      const date = (v) => (ISO_DATE.test(str(v)) ? str(v) : "");
+      const types = Array.isArray(r.serviceTypes) ? r.serviceTypes.filter((t) => SERVICE_TYPES.includes(t)) : [];
+      const vendors = r.vendors && typeof r.vendors === "object" ? r.vendors : {};
+      const dept = departments.includes(str(r.department)) ? str(r.department) : "";
+
+      setExtracted((prev) => {
+        const p = prev || {};
+        return {
+          ...p,
+          owner: str(r.owner) || p.owner || "",
+          ownerNeedsConfirmation: str(r.owner) ? false : p.ownerNeedsConfirmation,
+          beneficiary: str(r.beneficiary) || p.beneficiary || "",
+          serviceDateFrom: date(r.serviceDateFrom) || p.serviceDateFrom || "",
+          serviceDateTo: date(r.serviceDateTo) || p.serviceDateTo || "",
+          requiredDate: date(r.requiredDate) || p.requiredDate || "",
+          budget: str(r.budget).replace(/[^\d.]/g, "") || p.budget || "",
+          department: dept || p.department || "",
+          prNumber: str(r.prNumber) || p.prNumber || "",
+          notes: p.notes || emailText.slice(0, 500),
+        };
+      });
+      if (types.length) {
+        setSelectedTypes(types);
+        setTypeEntries((prev) => {
+          const next = { ...prev };
+          types.forEach((t) => {
+            const entry = next[t] || makeTypeEntry(t, "", customActions);
+            next[t] = { ...entry, vendor: entry.vendor || str(vendors[t]) };
+          });
+          return next;
+        });
+      }
+      setAi({
+        summary: str(r.summary),
+        city: str(r.city),
+        questions: Array.isArray(r.questionsForSender) ? r.questionsForSender.map(str).filter(Boolean).slice(0, 8) : [],
+        suggestions: Array.isArray(r.vendorSuggestions)
+          ? r.vendorSuggestions
+              .filter((s) => s && SERVICE_TYPES.includes(s.type) && str(s.name))
+              .map((s) => ({ type: s.type, name: str(s.name), why: str(s.why), source: str(s.source) }))
+              .slice(0, 9)
+          : [],
+      });
+      if (onContentReplaced) onContentReplaced();
+    } catch (e) {
+      const m = sampleErrorText(e);
+      if (m) appToast(m);
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
   const registerSupplier = (type, vendor) => {
     if (!vendor || !vendor.trim()) return;
     const list = getRegisteredSuppliers(suppliers, type);
@@ -5899,6 +6050,7 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
   };
 
   const extractAndSetForm = (text) => {
+    setAi(null);
     setSourceHash(fingerprintEmail(text));
     const detectedTypes = detectServiceTypes(text);
     const primaryType = guessServiceType(text);
@@ -5958,6 +6110,8 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
     setTypeEntries({});
     setAttachments([]);
     setSourceHash("");
+    setAi(null);
+    if (aiCtl.current) aiCtl.current.abort();
   };
 
   const handleEmailFile = async (e) => {
@@ -6136,10 +6290,22 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
           placeholder="Paste the email text from the department or SAP here..."
           className="sap-textarea"
         ></textarea>
-        <div className="flex justify-end mt-2">
-          <button type="button" onClick={handleExtract} className="sap-btn sap-btn-blue">
-            🔍 Extract Data
+        <div className="flex justify-end gap-2 mt-2">
+          <button type="button" onClick={handleExtract} className={sample ? "sap-btn sap-btn-outline" : "sap-btn sap-btn-blue"}>
+            🔍 Quick extract
           </button>
+          {sample && (
+            <button
+              type="button"
+              onClick={aiExtract}
+              disabled={aiBusy || !emailText.trim()}
+              className="sap-btn sap-btn-blue"
+              style={{ background: "linear-gradient(135deg, #3D5AFE, #8B5CF6)", border: "none" }}
+              title="Claude reads the whole email, fills the fields, lists what's missing and suggests suppliers"
+            >
+              {aiBusy ? "✨ Reading the email…" : "✨ Read with AI"}
+            </button>
+          )}
         </div>
       </div>
 
@@ -6155,6 +6321,80 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
                 {findRequestsFromSameEmail(sourceHash, requests).map((r) => r.serviceType).join(", ")}.
                 Saving again will duplicate them.
               </p>
+            </div>
+          )}
+
+          {aiBusy && (
+            <div className="p-3 text-sm flex items-center gap-2" style={{ background: "#EEF1FF", border: "1px solid #DCE2FF", borderRadius: "12px", color: "var(--sap-blue)" }}>
+              <AiBadge /> <span>Claude is reading the email… this usually takes 10–40 seconds.</span>
+              <button type="button" onClick={() => aiCtl.current && aiCtl.current.abort()} className="sap-link" style={{ marginInlineStart: "auto" }}>Stop</button>
+            </div>
+          )}
+
+          {sample && !ai && !aiBusy && (
+            <div className="p-3 text-sm flex items-center gap-3" style={{ background: "#F7F8FF", border: "1px dashed #C9D1FF", borderRadius: "12px" }}>
+              <AiBadge />
+              <span style={{ color: "var(--sap-text)" }}>Fields came from the quick rule-based reader. Let Claude read the full email for a more complete result.</span>
+              <button type="button" onClick={aiExtract} className="sap-btn sap-btn-outline" style={{ marginInlineStart: "auto" }}>✨ Read with AI</button>
+            </div>
+          )}
+
+          {ai && (
+            <div className="p-4 text-sm" style={{ background: "linear-gradient(145deg, #F1F3FF, #FAF7FF)", border: "1px solid #DCE2FF", borderRadius: "14px" }}>
+              <div className="flex items-center gap-2 mb-2">
+                <AiBadge>✨ AI review</AiBadge>
+                {ai.city && <span className="text-xs" style={{ color: "var(--sap-gray)" }}>📍 {ai.city}</span>}
+                <button type="button" onClick={aiExtract} disabled={aiBusy} className="sap-link" style={{ marginInlineStart: "auto" }}>Re-read</button>
+              </div>
+              {ai.summary && <p className="mb-3" style={{ color: "var(--sap-text)" }}>{ai.summary}</p>}
+
+              {ai.questions.length > 0 ? (
+                <div className="mb-3">
+                  <p className="font-semibold mb-1" style={{ color: "var(--sap-red)" }}>❓ Missing — ask the sender:</p>
+                  <ul className="flex flex-col gap-0.5" style={{ color: "var(--sap-text)" }}>
+                    {ai.questions.map((q, i) => <li key={i}>• {q}</li>)}
+                  </ul>
+                  <button
+                    type="button"
+                    className="sap-btn sap-btn-outline mt-2"
+                    onClick={async () => {
+                      const msg = ["Hi,", "", "To process this request, could you please confirm the following:", "", ...ai.questions.map((q, i) => `${i + 1}. ${q}`), "", "Thank you."].join("\n");
+                      try { await navigator.clipboard.writeText(msg); appToast("Copied — paste it into your reply to the sender."); }
+                      catch (err) { appToast("Could not copy — select the text manually."); }
+                    }}
+                  >
+                    📧 Copy reply to sender
+                  </button>
+                </div>
+              ) : (
+                <p className="mb-3 font-semibold" style={{ color: "var(--sap-green)" }}>✓ Claude found nothing missing that only the sender can answer.</p>
+              )}
+
+              {ai.suggestions.length > 0 && (
+                <div>
+                  <p className="font-semibold mb-1.5" style={{ color: "var(--sap-text)" }}>🏨 Supplier suggestions — click to use:</p>
+                  <div className="flex flex-col gap-1.5">
+                    {ai.suggestions.map((s, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => {
+                          if (!selectedTypes.includes(s.type)) setSelectedTypes((prev) => [...prev, s.type]);
+                          setTypeEntries((prev) => ({ ...prev, [s.type]: { ...(prev[s.type] || makeTypeEntry(s.type, "", customActions)), vendor: s.name } }));
+                          appToast(`${s.type} supplier set to "${s.name}"`);
+                        }}
+                        className="text-left px-3 py-2"
+                        style={{ background: "#fff", border: "1px solid var(--sap-border)", borderRadius: 10, cursor: "pointer" }}
+                      >
+                        <span className="font-semibold" style={{ color: "var(--sap-text)" }}>{s.name}</span>
+                        <span className="text-xs" style={{ color: "var(--sap-gray)" }}> · {s.type}{s.source ? ` · ${s.source}` : ""}</span>
+                        {s.why && <div className="text-xs" style={{ color: "var(--sap-gray)" }}>{s.why}</div>}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs mt-1.5" style={{ color: "var(--sap-gray)" }}>General suggestions are not verified — confirm availability and rates before booking.</p>
+                </div>
+              )}
             </div>
           )}
 
@@ -7235,12 +7475,52 @@ function CopyRow({ label, value, hint, multiline }) {
 function CopyForSapModal({ req, onClose }) {
   const shortText = [req.serviceType, req.beneficiary || req.owner, req.vendor].filter(Boolean).join(" - ");
   const pgrCode = purchasingGroupCodeFor(req.department);
+  const sample = useSample();
+  const [aiNote, setAiNote] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
+
+  const writeNoteWithAi = async () => {
+    if (!sample || aiBusy) return;
+    setAiBusy(true);
+    setAiNote("");
+    const facts = {
+      serviceType: req.serviceType, requester: req.owner, traveller: req.beneficiary || req.owner,
+      from: req.serviceDateFrom, to: req.serviceDateTo, requiredBy: req.requiredDate,
+      department: req.department, vendor: req.vendor, budget: req.budget,
+      emailSummary: req.emailSummary || "", notes: (req.notes || "").slice(0, 1500),
+    };
+    const prompt = [
+      "Write the Header Note for an SAP Purchase Requisition from these request details.",
+      "Professional English, 2-4 sentences, plain text only (no bullets, no markdown, no greeting).",
+      "Say what service is required, for whom, the dates and number of days/nights, the project/department, the supplier if known, and who requested it.",
+      "Use only the facts given; leave out anything that is empty. Dates as DD.MM.YYYY.",
+      "",
+      JSON.stringify(facts),
+    ].join("\n");
+    try {
+      await sample(prompt, { onText: ({ text }) => setAiNote(text) });
+    } catch (e) {
+      setAiNote(e.text || "");
+      const m = sampleErrorText(e);
+      if (m) appToast(m);
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-1">
       <p className="text-sm mb-2" style={{ color: "var(--sap-gray)" }}>
         Copy each field below, then paste it into the matching column on the SAP "Create Purchase Requisition" screen.
       </p>
-      <CopyRow label="Header Note" value={buildHeaderNote(req)} hint="Paste into the Texts / Header Note box" multiline />
+      <CopyRow label="Header Note" value={aiNote || buildHeaderNote(req)} hint={aiNote ? "✨ Written by AI" : "Paste into the Texts / Header Note box"} multiline />
+      {sample && (
+        <div className="flex justify-end mb-1">
+          <button type="button" onClick={writeNoteWithAi} disabled={aiBusy} className="sap-link">
+            {aiBusy ? "✨ Writing…" : aiNote ? "✨ Rewrite with AI" : "✨ Write a better Header Note with AI"}
+          </button>
+        </div>
+      )}
       <CopyRow label="Short Text" value={shortText} />
       <CopyRow label="Delivery Date" value={toSapDate(req.serviceDateFrom || req.requiredDate)} />
       <CopyRow label="Vendor" value={req.vendor} />
@@ -7261,8 +7541,160 @@ function CopyForSapModal({ req, onClose }) {
   );
 }
 
+// Compact one-line-per-request view of the tracker for the assistant's prompt:
+// only the fields worth reasoning over, long free text trimmed, newest first,
+// and capped so the whole prompt stays well inside the 64 KiB limit.
+function requestsForAssistant(requests) {
+  const rows = [...requests]
+    .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
+    .map((r) => ({
+      pr: r.prNumber || "", po: r.poNumber || "", requester: r.owner || "", for: r.beneficiary || "",
+      service: r.serviceType || "", vendor: r.vendor || "", status: r.status || "",
+      dept: r.department || "", from: r.serviceDateFrom || "", to: r.serviceDateTo || "",
+      requiredBy: r.requiredDate || "", budget: r.budget || "", ses: !!r.serviceEntrySheet,
+      files: (r.attachments || []).length, created: String(r.createdAt || "").slice(0, 10),
+      summary: (r.emailSummary || "").slice(0, 160),
+    }));
+  let out = "";
+  for (const row of rows) {
+    const line = JSON.stringify(row) + "\n";
+    if (out.length + line.length > 40000) break;
+    out += line;
+  }
+  return { text: out, shown: out ? out.trim().split("\n").length : 0, total: rows.length };
+}
+
+const ASSISTANT_STARTERS = [
+  "What needs my action today?",
+  "Which requests are still waiting PR approval?",
+  "Summarize this week's requests by department",
+  "Draft a follow-up email for the oldest pending request",
+];
+
+function AssistantChat({ requests }) {
+  const sample = useSample();
+  const [turns, setTurns] = useState([]); // [{role, content}]
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [live, setLive] = useState("");
+  const ctlRef = useRef(null);
+  const endRef = useRef(null);
+
+  useEffect(() => { if (endRef.current) endRef.current.scrollIntoView({ block: "end" }); }, [turns, live]);
+
+  if (!sample) {
+    return (
+      <p className="text-center py-8 text-sm" style={{ color: "var(--sap-gray)" }}>
+        The AI assistant runs on Claude, so it's available when this tracker is opened inside Claude (the shared link).
+      </p>
+    );
+  }
+
+  const send = async (text) => {
+    const msg = (text || draft).trim();
+    if (!msg || busy) return;
+    const data = requestsForAssistant(requests);
+    const rules = [
+      "You are the assistant built into a PR/PO tracker used by a procurement coordinator (hotels, car rentals, tickets for staff travel; requests become SAP Purchase Requisitions then POs).",
+      `Today is ${todayIso()}. Statuses: Pending → Waiting PR approval → Waiting PO approval → Completed (or Cancelled). "ses" = Service Entry Sheet done.`,
+      "Answer from the data below only — never invent requests, numbers or names. If the data can't answer, say so.",
+      "Reply in the language the coordinator writes in (Arabic or English). Be concise and well-organized; use short lists when helpful. When asked to draft an email, SAP text or a message, write it ready to paste.",
+      `Tracker data (${data.shown} of ${data.total} requests, newest first, one JSON object per line):`,
+      data.text || "(no requests yet)",
+    ].join("\n");
+    const nextTurns = [...turns, { role: "user", content: msg }];
+    setTurns(nextTurns);
+    setDraft("");
+    setLive("");
+    setBusy(true);
+    ctlRef.current = new AbortController();
+    try {
+      const { text: answer } = await sample([{ role: "user", content: rules }, ...nextTurns.slice(-12)], {
+        cache: false,
+        signal: ctlRef.current.signal,
+        onText: ({ text }) => setLive(text),
+      });
+      setTurns((prev) => [...prev, { role: "assistant", content: answer }]);
+    } catch (e) {
+      const m = sampleErrorText(e);
+      const kept = e.text || "";
+      if (kept || m) setTurns((prev) => [...prev, { role: "assistant", content: kept + (m ? (kept ? "\n\n" : "") + "⚠️ " + m : "") }]);
+    } finally {
+      setLive("");
+      setBusy(false);
+    }
+  };
+
+  const bubble = (role, content, key) => (
+    <div key={key} className={`flex ${role === "user" ? "justify-end" : "justify-start"}`}>
+      <div
+        className="text-sm px-4 py-2.5"
+        dir="auto"
+        style={{
+          maxWidth: "85%",
+          whiteSpace: "pre-wrap",
+          borderRadius: role === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
+          background: role === "user" ? "linear-gradient(135deg, #3D5AFE, #6C7CFF)" : "#F4F6FB",
+          color: role === "user" ? "#fff" : "var(--sap-text)",
+          border: role === "user" ? "none" : "1px solid var(--sap-border)",
+        }}
+      >
+        {content}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="flex flex-col" style={{ height: "62vh" }}>
+      <div className="flex-1 overflow-y-auto flex flex-col gap-2.5 pr-1">
+        {turns.length === 0 && !busy && (
+          <div className="flex flex-col items-center text-center gap-3 py-6">
+            <div style={{ fontSize: 34 }}>🤖</div>
+            <p className="text-sm" style={{ color: "var(--sap-gray)", maxWidth: 420 }}>
+              Ask anything about your requests — what's pending, who's waiting on what, totals by department — or have it draft follow-ups and SAP text. Arabic or English.
+            </p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {ASSISTANT_STARTERS.map((s) => (
+                <button key={s} type="button" onClick={() => send(s)} className="text-xs px-3 py-1.5" style={{ background: "#fff", border: "1px solid var(--sap-border)", borderRadius: 999, color: "var(--sap-text)", cursor: "pointer" }}>
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {turns.map((t, i) => bubble(t.role, t.content, i))}
+        {busy && bubble("assistant", live || "Thinking…", "live")}
+        <div ref={endRef} />
+      </div>
+      <div className="flex gap-2 pt-3" style={{ borderTop: "1px solid var(--sap-border)" }}>
+        <input
+          value={draft}
+          dir="auto"
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+          placeholder="Ask about your requests…"
+          className="sap-input"
+          style={{ flex: 1 }}
+          disabled={busy}
+        />
+        {busy ? (
+          <button type="button" onClick={() => ctlRef.current && ctlRef.current.abort()} className="sap-btn sap-btn-outline">Stop</button>
+        ) : (
+          <button type="button" onClick={() => send()} disabled={!draft.trim()} className="sap-btn sap-btn-blue">Send</button>
+        )}
+        {turns.length > 0 && !busy && (
+          <button type="button" onClick={() => setTurns([])} className="sap-btn sap-btn-outline" title="Start a new conversation">New</button>
+        )}
+      </div>
+      <p className="text-xs mt-1.5" style={{ color: "var(--sap-gray)" }}>Runs on your Claude account. AI answers can be wrong — double-check before acting.</p>
+    </div>
+  );
+}
+
 function App() {
   const [requests, setRequests] = useState(loadRequests);
+  const [showAssistant, setShowAssistant] = useState(false);
+  const sampleAvailable = useSample();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [ownerFilter, setOwnerFilter] = useState("all");
@@ -7598,6 +8030,15 @@ function App() {
                 🔊 Voice reminder
               </button>
             )}
+            {sampleAvailable && (
+              <button
+                onClick={() => setShowAssistant(true)}
+                className="sap-btn"
+                style={{ background: "linear-gradient(135deg, #3D5AFE, #8B5CF6)", color: "#fff", border: "none", boxShadow: "0 8px 20px rgba(61,90,254,.3)" }}
+              >
+                🤖 AI Assistant
+              </button>
+            )}
             <button onClick={() => setShowImport(true)} className="sap-btn sap-btn-ghost">
               📥 Import Excel
             </button>
@@ -7928,6 +8369,12 @@ function App() {
       {viewFilesReq && (
         <Modal title="📎 Attachments" onClose={() => setViewFilesReq(null)}>
           <AttachmentsView req={viewFilesReq} />
+        </Modal>
+      )}
+
+      {showAssistant && (
+        <Modal title="🤖 AI Assistant" onClose={() => setShowAssistant(false)} wide>
+          <AssistantChat requests={requests} />
         </Modal>
       )}
 
