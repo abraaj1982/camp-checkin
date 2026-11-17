@@ -6358,19 +6358,39 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
 
           {(() => {
             const checks = [
-              { label: "Requester", ok: !!extracted.owner.trim() },
-              { label: "Service duration (dates)", ok: !!(extracted.serviceDateFrom || extracted.requiredDate) },
-              { label: "Department / Project", ok: !!(extracted.department || "").trim() },
+              { label: "Requester", ok: !!extracted.owner.trim(), askSender: false },
+              { label: "Service duration (dates)", ok: !!(extracted.serviceDateFrom || extracted.requiredDate), askSender: true, ask: "The exact service/travel dates (check-in and check-out, or departure date)" },
+              { label: "Department / Project", ok: !!(extracted.department || "").trim(), askSender: true, ask: "Which project or department this request is for" },
               ...selectedTypes.flatMap((type) => {
                 const entry = typeEntries[type];
                 if (!entry) return [];
                 return [
-                  { label: `${type} — vendor/supplier`, ok: !!entry.vendor.trim() },
-                  { label: `${type} — PR number`, ok: !!entry.prNumber.trim() },
+                  { label: `${type} — vendor/supplier`, ok: !!entry.vendor.trim(), askSender: true, ask: `Their preferred ${type.toLowerCase()} supplier/vendor, if they have one in mind` },
+                  { label: `${type} — PR number`, ok: !!entry.prNumber.trim(), askSender: false },
                 ];
               }),
             ];
             const missing = checks.filter((c) => !c.ok);
+            const askSenderItems = missing.filter((c) => c.askSender);
+            const lowSignal = emailText.trim().length > 0 && emailText.replace(/\\par[d]?|\\[a-z]+\d*|[{}]/gi, "").trim().length < 40;
+
+            const copyQuestionsForSender = async () => {
+              const who = extracted.beneficiary || extracted.owner || "you";
+              const lines = [
+                `Hi, to process ${who === "you" ? "your" : `${who}'s`} ${selectedTypes.join("/") || "service"} request, could you please confirm:`,
+                "",
+                ...askSenderItems.map((c) => `- ${c.ask}`),
+                "",
+                "Thanks!",
+              ];
+              try {
+                await navigator.clipboard.writeText(lines.join("\n"));
+                appToast("Copied — paste it into a reply to whoever sent this email.");
+              } catch (err) {
+                appToast("Could not copy — select the text manually.");
+              }
+            };
+
             return (
               <div
                 className="p-3 text-sm"
@@ -6380,6 +6400,11 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
                   borderRadius: "10px",
                 }}
               >
+                {lowSignal && (
+                  <p className="font-semibold mb-2" style={{ color: "var(--sap-red)" }}>
+                    ⚠️ This email's content looks unreadable or mostly empty (possibly an unsupported Rich Text format) — the fields below are likely incomplete. Check them carefully, or ask the sender directly.
+                  </p>
+                )}
                 <p className="font-semibold mb-1.5" style={{ color: missing.length ? "var(--sap-amber)" : "var(--sap-green)" }}>
                   {missing.length
                     ? `⚠️ ${missing.length} field${missing.length === 1 ? "" : "s"} still need${missing.length === 1 ? "s" : ""} filling in`
@@ -6397,6 +6422,15 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
                   <p className="text-xs mt-1.5" style={{ color: "var(--sap-gray)" }}>
                     A missing PR number is normal before SAP approves it — fill it in once you have it. The rest, fill in above.
                   </p>
+                )}
+                {askSenderItems.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={copyQuestionsForSender}
+                    className="sap-btn sap-btn-outline mt-2"
+                  >
+                    📧 Copy questions for sender
+                  </button>
                 )}
               </div>
             );
