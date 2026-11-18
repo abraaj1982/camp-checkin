@@ -5172,6 +5172,267 @@ function ChargeFields({ value, onChange, compact }) {
 }
 
 // ---------------------------------------------------------------------------
+// "Ask for the missing info" — a ready-to-send, professional email to the
+// person who sent the request, listing exactly what's missing. Claude writes
+// it when available; otherwise a polished template does. Copy it, or open it
+// straight in the email app.
+// ---------------------------------------------------------------------------
+const SIGNATURE_KEY = "prpo-signature";
+const MISSING_ASKS = {
+  "Traveller / for": { en: "The full name(s) of the traveller(s)/guest(s), as shown on their ID or passport", ar: "الاسم الكامل للمسافر/الضيف كما هو في الهوية أو جواز السفر" },
+  "Service": { en: "The service required (hotel, car rental, flight tickets, etc.)", ar: "نوع الخدمة المطلوبة (فندق، تأجير سيارة، تذاكر طيران، إلخ)" },
+  "Dates": { en: "The exact dates (check-in and check-out, or departure and return)", ar: "التواريخ المحددة (تاريخ الدخول والخروج، أو الذهاب والعودة)" },
+  "Department": { en: "The department this request belongs to", ar: "القسم أو الإدارة التي يتبع لها الطلب" },
+  "Charged to": { en: "Whether the cost is charged to a project or to a cost center", ar: "هل التكلفة على مشروع أم على مركز تكلفة (Cost Center)" },
+  "Project or Cost Center": { en: "Whether the cost is charged to a project or to a cost center", ar: "هل التكلفة على مشروع أم على مركز تكلفة (Cost Center)" },
+  "Project": { en: "The project name/number", ar: "اسم أو رقم المشروع" },
+  "Network": { en: "The project Network number", ar: "رقم الـ Network الخاص بالمشروع" },
+  "Activity": { en: "The Activity number under the project Network", ar: "رقم الـ Activity التابع للـ Network" },
+  "PR number": { en: "The PR number already raised for this request", ar: "رقم طلب الشراء (PR) الذي تم رفعه لهذا الطلب" },
+  "supplier": { en: "Your preferred supplier, if any", ar: "المورد المفضّل لديكم إن وُجد" },
+};
+function missingAsk(label, lang) {
+  const key = /supplier$/i.test(label) ? "supplier" : /^PR number/.test(label) ? "PR number" : label;
+  const m = MISSING_ASKS[key];
+  return m ? m[lang] : label;
+}
+
+// "Al-Harbi, Sara <sara@x.com>" → { name: "Sara Al-Harbi", email: "sara@x.com" }
+function parseEmailHeader(text) {
+  const t = String(text || "");
+  const fromLine = (t.match(/^From:\s*(.+)$/im) || [])[1] || "";
+  const email = (fromLine.match(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/) || [])[0] || "";
+  let name = fromLine.replace(/<[^>]*>/g, "").replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, "").replace(/["'()]/g, "").trim();
+  if (/^[^,]+,\s*[^,]+$/.test(name)) { const [last, first] = name.split(/,\s*/); name = `${first} ${last}`; }
+  const subject = ((t.match(/^Subject:\s*(.+)$/im) || [])[1] || "").trim();
+  return { name, email, subject };
+}
+
+function firstNameOf(name) {
+  const clean = String(name || "").replace(/^(mr|mrs|ms|dr|eng)\.?\s+/i, "").trim();
+  return clean.split(/\s+/)[0] || "";
+}
+
+function templateDraft({ lang, toName, facts, questions, missingLabels, blocker, signature }) {
+  const first = firstNameOf(toName);
+  const sig = signature || (lang === "ar" ? "منسق المشتريات" : "Procurement Coordinator");
+  const svcAr = { Hotel: "حجز فندق", Car: "تأجير سيارة", Tickets: "حجز تذاكر", Other: "الخدمة" };
+  const service = lang === "ar"
+    ? String(facts.service || "").split(/\s*&\s*/).map((x) => svcAr[x] || x).filter(Boolean).join(" و")
+    : (facts.service ? `${String(facts.service).toLowerCase().replace("tickets", "ticket")} booking` : "");
+  const what = [service, facts.traveller && (lang === "ar" ? `لـ ${facts.traveller}` : `for ${facts.traveller}`), facts.dates && `(${facts.dates})`].filter(Boolean).join(" ");
+  if (lang === "ar") {
+    const list = missingLabels.map((l) => missingAsk(l, "ar"));
+    return [
+      `الأستاذ/ة ${toName || ""} المحترم/ة،`.replace("  ", " "),
+      "",
+      "تحية طيبة وبعد،",
+      "",
+      `نشكركم على طلبكم${what ? ` بخصوص ${what}` : ""}، وقد بدأنا في إجراءاته. ولاستكمال إجراءات رفع طلب الشراء (PR) في نظام SAP، نرجو التكرم بتزويدنا بالمعلومات التالية:`,
+      "",
+      ...list.map((q, i) => `${i + 1}. ${q}`),
+      "",
+      ...(blocker ? ["علماً بأنه لا يمكن إنشاء طلب الشراء بدون رقم الـ Network والـ Activity الخاصين بالمشروع.", ""] : []),
+      "وسنباشر بإكمال الإجراءات فور استلامها.",
+      "",
+      "مع خالص التحية،",
+      sig,
+    ].join("\n");
+  }
+  const list = questions.length ? questions : missingLabels.map((l) => missingAsk(l, "en"));
+  return [
+    `Dear ${first || "Sir/Madam"},`,
+    "",
+    `Thank you for your request${what ? ` regarding the ${what}` : ""}. We have started processing it.`,
+    "",
+    "To proceed with raising the Purchase Requisition (PR) in SAP, could you please provide the following:",
+    "",
+    ...list.map((q, i) => `${i + 1}. ${q}`),
+    "",
+    ...(blocker ? ["Please note that the PR cannot be created without the project's Network and Activity numbers.", ""] : []),
+    "We will proceed as soon as we receive these details.",
+    "",
+    "Kind regards,",
+    sig,
+  ].join("\n");
+}
+
+function MissingInfoDraft({ toName: initialName, toEmail: initialEmail, subject: originalSubject, facts, questions, missingLabels, blocker, autoAi = true }) {
+  const sample = useSample();
+  const [lang, setLang] = useState("en");
+  const [toName, setToName] = useState(initialName || "");
+  const [toEmail, setToEmail] = useState(initialEmail || "");
+  const [signature, setSignature] = useState(() => { try { return localStorage.getItem(SIGNATURE_KEY) || ""; } catch (e) { return ""; } });
+  const defaultSubject = (l) =>
+    originalSubject
+      ? (/^re:/i.test(originalSubject) ? originalSubject : `RE: ${originalSubject}`)
+      : l === "ar"
+      ? `معلومات مطلوبة – طلب ${facts.service || "خدمة"}${facts.traveller ? ` لـ ${facts.traveller}` : ""}`
+      : `Information required – ${facts.service || "service"} request${facts.traveller ? ` for ${facts.traveller}` : ""}`;
+  const [subject, setSubject] = useState(defaultSubject("en"));
+  const [body, setBody] = useState(() => templateDraft({ lang: "en", toName: initialName, facts, questions, missingLabels, blocker, signature }));
+  const [busy, setBusy] = useState(false);
+  const [byAi, setByAi] = useState(false);
+  const ctl = useRef(null);
+
+  const saveSignature = (v) => { setSignature(v); try { localStorage.setItem(SIGNATURE_KEY, v); } catch (e) { /* ignore */ } };
+
+  const writeWithAi = async (l = lang) => {
+    if (!sample || busy) return;
+    if (ctl.current) ctl.current.abort();
+    ctl.current = new AbortController();
+    setBusy(true);
+    const prompt = [
+      `Write a professional, courteous email in ${l === "ar" ? "formal Arabic" : "English"} from a procurement coordinator to ${toName || "the requester"}, replying to their service request and asking for the information that is missing.`,
+      l === "ar"
+        ? "Open with a formal Arabic greeting that uses their name (e.g. الأستاذ/ة <name> المحترم/ة، then تحية طيبة وبعد،)."
+        : `Open with "Dear ${firstNameOf(toName) || "Sir/Madam"},".`,
+      "Then one short sentence thanking them and naming the request (service, traveller, dates) from the facts below.",
+      "Then a numbered list with exactly the missing items below — one clear line each, saying precisely what is needed (and the expected format where useful). Do not add items that are not listed and do not ask for anything already provided.",
+      blocker ? "Add one sentence noting that the PR cannot be created in SAP without the project's Network and Activity numbers." : "",
+      "Close with one line saying the request will be processed as soon as the details are received, then a sign-off and this signature: " + (signature || (l === "ar" ? "منسق المشتريات" : "Procurement Coordinator")) + ".",
+      "Plain text only — no markdown, no subject line, no placeholders in brackets. Under 170 words. Reply with the email body only.",
+      "",
+      "Request facts: " + JSON.stringify(facts),
+      "Missing items: " + JSON.stringify(missingLabels.map((m) => ({ item: m, need: missingAsk(m, "en") }))),
+      questions.length ? "Questions already worked out for the sender (use them where they fit): " + JSON.stringify(questions) : "",
+    ].filter(Boolean).join("\n");
+    try {
+      const { text } = await sample(prompt, { signal: ctl.current.signal, cache: false, onText: ({ text: t }) => setBody(t) });
+      setBody(text.trim());
+      setByAi(true);
+    } catch (e) {
+      const m = sampleErrorText(e);
+      if (m) appToast(m);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Claude drafts it as soon as the panel opens, so the letter is just there.
+  const autoRan = useRef(false);
+  useEffect(() => {
+    if (autoAi && sample && !autoRan.current) { autoRan.current = true; writeWithAi("en"); }
+  }, [sample]);
+  useEffect(() => () => { if (ctl.current) ctl.current.abort(); }, []);
+
+  const switchLang = (l) => {
+    if (l === lang) return;
+    setLang(l);
+    setSubject(defaultSubject(l));
+    if (sample) writeWithAi(l);
+    else setBody(templateDraft({ lang: l, toName, facts, questions, missingLabels, blocker, signature }));
+  };
+
+  const copyAll = async (withToast = true) => {
+    try {
+      await navigator.clipboard.writeText(body);
+      if (withToast) appToast("Email copied — paste it into your reply.");
+      return true;
+    } catch (e) {
+      if (withToast) appToast("Could not copy — select the text and copy it manually.");
+      return false;
+    }
+  };
+
+  const openInEmail = async () => {
+    await copyAll(false);
+    const url = `mailto:${encodeURIComponent(toEmail.trim())}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body.replace(/\n/g, "\r\n"))}`;
+    const a = document.createElement("a");
+    a.href = url;
+    a.target = "_blank";
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    appToast("Opening your email app with the draft — it's also copied, so you can paste it if needed.");
+  };
+
+  const pill = (id, label) => (
+    <button
+      type="button"
+      onClick={() => switchLang(id)}
+      className="text-xs font-semibold px-3 py-1"
+      style={{ borderRadius: 999, border: "none", cursor: "pointer", background: lang === id ? "#3D5AFE" : "transparent", color: lang === id ? "#fff" : "var(--sap-gray)" }}
+    >
+      {label}
+    </button>
+  );
+
+  return (
+    <div className="flex flex-col gap-2 p-3" style={{ background: "#fff", border: "1px solid #DCE2FF", borderRadius: 14 }}>
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-sm" style={{ color: "var(--sap-text)" }}>✉️ Email to the sender</span>
+          {byAi && !busy && <AiBadge>✨ Written by AI</AiBadge>}
+          {busy && <span className="text-xs font-semibold" style={{ color: "#3D5AFE" }}>Claude is writing…</span>}
+        </div>
+        <div className="flex items-center gap-1 p-0.5" style={{ background: "#F1F3F9", borderRadius: 999 }}>
+          {pill("en", "English")}
+          {pill("ar", "العربية")}
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+        <div>
+          <label className="sap-label">To (name)</label>
+          <input value={toName} onChange={(e) => setToName(e.target.value)} className="sap-input" dir="auto" />
+        </div>
+        <div>
+          <label className="sap-label">Email address</label>
+          <input value={toEmail} onChange={(e) => setToEmail(e.target.value)} className="sap-input" placeholder="name@company.com" />
+        </div>
+      </div>
+      <div>
+        <label className="sap-label">Subject</label>
+        <input value={subject} onChange={(e) => setSubject(e.target.value)} className="sap-input" dir="auto" />
+      </div>
+      <div>
+        <label className="sap-label">Message</label>
+        <textarea value={body} onChange={(e) => { setBody(e.target.value); setByAi(false); }} rows={12} className="sap-textarea" dir="auto" style={{ lineHeight: 1.55 }} />
+      </div>
+      <div style={{ maxWidth: 320 }}>
+        <label className="sap-label">Your signature (saved for next time)</label>
+        <input value={signature} onChange={(e) => saveSignature(e.target.value)} className="sap-input" placeholder="e.g. Name — Procurement Coordinator" dir="auto" />
+      </div>
+      <div className="flex flex-wrap gap-2 justify-end pt-1">
+        {sample && (
+          <button type="button" onClick={() => writeWithAi()} disabled={busy} className="sap-btn sap-btn-outline">
+            {busy ? "✨ Writing…" : "✨ Rewrite with AI"}
+          </button>
+        )}
+        {!sample && (
+          <button type="button" onClick={() => setBody(templateDraft({ lang, toName, facts, questions, missingLabels, blocker, signature }))} className="sap-btn sap-btn-outline">
+            ↻ Refresh draft
+          </button>
+        )}
+        <button type="button" onClick={() => copyAll()} disabled={busy} className="sap-btn sap-btn-outline">📋 Copy</button>
+        <button type="button" onClick={openInEmail} disabled={busy} className="sap-btn sap-btn-blue" style={{ background: "linear-gradient(135deg, #3D5AFE, #8B5CF6)", border: "none" }}>
+          📧 Open in email
+        </button>
+      </div>
+      <p className="text-xs" style={{ color: "var(--sap-gray)" }}>
+        "Open in email" starts a new message in your email app (e.g. Outlook) with the address, subject and text filled in. Check it, then press Send.
+      </p>
+    </div>
+  );
+}
+
+// Same letter, starting from a request that's already in the tracker.
+function draftPropsForRequest(req) {
+  const gaps = requestGaps(req);
+  const dates = req.serviceDateFrom ? `${toSapDate(req.serviceDateFrom)}${req.serviceDateTo ? " – " + toSapDate(req.serviceDateTo) : ""}` : "";
+  return {
+    toName: req.senderName || req.owner || "",
+    toEmail: req.senderEmail || "",
+    subject: req.emailSubject || "",
+    facts: { service: req.serviceType, traveller: req.beneficiary && req.beneficiary.trim() !== (req.owner || "").trim() ? req.beneficiary : "", dates, project: req.projectName || "", requester: req.owner },
+    questions: gaps.map((g) => missingAsk(g, "en")),
+    missingLabels: gaps,
+    blocker: gaps.includes("Network") || gaps.includes("Activity"),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Where the PR stands when a request email arrives
 //
 // The company flow is always PR → PR approval → PO → PO approval. A request
@@ -5656,7 +5917,8 @@ function readEmailFile(file) {
           }
 
           const recipients = (data.recipients || []).map((r) => r.name || r.smtpAddress || r.email).filter(Boolean).join(", ");
-          const from = data.senderName || data.senderSmtpAddress || data.senderEmail || "";
+          const fromEmail = data.senderSmtpAddress || (/@/.test(data.senderEmail || "") ? data.senderEmail : "");
+          const from = data.senderName ? (fromEmail ? `${data.senderName} <${fromEmail}>` : data.senderName) : fromEmail;
           const lines = [
             from && `From: ${from}`,
             recipients && `To: ${recipients}`,
@@ -6253,6 +6515,7 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
   const [prStage, setPrStage] = useState("none");
   const [prStageSource, setPrStageSource] = useState(""); // "", "email", "ai", "you"
   const prStageByYou = useRef(false);
+  const [showDraft, setShowDraft] = useState(false);
   const choosePrStage = (id) => { prStageByYou.current = true; setPrStage(id); setPrStageSource("you"); };
   const aiCtl = useRef(null);
 
@@ -6276,7 +6539,7 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
       "You help a procurement coordinator log a travel/service request from an email into a tracker, before they raise an SAP Purchase Requisition (PR) and then a Purchase Order (PO).",
       "Read the whole email carefully, the way an experienced coordinator would — including forwarded messages, signatures that reveal the department, and any attachment text. When messages in a thread disagree, the latest one wins. Work out what is actually provided and what is missing.",
       "Read the email below and reply with ONLY one JSON object, exactly this shape:",
-      '{"owner":"","beneficiary":"","serviceTypes":["Hotel"],"serviceDateFrom":"","serviceDateTo":"","requiredDate":"","budget":"","department":"","city":"","vendors":{"Hotel":""},"prNumber":"","prStage":"none","prStageEvidence":"","chargeTo":"","projectName":"","network":"","activity":"","costCenter":"","summary":"","questionsForSender":[""],"vendorSuggestions":[{"type":"Hotel","name":"","why":"","source":"your list"}]}',
+      '{"owner":"","beneficiary":"","serviceTypes":["Hotel"],"serviceDateFrom":"","serviceDateTo":"","requiredDate":"","budget":"","department":"","city":"","vendors":{"Hotel":""},"prNumber":"","prStage":"none","prStageEvidence":"","chargeTo":"","projectName":"","network":"","activity":"","costCenter":"","senderName":"","senderEmail":"","summary":"","questionsForSender":[""],"vendorSuggestions":[{"type":"Hotel","name":"","why":"","source":"your list"}]}',
       "Rules:",
       "- owner: the person who asked for the service (never a signature footer, disclaimer or company name). beneficiary: who the service is for (traveller/guest names, comma-separated); \"\" if the same person.",
       '- serviceTypes: every service requested, each one of "Hotel", "Car", "Tickets", "Other".',
@@ -6288,6 +6551,7 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
       "- prStageEvidence: the short phrase from the email that shows the PR stage, or \"\".",
       '- chargeTo: who pays. "project" if the cost goes to a project (the email names a project, network, activity or WBS); "cost_center" if it goes to a cost center/department with no project; "" if the email does not make it clear.',
       "- projectName, network, activity, costCenter: exactly as written in the email, otherwise \"\". Never invent them.",
+      "- senderName / senderEmail: the person who sent the latest message (the one to reply to), from the From line or signature; \"\" if unknown.",
       "- budget: digits only, or \"\".",
       "- summary: one or two plain sentences on what is being requested, for whom, where and when.",
       "- questionsForSender: short, polite questions for anything missing or ambiguous that only the sender can answer (exact dates, number of nights/rooms, traveller names, city, project/department, preferences). Only if the email says a PR already exists but gives no number, ask for the PR number; otherwise never ask about PR or PO numbers. If it is unclear whether this is charged to a project or a cost center, ask. If it is a project and the Network or Activity number is missing, always ask for it (the PR cannot be created without both). Empty array if nothing is missing.",
@@ -6325,6 +6589,8 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
           network: str(r.network) || p.network || "",
           activity: str(r.activity) || p.activity || "",
           costCenter: str(r.costCenter) || p.costCenter || "",
+          senderName: p.senderName || str(r.senderName),
+          senderEmail: p.senderEmail || (/@/.test(str(r.senderEmail)) ? str(r.senderEmail) : ""),
           notes: p.notes || emailText.slice(0, 500),
         };
       });
@@ -6415,8 +6681,10 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
       department: "",
       prNumber: data.prNumber,
       ...detectCharge(text),
+      ...(() => { const h = parseEmailHeader(text); return { senderName: h.name, senderEmail: h.email, emailSubject: h.subject }; })(),
       notes: text.slice(0, 500),
     });
+    setShowDraft(false);
     const guessedStage = detectPrStage(text, data.prNumber);
     prStageByYou.current = false;
     setPrStage(guessedStage);
@@ -6465,6 +6733,7 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
     setPrStage("none");
     setPrStageSource("");
     prStageByYou.current = false;
+    setShowDraft(false);
     aiAutoFor.current = "";
     if (aiCtl.current) aiCtl.current.abort();
   };
@@ -6607,6 +6876,9 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
       network: extracted.chargeTo === "project" ? (extracted.network || "").trim() : "",
       activity: extracted.chargeTo === "project" ? (extracted.activity || "").trim() : "",
       costCenter: extracted.chargeTo === "cost_center" ? (extracted.costCenter || "").trim() : "",
+      senderName: extracted.senderName || "",
+      senderEmail: extracted.senderEmail || "",
+      emailSubject: extracted.emailSubject || "",
       status: stage.status,
       waitingOn: stage.waitingOn,
       prRaisedBy: stage.raisedBy,
@@ -6782,20 +7054,18 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
               green: { background: "var(--sap-green-bg)", color: "var(--sap-green)", border: "1px solid #BFE3CB" },
             }[verdict.tone];
 
-            const copyReply = async () => {
-              const who = x.beneficiary || x.owner;
-              const msg = [
-                "Hi,",
-                "",
-                `To proceed with ${who ? `the ${selectedTypes.join("/") || "service"} request for ${who}` : "this request"}, could you please confirm the following:`,
-                "",
-                ...questions.map((q, i) => `${i + 1}. ${q}`),
-                "",
-                "Thank you.",
-              ].join("\n");
-              try { await navigator.clipboard.writeText(msg); appToast("Copied — paste it into your reply to the sender."); }
-              catch (err) { appToast("Could not copy — select the text manually."); }
-            };
+            // What the letter asks for: everything only the sender can supply
+            // and that matters for the PR (optional supplier preference left out).
+            const draftLabels = missing.filter((i) => !i.you && (i.required || i.label === "Project")).map((i) => i.label);
+            const draftQuestions = [
+              ...aiQs,
+              ...missing
+                .filter((i) => draftLabels.includes(i.label) && !(i.kw && aiQs.some((q) => i.kw.test(q))))
+                .map((i) => missingAsk(i.label, "en")),
+            ];
+            const sapDates = x.serviceDateFrom
+              ? `${toSapDate(x.serviceDateFrom)}${x.serviceDateTo ? " – " + toSapDate(x.serviceDateTo) : ""}`
+              : (x.requiredDate ? toSapDate(x.requiredDate) : "");
 
             return (
               <div className="p-4 text-sm" style={{ background: "linear-gradient(145deg, #F1F3FF, #FAF7FF)", border: "1px solid #DCE2FF", borderRadius: "16px" }}>
@@ -6854,11 +7124,34 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
 
                 {questions.length > 0 && (
                   <div className="mb-3">
-                    <p className="font-semibold mb-1" style={{ color: "var(--sap-text)" }}>📧 Questions for the sender</p>
+                    <p className="font-semibold mb-1" style={{ color: "var(--sap-text)" }}>❓ What to ask the sender</p>
                     <ol className="flex flex-col gap-0.5" style={{ color: "var(--sap-text)", paddingInlineStart: 18, listStyle: "decimal" }}>
                       {questions.map((q, i) => <li key={i} dir="auto">{q}</li>)}
                     </ol>
-                    <button type="button" className="sap-btn sap-btn-blue mt-2" onClick={copyReply}>📧 Copy reply to sender</button>
+                    {!showDraft ? (
+                      <button
+                        type="button"
+                        className="sap-btn mt-2"
+                        onClick={() => setShowDraft(true)}
+                        style={{ background: "linear-gradient(135deg, #3D5AFE, #8B5CF6)", color: "#fff", border: "none", boxShadow: "0 8px 20px rgba(61,90,254,.25)" }}
+                      >
+                        ✉️ {sample ? "Draft the email to the sender with AI" : "Draft the email to the sender"}
+                      </button>
+                    ) : (
+                      <div className="mt-2">
+                        <MissingInfoDraft
+                          key={sourceHash}
+                          toName={x.senderName || x.owner}
+                          toEmail={x.senderEmail}
+                          subject={x.emailSubject}
+                          facts={{ service: selectedTypes.join(" & "), traveller: x.beneficiary || "", dates: sapDates, project: x.projectName || "", network: x.network || "", requester: x.owner, city: (ai && ai.city) || "" }}
+                          questions={draftQuestions}
+                          missingLabels={draftLabels}
+                          blocker={blockers.length > 0}
+                        />
+                        <button type="button" onClick={() => setShowDraft(false)} className="sap-link mt-1">Hide the email</button>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -8445,6 +8738,7 @@ function App() {
   const [attachPoRowId, setAttachPoRowId] = useState(null);
   const attachPoInputRef = useRef(null);
   const [copySapReq, setCopySapReq] = useState(null);
+  const [draftReq, setDraftReq] = useState(null);
 
   // Always keep the private per-browser cache current — a fallback that
   // costs nothing and matters if sharing ever becomes unavailable mid-session.
@@ -9007,13 +9301,15 @@ function App() {
                           <div className="text-xs" style={{ color: "var(--sap-gray)", whiteSpace: "nowrap" }}>{chargeLine(r)}</div>
                         )}
                         {r.status !== "Completed" && r.status !== "Cancelled" && requestGaps(r).length > 0 && (
-                          <div
+                          <button
+                            type="button"
+                            onClick={() => setDraftReq(r)}
                             className="text-xs font-semibold"
-                            style={{ color: requestGaps(r).some((g) => g === "Network" || g === "Activity") ? "var(--sap-red)" : "var(--sap-amber)", whiteSpace: "nowrap" }}
-                            title="Still missing before the PR/PO can go into SAP"
+                            style={{ color: requestGaps(r).some((g) => g === "Network" || g === "Activity") ? "var(--sap-red)" : "var(--sap-amber)", whiteSpace: "nowrap", background: "none", border: "none", padding: 0, cursor: "pointer", display: "block", textAlign: "left" }}
+                            title="Still missing before the PR/PO can go into SAP — click to email the sender for it"
                           >
-                            ⚠ Missing: {requestGaps(r).join(", ")}
-                          </div>
+                            ⚠ Missing: {requestGaps(r).join(", ")} · <span style={{ textDecoration: "underline" }}>✉️ ask</span>
+                          </button>
                         )}
                       </td>
                       <td>{r.vendor || "—"}</td>
@@ -9145,12 +9441,19 @@ function App() {
                       {missingPo && <p className="font-semibold" style={{ color: "var(--sap-red)" }}>🧾 PR approved — the PO isn't created yet (or its number isn't entered)</p>}
                       <p style={{ color: "var(--sap-blue-dark)" }}><span className="font-semibold">Next step:</span> {getNextAction(req)}</p>
                     </div>
-                    <button
-                      onClick={() => { setShowDaily(false); setStatusReq(req); }}
-                      className="mt-2 sap-link"
-                    >
-                      Update status now
-                    </button>
+                    <div className="flex gap-4 mt-2">
+                      <button
+                        onClick={() => { setShowDaily(false); setStatusReq(req); }}
+                        className="sap-link"
+                      >
+                        Update status now
+                      </button>
+                      {requestGaps(req).length > 0 && (
+                        <button onClick={() => { setShowDaily(false); setDraftReq(req); }} className="sap-link" style={{ color: "#3D5AFE" }}>
+                          ✉️ Email the sender for the missing info
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -9172,6 +9475,11 @@ function App() {
         </Modal>
       )}
 
+      {draftReq && (
+        <Modal title={`✉️ Missing info — ${draftReq.serviceType} for ${draftReq.beneficiary || draftReq.owner}`} onClose={() => setDraftReq(null)} wide>
+          <MissingInfoDraft key={draftReq.id} {...draftPropsForRequest(draftReq)} />
+        </Modal>
+      )}
       {copySapReq && (
         <Modal title={`📋 Copy for SAP — ${copySapReq.owner}`} onClose={() => setCopySapReq(null)}>
           <CopyForSapModal req={copySapReq} onClose={() => setCopySapReq(null)} />
