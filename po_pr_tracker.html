@@ -4227,6 +4227,7 @@ function buildHeaderNote(req) {
   const parts = [
     `This request requires a ${req.serviceType || "service"} booking for ${who}${duration}.`,
   ];
+  if (req.travelPurpose) parts.push(`Purpose: ${req.travelPurpose}.`);
   if (req.department) parts.push(`Project/Department: ${req.department}.`);
   if (req.chargeTo === "project") {
     const ref = [req.projectName && `project ${req.projectName}`, req.network && `Network ${req.network}`, req.activity && `Activity ${req.activity}`].filter(Boolean).join(", ");
@@ -5266,7 +5267,24 @@ function firstNameOf(name) {
   return clean.split(/\s+/)[0] || "";
 }
 
-function templateDraft({ lang, toName, facts, questions, missingLabels, blocker, signature }) {
+const FORM_LABELS = {
+  "Traveller / for": { en: "Traveller name(s)", ar: "اسم المسافر" },
+  "Service": { en: "Service required", ar: "الخدمة المطلوبة" },
+  "Dates": { en: "Dates (from – to)", ar: "التواريخ (من – إلى)" },
+  "Department": { en: "Department", ar: "القسم" },
+  "Charged to": { en: "Charged to (Project / Cost Center)", ar: "على حساب (مشروع / مركز تكلفة)" },
+  "Project or Cost Center": { en: "Charged to (Project / Cost Center)", ar: "على حساب (مشروع / مركز تكلفة)" },
+  "Project": { en: "Project name / number", ar: "اسم / رقم المشروع" },
+  "Network": { en: "Network number", ar: "رقم الـ Network" },
+  "Activity": { en: "Activity number", ar: "رقم الـ Activity" },
+  "PR number": { en: "PR number", ar: "رقم الـ PR" },
+};
+function formLabel(label, lang) {
+  const key = /^PR number/.test(label) ? "PR number" : label;
+  return (FORM_LABELS[key] || { en: label, ar: label })[lang];
+}
+
+function templateDraft({ lang, toName, facts, questions, missingLabels, blocker, signature, format = "list" }) {
   const first = firstNameOf(toName);
   const sig = signature || (lang === "ar" ? "منسق المشتريات" : "Procurement Coordinator");
   const svcAr = { Hotel: "حجز فندق", Car: "تأجير سيارة", Tickets: "حجز تذاكر", Other: "الخدمة" };
@@ -5276,6 +5294,21 @@ function templateDraft({ lang, toName, facts, questions, missingLabels, blocker,
   const what = [service, facts.traveller && (lang === "ar" ? `لـ ${facts.traveller}` : `for ${facts.traveller}`), facts.dates && `(${facts.dates})`].filter(Boolean).join(" ");
   if (lang === "ar") {
     const list = missingLabels.map((l) => missingAsk(l, "ar"));
+    if (format === "form") {
+      return [
+        `الأستاذ/ة ${toName || ""} المحترم/ة،`.replace("  ", " "),
+        "",
+        "تحية طيبة وبعد،",
+        "",
+        `نشكركم على طلبكم${what ? ` بخصوص ${what}` : ""}، وقد بدأنا في إجراءاته. ولاستكمال طلب الشراء (PR) في نظام SAP، نرجو التكرم بتعبئة البيانات التالية والرد على هذه الرسالة:`,
+        "",
+        ...missingLabels.map((l) => `• ${formLabel(l, "ar")}: ______________________`),
+        "",
+        ...(blocker ? ["علماً بأنه لا يمكن إنشاء طلب الشراء بدون رقم الـ Network والـ Activity.", ""] : []),
+        "مع خالص التحية،",
+        sig,
+      ].join("\n");
+    }
     return [
       `الأستاذ/ة ${toName || ""} المحترم/ة،`.replace("  ", " "),
       "",
@@ -5293,6 +5326,21 @@ function templateDraft({ lang, toName, facts, questions, missingLabels, blocker,
     ].join("\n");
   }
   const list = questions.length ? questions : missingLabels.map((l) => missingAsk(l, "en"));
+  if (format === "form") {
+    return [
+      `Dear ${first || "Sir/Madam"},`,
+      "",
+      `Thank you for your request${what ? ` regarding the ${what}` : ""}. We have started processing it.`,
+      "",
+      "To proceed with raising the Purchase Requisition (PR) in SAP, please fill in the details below and reply to this email:",
+      "",
+      ...missingLabels.map((l) => `• ${formLabel(l, "en")}: ______________________`),
+      "",
+      ...(blocker ? ["Please note that the PR cannot be created without the project's Network and Activity numbers.", ""] : []),
+      "Kind regards,",
+      sig,
+    ].join("\n");
+  }
   return [
     `Dear ${first || "Sir/Madam"},`,
     "",
@@ -5313,6 +5361,7 @@ function templateDraft({ lang, toName, facts, questions, missingLabels, blocker,
 function MissingInfoDraft({ toName: initialName, toEmail: initialEmail, subject: originalSubject, facts, questions, missingLabels, blocker, autoAi = true }) {
   const sample = useSample();
   const [lang, setLang] = useState("en");
+  const [format, setFormat] = useState("list"); // "list" | "form"
   const [toName, setToName] = useState(initialName || "");
   const [toEmail, setToEmail] = useState(initialEmail || "");
   const [signature, setSignature] = useState(() => { try { return localStorage.getItem(SIGNATURE_KEY) || ""; } catch (e) { return ""; } });
@@ -5323,14 +5372,14 @@ function MissingInfoDraft({ toName: initialName, toEmail: initialEmail, subject:
       ? `معلومات مطلوبة – طلب ${facts.service || "خدمة"}${facts.traveller ? ` لـ ${facts.traveller}` : ""}`
       : `Information required – ${facts.service || "service"} request${facts.traveller ? ` for ${facts.traveller}` : ""}`;
   const [subject, setSubject] = useState(defaultSubject("en"));
-  const [body, setBody] = useState(() => templateDraft({ lang: "en", toName: initialName, facts, questions, missingLabels, blocker, signature }));
+  const [body, setBody] = useState(() => templateDraft({ lang: "en", toName: initialName, facts, questions, missingLabels, blocker, signature, format: "list" }));
   const [busy, setBusy] = useState(false);
   const [byAi, setByAi] = useState(false);
   const ctl = useRef(null);
 
   const saveSignature = (v) => { setSignature(v); try { localStorage.setItem(SIGNATURE_KEY, v); } catch (e) { /* ignore */ } };
 
-  const writeWithAi = async (l = lang) => {
+  const writeWithAi = async (l = lang, f = format) => {
     if (!sample || busy) return;
     if (ctl.current) ctl.current.abort();
     ctl.current = new AbortController();
@@ -5341,7 +5390,9 @@ function MissingInfoDraft({ toName: initialName, toEmail: initialEmail, subject:
         ? "Open with a formal Arabic greeting that uses their name (e.g. الأستاذ/ة <name> المحترم/ة، then تحية طيبة وبعد،)."
         : `Open with "Dear ${firstNameOf(toName) || "Sir/Madam"},".`,
       "Then one short sentence thanking them and naming the request (service, traveller, dates) from the facts below.",
-      "Then a numbered list with exactly the missing items below — one clear line each, saying precisely what is needed (and the expected format where useful). Do not add items that are not listed and do not ask for anything already provided.",
+      f === "form"
+        ? `Then a fill-in form instead of a list: one bullet per missing item below, written as "• <short item name>: ______________________" (use these exact item names: ${JSON.stringify(missingLabels.map((m) => formLabel(m, l)))}), so the sender can type the answers in the blanks. Before the form say they can fill it in and reply to the email. Do not add items that are not listed and do not ask for anything already provided.`
+        : "Then a numbered list with exactly the missing items below — one clear line each, saying precisely what is needed (and the expected format where useful). Do not add items that are not listed and do not ask for anything already provided.",
       blocker ? "Add one sentence noting that the PR cannot be created in SAP without the project's Network and Activity numbers." : "",
       "Close with one line saying the request will be processed as soon as the details are received, then a sign-off and this signature: " + (signature || (l === "ar" ? "منسق المشتريات" : "Procurement Coordinator")) + ".",
       "Plain text only — no markdown, no subject line, no placeholders in brackets. Under 170 words. Reply with the email body only.",
@@ -5373,8 +5424,14 @@ function MissingInfoDraft({ toName: initialName, toEmail: initialEmail, subject:
     if (l === lang) return;
     setLang(l);
     setSubject(defaultSubject(l));
-    if (sample) writeWithAi(l);
-    else setBody(templateDraft({ lang: l, toName, facts, questions, missingLabels, blocker, signature }));
+    if (sample) writeWithAi(l, format);
+    else setBody(templateDraft({ lang: l, toName, facts, questions, missingLabels, blocker, signature, format }));
+  };
+  const switchFormat = (f) => {
+    if (f === format) return;
+    setFormat(f);
+    if (sample) writeWithAi(lang, f);
+    else setBody(templateDraft({ lang, toName, facts, questions, missingLabels, blocker, signature, format: f }));
   };
 
   const copyAll = async (withToast = true) => {
@@ -5420,9 +5477,16 @@ function MissingInfoDraft({ toName: initialName, toEmail: initialEmail, subject:
           {byAi && !busy && <AiBadge>✨ Written by AI</AiBadge>}
           {busy && <span className="text-xs font-semibold" style={{ color: "#3D5AFE" }}>Claude is writing…</span>}
         </div>
-        <div className="flex items-center gap-1 p-0.5" style={{ background: "#F1F3F9", borderRadius: 999 }}>
-          {pill("en", "English")}
-          {pill("ar", "العربية")}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1 p-0.5" style={{ background: "#F1F3F9", borderRadius: 999 }} title="How the missing items are laid out in the email">
+            {[["list", "1. 2. 3. List"], ["form", "▭ Fill-in form"]].map(([id, label]) => (
+              <button key={id} type="button" onClick={() => switchFormat(id)} className="text-xs font-semibold px-3 py-1" style={{ borderRadius: 999, border: "none", cursor: "pointer", background: format === id ? "#3D5AFE" : "transparent", color: format === id ? "#fff" : "var(--sap-gray)" }}>{label}</button>
+            ))}
+          </div>
+          <div className="flex items-center gap-1 p-0.5" style={{ background: "#F1F3F9", borderRadius: 999 }}>
+            {pill("en", "English")}
+            {pill("ar", "العربية")}
+          </div>
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -5454,7 +5518,7 @@ function MissingInfoDraft({ toName: initialName, toEmail: initialEmail, subject:
           </button>
         )}
         {!sample && (
-          <button type="button" onClick={() => setBody(templateDraft({ lang, toName, facts, questions, missingLabels, blocker, signature }))} className="sap-btn sap-btn-outline">
+          <button type="button" onClick={() => setBody(templateDraft({ lang, toName, facts, questions, missingLabels, blocker, signature, format }))} className="sap-btn sap-btn-outline">
             ↻ Refresh draft
           </button>
         )}
@@ -6059,7 +6123,7 @@ function AttachDropZone({ attachments, onChange, hint }) {
       <p className="text-sm font-semibold" style={{ color: "var(--sap-text)" }}>
         🎫 {hint || "Drop tickets or documents here, or press Ctrl+V to paste a screenshot"}
       </p>
-      <p className="text-xs mt-1" style={{ color: "var(--sap-gray)" }}>PDF, images (JPG/PNG), or another email — the AI reads them for names, dates and cities.</p>
+      <p className="text-xs mt-1" style={{ color: "var(--sap-gray)" }}>Add as many as you need — a ticket per traveller, the Travel Form (project, reason), screenshots. The AI reads them all together.</p>
       <label className="sap-btn sap-btn-outline mt-2" style={{ cursor: "pointer", display: "inline-block" }}>
         Choose files
         <input type="file" multiple onChange={(e) => { const f = e.target.files; addFiles(f); e.target.value = ""; }} style={{ display: "none" }} />
@@ -6728,13 +6792,16 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
       "You help a procurement coordinator log a travel/service request from an email into a tracker, before they raise an SAP Purchase Requisition (PR) and then a Purchase Order (PO).",
       "Read the whole email carefully, the way an experienced coordinator would — including forwarded messages, signatures that reveal the department, and any attachment text. When messages in a thread disagree, the latest one wins. Work out what is actually provided and what is missing.",
       "Read the email below and reply with ONLY one JSON object, exactly this shape:",
-      '{"owner":"","beneficiary":"","serviceTypes":["Hotel"],"serviceDateFrom":"","serviceDateTo":"","requiredDate":"","budget":"","department":"","city":"","vendors":{"Hotel":""},"prNumber":"","prStage":"none","prStageEvidence":"","chargeTo":"","projectName":"","network":"","activity":"","costCenter":"","senderName":"","senderEmail":"","fromAttachments":"","summary":"","questionsForSender":[""],"vendorSuggestions":[{"type":"Hotel","name":"","why":"","source":"your list"}]}',
+      '{"owner":"","beneficiary":"","serviceTypes":["Hotel"],"serviceDateFrom":"","serviceDateTo":"","requiredDate":"","budget":"","department":"","city":"","vendors":{"Hotel":""},"prNumber":"","prStage":"none","prStageEvidence":"","chargeTo":"","projectName":"","network":"","activity":"","costCenter":"","senderName":"","senderEmail":"","purpose":"","attachmentsRead":[{"name":"","kind":"ticket","note":""}],"fromAttachments":"","summary":"","questionsForSender":[""],"vendorSuggestions":[{"type":"Hotel","name":"","why":"","source":"your list"}]}',
       "Rules:",
       "- owner: the person who asked for the service (never a signature footer, disclaimer or company name). beneficiary: who the service is for (traveller/guest names, comma-separated); \"\" if the same person.",
       '- serviceTypes: every service requested, each one of "Hotel", "Car", "Tickets", "Other".',
       `- Dates as YYYY-MM-DD. Today is ${todayIso()}; resolve relative dates ("next Sunday") against it. Use "" when a date is not stated — never guess.`,
       `- department: exactly one of these values, or "" if the email does not make it clear: ${departments.join(" | ")}.`,
       "- ATTACHMENTS: if tickets, itineraries or confirmations are attached (text or images), they are part of the request. Take every traveller's name from them (all passengers, comma-separated, in beneficiary), the destination city, and for a hotel request set serviceDateFrom to the arrival date and serviceDateTo to the departure date on the tickets unless the email says otherwise. If tickets for different travellers have different dates, use the earliest arrival and the latest departure and mention it in the summary.",
+      "- TRAVEL FORM: an attachment may be a Travel Form / travel request form. It is the most reliable source for the project (name or number), Network, Activity, cost center, department, the purpose/reason of the trip and the destination — use its values for projectName, network, activity, costCenter, department, chargeTo and purpose. Tickets give names and dates; the form gives who pays and why. Several tickets (one per traveller, often one PDF each) all belong to this one request.",
+      '- purpose: the reason for the trip in one short phrase (from the travel form or email), or "".',
+      '- attachmentsRead: one entry per attached file you could read: kind is "ticket", "travel_form" or "other", and note says in a few words what you took from it (e.g. "passenger Hassan Shahine, arrives 12 Dec"). Omit files you could not read.',
       '- fromAttachments: one short sentence saying what you found in the attachments (e.g. "3 flight tickets: Nabil Bidawi, Hassan Shahine, Mohammad El Masri — arrive Muscat 12 Dec, depart 15 Dec"), or "" if there were none or they were unreadable.',
       "- vendors: only suppliers actually named in the email, keyed by service type.",
       "- prNumber: the SAP Purchase Requisition number if the email (or an attachment text) gives one, digits only; otherwise \"\".",
@@ -6782,6 +6849,7 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
           network: str(r.network) || p.network || "",
           activity: str(r.activity) || p.activity || "",
           costCenter: str(r.costCenter) || p.costCenter || "",
+          purpose: str(r.purpose) || p.purpose || "",
           senderName: p.senderName || str(r.senderName),
           senderEmail: p.senderEmail || (/@/.test(str(r.senderEmail)) ? str(r.senderEmail) : ""),
           notes: p.notes || emailText.slice(0, 500),
@@ -6815,6 +6883,9 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
       }
       setAi({
         fromAttachments: str(r.fromAttachments),
+        attachmentsRead: Array.isArray(r.attachmentsRead)
+          ? r.attachmentsRead.filter((a) => a && str(a.name)).map((a) => ({ name: str(a.name), kind: ["ticket", "travel_form"].includes(str(a.kind)) ? str(a.kind) : "other", note: str(a.note) })).slice(0, 20)
+          : [],
         prStageEvidence: str(r.prStageEvidence),
         summary: str(r.summary),
         city: str(r.city),
@@ -7090,6 +7161,7 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
       network: extracted.chargeTo === "project" ? (extracted.network || "").trim() : "",
       activity: extracted.chargeTo === "project" ? (extracted.activity || "").trim() : "",
       costCenter: extracted.chargeTo === "cost_center" ? (extracted.costCenter || "").trim() : "",
+      travelPurpose: extracted.purpose || "",
       senderName: extracted.senderName || "",
       senderEmail: extracted.senderEmail || "",
       emailSubject: extracted.emailSubject || "",
@@ -7218,6 +7290,7 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
               { label: "Service", value: selectedTypes.join(", "), required: true, ask: "Which service is needed (hotel, car rental, tickets…)", kw: /service|hotel|car|ticket|خدمة/i },
               { label: "Dates", value: datesVal, required: true, ask: "The exact dates (check-in and check-out, or departure and return)", kw: /date|check-?in|check-?out|depart|تاريخ/i },
               ...(ai && ai.city ? [{ label: "City", value: ai.city }] : []),
+              ...(has(x.purpose) ? [{ label: "Purpose", value: x.purpose }] : []),
               { label: "Department", value: x.department, required: true, ask: "Which department this request is for", kw: /department|قسم|ادارة|إدارة/i },
               { label: "Charged to", value: x.chargeTo === "project" ? "Project" : x.chargeTo === "cost_center" ? "Cost Center" : "", required: true, ask: "Is this charged to a project or to a cost center?", kw: /cost cent|project|مشروع|تكلفة/i },
               ...(x.chargeTo === "project"
@@ -7305,9 +7378,19 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
                     ⚠️ This email's text looks unreadable or mostly empty (possibly an unsupported Rich Text format) — check the fields carefully, or ask the sender directly.
                   </p>
                 )}
-                {(ai && ai.fromAttachments) && (
-                  <div className="p-2 mb-3 text-xs" style={{ background: "#fff", border: "1px solid #DCE2FF", borderRadius: 10, color: "var(--sap-text)" }} dir="auto">
-                    📎 <strong>From the attachments:</strong> {ai.fromAttachments}
+                {(ai && (ai.fromAttachments || (ai.attachmentsRead && ai.attachmentsRead.length > 0))) && (
+                  <div className="p-3 mb-3 text-xs" style={{ background: "#fff", border: "1px solid #DCE2FF", borderRadius: 10, color: "var(--sap-text)" }} dir="auto">
+                    <p>📎 <strong>From the attachments:</strong> {ai.fromAttachments}</p>
+                    {ai.attachmentsRead && ai.attachmentsRead.length > 0 && (
+                      <ul className="mt-1.5 flex flex-col gap-0.5">
+                        {ai.attachmentsRead.map((a, i) => (
+                          <li key={i}>
+                            {a.kind === "ticket" ? "🎫" : a.kind === "travel_form" ? "📋" : "📄"} <strong>{a.name}</strong>
+                            <span style={{ color: "var(--sap-gray)" }}> — {a.kind === "ticket" ? "ticket" : a.kind === "travel_form" ? "travel form" : "document"}{a.note ? `: ${a.note}` : ""}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 )}
                 {attRead && attRead.unreadable.length > 0 && (
@@ -7660,6 +7743,10 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
             );
           })}
 
+          <div>
+            <label className="sap-label">Purpose of travel (goes into the Header Note)</label>
+            <input value={extracted.purpose || ""} onChange={(e) => setExtracted({ ...extracted, purpose: e.target.value })} className="sap-input" dir="auto" />
+          </div>
           <div>
             <label className="sap-label">Additional Notes (shared)</label>
             <textarea value={extracted.notes} onChange={(e) => setExtracted({ ...extracted, notes: e.target.value })} rows="3" className="sap-textarea"></textarea>
@@ -8501,6 +8588,55 @@ function CopyRow({ label, value, hint, multiline }) {
   );
 }
 
+// A SAP screen's fields, in the order they appear on that screen: grouped by
+// screen area, numbered, with the values the tracker knows ready to copy one by
+// one or all at once, and the ones it can't know marked "fill in on SAP".
+function SapFieldList({ groups, onTabCopy }) {
+  const flat = groups.flatMap((g) => g.fields);
+  const copyText = async (text, msg) => {
+    try { await navigator.clipboard.writeText(text); appToast(msg); }
+    catch (e) { appToast("Could not copy — select the text manually."); }
+  };
+  const filled = flat.filter((f) => !f.manual && f.value);
+  const allText = groups
+    .map((g) => [`# ${g.title}`, ...g.fields.filter((f) => !f.manual && f.value).map((f) => `${f.label}\t${String(f.value).replace(/\n/g, " ")}`)].join("\n"))
+    .join("\n\n");
+  const rowText = flat.filter((f) => !f.multiline && f.row).map((f) => (f.manual ? "" : String(f.value || ""))).join("\t");
+  let n = 0;
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-2 p-3" style={{ background: "#F1F3FF", border: "1px solid #DCE2FF", borderRadius: 12 }}>
+        <span className="text-sm font-semibold" style={{ color: "var(--sap-text)" }}>{filled.length} of {flat.length} fields ready</span>
+        <span className="text-xs" style={{ color: "var(--sap-gray)", flex: 1 }}>in the same order as the SAP screen</span>
+        <button type="button" onClick={() => copyText(allText, "Copied all fields in SAP order.")} className="sap-btn sap-btn-blue">📋 Copy all in SAP order</button>
+        {rowText.replace(/\t/g, "") && (
+          <button type="button" onClick={() => copyText(rowText, "Copied the item row — click the first cell on the SAP item line and paste.")} className="sap-btn sap-btn-outline" title="One tab-separated line in the order of the item-overview columns, for pasting across the line in one go">
+            ➡️ Copy the item line
+          </button>
+        )}
+      </div>
+      {groups.map((g) => (
+        <div key={g.title}>
+          <p className="text-xs font-bold mb-1" style={{ color: "#3D5AFE", letterSpacing: ".05em", textTransform: "uppercase" }}>{g.title}</p>
+          {g.fields.map((f) => {
+            n += 1;
+            return f.manual ? (
+              <div key={f.label} className="flex gap-3 py-1.5 items-center" style={{ borderBottom: "1px solid #F1F2F8" }}>
+                <div style={{ flex: "0 0 160px" }}>
+                  <div className="text-xs font-semibold" style={{ color: "var(--sap-gray)" }}>{n}. {f.label}</div>
+                </div>
+                <div className="text-xs flex-1" style={{ color: "var(--sap-gray)" }}>✍️ {f.hint || "Fill in on the SAP screen"}</div>
+              </div>
+            ) : (
+              <CopyRow key={f.label} label={`${n}. ${f.label}`} value={f.value} hint={f.hint} multiline={f.multiline} />
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function CopyForSapModal({ req, onClose }) {
   const shortText = [req.serviceType, req.beneficiary || req.owner, req.vendor].filter(Boolean).join(" - ");
   const pgrCode = purchasingGroupCodeFor(req.department);
@@ -8583,6 +8719,57 @@ function CopyForSapModal({ req, onClose }) {
       </button>
     </div>
   );
+  const acctFields = req.chargeTo === "project"
+    ? [
+        { label: "Network", value: req.network, hint: req.network ? "Project account assignment" : "⛔ Required — ask the requester" },
+        { label: "Activity", value: req.activity, hint: req.activity ? "" : "⛔ Required — ask the requester" },
+        ...(req.projectName ? [{ label: "Project (reference)", value: req.projectName }] : []),
+      ]
+    : req.chargeTo === "cost_center"
+    ? [{ label: "Cost Center", value: req.costCenter, ...(req.costCenter ? {} : { manual: true, hint: "Enter the cost center on the SAP screen" }) }]
+    : [{ label: "Network / Cost Center", manual: true, hint: "⚠ Not set whether this is a Project or a Cost Center — set it in Update Status" }];
+  const acctCat = req.chargeTo === "project" ? "the project Network" : req.chargeTo === "cost_center" ? "the cost center" : "how it's charged";
+  const deliveryDate = toSapDate(req.serviceDateFrom || req.requiredDate);
+  const pgrValue = pgrCode ? `${pgrCode} — ${req.department}` : "";
+  const pgrHint = !req.department ? "Set the Department on this request first" : (!pgrCode ? "No matching SAP code for this department" : "");
+  const prGroups = [
+    { title: "Header — Texts", fields: [
+      { label: "Header Note", value: headerNote, hint: aiNote ? "✨ Written by AI" : "Paste into the Header Note box", multiline: true },
+    ] },
+    { title: "Item line — in column order", fields: [
+      { label: "Acct Assgmt Cat.", manual: true, row: true, hint: `Pick the category for ${acctCat}` },
+      { label: "Item Category", manual: true, row: true },
+      { label: "Short Text", value: shortText, row: true },
+      { label: "Quantity", value: "1", row: true },
+      { label: "Delivery Date", value: deliveryDate, row: true },
+      { label: "Material Group", manual: true, row: true },
+      { label: "Plant", manual: true, row: true },
+      { label: "Storage Location", manual: true, row: true },
+      { label: "Purchasing Group", value: pgrValue, hint: pgrHint, row: true },
+      { label: "Requisnr.", value: req.owner, hint: "Requester", row: true },
+      { label: "Fixed Vendor", value: req.vendor, row: true },
+    ] },
+    { title: "Account assignment", fields: acctFields },
+    { title: "Organisation", fields: [{ label: "Purchasing Org.", value: "OM01", hint: "Always OM01" }] },
+  ];
+  const poGroups = [
+    { title: "Header", fields: [
+      { label: "Vendor", value: req.vendor },
+      { label: "Purch. Org.", value: "OM01", hint: "Always OM01" },
+      { label: "Purchasing Group", value: pgrValue, hint: pgrHint },
+      { label: "Header Note", value: headerNote, hint: aiNote ? "✨ Written by AI" : "Paste into the PO header text", multiline: true },
+    ] },
+    { title: "Item line — in column order", fields: [
+      { label: "Reference PR", value: req.prNumber, hint: "Adopt this PR's items into the new PO", row: true },
+      { label: "Short Text", value: shortText, row: true },
+      { label: "PO Quantity", value: "1", row: true },
+      { label: "Net Price", value: req.finalAmount || req.budget || "", hint: req.finalAmount ? "Final amount" : "Budget — replace with the supplier's quoted price", row: true },
+      { label: "Delivery Date", value: deliveryDate, row: true },
+      { label: "Plant", manual: true, row: true },
+      { label: "Storage Location", manual: true, row: true },
+    ] },
+    { title: "Account assignment", fields: acctFields },
+  ];
   const pgrRow = (
     <CopyRow
       label="Purchasing Group"
@@ -8607,20 +8794,10 @@ function CopyForSapModal({ req, onClose }) {
             </div>
           )}
           <p className="text-sm mb-2" style={{ color: "var(--sap-gray)" }}>
-            Copy each field below, then paste it into the matching column on the SAP "Create Purchase Requisition" screen.
+            Fields in the order of the SAP "Create Purchase Requisition" screen — top to bottom, left to right.
           </p>
-          <CopyRow label="Header Note" value={headerNote} hint={aiNote ? "✨ Written by AI" : "Paste into the Texts / Header Note box"} multiline />
+          <SapFieldList groups={prGroups} />
           {noteButton}
-          <CopyRow label="Short Text" value={shortText} />
-          <CopyRow label="Delivery Date" value={toSapDate(req.serviceDateFrom || req.requiredDate)} />
-          <CopyRow label="Vendor" value={req.vendor} />
-          <CopyRow label="Requisnr." value={req.owner} hint="Requester" />
-          <CopyRow label="Quantity" value="1" />
-          {pgrRow}
-          {chargeRows}
-          <div className="p-3 text-xs mt-3" style={{ background: "#F5F6F7", border: "1px solid var(--sap-border)", borderRadius: "10px", color: "var(--sap-gray)" }}>
-            Fill in manually on the SAP screen (not auto-filled — these vary per request): <strong>Account Assignment Category</strong> (matching {req.chargeTo === "project" ? "the project Network" : req.chargeTo === "cost_center" ? "the cost center" : "how it's charged"}), <strong>Item Category</strong>, <strong>Plant</strong>, <strong>Storage Location</strong>{req.chargeTo === "cost_center" && !req.costCenter ? <>, <strong>Cost Center</strong></> : null}. Purchasing Organization is always <strong>OM01</strong>.
-          </div>
         </>
       )}
 
@@ -8638,14 +8815,7 @@ function CopyForSapModal({ req, onClose }) {
           <p className="text-sm mb-2" style={{ color: "var(--sap-gray)" }}>
             Create the PO <strong>with reference to the approved PR</strong> so its items carry over, then check and copy the fields below. Enter the new PO number here afterwards (Update Status).
           </p>
-          <CopyRow label="Reference PR" value={req.prNumber} hint="Adopt this PR's items into the new PO" />
-          <CopyRow label="Vendor" value={req.vendor} />
-          <CopyRow label="Purch. Org." value="OM01" />
-          {pgrRow}
-          {chargeRows}
-          <CopyRow label="Delivery Date" value={toSapDate(req.serviceDateFrom || req.requiredDate)} />
-          <CopyRow label="Net Price" value={req.finalAmount || req.budget || ""} hint={req.finalAmount ? "Final amount" : "Budget — replace with the supplier's quoted price"} />
-          <CopyRow label="Header Note" value={headerNote} hint={aiNote ? "✨ Written by AI" : "Paste into the PO header text"} multiline />
+          <SapFieldList groups={poGroups} />
           {noteButton}
           <div className="p-3 text-xs mt-3" style={{ background: "#F5F6F7", border: "1px solid var(--sap-border)", borderRadius: "10px", color: "var(--sap-gray)" }}>
             Once the PO is created: enter the PO number on this request, keep it at <strong>Waiting PO approval</strong> until it's approved, then attach the PO document and mark it <strong>Completed</strong>.
