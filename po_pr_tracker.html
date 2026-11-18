@@ -4499,6 +4499,15 @@ function parseJsonReply(text) {
   return undefined;
 }
 
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(",")[1] || "");
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(blob);
+  });
+}
+
 function makeApiSample(apiKey) {
   const run = async (input, opts = {}) => {
     const { onText, signal } = opts;
@@ -4506,6 +4515,15 @@ function makeApiSample(apiKey) {
     try {
       const messages = toApiMessages(input);
       if (!messages.length) throw { code: "failed", message: "Nothing to send." };
+      const imgs = opts.images ? (Array.isArray(opts.images) ? opts.images : Array.from(opts.images)) : [];
+      if (imgs.length) {
+        const blocks = [];
+        for (const b of imgs.slice(0, 8)) {
+          blocks.push({ type: "image", source: { type: "base64", media_type: b.type || "image/png", data: await blobToBase64(b) } });
+        }
+        const last = messages[messages.length - 1];
+        last.content = [...blocks, { type: "text", text: last.content }];
+      }
       const Anthropic = await loadAnthropicSdk();
       const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
       const stream = client.beta.messages.stream(
@@ -4542,6 +4560,7 @@ function makeApiSample(apiKey) {
     if (parsed === undefined) throw { code: "invalid_json", text };
     return parsed;
   };
+  run.limits = async () => ({ images: { maxCount: 8, mediaTypes: ["image/jpeg", "image/png", "image/webp", "image/gif"] } });
   run.mode = "api";
   return run;
 }
@@ -5924,6 +5943,132 @@ function parseEml(text) {
 // file and returns its content as plain text, ready to drop into the paste
 // box — so attaching the original email file works instead of only
 // copy/paste.
+// Files attached inside an Outlook .msg, as real File objects. Tiny inline
+// pictures (logos, signature icons) are skipped — they carry no request data.
+function extractMsgAttachments(file) {
+  if (!/\.msg$/i.test(file.name)) return Promise.resolve([]);
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const msg = new window.MsgReader(new Uint8Array(reader.result));
+        const data = msg.getFileData();
+        const out = [];
+        (data.attachments || []).forEach((att, i) => {
+          try {
+            if (att.attachmentHidden) return;
+            const got = msg.getAttachment(i);
+            if (!got || !got.content || !got.fileName) return;
+            const name = got.fileName;
+            const isImg = /\.(png|jpe?g|gif|webp|bmp)$/i.test(name);
+            if (isImg && (got.content.length < 15000 || /^image\d{3}\./i.test(name))) return;
+            const mime = /\.pdf$/i.test(name) ? "application/pdf"
+              : /\.png$/i.test(name) ? "image/png"
+              : /\.jpe?g$/i.test(name) ? "image/jpeg"
+              : /\.gif$/i.test(name) ? "image/gif"
+              : /\.webp$/i.test(name) ? "image/webp"
+              : "application/octet-stream";
+            out.push(new File([got.content], name, { type: mime }));
+          } catch (e) { /* skip this one attachment */ }
+        });
+        resolve(out);
+      } catch (e) {
+        resolve([]);
+      }
+    };
+    reader.onerror = () => resolve([]);
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+const AI_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const isAiImage = (a) => AI_IMAGE_TYPES.includes(String(a.type || "").toLowerCase());
+
+// What the AI gets from the attachments: the text inside PDFs and the
+// pictures themselves (flight tickets are often photos/screenshots).
+async function attachmentsForAi(attachments, maxImages) {
+  const textParts = [];
+  const images = [];
+  const unreadable = [];
+  for (const a of attachments || []) {
+    if (/\.(msg|eml)$/i.test(a.name || "") && !a.kind) { /* the email itself */ }
+    if (a.text && a.text.trim()) {
+      textParts.push(`--- ATTACHMENT "${a.name}" ---\n${a.text.slice(0, 8000)}`);
+    } else if (isAiImage(a) && images.length < maxImages) {
+      const data = await resolveAttachmentData(a);
+      if (data) images.push({ name: a.name, blob: dataUrlToBlob(data) });
+      else unreadable.push(a.name);
+    } else if (!/\.(msg|eml)$/i.test(a.name || "")) {
+      unreadable.push(a.name);
+    }
+  }
+  return { text: textParts.join("\n\n").slice(0, 24000), images, unreadable };
+}
+
+// Drag files here, or press Ctrl+V anywhere on the screen to paste a copied
+// file or a screenshot (e.g. a flight ticket). Everything is read on arrival.
+function AttachDropZone({ attachments, onChange, hint }) {
+  const [over, setOver] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const live = useRef({ attachments, onChange });
+  live.current = { attachments, onChange };
+
+  const addFiles = async (files) => {
+    const list = Array.from(files || []).filter(Boolean);
+    if (!list.length) return;
+    setBusy(true);
+    try {
+      const read = [];
+      for (const f of list) {
+        let file = f;
+        if (!file.name || /^image\.(png|jpe?g)$/i.test(file.name)) {
+          const ext = (file.type.split("/")[1] || "png").replace("jpeg", "jpg");
+          file = new File([f], `pasted-${Date.now()}-${read.length + 1}.${ext}`, { type: f.type });
+        }
+        read.push(await ingestAttachment(file));
+        if (/\.msg$/i.test(file.name)) {
+          for (const inner of await extractMsgAttachments(file)) read.push(await ingestAttachment(inner));
+        }
+      }
+      live.current.onChange([...(live.current.attachments || []), ...read]);
+      appToast(`Added ${read.length} file${read.length === 1 ? "" : "s"} — the AI will read them`);
+    } catch (err) {
+      appToast("Could not read one of the files: " + err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    const onPaste = (e) => {
+      const files = e.clipboardData && e.clipboardData.files;
+      if (files && files.length) { e.preventDefault(); addFiles(files); }
+    };
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+  }, []);
+
+  return (
+    <div
+      onDragOver={(e) => { e.preventDefault(); setOver(true); }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => { e.preventDefault(); setOver(false); addFiles(e.dataTransfer.files); }}
+      className="text-center p-4"
+      style={{ border: `2px dashed ${over ? "#3D5AFE" : "var(--sap-border)"}`, borderRadius: 14, background: over ? "#EEF1FF" : "#FAFBFF" }}
+    >
+      <p className="text-sm font-semibold" style={{ color: "var(--sap-text)" }}>
+        🎫 {hint || "Drop tickets or documents here, or press Ctrl+V to paste a screenshot"}
+      </p>
+      <p className="text-xs mt-1" style={{ color: "var(--sap-gray)" }}>PDF, images (JPG/PNG), or another email — the AI reads them for names, dates and cities.</p>
+      <label className="sap-btn sap-btn-outline mt-2" style={{ cursor: "pointer", display: "inline-block" }}>
+        Choose files
+        <input type="file" multiple onChange={(e) => { const f = e.target.files; addFiles(f); e.target.value = ""; }} style={{ display: "none" }} />
+      </label>
+      {busy && <p className="text-xs mt-1 font-semibold" style={{ color: "#3D5AFE" }}>Reading…</p>}
+    </div>
+  );
+}
+
 function readEmailFile(file) {
   const name = file.name.toLowerCase();
   if (name.endsWith(".msg")) {
@@ -6118,7 +6263,7 @@ async function ingestAttachment(file, textOverride) {
   }
 }
 
-function AttachmentPicker({ attachments, onChange }) {
+function AttachmentPicker({ attachments, onChange, hideInput }) {
   const [busy, setBusy] = useState(false);
 
   const handleFiles = async (e) => {
@@ -6143,8 +6288,8 @@ function AttachmentPicker({ attachments, onChange }) {
 
   return (
     <div>
-      <label className="sap-label">Attachments (ticket, confirmation, etc.)</label>
-      <input type="file" multiple onChange={handleFiles} className="sap-input" />
+      {!hideInput && <label className="sap-label">Attachments (ticket, confirmation, etc.)</label>}
+      {!hideInput && <input type="file" multiple onChange={handleFiles} className="sap-input" />}
       {busy && <p className="text-xs mt-1" style={{ color: "var(--sap-gray)" }}>Reading file(s)...</p>}
       {attachments && attachments.length > 0 && (
         <ul className="mt-2 space-y-1">
@@ -6555,6 +6700,7 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
   const [prStageSource, setPrStageSource] = useState(""); // "", "email", "ai", "you"
   const prStageByYou = useRef(false);
   const [showDraft, setShowDraft] = useState(false);
+  const [attRead, setAttRead] = useState(null); // what the AI could/couldn't read from attachments
   const choosePrStage = (id) => { prStageByYou.current = true; setPrStage(id); setPrStageSource("you"); };
   const aiCtl = useRef(null);
 
@@ -6574,16 +6720,22 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
       previousVendors: knownVendorsAll.slice(0, 30),
       registeredSuppliers: suppliers,
     };
+    let limits = null;
+    try { limits = sample.limits ? await sample.limits() : null; } catch (e) { limits = null; }
+    const att = await attachmentsForAi(attachments, limits && limits.images ? Math.min(limits.images.maxCount || 4, 6) : 0);
+    setAttRead({ files: attachments.filter((a) => !/\.(msg|eml)$/i.test(a.name || "")).length, images: att.images.length, textFiles: att.text ? att.text.split("--- ATTACHMENT").length - 1 : 0, unreadable: att.unreadable });
     const prompt = [
       "You help a procurement coordinator log a travel/service request from an email into a tracker, before they raise an SAP Purchase Requisition (PR) and then a Purchase Order (PO).",
       "Read the whole email carefully, the way an experienced coordinator would — including forwarded messages, signatures that reveal the department, and any attachment text. When messages in a thread disagree, the latest one wins. Work out what is actually provided and what is missing.",
       "Read the email below and reply with ONLY one JSON object, exactly this shape:",
-      '{"owner":"","beneficiary":"","serviceTypes":["Hotel"],"serviceDateFrom":"","serviceDateTo":"","requiredDate":"","budget":"","department":"","city":"","vendors":{"Hotel":""},"prNumber":"","prStage":"none","prStageEvidence":"","chargeTo":"","projectName":"","network":"","activity":"","costCenter":"","senderName":"","senderEmail":"","summary":"","questionsForSender":[""],"vendorSuggestions":[{"type":"Hotel","name":"","why":"","source":"your list"}]}',
+      '{"owner":"","beneficiary":"","serviceTypes":["Hotel"],"serviceDateFrom":"","serviceDateTo":"","requiredDate":"","budget":"","department":"","city":"","vendors":{"Hotel":""},"prNumber":"","prStage":"none","prStageEvidence":"","chargeTo":"","projectName":"","network":"","activity":"","costCenter":"","senderName":"","senderEmail":"","fromAttachments":"","summary":"","questionsForSender":[""],"vendorSuggestions":[{"type":"Hotel","name":"","why":"","source":"your list"}]}',
       "Rules:",
       "- owner: the person who asked for the service (never a signature footer, disclaimer or company name). beneficiary: who the service is for (traveller/guest names, comma-separated); \"\" if the same person.",
       '- serviceTypes: every service requested, each one of "Hotel", "Car", "Tickets", "Other".',
       `- Dates as YYYY-MM-DD. Today is ${todayIso()}; resolve relative dates ("next Sunday") against it. Use "" when a date is not stated — never guess.`,
       `- department: exactly one of these values, or "" if the email does not make it clear: ${departments.join(" | ")}.`,
+      "- ATTACHMENTS: if tickets, itineraries or confirmations are attached (text or images), they are part of the request. Take every traveller's name from them (all passengers, comma-separated, in beneficiary), the destination city, and for a hotel request set serviceDateFrom to the arrival date and serviceDateTo to the departure date on the tickets unless the email says otherwise. If tickets for different travellers have different dates, use the earliest arrival and the latest departure and mention it in the summary.",
+      '- fromAttachments: one short sentence saying what you found in the attachments (e.g. "3 flight tickets: Nabil Bidawi, Hassan Shahine, Mohammad El Masri — arrive Muscat 12 Dec, depart 15 Dec"), or "" if there were none or they were unreadable.',
       "- vendors: only suppliers actually named in the email, keyed by service type.",
       "- prNumber: the SAP Purchase Requisition number if the email (or an attachment text) gives one, digits only; otherwise \"\".",
       '- prStage: where the PR stands. "none" = the sender asks the coordinator to start the process/raise the PR (no PR exists yet). "created" = a PR already exists but is not approved yet (or its approval status is not stated). "approved" = the email says the PR is approved/released, so only the PO is left.',
@@ -6600,9 +6752,11 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
       "",
       "EMAIL:",
       emailText.slice(0, 24000),
+      att.text ? "\n" + att.text : "",
+      att.images.length ? `\nIMAGES attached to this message, in order: ${att.images.map((i) => i.name).join(", ")}. They are documents the sender attached (typically flight tickets, itineraries or booking confirmations) — read them.` : "",
     ].join("\n");
     try {
-      const r = await sample.json(prompt, { signal: aiCtl.current.signal });
+      const r = await sample.json(prompt, { signal: aiCtl.current.signal, ...(att.images.length ? { images: att.images.map((i) => i.blob) } : {}) });
       if (!r || typeof r !== "object") throw { code: "invalid_json" };
       const str = (v) => (typeof v === "string" ? v.trim() : "");
       const date = (v) => (ISO_DATE.test(str(v)) ? str(v) : "");
@@ -6660,6 +6814,7 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
         }
       }
       setAi({
+        fromAttachments: str(r.fromAttachments),
         prStageEvidence: str(r.prStageEvidence),
         summary: str(r.summary),
         city: str(r.city),
@@ -6689,6 +6844,22 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
     aiAutoFor.current = sourceHash;
     aiExtract();
   }, [sample, sourceHash, extracted]);
+
+  // Files added after the first read (tickets dropped or pasted) trigger a re-read.
+  const attSig = useRef("");
+  useEffect(() => {
+    const sig = attachments.map((a) => a.name + ":" + (a.size || "")).join("|");
+    const prev = attSig.current;
+    attSig.current = sig;
+    if (!sample || !extracted || !prev || prev === sig) return;
+    if (aiAutoFor.current !== sourceHash) return;
+    if (aiBusy) { reReadQueued.current = true; return; }
+    aiExtract();
+  }, [attachments]);
+  const reReadQueued = useRef(false);
+  useEffect(() => {
+    if (!aiBusy && reReadQueued.current) { reReadQueued.current = false; aiExtract(); }
+  }, [aiBusy]);
 
   const registerSupplier = (type, vendor) => {
     if (!vendor || !vendor.trim()) return;
@@ -6773,6 +6944,7 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
     setPrStageSource("");
     prStageByYou.current = false;
     setShowDraft(false);
+    setAttRead(null);
     aiAutoFor.current = "";
     if (aiCtl.current) aiCtl.current.abort();
   };
@@ -6797,9 +6969,12 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
     try {
       const text = await readEmailFile(file);
       const fileAttachment = await ingestAttachment(file, text);
+      const inner = [];
+      for (const f of await extractMsgAttachments(file)) inner.push(await ingestAttachment(f));
 
       setEmailText(text);
-      setAttachments([fileAttachment]);
+      setAttachments([fileAttachment, ...inner]);
+      if (inner.length) appToast(`Found ${inner.length} attachment${inner.length === 1 ? "" : "s"} inside the email — reading them too`);
       if (text.trim()) {
         const seen = findRequestsFromSameEmail(fingerprintEmail(text), requests);
         if (seen.length) {
@@ -7000,7 +7175,8 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
         </div>
       </div>
 
-      <AttachmentPicker attachments={attachments} onChange={setAttachments} />
+      <AttachDropZone attachments={attachments} onChange={setAttachments} hint="Attach the travellers' tickets here — drop them, or Ctrl+V to paste" />
+      <AttachmentPicker attachments={attachments} onChange={setAttachments} hideInput />
 
       {extracted && (
         <form onSubmit={handleSubmit} className="flex flex-col gap-4" style={{ borderTop: "1px solid var(--sap-border)", paddingTop: "1rem" }}>
@@ -7128,6 +7304,17 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
                   <p className="font-semibold mb-2" style={{ color: "var(--sap-red)" }}>
                     ⚠️ This email's text looks unreadable or mostly empty (possibly an unsupported Rich Text format) — check the fields carefully, or ask the sender directly.
                   </p>
+                )}
+                {(ai && ai.fromAttachments) && (
+                  <div className="p-2 mb-3 text-xs" style={{ background: "#fff", border: "1px solid #DCE2FF", borderRadius: 10, color: "var(--sap-text)" }} dir="auto">
+                    📎 <strong>From the attachments:</strong> {ai.fromAttachments}
+                  </div>
+                )}
+                {attRead && attRead.unreadable.length > 0 && (
+                  <div className="p-2 mb-3 text-xs" style={{ background: "var(--sap-amber-bg)", border: "1px solid #F5DFA6", borderRadius: 10, color: "var(--sap-amber)" }}>
+                    ⚠️ Couldn't read: {attRead.unreadable.join(", ")}
+                    {sample ? " — scanned PDFs and unusual formats can't be read; paste a screenshot of the ticket (Ctrl+V) instead." : " — turn on AI to read tickets and images."}
+                  </div>
                 )}
                 <div className="px-3 py-2 mb-3 font-semibold" style={{ ...toneStyle, borderRadius: 10 }}>{verdict.text}</div>
 
