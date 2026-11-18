@@ -5046,18 +5046,51 @@ function batchColorFor(batchId) {
   return BATCH_COLORS[hash % BATCH_COLORS.length];
 }
 
+// ---------------------------------------------------------------------------
+// Where the PR stands when a request email arrives
+//
+// The company flow is always PR → PR approval → PO → PO approval. A request
+// email can land at any point of it: asking me to raise the PR, or with a PR
+// the requester already raised (approved or not) that I only follow up and
+// turn into a PO. The stage picked at intake sets the starting status, who
+// it's waiting on and what the next step is.
+// ---------------------------------------------------------------------------
+const PR_STAGES = [
+  { id: "none", icon: "🆕", title: "No PR yet — I'll create it", hint: "Starts as Pending · next: create the PR in SAP", status: "Pending", waitingOn: "Me", raisedBy: "me" },
+  { id: "created", icon: "⏳", title: "PR already created — not approved yet", hint: "Starts as Waiting PR approval · next: follow up the approval", status: "Waiting PR approval", waitingOn: "SAP", raisedBy: "requester" },
+  { id: "approved", icon: "✅", title: "PR already approved — create the PO", hint: "Starts as Waiting PO approval · next: create the PO from this PR", status: "Waiting PO approval", waitingOn: "Me", raisedBy: "requester" },
+];
+const PR_STAGE_BY_ID = Object.fromEntries(PR_STAGES.map((st) => [st.id, st]));
+
+// Rule-based first guess, before anyone (or the AI) confirms it: a PR number
+// in the email means the PR exists; "approved"/"released" near it means it's
+// approved — unless the email says it's still pending/awaiting approval.
+function detectPrStage(text, prNumber) {
+  const t = String(text || "").toLowerCase();
+  if (!prNumber && !/\bpr\b[^.\n]{0,40}(created|raised|approved|released|attached)|تم (إنشاء|انشاء|رفع|اعتماد) (ال)?pr/i.test(t)) return "none";
+  const notYet = /not (yet )?(been )?approved|pending (for )?approval|awaiting (for )?approval|waiting (for )?(the )?approval|under approval|in approval|بانتظار (ال)?(موافقة|اعتماد)|لم (يتم|تتم|يعتمد)|قيد (ال)?(موافقة|اعتماد)/i;
+  const done = /\bapproved\b|\breleased\b|fully approved|تمت (ال)?موافقة|تم (ال)?اعتماد|معتمد/i;
+  if (notYet.test(t)) return "created";
+  if (done.test(t)) return "approved";
+  return "created";
+}
+
 // Tells the user exactly what to do next for this request, based on its
 // current status and what's already filled in — the workflow guidance.
 function getNextAction(req) {
+  const byRequester = req.prRaisedBy === "requester";
   switch (req.status) {
     case "Pending":
-      if (!req.vendor) return "Choose a supplier for this request";
-      return "Create the PR in SAP, then enter the PR number here";
+      if (!req.vendor) return "Choose a supplier, then create the PR in SAP (📋 Copy for SAP)";
+      return "Create the PR in SAP (📋 Copy for SAP), then enter the PR number here";
     case "Waiting PR approval":
-      if (!req.prNumber) return "Enter the PR number, then wait for PR approval from SAP";
-      return "Waiting for PR approval from SAP";
+      if (!req.prNumber) return "Enter the PR number, then follow up its approval";
+      return byRequester
+        ? `PR ${req.prNumber} was raised by ${req.owner || "the requester"} — follow up its approval, then create the PO`
+        : `Follow up the approval of PR ${req.prNumber}, then create the PO`;
     case "Waiting PO approval":
-      if (!req.poNumber) return "Enter the PO number, then wait for PO approval";
+      if (!req.prNumber) return "Enter the approved PR number this PO is based on";
+      if (!req.poNumber) return `PR ${req.prNumber} is approved — create the PO in SAP with reference to it (📋 Copy for SAP), then enter the PO number`;
       return "Waiting for PO approval — confirm booking/delivery once approved";
     case "Completed":
       return "Completed — no action needed";
@@ -5881,7 +5914,7 @@ const EXCEL_STATUS_FONT = {
 const EXCEL_HEADER_FILL = "3D5AFE";
 const EXCEL_BORDER = { style: "thin", color: { rgb: "E7EAF3" } };
 const EXCEL_COLUMNS = [
-  "PR Number", "PO Number", "Requester", "Beneficiary", "Service From", "Service To",
+  "PR Number", "PR Raised By", "PO Number", "Requester", "Beneficiary", "Service From", "Service To",
   "Department", "Service Type", "Vendor", "Status", "Budget", "Final Amount",
   "Required Date", "Completed Date", "Notes", "Created",
 ];
@@ -5893,6 +5926,7 @@ async function exportToExcel(requests) {
   }
   const rows = requests.map((r) => ({
     "PR Number": r.prNumber,
+    "PR Raised By": r.prRaisedBy === "requester" ? "Requester" : "Me",
     "PO Number": r.poNumber,
     "Requester": r.owner,
     "Beneficiary": r.beneficiary,
@@ -5946,7 +5980,7 @@ async function exportToExcel(requests) {
   });
 
   ws["!cols"] = [
-    { wch: 12 }, { wch: 12 }, { wch: 18 }, { wch: 18 }, { wch: 12 }, { wch: 12 },
+    { wch: 12 }, { wch: 13 }, { wch: 12 }, { wch: 18 }, { wch: 18 }, { wch: 12 }, { wch: 12 },
     { wch: 14 }, { wch: 12 }, { wch: 16 }, { wch: 16 }, { wch: 10 }, { wch: 12 },
     { wch: 12 }, { wch: 14 }, { wch: 30 }, { wch: 12 },
   ];
@@ -6082,6 +6116,11 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
   const sample = useSample();
   const [aiBusy, setAiBusy] = useState(false);
   const [ai, setAi] = useState(null); // { summary, city, questions[], suggestions[] }
+  // Where the PR stands in this email: "none" | "created" | "approved".
+  const [prStage, setPrStage] = useState("none");
+  const [prStageSource, setPrStageSource] = useState(""); // "", "email", "ai", "you"
+  const prStageByYou = useRef(false);
+  const choosePrStage = (id) => { prStageByYou.current = true; setPrStage(id); setPrStageSource("you"); };
   const aiCtl = useRef(null);
 
   // Claude reads the raw email the way a person would — handles any phrasing,
@@ -6103,16 +6142,19 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
     const prompt = [
       "You help a procurement coordinator log a travel/service request from an email into a tracker, before they raise an SAP Purchase Requisition.",
       "Read the email below and reply with ONLY one JSON object, exactly this shape:",
-      '{"owner":"","beneficiary":"","serviceTypes":["Hotel"],"serviceDateFrom":"","serviceDateTo":"","requiredDate":"","budget":"","department":"","city":"","vendors":{"Hotel":""},"prNumber":"","summary":"","questionsForSender":[""],"vendorSuggestions":[{"type":"Hotel","name":"","why":"","source":"your list"}]}',
+      '{"owner":"","beneficiary":"","serviceTypes":["Hotel"],"serviceDateFrom":"","serviceDateTo":"","requiredDate":"","budget":"","department":"","city":"","vendors":{"Hotel":""},"prNumber":"","prStage":"none","prStageEvidence":"","summary":"","questionsForSender":[""],"vendorSuggestions":[{"type":"Hotel","name":"","why":"","source":"your list"}]}',
       "Rules:",
       "- owner: the person who asked for the service (never a signature footer, disclaimer or company name). beneficiary: who the service is for (traveller/guest names, comma-separated); \"\" if the same person.",
       '- serviceTypes: every service requested, each one of "Hotel", "Car", "Tickets", "Other".',
       `- Dates as YYYY-MM-DD. Today is ${todayIso()}; resolve relative dates ("next Sunday") against it. Use "" when a date is not stated — never guess.`,
       `- department: exactly one of these values, or "" if the email does not make it clear: ${departments.join(" | ")}.`,
       "- vendors: only suppliers actually named in the email, keyed by service type.",
+      "- prNumber: the SAP Purchase Requisition number if the email (or an attachment text) gives one, digits only; otherwise \"\".",
+      '- prStage: where the PR stands. "none" = the sender asks the coordinator to start the process/raise the PR (no PR exists yet). "created" = a PR already exists but is not approved yet (or its approval status is not stated). "approved" = the email says the PR is approved/released, so only the PO is left.',
+      "- prStageEvidence: the short phrase from the email that shows the PR stage, or \"\".",
       "- budget: digits only, or \"\".",
       "- summary: one or two plain sentences on what is being requested, for whom, where and when.",
-      "- questionsForSender: short, polite questions for anything missing or ambiguous that only the sender can answer (exact dates, number of nights/rooms, traveller names, city, project/department, preferences). Never ask about PR or PO numbers. Empty array if nothing is missing.",
+      "- questionsForSender: short, polite questions for anything missing or ambiguous that only the sender can answer (exact dates, number of nights/rooms, traveller names, city, project/department, preferences). Only if the email says a PR already exists but gives no number, ask for the PR number; otherwise never ask about PR or PO numbers. Empty array if nothing is missing.",
       "- vendorSuggestions: up to 3 per requested service that has no vendor yet. Prefer the coordinator's registered or previous suppliers below when they fit the city; set source to \"your list\" for those and \"suggestion\" for general well-known options in that city.",
       "",
       "Coordinator's own data: " + JSON.stringify(known),
@@ -6156,7 +6198,23 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
           return next;
         });
       }
+      const aiPr = str(r.prNumber).replace(/[^\d]/g, "");
+      if (aiPr) {
+        setTypeEntries((prev) => {
+          const next = { ...prev };
+          Object.keys(next).forEach((t) => { if (!next[t].prNumber) next[t] = { ...next[t], prNumber: aiPr }; });
+          return next;
+        });
+      }
+      if (PR_STAGE_BY_ID[str(r.prStage)]) {
+        // Never overrule a choice the coordinator already made by hand.
+        if (!prStageByYou.current) {
+          setPrStage(str(r.prStage));
+          setPrStageSource("ai");
+        }
+      }
       setAi({
+        prStageEvidence: str(r.prStageEvidence),
         summary: str(r.summary),
         city: str(r.city),
         questions: Array.isArray(r.questionsForSender) ? r.questionsForSender.map(str).filter(Boolean).slice(0, 8) : [],
@@ -6207,6 +6265,10 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
       prNumber: data.prNumber,
       notes: text.slice(0, 500),
     });
+    const guessedStage = detectPrStage(text, data.prNumber);
+    prStageByYou.current = false;
+    setPrStage(guessedStage);
+    setPrStageSource(guessedStage === "none" ? "" : "email");
     setSelectedTypes(detectedTypes);
     const entries = {};
     detectedTypes.forEach((type) => {
@@ -6248,6 +6310,9 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
     setAttachments([]);
     setSourceHash("");
     setAi(null);
+    setPrStage("none");
+    setPrStageSource("");
+    prStageByYou.current = false;
     if (aiCtl.current) aiCtl.current.abort();
   };
 
@@ -6350,6 +6415,15 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
       appToast("Select at least one service this email is requesting");
       return;
     }
+    const stage = PR_STAGE_BY_ID[prStage] || PR_STAGES[0];
+    const prFor = (type) => (typeEntries[type].prNumber || "").trim() || (stage.id !== "none" ? (extracted.prNumber || "").trim() : "");
+    if (stage.id !== "none") {
+      const noPr = selectedTypes.filter((type) => !prFor(type));
+      if (noPr.length) {
+        appToast(`Enter the PR number from the email for: ${noPr.join(", ")} — or choose "No PR yet" if it hasn't been raised.`);
+        return;
+      }
+    }
     const batchId = selectedTypes.length > 1 ? uid() : null;
     const emailSummary = summarizeEmail({
       owner: extracted.owner,
@@ -6374,13 +6448,29 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
       attachments,
       serviceType: type,
       vendor: typeEntries[type].vendor,
-      prNumber: typeEntries[type].prNumber,
-      waitingOn: DEFAULT_WAITING_ON["Pending"],
+      prNumber: prFor(type),
+      status: stage.status,
+      waitingOn: stage.waitingOn,
+      prRaisedBy: stage.raisedBy,
       batchId,
       batchSize: selectedTypes.length,
       emailSummary,
       sourceHash,
     }));
+
+    // A follow-up email about a PR that's already in the tracker should update
+    // that request, not create a second one.
+    const knownPr = forms
+      .map((f) => ({ form: f, hit: f.prNumber && requests.find((r) => (r.prNumber || "").trim() === f.prNumber.trim()) }))
+      .find((x) => x.hit);
+    if (knownPr) {
+      const { hit } = knownPr;
+      const proceed = await appConfirm(
+        `PR ${hit.prNumber} is already in the tracker (${hit.serviceType} for ${hit.beneficiary || hit.owner}, status ${STATUS_LABELS[hit.status]}). ` +
+        `If this email is a follow-up, cancel and use "Update Status" on that request instead. Save a new request anyway?`
+      );
+      if (!proceed) return;
+    }
 
     // Catch the same trip being logged twice — the usual cause of a duplicate
     // PO going out to the same supplier.
@@ -6540,6 +6630,46 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
             <p>{summarizeEmail({ owner: extracted.owner, beneficiary: extracted.beneficiary, selectedTypes, budget: extracted.budget, requiredDate: extracted.requiredDate, serviceDateFrom: extracted.serviceDateFrom, serviceDateTo: extracted.serviceDateTo, prNumber: extracted.prNumber })}</p>
           </div>
 
+          <div className="p-3" style={{ background: "#fff", border: "1px solid var(--sap-border)", borderRadius: 14 }}>
+            <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+              <p className="font-semibold text-sm" style={{ color: "var(--sap-text)" }}>📌 Where is the PR for this request?</p>
+              {prStageSource === "email" && <span className="text-xs" style={{ color: "var(--sap-gray)" }}>Detected from the email — confirm it</span>}
+              {prStageSource === "ai" && <AiBadge>✨ Read by AI — confirm it</AiBadge>}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              {PR_STAGES.map((st) => {
+                const on = prStage === st.id;
+                const tone = STATUS_INLINE_STYLE[st.status];
+                return (
+                  <button
+                    key={st.id}
+                    type="button"
+                    onClick={() => choosePrStage(st.id)}
+                    className="text-left p-3"
+                    style={{
+                      borderRadius: 12,
+                      cursor: "pointer",
+                      background: on ? tone.background : "#fff",
+                      border: `2px solid ${on ? tone.color : "var(--sap-border)"}`,
+                      boxShadow: on ? "0 6px 16px rgba(16,24,40,.08)" : "none",
+                    }}
+                  >
+                    <div className="text-sm font-semibold" style={{ color: on ? tone.color : "var(--sap-text)" }}>{st.icon} {st.title}</div>
+                    <div className="text-xs mt-1" style={{ color: "var(--sap-gray)" }}>{st.hint}</div>
+                  </button>
+                );
+              })}
+            </div>
+            {ai && ai.prStageEvidence && prStage !== "none" && (
+              <p className="text-xs mt-2" style={{ color: "var(--sap-gray)" }} dir="auto">From the email: “{ai.prStageEvidence}”</p>
+            )}
+            {prStage !== "none" && (
+              <p className="text-xs mt-2" style={{ color: "var(--sap-blue-dark)" }}>
+                The requester already raised this PR, so you won't create it again — enter its number in each service below and the tracker will follow it up{prStage === "approved" ? " and guide you to create the PO" : " until it's approved"}.
+              </p>
+            )}
+          </div>
+
           <div className="sap-panel-info p-3 text-sm" style={{ color: "var(--sap-blue-dark)" }}>
             <p className="font-semibold mb-2">
               🤖 Confirm or adjust which services apply. Each checked service becomes its own tracked request (its own supplier, PR, and PO), since they don't share the same approval.
@@ -6696,8 +6826,14 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
                     )}
                   </div>
                   <div>
-                    <label className="sap-label">PR Number (if any)</label>
-                    <input value={entry.prNumber} onChange={(e) => updateEntry(type, { prNumber: e.target.value })} className="sap-input" />
+                    <label className="sap-label">{prStage === "none" ? "PR Number (after you create it)" : "PR Number (from the email) *"}</label>
+                    <input
+                      value={entry.prNumber}
+                      onChange={(e) => updateEntry(type, { prNumber: e.target.value })}
+                      className="sap-input"
+                      placeholder={prStage === "none" ? "Leave empty for now" : "e.g. 1000234567"}
+                      style={prStage !== "none" && !entry.prNumber.trim() ? { borderColor: "var(--sap-red)" } : undefined}
+                    />
                   </div>
                 </div>
 
@@ -6743,7 +6879,8 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
                 if (!entry) return [];
                 return [
                   { label: `${type} — vendor/supplier`, ok: !!entry.vendor.trim(), askSender: true, ask: `Their preferred ${type.toLowerCase()} supplier/vendor, if they have one in mind` },
-                  { label: `${type} — PR number`, ok: !!entry.prNumber.trim(), askSender: false },
+                  // With no PR yet, the number comes later (once I raise it) — not a gap now.
+                  ...(prStage === "none" ? [] : [{ label: `${type} — PR number`, ok: !!entry.prNumber.trim(), askSender: true, ask: "The PR number you raised for this request" }]),
                 ];
               }),
             ];
@@ -6853,6 +6990,8 @@ function emptyForm() {
     completedDate: "",
     status: "Pending",
     waitingOn: "Me",
+    // "me" = I raise the PR in SAP; "requester" = it arrived already raised.
+    prRaisedBy: "me",
     stageSince: "",
     notes: "",
     attachments: [],
@@ -7005,6 +7144,13 @@ function RequestForm({ initial, onSave, onCancel, requests }) {
         <input value={form.prNumber} onChange={set("prNumber")} className="sap-input" />
       </div>
       <div>
+        <label className="sap-label">PR raised by</label>
+        <select value={form.prRaisedBy || "me"} onChange={set("prRaisedBy")} className="sap-select">
+          <option value="me">Me — I create it in SAP</option>
+          <option value="requester">The requester — it arrived already raised</option>
+        </select>
+      </div>
+      <div>
         <label className="sap-label">PO Number</label>
         <input value={form.poNumber} onChange={set("poNumber")} className="sap-input" />
       </div>
@@ -7043,8 +7189,9 @@ function StatusUpdateForm({ req, onSave, onCancel }) {
   const handleStatusChange = (e) => {
     const next = e.target.value;
     setStatus(next);
-    if ((req.waitingOn || "") === (DEFAULT_WAITING_ON[req.status] || "")) {
-      setWaitingOn(DEFAULT_WAITING_ON[next] || "");
+    if ((req.waitingOn || "") === (DEFAULT_WAITING_ON[req.status] || "") || req.waitingOn === "Me") {
+      // An approved PR with no PO yet is mine to act on: I create the PO.
+      setWaitingOn(next === "Waiting PO approval" && !poNumber ? "Me" : (DEFAULT_WAITING_ON[next] || ""));
     }
   };
 
@@ -7615,6 +7762,12 @@ function CopyForSapModal({ req, onClose }) {
   const sample = useSample();
   const [aiNote, setAiNote] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
+  // PR tab while the PR still has to be raised; PO tab once a PR exists and
+  // is approved (or arrived already raised by the requester).
+  const prExists = !!(req.prNumber || "").trim();
+  const [mode, setMode] = useState(
+    req.status === "Waiting PO approval" || (req.prRaisedBy === "requester" && prExists) ? "PO" : "PR"
+  );
 
   const writeNoteWithAi = async () => {
     if (!sample || aiBusy) return;
@@ -7625,9 +7778,10 @@ function CopyForSapModal({ req, onClose }) {
       from: req.serviceDateFrom, to: req.serviceDateTo, requiredBy: req.requiredDate,
       department: req.department, vendor: req.vendor, budget: req.budget,
       emailSummary: req.emailSummary || "", notes: (req.notes || "").slice(0, 1500),
+      ...(mode === "PO" && prExists ? { basedOnPR: req.prNumber } : {}),
     };
     const prompt = [
-      "Write the Header Note for an SAP Purchase Requisition from these request details.",
+      `Write the Header Note for an SAP ${mode === "PO" ? "Purchase Order" : "Purchase Requisition"} from these request details.`,
       "Professional English, 2-4 sentences, plain text only (no bullets, no markdown, no greeting).",
       "Say what service is required, for whom, the dates and number of days/nights, the project/department, the supplier if known, and who requested it.",
       "Use only the facts given; leave out anything that is empty. Dates as DD.MM.YYYY.",
@@ -7645,32 +7799,97 @@ function CopyForSapModal({ req, onClose }) {
     }
   };
 
+  const tab = (id, label) => (
+    <button
+      type="button"
+      onClick={() => { setMode(id); setAiNote(""); }}
+      className="text-sm font-semibold px-4 py-1.5"
+      style={{
+        borderRadius: 999,
+        border: "none",
+        cursor: "pointer",
+        background: mode === id ? "linear-gradient(135deg, #3D5AFE, #6C7CFF)" : "transparent",
+        color: mode === id ? "#fff" : "var(--sap-gray)",
+      }}
+    >
+      {label}
+    </button>
+  );
+  const headerNote = aiNote || (mode === "PO" && prExists ? `${buildHeaderNote(req)} Based on approved PR ${req.prNumber}.` : buildHeaderNote(req));
+  const noteButton = sample && (
+    <div className="flex justify-end mb-1">
+      <button type="button" onClick={writeNoteWithAi} disabled={aiBusy} className="sap-link">
+        {aiBusy ? "✨ Writing…" : aiNote ? "✨ Rewrite with AI" : "✨ Write a better Header Note with AI"}
+      </button>
+    </div>
+  );
+  const pgrRow = (
+    <CopyRow
+      label="Purchasing Group"
+      value={pgrCode ? `${pgrCode} — ${req.department}` : ""}
+      hint={!req.department ? "Set the Department field on this request first" : (!pgrCode ? "No matching SAP code for this department" : "")}
+    />
+  );
+
   return (
     <div className="flex flex-col gap-1">
-      <p className="text-sm mb-2" style={{ color: "var(--sap-gray)" }}>
-        Copy each field below, then paste it into the matching column on the SAP "Create Purchase Requisition" screen.
-      </p>
-      <CopyRow label="Header Note" value={aiNote || buildHeaderNote(req)} hint={aiNote ? "✨ Written by AI" : "Paste into the Texts / Header Note box"} multiline />
-      {sample && (
-        <div className="flex justify-end mb-1">
-          <button type="button" onClick={writeNoteWithAi} disabled={aiBusy} className="sap-link">
-            {aiBusy ? "✨ Writing…" : aiNote ? "✨ Rewrite with AI" : "✨ Write a better Header Note with AI"}
-          </button>
-        </div>
-      )}
-      <CopyRow label="Short Text" value={shortText} />
-      <CopyRow label="Delivery Date" value={toSapDate(req.serviceDateFrom || req.requiredDate)} />
-      <CopyRow label="Vendor" value={req.vendor} />
-      <CopyRow label="Requisnr." value={req.owner} hint="Requester" />
-      <CopyRow label="Quantity" value="1" />
-      <CopyRow
-        label="Purchasing Group"
-        value={pgrCode ? `${pgrCode} — ${req.department}` : ""}
-        hint={!req.department ? "Set the Department field on this request first" : (!pgrCode ? "No matching SAP code for this department" : "")}
-      />
-      <div className="p-3 text-xs mt-3" style={{ background: "#F5F6F7", border: "1px solid var(--sap-border)", borderRadius: "10px", color: "var(--sap-gray)" }}>
-        Fill in manually on the SAP screen (not auto-filled — these vary per request): <strong>Account Assignment Category</strong>, <strong>Item Category</strong>, <strong>Plant</strong>, <strong>Storage Location</strong>, <strong>Cost Center</strong>. Purchasing Organization is always <strong>OM01</strong>.
+      <div className="flex items-center gap-1 p-1 mb-3 self-start" style={{ background: "#F1F3F9", borderRadius: 999 }}>
+        {tab("PR", "1 · Purchase Requisition")}
+        {tab("PO", "2 · Purchase Order")}
       </div>
+
+      {mode === "PR" && (
+        <>
+          {req.prRaisedBy === "requester" && prExists && (
+            <div className="p-3 text-sm mb-2" style={{ background: "var(--sap-amber-bg)", border: "1px solid #F5DFA6", borderRadius: 10, color: "var(--sap-amber)" }}>
+              ⚠️ PR <strong>{req.prNumber}</strong> was already raised by the requester — don't create it again. Use the <strong>Purchase Order</strong> tab once it's approved.
+            </div>
+          )}
+          <p className="text-sm mb-2" style={{ color: "var(--sap-gray)" }}>
+            Copy each field below, then paste it into the matching column on the SAP "Create Purchase Requisition" screen.
+          </p>
+          <CopyRow label="Header Note" value={headerNote} hint={aiNote ? "✨ Written by AI" : "Paste into the Texts / Header Note box"} multiline />
+          {noteButton}
+          <CopyRow label="Short Text" value={shortText} />
+          <CopyRow label="Delivery Date" value={toSapDate(req.serviceDateFrom || req.requiredDate)} />
+          <CopyRow label="Vendor" value={req.vendor} />
+          <CopyRow label="Requisnr." value={req.owner} hint="Requester" />
+          <CopyRow label="Quantity" value="1" />
+          {pgrRow}
+          <div className="p-3 text-xs mt-3" style={{ background: "#F5F6F7", border: "1px solid var(--sap-border)", borderRadius: "10px", color: "var(--sap-gray)" }}>
+            Fill in manually on the SAP screen (not auto-filled — these vary per request): <strong>Account Assignment Category</strong>, <strong>Item Category</strong>, <strong>Plant</strong>, <strong>Storage Location</strong>, <strong>Cost Center</strong>. Purchasing Organization is always <strong>OM01</strong>.
+          </div>
+        </>
+      )}
+
+      {mode === "PO" && (
+        <>
+          {!prExists ? (
+            <div className="p-3 text-sm mb-2" style={{ background: "var(--sap-red-bg)", border: "1px solid #F5C2C2", borderRadius: 10, color: "var(--sap-red)" }}>
+              The PO is created from an approved PR — enter the PR number on this request first (Update Status).
+            </div>
+          ) : req.status !== "Waiting PO approval" && req.status !== "Completed" ? (
+            <div className="p-3 text-sm mb-2" style={{ background: "var(--sap-amber-bg)", border: "1px solid #F5DFA6", borderRadius: 10, color: "var(--sap-amber)" }}>
+              ⏳ PR <strong>{req.prNumber}</strong> isn't marked approved yet ({STATUS_LABELS[req.status]}). Create the PO only after it's approved, then move this request to <strong>Waiting PO approval</strong>.
+            </div>
+          ) : null}
+          <p className="text-sm mb-2" style={{ color: "var(--sap-gray)" }}>
+            Create the PO <strong>with reference to the approved PR</strong> so its items carry over, then check and copy the fields below. Enter the new PO number here afterwards (Update Status).
+          </p>
+          <CopyRow label="Reference PR" value={req.prNumber} hint="Adopt this PR's items into the new PO" />
+          <CopyRow label="Vendor" value={req.vendor} />
+          <CopyRow label="Purch. Org." value="OM01" />
+          {pgrRow}
+          <CopyRow label="Delivery Date" value={toSapDate(req.serviceDateFrom || req.requiredDate)} />
+          <CopyRow label="Net Price" value={req.finalAmount || req.budget || ""} hint={req.finalAmount ? "Final amount" : "Budget — replace with the supplier's quoted price"} />
+          <CopyRow label="Header Note" value={headerNote} hint={aiNote ? "✨ Written by AI" : "Paste into the PO header text"} multiline />
+          {noteButton}
+          <div className="p-3 text-xs mt-3" style={{ background: "#F5F6F7", border: "1px solid var(--sap-border)", borderRadius: "10px", color: "var(--sap-gray)" }}>
+            Once the PO is created: enter the PO number on this request, keep it at <strong>Waiting PO approval</strong> until it's approved, then attach the PO document and mark it <strong>Completed</strong>.
+          </div>
+        </>
+      )}
+
       <div className="flex justify-end pt-3">
         <button type="button" onClick={onClose} className="sap-btn sap-btn-blue">Done</button>
       </div>
@@ -7685,7 +7904,7 @@ function requestsForAssistant(requests) {
   const rows = [...requests]
     .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
     .map((r) => ({
-      pr: r.prNumber || "", po: r.poNumber || "", requester: r.owner || "", for: r.beneficiary || "",
+      pr: r.prNumber || "", prBy: r.prRaisedBy === "requester" ? "requester" : "me", po: r.poNumber || "", requester: r.owner || "", for: r.beneficiary || "",
       service: r.serviceType || "", vendor: r.vendor || "", status: r.status || "",
       dept: r.department || "", from: r.serviceDateFrom || "", to: r.serviceDateTo || "",
       requiredBy: r.requiredDate || "", budget: r.budget || "", ses: !!r.serviceEntrySheet,
@@ -7805,7 +8024,7 @@ function AssistantChat({ requests }) {
     const data = requestsForAssistant(requests);
     const rules = [
       "You are the assistant built into a PR/PO tracker used by a procurement coordinator (hotels, car rentals, tickets for staff travel; requests become SAP Purchase Requisitions then POs).",
-      `Today is ${todayIso()}. Statuses: Pending → Waiting PR approval → Waiting PO approval → Completed (or Cancelled). "ses" = Service Entry Sheet done.`,
+      `Today is ${todayIso()}. Company flow: PR (Purchase Requisition) → PR approval → PO (Purchase Order, created from the approved PR) → PO approval. Statuses: Pending (no PR yet — the coordinator must create it) → Waiting PR approval (PR exists, follow up its approval) → Waiting PO approval (PR approved; if "po" is empty the coordinator still has to create the PO) → Completed (or Cancelled). "prBy": "requester" means the PR arrived already raised by the requester (only follow up), "me" means the coordinator raises it. "ses" = Service Entry Sheet done.`,
       "Answer from the data below only — never invent requests, numbers or names. If the data can't answer, say so.",
       "Reply in the language the coordinator writes in (Arabic or English). Be concise and well-organized; use short lists when helpful. When asked to draft an email, SAP text or a message, write it ready to paste.",
       `Tracker data (${data.shown} of ${data.total} requests, newest first, one JSON object per line):`,
@@ -8401,8 +8620,22 @@ function App() {
                       <td>
                         <input type="checkbox" checked={selectedIds.has(r.id)} onChange={() => toggleSelected(r.id)} />
                       </td>
-                      <td>{r.prNumber || "—"}</td>
-                      <td>{r.poNumber || "—"}</td>
+                      <td>
+                        {r.prNumber || "—"}
+                        {r.prRaisedBy === "requester" && (
+                          <div className="text-xs" style={{ color: "var(--sap-gray)", whiteSpace: "nowrap" }} title="This PR arrived already raised by the requester — you follow it up, you don't create it">
+                            raised by requester
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        {r.poNumber || "—"}
+                        {!r.poNumber && r.status === "Waiting PO approval" && (
+                          <div className="text-xs font-semibold" style={{ color: "var(--sap-purple)", whiteSpace: "nowrap" }} title="The PR is approved — create the PO in SAP">
+                            → create PO
+                          </div>
+                        )}
+                      </td>
                       <td style={{ minWidth: 130 }}>
                         {r.owner}
                         {r.beneficiary && r.beneficiary.trim() && r.beneficiary.trim() !== (r.owner || "").trim() && (
@@ -8561,7 +8794,7 @@ function App() {
                         </p>
                       )}
                       {missingPr && <p className="font-semibold" style={{ color: "var(--sap-red)" }}>💾 Reminder: PR number not entered for this request</p>}
-                      {missingPo && <p className="font-semibold" style={{ color: "var(--sap-red)" }}>💾 Reminder: PO number not entered for this request</p>}
+                      {missingPo && <p className="font-semibold" style={{ color: "var(--sap-red)" }}>🧾 PR approved — the PO isn't created yet (or its number isn't entered)</p>}
                       <p style={{ color: "var(--sap-blue-dark)" }}><span className="font-semibold">Next step:</span> {getNextAction(req)}</p>
                     </div>
                     <button
