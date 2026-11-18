@@ -21,7 +21,7 @@ const ctx={console,Logger:{log:()=>{}},Date,
   computeDigest:(a,seed)=>[...crypto.createHash('sha256').update(seed).digest()],DigestAlgorithm:{SHA_256:1},getUuid:()=>crypto.randomUUID(),
   formatDate:(d,tz,f)=>{const x=new Date(d.getTime()+4*3600e3);return String(x.getUTCHours()).padStart(2,'0')+':'+String(x.getUTCMinutes()).padStart(2,'0')}}};
 vm.createContext(ctx);
-vm.runInContext(fs.readFileSync(__dirname+'/../server/Auth.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Code.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Custody.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Health.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Media.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Shirts.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Reports.gs','utf8'),ctx);
+vm.runInContext(fs.readFileSync(__dirname+'/../server/Auth.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Code.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Custody.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Health.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Media.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Shirts.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Reports.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Reception.gs','utf8'),ctx);
 const U=['Username','PasswordHash','Salt','FullName','Role','AssignedBus','Active','FailedAttempts','LockedUntil','TokenEpoch','LastActivityAt','CreatedAt','LastLogin'];
 book.Users=mkSheet([U]);book.Settings=mkSheet([['Key','Value']]);book.AuditLog=mkSheet([['Timestamp','ActorUsername','Action','TargetUsername','Details']]);
 // student sheet: reordered columns, includes Photo URL + Contact number which must never leak
@@ -501,6 +501,41 @@ post({action:'custodyRecord',token:ts,studentId:'3002',item:'phone',op:'receive'
 {const l=post({action:'gateList',token:tsc}).waiting.find(x=>x.id==='3002');r=post({action:'gateConfirm',token:tsc,id:l.wid});assert(!r.success&&r.code==='ITEMS_NOT_RETURNED','gate cannot let him out while his phone is still in custody');}
 r=post({action:'createCase',token:tsc,type:'student',text:'الاسم لا يطابق المستلِم',studentId:'3002'});assert(r.success,'scout can report a problem to the administration');
 r=post({action:'custodySummary',token:tsc});assert(!r.success,'scout has no access to custody data');
+// ---- reception: late registrations added by hand, and students who arrive WITH their guardian (not by bus)
+{post({action:'createUser',token:T,username:'recp',password:'prc-12345',fullName:'الاستقبال',role:'supervisor',permissions:['reception'],committees:[]});
+ const tr1=post({action:'login',username:'recp',password:'prc-12345'}).token,tb1=post({action:'login',username:'sup1',password:'p1-12345'}).token;
+ for(const a of ['receptionFind','receptionList','receptionAdd','receptionArrive','receptionUndo'])assert(!post({action:a,token:tb1,q:'x',name:'طالب جديد',studentId:'1002',guardian:'ولي أمر'}).success,'supervisor cannot use '+a);
+ let q=post({action:'receptionAdd',token:tr1,name:'سالم متأخر',cls:'6',team:'zzz',bus:'1'});assert(!q.success&&q.code==='BAD_REQUEST','unknown team rejected');
+ q=post({action:'receptionAdd',token:tr1,name:'ab'});assert(!q.success,'a full name is required');
+ q=post({action:'receptionAdd',token:tr1,name:'سالم متأخر',cls:'6',team:'أزرق',bus:'1',shirt:'xl',note:'سجّل قبل المخيم بيومين',clientId:'ad1'});assert(q.success&&q.id==='X1','late student added with an automatic id (X1)');const nid=q.id;
+ q=post({action:'receptionAdd',token:tr1,name:'سالم متأخر',cls:'6',clientId:'ad1'});assert(q.success&&q.repeated&&q.id===nid,'same request twice adds him once');
+ q=post({action:'receptionAdd',token:tr1,name:'أحمد الجديد',cls:'5',bus:'2',clientId:'ad4'});assert(q.success&&q.id==='X2','second late student gets X2');
+ q=post({action:'receptionAdd',token:tr1,name:'سالم متأخر',cls:'6',clientId:'ad5'});assert(!q.success&&q.code==='POSSIBLE_DUPLICATE','same name warns about a possible duplicate');
+ q=post({action:'receptionAdd',token:tr1,name:'سالم متأخر',cls:'6',clientId:'ad5',confirmDuplicate:true});assert(q.success&&q.id==='X3','duplicate allowed after confirmation');
+ const rost=post({action:'roster',token:tb1});assert(rost.students.some(x=>x.id==='X1'&&x.state==='none'),'the late student appears in his bus roster');
+ q=post({action:'receptionFind',token:tr1,q:'متأخر'});assert(q.results.some(x=>x.id==='X1'&&x.manual===true&&x.arrival===''),'reception search finds him');
+ assert(post({action:'shirtFind',token:T,q:'X1'}).results.some(x=>x.id==='X1'&&x.size==='XL'),'his shirt size reaches the shirts screen');
+ q=post({action:'reportData',token:T,report:'busAttendance',filters:{bus:'1'}});assert(q.rows.some(x=>x.id==='X1'),'and the attendance sheet');
+ // arrives with his guardian
+ q=post({action:'receptionArrive',token:tr1,studentId:'X1',guardian:'',clientId:'ar0'});assert(!q.success&&q.code==='BAD_REQUEST','guardian name is required');
+ q=post({action:'receptionArrive',token:tr1,studentId:'X1',guardian:'محمد سالم',relation:'father',clientId:'ar1'});assert(q.success&&q.student.via==='guardian'&&q.student.state==='boarded','arrival with the guardian recorded');
+ q=post({action:'receptionArrive',token:tr1,studentId:'X1',guardian:'محمد سالم',relation:'father',clientId:'ar1'});assert(q.success&&q.repeated,'retry is idempotent');
+ q=post({action:'receptionArrive',token:tr1,studentId:'X1',guardian:'آخر',clientId:'ar2'});assert(!q.success&&q.code==='DUPLICATE'&&q.via==='guardian','second arrival refused, says he came with the guardian');
+ q=post({action:'scan',token:tb1,studentId:'X1',op:'board',clientId:'ar3'});assert(!q.success&&q.code==='DUPLICATE','the bus supervisor cannot board him again');
+ const r2=post({action:'roster',token:tb1}).students.find(x=>x.id==='X1');assert(r2.state==='boarded'&&r2.via==='guardian','bus supervisor sees: arrived with guardian (not missing)');
+ const bs=post({action:'busState',token:tb1});assert(!bs.missing.some(x=>x.id==='X1'),'not in the missing list of the bus');
+ q=post({action:'roundSave',token:tb1,phase:'depart',absent:[],clientId:'rdg'});assert(q.success&&q.total===post({action:'roster',token:tb1}).students.filter(x=>x.state==='boarded'&&!x.via).length,'the verification round does not expect him on the bus');
+ const rep=post({action:'reportData',token:T,report:'busAttendance',filters:{bus:'1'}}).rows.find(x=>x.id==='X1');assert(rep.state==='حضر مع ولي الأمر','report says: came with guardian');
+ q=post({action:'receptionList',token:tr1});const ar=q.arrivals.find(x=>x.id==='X1');assert(ar&&ar.guardian==='محمد سالم'&&ar.relation==='father'&&q.added.some(x=>x.id==='X1')&&q.teams.length>0,'list shows the guardian and the added students');
+ assert(!JSON.stringify(q).includes('9999000'),'no phone numbers on the reception screen');
+ q=post({action:'receptionUndo',token:tr1,studentId:'X1'});assert(q.success,'arrival can be undone');
+ q=post({action:'receptionUndo',token:tr1,studentId:'X1'});assert(!q.success&&q.code==='NOTHING_TO_UNDO','nothing left to undo');
+ {const tb2=post({action:'login',username:'sup2',password:'p2-12345'}).token;post({action:'scan',token:tb2,studentId:'X2',op:'board',clientId:'bx2'});
+  q=post({action:'receptionUndo',token:tr1,studentId:'X2'});assert(!q.success&&q.code==='NOTHING_TO_UNDO','a bus boarding cannot be undone from reception');
+  q=post({action:'receptionArrive',token:tr1,studentId:'X2',guardian:'ولي أمر'});assert(!q.success&&q.code==='DUPLICATE'&&q.via==='bus','a student already on the bus is not re-registered');}
+ q=post({action:'receptionArrive',token:tr1,studentId:'9999',guardian:'ولي أمر'});assert(!q.success&&q.code==='NOT_FOUND','unknown student');
+ FORMULAS.length=0;post({action:'receptionAdd',token:tr1,name:'=HYPERLINK("x")',cls:'=1',clientId:'adf'});post({action:'receptionArrive',token:tr1,studentId:'X2',guardian:'=cmd',clientId:'arf'});assert(FORMULAS.length===0,'no formula can be injected through the reception forms');
+ assert(book.AuditLog.rows.some(x=>x[2]==='STUDENT_ADDED')&&book.AuditLog.rows.some(x=>x[2]==='RECEPTION_ARRIVAL'),'audit: reception');}
 // ---- sheet check
-r=post({action:'checkStudentSheet',token:T});assert(r.success&&r.report.ok&&r.report.total===6,'student sheet check passes');
+r=post({action:'checkStudentSheet',token:T});assert(r.success&&r.report.ok&&r.report.total===10,'student sheet check passes; students added by hand without a bus are not flagged');
 console.log(fails?`\n${fails} FAILED`:'\nALL PASSED');

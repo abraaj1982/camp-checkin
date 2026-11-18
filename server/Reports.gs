@@ -15,7 +15,7 @@ const REPORTS_ = [
   { id: 'campSummary', group: 'ملخصات', title: 'ملخص المخيم', filters: [], landscape: false }
 ];
 const REPORT_MAX_ROWS_ = 2000;
-const STATE_LABEL_ = { boarded: 'صعد', withdrawn: 'خرج بإذن', none: 'لم يصعد' };
+const STATE_LABEL_ = { boarded: 'صعد', withdrawn: 'خرج بإذن', none: 'لم يصعد', guardian: 'حضر مع ولي الأمر' };
 const EXIT_LABEL_ = { open: 'معتمد (بانتظار الخروج)', closed: 'خرج', cancelled: 'مُلغى', reversed: 'أُعيد الطالب' };
 
 function repText_(v, n) { return String(v === undefined || v === null ? '' : v).trim().slice(0, n || 40); }
@@ -67,7 +67,7 @@ function repBusAttendance_(f) {
     if (bus && s.bus !== bus) return; if (team && s.team !== team) return; if (cls && s.cls !== cls) return;
     const st = states[s.id], state = st ? st.state : 'none';
     if (status === 'boarded' && state !== 'boarded') return; if (status === 'withdrawn' && state !== 'withdrawn') return; if (status === 'missing' && state !== 'none') return;
-    rows.push({ id: s.id, name: s.name, team: s.team, cls: s.cls, bus: s.bus, state: STATE_LABEL_[state] || state, at: st && st.at && state !== 'none' ? st.at.toISOString() : '' });
+    rows.push({ id: s.id, name: s.name, team: s.team, cls: s.cls, bus: s.bus, state: st && st.via === 'guardian' ? STATE_LABEL_.guardian : (STATE_LABEL_[state] || state), at: st && st.at && state !== 'none' ? st.at.toISOString() : '' });
   });
   rows.sort(function(a, b) { return repNum_(a.bus, b.bus) || repNum_(a.id, b.id); });
   return { kind: 'table', columns: [{ key: 'id', label: 'الرقم' }, { key: 'name', label: 'الاسم', wide: true }, { key: 'team', label: 'الفريق' }, { key: 'cls', label: 'الصف' }, { key: 'bus', label: 'الباص' }, { key: 'state', label: 'الحالة' }, { key: 'at', label: 'الوقت', type: 'time' }], rows: rows,
@@ -170,7 +170,7 @@ function repStudentSheet_(f) {
   readStudents_().students.forEach(function(s) {
     if (bus && s.bus !== bus) return; if (team && s.team !== team) return; if (cls && s.cls !== cls) return;
     const r = { id: s.id, name: s.name, team: s.team, cls: s.cls, bus: s.bus };
-    if (use.indexOf('att') !== -1) { const st = states[s.id], state = st ? st.state : 'none'; r.state = STATE_LABEL_[state] || state; r.at = st && st.at && state !== 'none' ? st.at.toISOString() : ''; }
+    if (use.indexOf('att') !== -1) { const st = states[s.id], state = st ? st.state : 'none'; r.state = st && st.via === 'guardian' ? STATE_LABEL_.guardian : (STATE_LABEL_[state] || state); r.at = st && st.at && state !== 'none' ? st.at.toISOString() : ''; }
     if (use.indexOf('exit') !== -1) { const w = lastExit[s.id]; r.exit = w ? (EXIT_LABEL_[w.status] || w.status) : ''; r.exitAt = w ? (w.status === 'closed' ? w.closedAt : w.time) : ''; }
     if (use.indexOf('shirt') !== -1) { const g = given['student:' + s.id]; r.size = normSize_(s.shirt) || 'غير محدد'; r.shirt = g ? 'استلم' : 'لم يستلم'; }
     rows.push(r);

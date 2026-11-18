@@ -77,6 +77,11 @@ const ACTIONS_ = {
   prayerSave: function(d) { return handlePrayerSave_(d); },
   displayTheme: function(d) { return handleDisplayTheme_(d); },
   roundSave: function(d) { return handleRoundSave_(d); },
+  receptionFind: function(d) { return handleReceptionFind_(d); },
+  receptionArrive: function(d) { return handleReceptionArrive_(d); },
+  receptionUndo: function(d) { return handleReceptionUndo_(d); },
+  receptionList: function(d) { return handleReceptionList_(d); },
+  receptionAdd: function(d) { return handleReceptionAdd_(d); },
   reportOptions: function(d) { return handleReportOptions_(d); },
   reportData: function(d) { return handleReportData_(d); },
   shirtStock: function(d) { return handleShirtStock_(d); },
@@ -186,6 +191,7 @@ function readStudents_() {
       _row: i + 1
     });
   }
+  readExtraStudents_().forEach(function(x) { if (!students.some(function(s) { return s.id === x.id; })) students.push(x); }); // students added by hand
   const result = { students: students, cols: cols };
   try { cache.put('students_v2', JSON.stringify(result), 60); } catch (e) { /* too large: skip cache */ }
   return result;
@@ -218,7 +224,7 @@ function scanStates_() {
   const data = scansSheet_().getDataRange().getValues();
   const h = data[0] || [];
   const ix = function(n) { return h.indexOf(n); };
-  const iT = ix('Time'), iS = ix('StudentID'), iA = ix('Action'), iB = ix('Bus'), iU = ix('Supervisor'), iC = ix('ClientId');
+  const iT = ix('Time'), iS = ix('StudentID'), iA = ix('Action'), iB = ix('Bus'), iU = ix('Supervisor'), iC = ix('ClientId'), iM = ix('Method'), iN = ix('Notes');
   const states = {}, clients = {};
   for (let r = 1; r < data.length; r++) {
     const id = String(data[r][iS]).trim();
@@ -226,7 +232,7 @@ function scanStates_() {
     const act = String(data[r][iA]);
     const when = data[r][iT] instanceof Date ? data[r][iT] : new Date(data[r][iT]);
     if (iC !== -1 && data[r][iC]) clients[String(data[r][iC])] = { id: id, act: act };
-    if (act === 'board') states[id] = { state: 'boarded', at: when, by: data[r][iU], bus: String(data[r][iB]) };
+    if (act === 'board') { const viaG = iM !== -1 && String(data[r][iM]) === 'guardian'; states[id] = { state: 'boarded', at: when, by: data[r][iU], bus: String(data[r][iB]), via: viaG ? 'guardian' : '', note: viaG && iN !== -1 ? String(data[r][iN]) : '' }; }
     else if (act === 'withdraw') states[id] = { state: 'withdrawn', at: when, by: data[r][iU], bus: String(data[r][iB]), prev: states[id] || null };
     else if (act === 'readmit') { const pv = states[id] && states[id].prev; if (pv) states[id] = pv; else delete states[id]; } // back to what he was before the withdrawal
     else if (act === 'undo') delete states[id];
@@ -248,7 +254,7 @@ function busCounts_(bus, students, states) {
 
 function publicStudent_(s, st, withSup) {
   const out = { id: s.id, name: s.name, team: s.team, cls: s.cls, bus: s.bus,
-    state: st ? st.state : 'none', at: st && st.at ? fmtTime_(st.at) : '' };
+    state: st ? st.state : 'none', at: st && st.at ? fmtTime_(st.at) : '', via: st && st.via ? st.via : '' };
   if (withSup) out.supervisor = busSupervisorName_(s.bus);
   return out;
 }
@@ -726,7 +732,7 @@ function checkStudentSheet_() {
   const seen = {}, perBus = {}, dups = [], noBus = [];
   result.students.forEach(function(st) {
     if (seen[st.id]) dups.push(st.id); seen[st.id] = true;
-    if (!st.bus) noBus.push('صف ' + st._row);
+    if (!st.bus && !st.manual) noBus.push('صف ' + st._row); // a student added at reception may come with his guardian (no bus)
     perBus[st.bus || '—'] = (perBus[st.bus || '—'] || 0) + 1;
   });
   if (dups.length) { report.ok = false; report.problems.push('أرقام طلاب مكررة: ' + dups.join(', ')); }
@@ -762,7 +768,7 @@ function handleRoundSave_(data) {
     if (!bus) return { success: false, code: 'BAD_REQUEST', error: 'لا يوجد باص مخصَّص لحسابك' };
     const clientId = String(data.clientId || '').slice(0, 60);
     const students = readStudents_().students, states = scanStates_().states;
-    const boarded = students.filter(function(s) { return s.bus === bus && states[s.id] && states[s.id].state === 'boarded'; }).map(function(s) { return s.id; });
+    const boarded = students.filter(function(s) { return s.bus === bus && states[s.id] && states[s.id].state === 'boarded' && !states[s.id].via; }).map(function(s) { return s.id; });
     const absent = []; (Array.isArray(data.absent) ? data.absent : []).map(String).forEach(function(id) { if (boarded.indexOf(id) !== -1 && absent.indexOf(id) === -1) absent.push(id); });
     const lock = LockService.getScriptLock();
     lock.waitLock(10000);

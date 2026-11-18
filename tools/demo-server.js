@@ -17,7 +17,7 @@ const ctx={console,Logger:{log:()=>{}},Date,
   computeDigest:(a,seed)=>[...crypto.createHash('sha256').update(seed).digest()],DigestAlgorithm:{SHA_256:1},getUuid:()=>crypto.randomUUID(),
   formatDate:(d,tz,f)=>{const x=new Date(d.getTime()+4*3600e3);return String(x.getUTCHours()).padStart(2,'0')+':'+String(x.getUTCMinutes()).padStart(2,'0')}}};
 vm.createContext(ctx);
-vm.runInContext(fs.readFileSync(__dirname+'/../server/Auth.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Code.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Custody.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Health.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Media.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Shirts.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Reports.gs','utf8'),ctx);
+vm.runInContext(fs.readFileSync(__dirname+'/../server/Auth.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Code.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Custody.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Health.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Media.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Shirts.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Reports.gs','utf8')+'\n'+fs.readFileSync(__dirname+'/../server/Reception.gs','utf8'),ctx);
 // ---------- DEMO SERVER: the REAL server code + invented data. Never touches any real sheet. ----------
 const U=['Username','PasswordHash','Salt','FullName','Role','AssignedBus','Active','FailedAttempts','LockedUntil','TokenEpoch','LastActivityAt','CreatedAt','LastLogin'];
 book.Users=mkSheet([U]);book.Settings=mkSheet([['Key','Value']]);book.AuditLog=mkSheet([['Timestamp','ActorUsername','Action','TargetUsername','Details']]);
@@ -35,7 +35,7 @@ post({action:'createUser',username:'admin',password:'demo-1234',fullName:'مدي
 const T=post({action:'login',username:'admin',password:'demo-1234'}).token;
 const mk=(u,n,role,bus,perms)=>post({action:'createUser',token:T,username:u,password:'demo-1234',fullName:n,role:role,assignedBus:bus||'',permissions:perms||undefined,committees:[]});
 mk('sup1','مشرف الباص 1','supervisor','1');mk('sup2','مشرف الباص 2','supervisor','2');mk('sup3','مشرف الباص 3','supervisor','3');mk('sup4','مشرف الباص 4','supervisor','4');
-mk('leader','قائد المخيم','camp_leader','',['dashboard','stats','allbuses']);mk('secr','السكرتارية','supervisor','',['reports','custody','print']);
+mk('leader','قائد المخيم','camp_leader','',['dashboard','stats','allbuses']);mk('secr','السكرتارية','supervisor','',['reports','custody','print','reception']);
 mk('doctor','الطبيب','supervisor','',['medical']);mk('nutri','لجنة التغذية','supervisor','',['nutrition']);mk('scout','لجنة الكشافة','supervisor','',['gate']);mk('media','اللجنة الإعلامية','supervisor','',['announce','results','verify']);
 const tok=u=>post({action:'login',username:u,password:'demo-1234'}).token;
 const tokS=[1,2,3,4].map(i=>tok('sup'+i));

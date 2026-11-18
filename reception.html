@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="ar" dir="rtl" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>الاستقبال — MUKHAYYAM</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="theme.css">
+<script src="ui.js" defer></script>
+<style>
+.stu2{display:flex;gap:12px;align-items:center}.stu2 .av{width:54px;height:54px;border-radius:16px;background:var(--soft);display:grid;place-items:center;font-size:26px;flex:none}
+.banner.go{background:var(--okbg);color:var(--ok)}
+.fgrid{display:grid;grid-template-columns:1fr;gap:10px}@media(min-width:520px){.fgrid.two{grid-template-columns:1fr 1fr}}
+.arow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}.arow:last-child{border:0}
+.arow .g{font-size:13px;color:var(--muted)}
+.btn.go{background:#1F7A45;min-height:58px;font-size:18px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hdr">
+    <div class="brand"><div class="logo">م</div><div style="min-width:0"><div class="t" id="campT"></div><div class="s" id="campS"></div></div></div>
+    <div class="tools"><a class="tool" href="hub.html" id="homeBtn"></a><button class="tool" id="langBtn"></button><button class="tool" id="themeBtn"></button></div>
+  </header>
+  <section class="hero compact"><div class="ic" aria-hidden="true">🛎️</div><div><h1 id="hT"></h1><p id="hS"></p></div></section>
+  <main id="app"></main>
+</div>
+<script>
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4lEBGPNxghwq9UmK0iljI5QdS-8iCvC-K09dDtbZCXGvGZyA4repTE3rFVVRp5zS4yw/exec';
+const token = sessionStorage.getItem('mukhayyam_token');
+let perms = [];
+try { perms = JSON.parse(sessionStorage.getItem('mukhayyam_permissions') || '[]'); } catch (e) {}
+const can = k => perms.indexOf('*') !== -1 || perms.indexOf(k) !== -1;
+if (!token) location.href = 'login.html'; else if (!can('reception')) location.href = 'hub.html';
+const pref = { get(k, d) { try { return localStorage.getItem('mk_pref_' + k) || d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('mk_pref_' + k, v); } catch (e) {} } };
+const $ = id => document.getElementById(id);
+const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const AUTH_ERR = /EXPIRED|IDLE_TIMEOUT|REVOKED|BAD_SIGNATURE|MALFORMED|USER_NOT_FOUND|ACCOUNT_DISABLED|BAD_PAYLOAD/;
+const REL = { father: ['الأب', 'Father'], mother: ['الأم', 'Mother'], brother: ['الأخ', 'Brother'], sister: ['الأخت', 'Sister'], relative: ['قريب', 'Relative'], other: ['آخر', 'Other'] };
+const T = {
+ ar: { dir: 'rtl', title: 'الاستقبال', sub: 'دخول الطلاب مع أولياء أمورهم · إضافة المسجّلين المتأخرين', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
+  tArrive: 'دخول مع ولي الأمر', tAdd: 'إضافة طالب', search: 'اسم الطالب أو رقمه', none: 'لا نتائج', bus: n => 'باص ' + n, noBus: 'بلا باص', guardian: 'اسم ولي الأمر', relation: 'صلة القرابة', optional: 'اختياري', register: 'تسجيل الدخول مع ولي الأمر',
+  onBus: 'صعد الباص مسبقًا. لا حاجة لتسجيله هنا.', withG: n => 'دخل مسبقًا مع ولي أمره', undo: 'تراجع عن الدخول', confirmUndo: 'التراجع عن هذا الدخول؟', todayList: 'دخلوا مع أولياء أمورهم', noArrivals: 'لا يوجد بعد.',
+  done: 'تم تسجيل الدخول ✓', undone: 'تم التراجع', name: 'اسم الطالب (كاملًا)', cls: 'الصف', team: 'الفريق', busLbl: 'الباص', shirt: 'مقاس القميص', note: 'ملاحظة', add: 'إضافة الطالب', added: (id, n) => `تمت إضافة ${n}. رقمه: ${id}`, addedList: 'أُضيفوا يدويًا', noAdded: 'لم يُضف أحد بعد.',
+  printBand: 'اطبع سواره', dupAsk: e => `يوجد طالب بنفس الاسم (${e.name} · ${e.id}). هل هذا طالب مختلف؟ اضغط موافق للإضافة.`, none2: 'بلا', pick: 'اختر', manual: 'مضاف يدويًا',
+  error: 'تعذّر الاتصال. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.', codes: { DUPLICATE: 'سُجّل مسبقًا', WITHDRAWN: 'الطالب خرج بإذن', NOT_FOUND: 'الطالب غير موجود', BAD_REQUEST: 'تحقق من البيانات المكتوبة', NOTHING_TO_UNDO: 'لا يوجد ما يُتراجع عنه' } },
+ en: { dir: 'ltr', title: 'Reception', sub: 'Arrivals with guardians · late registrations', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
+  tArrive: 'Arrive with guardian', tAdd: 'Add a student', search: 'Student name or number', none: 'No results', bus: n => 'Bus ' + n, noBus: 'No bus', guardian: 'Guardian name', relation: 'Relationship', optional: 'optional', register: 'Register arrival with guardian',
+  onBus: 'Already boarded the bus. No need to register here.', withG: n => 'Already arrived with his guardian', undo: 'Undo arrival', confirmUndo: 'Undo this arrival?', todayList: 'Arrived with guardians', noArrivals: 'None yet.',
+  done: 'Arrival registered ✓', undone: 'Undone', name: 'Student full name', cls: 'Class', team: 'Team', busLbl: 'Bus', shirt: 'Shirt size', note: 'Note', add: 'Add student', added: (id, n) => `${n} added. Number: ${id}`, addedList: 'Added by hand', noAdded: 'Nobody added yet.',
+  printBand: 'Print wristband', dupAsk: e => `A student with the same name exists (${e.name} · ${e.id}). Is this a different student? Press OK to add.`, none2: 'None', pick: 'Choose', manual: 'Added by hand',
+  error: 'Connection problem. Try again.', sessionEnd: 'Session expired. Please log in again.', codes: { DUPLICATE: 'Already registered', WITHDRAWN: 'The student left with permission', NOT_FOUND: 'Student not found', BAD_REQUEST: 'Check the entered data', NOTHING_TO_UNDO: 'Nothing to undo' } }
+};
+const st = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), tab: 'arrive', q: '', results: [], cur: null, arrivals: [], added: [], teams: [], buses: [], classes: [], msg: null, f: { name: '', cls: '', team: '', bus: '', shirt: '', note: '' }, g: { name: '', rel: '' }, last: null };
+const L = () => T[st.lang];
+async function api(action, extra) {
+  const r = await (await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(Object.assign({ action: action, token: token }, extra || {})) })).json();
+  if (r && r.code && AUTH_ERR.test(r.code)) { st.msg = { cls: 'bad', t: L().sessionEnd }; render(); setTimeout(() => { sessionStorage.clear(); location.href = 'login.html'; }, 1500); throw new Error('auth'); }
+  return r;
+}
+const say = (cls, t) => { st.msg = { cls: cls, t: t }; };
+const errText = r => (r && L().codes[r.code]) || (r && r.error) || L().error;
+const hhmm = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleTimeString('en-GB', { timeZone: 'Asia/Muscat', hour: '2-digit', minute: '2-digit' }); };
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2));
+const rel = k => k && REL[k] ? REL[k][st.lang === 'en' ? 1 : 0] : '';
+async function load() { try { const r = await api('receptionList'); if (r.success) { st.arrivals = r.arrivals; st.added = r.added; st.teams = r.teams; st.buses = r.buses; st.classes = r.classes; } } catch (e) {} render(); }
+let qT = null;
+function onQ(v) { st.q = v; st.cur = null; clearTimeout(qT); if (!v.trim()) { st.results = []; return render(); }
+  qT = setTimeout(async () => { try { const r = await api('receptionFind', { q: v.trim() }); if (r.success && st.q === v) { st.results = r.results; if (r.results.length === 1) st.cur = r.results[0]; render(); } } catch (e) {} }, 300); }
+async function arrive() {
+  const c = st.cur; if (!c) return;
+  try { const r = await api('receptionArrive', { studentId: c.id, guardian: st.g.name, relation: st.g.rel, clientId: uid() });
+    if (r.success) { say('ok', L().done + ' — ' + c.name); st.cur = null; st.q = ''; st.results = []; st.g = { name: '', rel: '' }; await load(); return; }
+    say('bad', errText(r)); if (r.code === 'DUPLICATE') { c.arrival = r.via === 'guardian' ? 'guardian' : 'bus'; }
+  } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
+  render();
+}
+async function undo(id) { if (!confirm(L().confirmUndo)) return; try { const r = await api('receptionUndo', { studentId: id }); say(r.success ? 'ok' : 'bad', r.success ? L().undone : errText(r)); if (st.cur && st.cur.id === id) { st.cur = null; st.q = ''; st.results = []; } } catch (e) { if (e.message !== 'auth') say('bad', L().error); } await load(); }
+async function addStudent(confirmDup) {
+  const f = st.f;
+  try { const r = await api('receptionAdd', { name: f.name, cls: f.cls, team: f.team, bus: f.bus, shirt: f.shirt, note: f.note, confirmDuplicate: confirmDup || undefined, clientId: st.addId || (st.addId = uid()) });
+    if (r.success) { st.last = { id: r.id, name: r.name }; say('ok', L().added(r.id, r.name)); st.f = { name: '', cls: '', team: '', bus: '', shirt: '', note: '' }; st.addId = null; await load(); return; }
+    if (r.code === 'POSSIBLE_DUPLICATE') { if (confirm(L().dupAsk(r.existing))) return addStudent(true); render(); return; }
+    say('bad', errText(r));
+  } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
+  render();
+}
+function stuLine(c) { const l = L(); return `<div class="stu2"><div class="av">🎓</div><div style="flex:1;min-width:0"><div class="big2">${esc(c.name)}</div><div class="muted" style="font-size:13px">${esc(c.id)}</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${c.team ? `<span class="pill">${esc(c.team)}</span>` : ''}${c.cls ? `<span class="pill">${esc(c.cls)}</span>` : ''}<span class="pill">${c.bus ? l.bus(esc(c.bus)) : l.noBus}</span>${c.manual ? `<span class="pill warn">${l.manual}</span>` : ''}</div></div></div>`; }
+function curCard() {
+  const l = L(), c = st.cur; if (!c) return '';
+  if (c.arrival === 'bus') return `<section class="card">${stuLine(c)}<div class="banner warn" style="margin-top:10px">${l.onBus}</div></section>`;
+  if (c.arrival === 'guardian') return `<section class="card">${stuLine(c)}<div class="banner go" style="margin-top:10px">${l.withG()}</div><button class="btn alt full" style="margin-top:8px" data-undo="${esc(c.id)}">${l.undo}</button></section>`;
+  return `<section class="card">${stuLine(c)}<div class="fgrid two" style="margin-top:12px"><div><label class="lbl" for="gn">${l.guardian}</label><input id="gn" type="text" maxlength="60" value="${esc(st.g.name)}" autocomplete="off"></div>
+    <div><label class="lbl" for="gr">${l.relation} (${l.optional})</label><select id="gr"><option value="">—</option>${Object.keys(REL).map(k => `<option value="${k}" ${st.g.rel === k ? 'selected' : ''}>${esc(REL[k][st.lang === 'en' ? 1 : 0])}</option>`).join('')}</select></div></div>
+    <button class="btn go full" style="margin-top:12px" data-arrive="1" ${st.g.name.trim().length < 3 ? 'disabled' : ''}>${l.register}</button></section>`;
+}
+function resultsHtml() { const l = L(); if (!st.q.trim()) return ''; if (!st.results.length) return `<div class="muted" style="padding:8px">${l.none}</div>`; if (st.cur) return '';
+  return st.results.map(s => `<button class="res" data-pick="${esc(s.id)}"><span><b>${esc(s.name)}</b> <span class="muted">· ${esc(s.id)} · ${s.bus ? l.bus(esc(s.bus)) : l.noBus}</span></span><span class="pill ${s.arrival ? 'ok' : ''}">${s.arrival === 'guardian' ? '🚗' : s.arrival === 'bus' ? '🚌' : ''}</span></button>`).join(''); }
+function arriveView() {
+  const l = L();
+  return `<section class="card"><label class="lbl" for="q">${l.search}</label><input id="q" type="search" value="${esc(st.q)}" autocomplete="off"><div id="qres" style="margin-top:6px">${resultsHtml()}</div></section>${curCard()}
+    <section class="card"><h2 class="h2" style="margin-bottom:6px">${l.todayList} (${st.arrivals.length})</h2>${st.arrivals.length ? st.arrivals.map(a => `<div class="arow"><div><b>${esc(a.name)}</b> <span class="muted">· ${esc(a.id)}</span><div class="g">🚗 ${esc(a.guardian)}${a.relation ? ' (' + esc(rel(a.relation)) + ')' : ''} · ${esc(hhmm(a.at))}</div></div><button class="chip" data-undo="${esc(a.id)}">${l.undo}</button></div>`).join('') : `<div class="muted">${l.noArrivals}</div>`}</section>`;
+}
+function opt(list, val, blank) { return `<option value="">${blank}</option>` + list.map(x => `<option value="${esc(x)}" ${val === x ? 'selected' : ''}>${esc(x)}</option>`).join(''); }
+function addView() {
+  const l = L(), f = st.f;
+  return `<section class="card"><div class="fgrid"><div><label class="lbl" for="fn">${l.name}</label><input id="fn" type="text" maxlength="60" value="${esc(f.name)}" autocomplete="off"></div>
+    <div class="fgrid two"><div><label class="lbl" for="fc">${l.cls}</label><select id="fc" data-f="cls">${opt(st.classes, f.cls, l.pick)}</select></div><div><label class="lbl" for="ft">${l.team}</label><select id="ft" data-f="team">${opt(st.teams, f.team, l.pick)}</select></div></div>
+    <div class="fgrid two"><div><label class="lbl" for="fb">${l.busLbl}</label><select id="fb" data-f="bus">${opt(st.buses, f.bus, l.noBus)}</select></div><div><label class="lbl" for="fs">${l.shirt} (${l.optional})</label><input id="fs" type="text" maxlength="8" value="${esc(f.shirt)}" placeholder="M / L / XL" autocomplete="off"></div></div>
+    <div><label class="lbl" for="fo">${l.note} (${l.optional})</label><input id="fo" type="text" maxlength="100" value="${esc(f.note)}" autocomplete="off"></div></div>
+    <button class="btn go full" style="margin-top:12px" data-add="1" ${f.name.trim().length < 3 ? 'disabled' : ''}>${l.add}</button>
+    ${st.last ? `<div class="banner go" style="margin-top:10px">${esc(l.added(st.last.id, st.last.name))} <a href="wristbands.html" style="margin-inline-start:8px">${l.printBand}</a></div>` : ''}</section>
+    <section class="card"><h2 class="h2" style="margin-bottom:6px">${l.addedList} (${st.added.length})</h2>${st.added.length ? st.added.map(a => `<div class="arow"><div><b>${esc(a.name)}</b> <span class="muted">· ${esc(a.id)}</span><div class="g">${esc([a.cls, a.team, a.bus ? l.bus(a.bus) : l.noBus, a.shirt].filter(Boolean).join(' · '))}</div></div></div>`).join('') : `<div class="muted">${l.noAdded}</div>`}</section>`;
+}
+function render() {
+  const l = L(); document.documentElement.lang = st.lang; document.documentElement.dir = l.dir; document.documentElement.dataset.theme = st.theme; document.title = l.title + ' — MUKHAYYAM';
+  $('hT').textContent = l.title; $('hS').textContent = l.sub; $('homeBtn').textContent = l.home; $('langBtn').textContent = l.lang; $('themeBtn').textContent = st.theme === 'light' ? l.dark : l.light;
+  const ae = document.activeElement, keep = ae && ae.id ? { id: ae.id, pos: ae.selectionStart } : null;
+  $('app').innerHTML = `${st.msg ? `<div class="banner ${st.msg.cls}" role="alert">${esc(st.msg.t)}</div>` : ''}<div class="tabs">${[['arrive', l.tArrive], ['add', l.tAdd]].map(t => `<button class="${st.tab === t[0] ? 'on' : ''}" data-tab="${t[0]}">${t[1]}</button>`).join('')}</div>${st.tab === 'arrive' ? arriveView() : addView()}`;
+  if (keep && $(keep.id) && ['INPUT', 'TEXTAREA'].indexOf($(keep.id).tagName) !== -1) { const e = $(keep.id); e.focus(); try { e.setSelectionRange(keep.pos, keep.pos); } catch (x) {} }
+}
+document.addEventListener('input', e => { const i = e.target.id;
+  if (i === 'q') onQ(e.target.value); else if (i === 'gn') { st.g.name = e.target.value; render(); } else if (i === 'fn') { st.f.name = e.target.value; render(); } else if (i === 'fs') st.f.shirt = e.target.value; else if (i === 'fo') st.f.note = e.target.value; });
+document.addEventListener('change', e => { const i = e.target.id; if (i === 'gr') st.g.rel = e.target.value; else if (e.target.dataset && e.target.dataset.f) st.f[e.target.dataset.f] = e.target.value; });
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('button'); if (!b) return; const d = b.dataset;
+  if (d.tab) { st.tab = d.tab; st.msg = null; render(); } else if (d.arrive) arrive(); else if (d.add) addStudent(false); else if (d.undo) undo(d.undo);
+  else if (d.pick) { st.cur = st.results.find(x => x.id === d.pick) || null; st.msg = null; render(); }
+});
+$('langBtn').onclick = () => { st.lang = st.lang === 'ar' ? 'en' : 'ar'; pref.set('lang', st.lang); render(); };
+$('themeBtn').onclick = () => { st.theme = st.theme === 'light' ? 'dark' : 'light'; pref.set('theme', st.theme); render(); };
+render(); load();
+</script>
+</body></html>
