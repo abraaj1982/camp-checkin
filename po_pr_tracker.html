@@ -4228,6 +4228,12 @@ function buildHeaderNote(req) {
     `This request requires a ${req.serviceType || "service"} booking for ${who}${duration}.`,
   ];
   if (req.department) parts.push(`Project/Department: ${req.department}.`);
+  if (req.chargeTo === "project") {
+    const ref = [req.projectName && `project ${req.projectName}`, req.network && `Network ${req.network}`, req.activity && `Activity ${req.activity}`].filter(Boolean).join(", ");
+    parts.push(`Charged to the project${ref ? ` (${ref})` : ""}.`);
+  } else if (req.chargeTo === "cost_center") {
+    parts.push(`Charged to cost center${req.costCenter ? ` ${req.costCenter}` : ""}.`);
+  }
   if (req.vendor) parts.push(`Vendor: ${req.vendor}.`);
   parts.push(`Requested by: ${req.owner || "—"}.`);
   if (req.notes && req.notes.trim()) parts.push(`Notes: ${req.notes.trim().slice(0, 300)}`);
@@ -5047,6 +5053,125 @@ function batchColorFor(batchId) {
 }
 
 // ---------------------------------------------------------------------------
+// Who pays: a Cost Center or a Project
+//
+// A cost-center request is simply charged to that cost center. A project
+// request is charged to the project itself, through its Network and Activity
+// — and SAP won't take the PR (or the PO) without both, so they are hard
+// requirements, chased from the moment the email arrives.
+// ---------------------------------------------------------------------------
+const CHARGE_TYPES = [
+  { id: "cost_center", icon: "🏢", title: "Cost Center", hint: "Charged to the cost center — nothing else needed" },
+  { id: "project", icon: "🏗️", title: "Project", hint: "Charged to the project — Network & Activity are required" },
+];
+
+function detectCharge(text) {
+  const t = String(text || "");
+  const grab = (re) => { const m = t.match(re); return m ? m[1].trim() : ""; };
+  const network =
+    grab(/\bnetwork\s*(?:no\.?|number|#|code)?\s*[:\-]?\s*([A-Z]{0,3}\d{4,12})\b/i) ||
+    grab(/(?:رقم الشبكة|الشبكة|نتورك|النتورك)\s*[:\-]?\s*([A-Z]{0,3}\d{4,12})/i);
+  const activity =
+    grab(/\bactivity\s*(?:no\.?|number|#|code)?\s*[:\-]?\s*([A-Z]{0,3}\d{2,6})\b/i) ||
+    grab(/(?:رقم النشاط|النشاط|اكتيفيتي|الاكتيفيتي)\s*[:\-]?\s*([A-Z]{0,3}\d{2,6})/i);
+  const costCenter =
+    grab(/\bcost\s*cent(?:er|re)\s*(?:no\.?|number|#|code)?\s*[:\-]?\s*([A-Z]{0,4}\d{3,10})\b/i) ||
+    grab(/(?:مركز التكلفة|مركز تكلفة|كوست سنتر)\s*[:\-]?\s*([A-Z]{0,4}\d{3,10})/i);
+  const projectName =
+    grab(/\bproject\s*(?:name|no\.?|number|#|code)?\s*[:\-]\s*([^\n,;]{2,60})/i) ||
+    grab(/(?:اسم المشروع|المشروع|مشروع)\s*[:\-]\s*([^\n،,;]{2,60})/i);
+  const mentionsProject = !!(network || activity || projectName) || /\b(network|wbs)\b|\bproject\b|مشروع|نتورك|اكتيفيتي/i.test(t);
+  const mentionsCC = !!costCenter || /cost\s*cent(?:er|re)|مركز (?:ال)?تكلفة|كوست سنتر/i.test(t);
+  let chargeTo = "";
+  if (network || activity) chargeTo = "project";
+  else if (mentionsCC && !mentionsProject) chargeTo = "cost_center";
+  else if (mentionsProject && !mentionsCC) chargeTo = "project";
+  return { chargeTo, costCenter, projectName, network, activity };
+}
+
+// What a request still lacks before its PR can go into SAP — the same rule
+// everywhere: intake, the table, Today's Follow-up and the status gate.
+function requestGaps(req) {
+  const gaps = [];
+  if (!(req.serviceDateFrom || req.requiredDate)) gaps.push("Dates");
+  if (!(req.department || "").trim()) gaps.push("Department");
+  if (!req.chargeTo) gaps.push("Project or Cost Center");
+  if (req.chargeTo === "project") {
+    if (!(req.network || "").trim()) gaps.push("Network");
+    if (!(req.activity || "").trim()) gaps.push("Activity");
+  }
+  if (req.status !== "Pending" && !(req.prNumber || "").trim()) gaps.push("PR number");
+  return gaps;
+}
+
+function chargeLine(req) {
+  if (req.chargeTo === "project") {
+    const bits = [req.projectName, req.network && `NW ${req.network}`, req.activity && `Act ${req.activity}`].filter(Boolean);
+    return `🏗️ Project${bits.length ? " · " + bits.join(" · ") : ""}`;
+  }
+  if (req.chargeTo === "cost_center") return `🏢 Cost Center${req.costCenter ? " · " + req.costCenter : ""}`;
+  return "";
+}
+
+// One editor for the charge, used at intake, in New Request and in Update Status.
+function ChargeFields({ value, onChange, compact }) {
+  const v = value || {};
+  const set = (k) => (e) => onChange({ ...v, [k]: e.target.value });
+  const missingStyle = (x) => (!(x || "").trim() ? { borderColor: "var(--sap-red)", background: "#FFF7F8" } : undefined);
+  return (
+    <div className="flex flex-col gap-2">
+      <div className={`grid grid-cols-1 ${compact ? "" : "md:"}grid-cols-2 gap-2`}>
+        {CHARGE_TYPES.map((c) => {
+          const on = v.chargeTo === c.id;
+          return (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => onChange({ ...v, chargeTo: on ? "" : c.id })}
+              className="text-left p-3"
+              style={{
+                borderRadius: 12,
+                cursor: "pointer",
+                background: on ? "#EEF1FF" : "#fff",
+                border: `2px solid ${on ? "#3D5AFE" : "var(--sap-border)"}`,
+              }}
+            >
+              <div className="text-sm font-semibold" style={{ color: on ? "#3D5AFE" : "var(--sap-text)" }}>{c.icon} {c.title}</div>
+              {!compact && <div className="text-xs mt-0.5" style={{ color: "var(--sap-gray)" }}>{c.hint}</div>}
+            </button>
+          );
+        })}
+      </div>
+      {v.chargeTo === "project" && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+          <div>
+            <label className="sap-label">Project (name / number)</label>
+            <input value={v.projectName || ""} onChange={set("projectName")} className="sap-input" />
+          </div>
+          <div>
+            <label className="sap-label">Network *</label>
+            <input value={v.network || ""} onChange={set("network")} className="sap-input" style={missingStyle(v.network)} placeholder="Required" />
+          </div>
+          <div>
+            <label className="sap-label">Activity *</label>
+            <input value={v.activity || ""} onChange={set("activity")} className="sap-input" style={missingStyle(v.activity)} placeholder="Required" />
+          </div>
+        </div>
+      )}
+      {v.chargeTo === "project" && (!(v.network || "").trim() || !(v.activity || "").trim()) && (
+        <p className="text-xs font-semibold" style={{ color: "var(--sap-red)" }}>⛔ The PR/PO can't be created without the Network and Activity — get them from the requester.</p>
+      )}
+      {v.chargeTo === "cost_center" && (
+        <div style={{ maxWidth: 320 }}>
+          <label className="sap-label">Cost Center (if given)</label>
+          <input value={v.costCenter || ""} onChange={set("costCenter")} className="sap-input" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Where the PR stands when a request email arrives
 //
 // The company flow is always PR → PR approval → PO → PO approval. A request
@@ -5081,6 +5206,9 @@ function getNextAction(req) {
   const byRequester = req.prRaisedBy === "requester";
   switch (req.status) {
     case "Pending":
+      if (req.chargeTo === "project" && (!req.network || !req.activity))
+        return "Get the Network & Activity from the requester — the PR can't be created without them";
+      if (!req.chargeTo) return "Confirm whether this is charged to a Project or a Cost Center";
       if (!req.vendor) return "Choose a supplier, then create the PR in SAP (📋 Copy for SAP)";
       return "Create the PR in SAP (📋 Copy for SAP), then enter the PR number here";
     case "Waiting PR approval":
@@ -5915,7 +6043,7 @@ const EXCEL_HEADER_FILL = "3D5AFE";
 const EXCEL_BORDER = { style: "thin", color: { rgb: "E7EAF3" } };
 const EXCEL_COLUMNS = [
   "PR Number", "PR Raised By", "PO Number", "Requester", "Beneficiary", "Service From", "Service To",
-  "Department", "Service Type", "Vendor", "Status", "Budget", "Final Amount",
+  "Department", "Charged To", "Project", "Network", "Activity", "Cost Center", "Service Type", "Vendor", "Status", "Budget", "Final Amount",
   "Required Date", "Completed Date", "Notes", "Created",
 ];
 
@@ -5933,6 +6061,11 @@ async function exportToExcel(requests) {
     "Service From": r.serviceDateFrom,
     "Service To": r.serviceDateTo,
     "Department": r.department,
+    "Charged To": r.chargeTo === "project" ? "Project" : r.chargeTo === "cost_center" ? "Cost Center" : "",
+    "Project": r.projectName || "",
+    "Network": r.network || "",
+    "Activity": r.activity || "",
+    "Cost Center": r.costCenter || "",
     "Service Type": r.serviceType,
     "Vendor": r.vendor,
     "Status": STATUS_LABELS[r.status] || r.status,
@@ -5981,7 +6114,7 @@ async function exportToExcel(requests) {
 
   ws["!cols"] = [
     { wch: 12 }, { wch: 13 }, { wch: 12 }, { wch: 18 }, { wch: 18 }, { wch: 12 }, { wch: 12 },
-    { wch: 14 }, { wch: 12 }, { wch: 16 }, { wch: 16 }, { wch: 10 }, { wch: 12 },
+    { wch: 14 }, { wch: 13 }, { wch: 18 }, { wch: 14 }, { wch: 10 }, { wch: 13 }, { wch: 12 }, { wch: 16 }, { wch: 16 }, { wch: 10 }, { wch: 12 },
     { wch: 12 }, { wch: 14 }, { wch: 30 }, { wch: 12 },
   ];
   ws["!autofilter"] = { ref: `A1:${XLSX.utils.encode_col(EXCEL_COLUMNS.length - 1)}1` };
@@ -6140,9 +6273,10 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
       registeredSuppliers: suppliers,
     };
     const prompt = [
-      "You help a procurement coordinator log a travel/service request from an email into a tracker, before they raise an SAP Purchase Requisition.",
+      "You help a procurement coordinator log a travel/service request from an email into a tracker, before they raise an SAP Purchase Requisition (PR) and then a Purchase Order (PO).",
+      "Read the whole email carefully, the way an experienced coordinator would — including forwarded messages, signatures that reveal the department, and any attachment text. When messages in a thread disagree, the latest one wins. Work out what is actually provided and what is missing.",
       "Read the email below and reply with ONLY one JSON object, exactly this shape:",
-      '{"owner":"","beneficiary":"","serviceTypes":["Hotel"],"serviceDateFrom":"","serviceDateTo":"","requiredDate":"","budget":"","department":"","city":"","vendors":{"Hotel":""},"prNumber":"","prStage":"none","prStageEvidence":"","summary":"","questionsForSender":[""],"vendorSuggestions":[{"type":"Hotel","name":"","why":"","source":"your list"}]}',
+      '{"owner":"","beneficiary":"","serviceTypes":["Hotel"],"serviceDateFrom":"","serviceDateTo":"","requiredDate":"","budget":"","department":"","city":"","vendors":{"Hotel":""},"prNumber":"","prStage":"none","prStageEvidence":"","chargeTo":"","projectName":"","network":"","activity":"","costCenter":"","summary":"","questionsForSender":[""],"vendorSuggestions":[{"type":"Hotel","name":"","why":"","source":"your list"}]}',
       "Rules:",
       "- owner: the person who asked for the service (never a signature footer, disclaimer or company name). beneficiary: who the service is for (traveller/guest names, comma-separated); \"\" if the same person.",
       '- serviceTypes: every service requested, each one of "Hotel", "Car", "Tickets", "Other".',
@@ -6152,9 +6286,11 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
       "- prNumber: the SAP Purchase Requisition number if the email (or an attachment text) gives one, digits only; otherwise \"\".",
       '- prStage: where the PR stands. "none" = the sender asks the coordinator to start the process/raise the PR (no PR exists yet). "created" = a PR already exists but is not approved yet (or its approval status is not stated). "approved" = the email says the PR is approved/released, so only the PO is left.',
       "- prStageEvidence: the short phrase from the email that shows the PR stage, or \"\".",
+      '- chargeTo: who pays. "project" if the cost goes to a project (the email names a project, network, activity or WBS); "cost_center" if it goes to a cost center/department with no project; "" if the email does not make it clear.',
+      "- projectName, network, activity, costCenter: exactly as written in the email, otherwise \"\". Never invent them.",
       "- budget: digits only, or \"\".",
       "- summary: one or two plain sentences on what is being requested, for whom, where and when.",
-      "- questionsForSender: short, polite questions for anything missing or ambiguous that only the sender can answer (exact dates, number of nights/rooms, traveller names, city, project/department, preferences). Only if the email says a PR already exists but gives no number, ask for the PR number; otherwise never ask about PR or PO numbers. Empty array if nothing is missing.",
+      "- questionsForSender: short, polite questions for anything missing or ambiguous that only the sender can answer (exact dates, number of nights/rooms, traveller names, city, project/department, preferences). Only if the email says a PR already exists but gives no number, ask for the PR number; otherwise never ask about PR or PO numbers. If it is unclear whether this is charged to a project or a cost center, ask. If it is a project and the Network or Activity number is missing, always ask for it (the PR cannot be created without both). Empty array if nothing is missing.",
       "- vendorSuggestions: up to 3 per requested service that has no vendor yet. Prefer the coordinator's registered or previous suppliers below when they fit the city; set source to \"your list\" for those and \"suggestion\" for general well-known options in that city.",
       "",
       "Coordinator's own data: " + JSON.stringify(known),
@@ -6184,6 +6320,11 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
           budget: str(r.budget).replace(/[^\d.]/g, "") || p.budget || "",
           department: dept || p.department || "",
           prNumber: str(r.prNumber) || p.prNumber || "",
+          chargeTo: ["project", "cost_center"].includes(str(r.chargeTo)) ? str(r.chargeTo) : (p.chargeTo || ""),
+          projectName: str(r.projectName) || p.projectName || "",
+          network: str(r.network) || p.network || "",
+          activity: str(r.activity) || p.activity || "",
+          costCenter: str(r.costCenter) || p.costCenter || "",
           notes: p.notes || emailText.slice(0, 500),
         };
       });
@@ -6234,6 +6375,16 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
     }
   };
 
+  // The AI reads every new email on its own — no extra click. It runs once per
+  // email (keyed by the email's fingerprint); "Re-read" runs it again on demand.
+  const aiAutoFor = useRef("");
+  useEffect(() => {
+    if (!sample || !sourceHash || !extracted || aiBusy) return;
+    if (aiAutoFor.current === sourceHash) return;
+    aiAutoFor.current = sourceHash;
+    aiExtract();
+  }, [sample, sourceHash, extracted]);
+
   const registerSupplier = (type, vendor) => {
     if (!vendor || !vendor.trim()) return;
     const list = getRegisteredSuppliers(suppliers, type);
@@ -6263,6 +6414,7 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
       budget: data.budget,
       department: "",
       prNumber: data.prNumber,
+      ...detectCharge(text),
       notes: text.slice(0, 500),
     });
     const guessedStage = detectPrStage(text, data.prNumber);
@@ -6313,6 +6465,7 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
     setPrStage("none");
     setPrStageSource("");
     prStageByYou.current = false;
+    aiAutoFor.current = "";
     if (aiCtl.current) aiCtl.current.abort();
   };
 
@@ -6449,6 +6602,11 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
       serviceType: type,
       vendor: typeEntries[type].vendor,
       prNumber: prFor(type),
+      chargeTo: extracted.chargeTo || "",
+      projectName: extracted.chargeTo === "project" ? (extracted.projectName || "").trim() : "",
+      network: extracted.chargeTo === "project" ? (extracted.network || "").trim() : "",
+      activity: extracted.chargeTo === "project" ? (extracted.activity || "").trim() : "",
+      costCenter: extracted.chargeTo === "cost_center" ? (extracted.costCenter || "").trim() : "",
       status: stage.status,
       waitingOn: stage.waitingOn,
       prRaisedBy: stage.raisedBy,
@@ -6518,21 +6676,16 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
           className="sap-textarea"
         ></textarea>
         <div className="flex justify-end gap-2 mt-2">
-          <button type="button" onClick={handleExtract} className={sample ? "sap-btn sap-btn-outline" : "sap-btn sap-btn-blue"}>
-            🔍 Quick extract
+          <button
+            type="button"
+            onClick={handleExtract}
+            disabled={aiBusy || !emailText.trim()}
+            className="sap-btn sap-btn-blue"
+            style={sample ? { background: "linear-gradient(135deg, #3D5AFE, #8B5CF6)", border: "none" } : undefined}
+            title={sample ? "Claude reads the whole email, fills the fields, lists what's there and what's missing, and drafts your questions to the sender" : "Reads the email with built-in rules"}
+          >
+            {aiBusy ? "✨ Reading the email…" : sample ? "✨ Read the email" : "🔍 Read the email"}
           </button>
-          {sample && (
-            <button
-              type="button"
-              onClick={aiExtract}
-              disabled={aiBusy || !emailText.trim()}
-              className="sap-btn sap-btn-blue"
-              style={{ background: "linear-gradient(135deg, #3D5AFE, #8B5CF6)", border: "none" }}
-              title="Claude reads the whole email, fills the fields, lists what's missing and suggests suppliers"
-            >
-              {aiBusy ? "✨ Reading the email…" : "✨ Read with AI"}
-            </button>
-          )}
         </div>
       </div>
 
@@ -6566,38 +6719,150 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
             </div>
           )}
 
-          {ai && (
-            <div className="p-4 text-sm" style={{ background: "linear-gradient(145deg, #F1F3FF, #FAF7FF)", border: "1px solid #DCE2FF", borderRadius: "14px" }}>
-              <div className="flex items-center gap-2 mb-2">
-                <AiBadge>✨ AI review</AiBadge>
-                {ai.city && <span className="text-xs" style={{ color: "var(--sap-gray)" }}>📍 {ai.city}</span>}
-                <button type="button" onClick={aiExtract} disabled={aiBusy} className="sap-link" style={{ marginInlineStart: "auto" }}>Re-read</button>
-              </div>
-              {ai.summary && <p className="mb-3" style={{ color: "var(--sap-text)" }}>{ai.summary}</p>}
+          {(() => {
+            const x = extracted;
+            const has = (v) => !!String(v || "").trim();
+            const datesVal = x.serviceDateFrom
+              ? `${x.serviceDateFrom}${x.serviceDateTo ? " → " + x.serviceDateTo : ""}`
+              : (x.requiredDate ? `needed by ${x.requiredDate}` : "");
+            const items = [
+              { label: "Requester", value: x.owner, required: true, you: true },
+              { label: "Traveller / for", value: x.beneficiary || (x.owner ? `${x.owner} (same person)` : ""), required: true, ask: "The full name(s) of the traveller(s) / guest(s)", kw: /name|traveller|traveler|guest|مسافر|اسم/i },
+              { label: "Service", value: selectedTypes.join(", "), required: true, ask: "Which service is needed (hotel, car rental, tickets…)", kw: /service|hotel|car|ticket|خدمة/i },
+              { label: "Dates", value: datesVal, required: true, ask: "The exact dates (check-in and check-out, or departure and return)", kw: /date|check-?in|check-?out|depart|تاريخ/i },
+              ...(ai && ai.city ? [{ label: "City", value: ai.city }] : []),
+              { label: "Department", value: x.department, required: true, ask: "Which department this request is for", kw: /department|قسم|ادارة|إدارة/i },
+              { label: "Charged to", value: x.chargeTo === "project" ? "Project" : x.chargeTo === "cost_center" ? "Cost Center" : "", required: true, ask: "Is this charged to a project or to a cost center?", kw: /cost cent|project|مشروع|تكلفة/i },
+              ...(x.chargeTo === "project"
+                ? [
+                    { label: "Project", value: x.projectName, ask: "The project name/number", kw: /project name|project number|اسم المشروع/i },
+                    { label: "Network", value: x.network, required: true, blocker: true, ask: "The project's Network number (needed to raise the PR)", kw: /network|نتورك|شبكة/i },
+                    { label: "Activity", value: x.activity, required: true, blocker: true, ask: "The Activity number under that Network (needed to raise the PR)", kw: /activity|اكتيفيتي|نشاط/i },
+                  ]
+                : []),
+              ...(x.chargeTo === "cost_center" && has(x.costCenter) ? [{ label: "Cost Center", value: x.costCenter }] : []),
+              ...(prStage !== "none"
+                ? selectedTypes.map((type) => ({
+                    label: `PR number${selectedTypes.length > 1 ? ` (${type})` : ""}`,
+                    value: (typeEntries[type] && typeEntries[type].prNumber) || x.prNumber || "",
+                    required: true,
+                    ask: "The PR number you raised for this request",
+                    kw: /\bPR\b|requisition/i,
+                  }))
+                : []),
+              ...selectedTypes.map((type) => ({
+                label: `${type} supplier`,
+                value: (typeEntries[type] && typeEntries[type].vendor) || "",
+                ask: `Your preferred ${type.toLowerCase()} supplier, if you have one in mind`,
+                kw: /supplier|vendor|hotel name|مورد/i,
+              })),
+              ...(has(x.budget) ? [{ label: "Budget", value: x.budget }] : []),
+            ];
+            const found = items.filter((i) => has(i.value));
+            const missing = items.filter((i) => !has(i.value));
+            const missingRequired = missing.filter((i) => i.required);
+            const blockers = missing.filter((i) => i.blocker);
+            const aiQs = ai ? ai.questions : [];
+            // The AI's questions come first (better worded); rule-based ones fill
+            // in whatever it didn't already cover.
+            const questions = [
+              ...aiQs,
+              ...missing.filter((i) => i.ask && !(i.kw && aiQs.some((q) => i.kw.test(q)))).map((i) => i.ask),
+            ];
+            const lowSignal = emailText.trim().length > 0 && emailText.replace(/\\par[d]?|\\[a-z]+\d*|[{}]/gi, "").trim().length < 40;
+            const target = prStage === "approved" ? "PO" : "PR";
+            const verdict = blockers.length
+              ? { tone: "red", text: `⛔ Can't raise the ${target} yet — ${blockers.map((b) => b.label).join(" & ")} missing` }
+              : missingRequired.length
+              ? { tone: "amber", text: `⚠️ Almost there — ${missingRequired.length} required item${missingRequired.length === 1 ? "" : "s"} missing` }
+              : { tone: "green", text: `✅ Everything needed for the ${target} is here` };
+            const toneStyle = {
+              red: { background: "var(--sap-red-bg)", color: "var(--sap-red)", border: "1px solid #F5C2C2" },
+              amber: { background: "var(--sap-amber-bg)", color: "var(--sap-amber)", border: "1px solid #F5DFA6" },
+              green: { background: "var(--sap-green-bg)", color: "var(--sap-green)", border: "1px solid #BFE3CB" },
+            }[verdict.tone];
 
-              {ai.questions.length > 0 ? (
-                <div className="mb-3">
-                  <p className="font-semibold mb-1" style={{ color: "var(--sap-red)" }}>❓ Missing — ask the sender:</p>
-                  <ul className="flex flex-col gap-0.5" style={{ color: "var(--sap-text)" }}>
-                    {ai.questions.map((q, i) => <li key={i}>• {q}</li>)}
-                  </ul>
-                  <button
-                    type="button"
-                    className="sap-btn sap-btn-outline mt-2"
-                    onClick={async () => {
-                      const msg = ["Hi,", "", "To process this request, could you please confirm the following:", "", ...ai.questions.map((q, i) => `${i + 1}. ${q}`), "", "Thank you."].join("\n");
-                      try { await navigator.clipboard.writeText(msg); appToast("Copied — paste it into your reply to the sender."); }
-                      catch (err) { appToast("Could not copy — select the text manually."); }
-                    }}
-                  >
-                    📧 Copy reply to sender
-                  </button>
+            const copyReply = async () => {
+              const who = x.beneficiary || x.owner;
+              const msg = [
+                "Hi,",
+                "",
+                `To proceed with ${who ? `the ${selectedTypes.join("/") || "service"} request for ${who}` : "this request"}, could you please confirm the following:`,
+                "",
+                ...questions.map((q, i) => `${i + 1}. ${q}`),
+                "",
+                "Thank you.",
+              ].join("\n");
+              try { await navigator.clipboard.writeText(msg); appToast("Copied — paste it into your reply to the sender."); }
+              catch (err) { appToast("Could not copy — select the text manually."); }
+            };
+
+            return (
+              <div className="p-4 text-sm" style={{ background: "linear-gradient(145deg, #F1F3FF, #FAF7FF)", border: "1px solid #DCE2FF", borderRadius: "16px" }}>
+                <div className="flex items-center gap-2 mb-2 flex-wrap">
+                  {sample ? <AiBadge>✨ AI reading</AiBadge> : <span className="font-semibold" style={{ color: "var(--sap-text)" }}>🔍 Quick read</span>}
+                  {aiBusy && <span className="text-xs font-semibold" style={{ color: "#3D5AFE" }}>Claude is reading the email…</span>}
+                  {ai && ai.city && <span className="text-xs" style={{ color: "var(--sap-gray)" }}>📍 {ai.city}</span>}
+                  {sample && !aiBusy && (
+                    <button type="button" onClick={aiExtract} className="sap-link" style={{ marginInlineStart: "auto" }}>{ai ? "↻ Re-read" : "✨ Read with AI"}</button>
+                  )}
                 </div>
-              ) : (
-                <p className="mb-3 font-semibold" style={{ color: "var(--sap-green)" }}>✓ Claude found nothing missing that only the sender can answer.</p>
-              )}
+                {!sample && (
+                  <p className="text-xs mb-2" style={{ color: "var(--sap-gray)" }}>
+                    Read by rules only. For a real read (meaning, missing items, questions for the sender), turn on AI: 🤖 AI Assistant → API key.
+                  </p>
+                )}
+                <p className="mb-3" style={{ color: "var(--sap-text)" }} dir="auto">
+                  {(ai && ai.summary) || summarizeEmail({ owner: x.owner, beneficiary: x.beneficiary, selectedTypes, budget: x.budget, requiredDate: x.requiredDate, serviceDateFrom: x.serviceDateFrom, serviceDateTo: x.serviceDateTo, prNumber: x.prNumber })}
+                </p>
+                {lowSignal && (
+                  <p className="font-semibold mb-2" style={{ color: "var(--sap-red)" }}>
+                    ⚠️ This email's text looks unreadable or mostly empty (possibly an unsupported Rich Text format) — check the fields carefully, or ask the sender directly.
+                  </p>
+                )}
+                <div className="px-3 py-2 mb-3 font-semibold" style={{ ...toneStyle, borderRadius: 10 }}>{verdict.text}</div>
 
-              {ai.suggestions.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                  <div className="p-3" style={{ background: "#fff", border: "1px solid var(--sap-border)", borderRadius: 12 }}>
+                    <p className="font-semibold mb-1.5" style={{ color: "var(--sap-green)" }}>✅ Found in the email ({found.length})</p>
+                    <ul className="flex flex-col gap-1">
+                      {found.map((i) => (
+                        <li key={i.label} className="flex gap-2">
+                          <span style={{ color: "var(--sap-gray)", minWidth: 110 }}>{i.label}</span>
+                          <span className="font-semibold" style={{ color: "var(--sap-text)" }} dir="auto">{String(i.value)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="p-3" style={{ background: "#fff", border: `1px solid ${missing.length ? "#F5C2C2" : "var(--sap-border)"}`, borderRadius: 12 }}>
+                    <p className="font-semibold mb-1.5" style={{ color: missing.length ? "var(--sap-red)" : "var(--sap-green)" }}>
+                      {missing.length ? `❌ Missing (${missing.length})` : "❌ Missing — nothing 🎉"}
+                    </p>
+                    <ul className="flex flex-col gap-1">
+                      {missing.map((i) => (
+                        <li key={i.label} className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold" style={{ color: i.blocker ? "var(--sap-red)" : "var(--sap-text)" }}>{i.label}</span>
+                          {i.blocker && <span className="text-xs font-bold px-2" style={{ background: "var(--sap-red-bg)", color: "var(--sap-red)", borderRadius: 999 }}>blocks the PR</span>}
+                          {!i.blocker && i.required && <span className="text-xs px-2" style={{ background: "var(--sap-amber-bg)", color: "var(--sap-amber)", borderRadius: 999 }}>required</span>}
+                          {!i.required && <span className="text-xs" style={{ color: "var(--sap-gray)" }}>optional</span>}
+                          <span className="text-xs" style={{ color: "var(--sap-gray)" }}>{i.you ? "· you fill it in" : "· ask the sender"}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                {questions.length > 0 && (
+                  <div className="mb-3">
+                    <p className="font-semibold mb-1" style={{ color: "var(--sap-text)" }}>📧 Questions for the sender</p>
+                    <ol className="flex flex-col gap-0.5" style={{ color: "var(--sap-text)", paddingInlineStart: 18, listStyle: "decimal" }}>
+                      {questions.map((q, i) => <li key={i} dir="auto">{q}</li>)}
+                    </ol>
+                    <button type="button" className="sap-btn sap-btn-blue mt-2" onClick={copyReply}>📧 Copy reply to sender</button>
+                  </div>
+                )}
+
+              {ai && ai.suggestions.length > 0 && (
                 <div>
                   <p className="font-semibold mb-1.5" style={{ color: "var(--sap-text)" }}>🏨 Supplier suggestions — click to use:</p>
                   <div className="flex flex-col gap-1.5">
@@ -6622,13 +6887,9 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
                   <p className="text-xs mt-1.5" style={{ color: "var(--sap-gray)" }}>General suggestions are not verified — confirm availability and rates before booking.</p>
                 </div>
               )}
-            </div>
-          )}
-
-          <div className="p-3 text-sm" style={{ background: "var(--sap-purple-bg)", border: "1px solid #D9CCEA", borderRadius: "2px", color: "var(--sap-purple)" }}>
-            <p className="font-semibold mb-1">🧠 Summary — what this email is asking for:</p>
-            <p>{summarizeEmail({ owner: extracted.owner, beneficiary: extracted.beneficiary, selectedTypes, budget: extracted.budget, requiredDate: extracted.requiredDate, serviceDateFrom: extracted.serviceDateFrom, serviceDateTo: extracted.serviceDateTo, prNumber: extracted.prNumber })}</p>
-          </div>
+              </div>
+            );
+          })()}
 
           <div className="p-3" style={{ background: "#fff", border: "1px solid var(--sap-border)", borderRadius: 14 }}>
             <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
@@ -6668,6 +6929,17 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
                 The requester already raised this PR, so you won't create it again — enter its number in each service below and the tracker will follow it up{prStage === "approved" ? " and guide you to create the PO" : " until it's approved"}.
               </p>
             )}
+          </div>
+
+          <div className="p-3" style={{ background: "#fff", border: "1px solid var(--sap-border)", borderRadius: 14 }}>
+            <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+              <p className="font-semibold text-sm" style={{ color: "var(--sap-text)" }}>💳 Charged to</p>
+              {extracted.chargeTo && <span className="text-xs" style={{ color: "var(--sap-gray)" }}>{ai ? "Read by AI" : "Detected from the email"} — confirm it</span>}
+            </div>
+            <ChargeFields
+              value={extracted}
+              onChange={(v) => setExtracted((prev) => ({ ...prev, chargeTo: v.chargeTo, projectName: v.projectName, network: v.network, activity: v.activity, costCenter: v.costCenter }))}
+            />
           </div>
 
           <div className="sap-panel-info p-3 text-sm" style={{ color: "var(--sap-blue-dark)" }}>
@@ -6869,87 +7141,6 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
             );
           })}
 
-          {(() => {
-            const checks = [
-              { label: "Requester", ok: !!extracted.owner.trim(), askSender: false },
-              { label: "Service duration (dates)", ok: !!(extracted.serviceDateFrom || extracted.requiredDate), askSender: true, ask: "The exact service/travel dates (check-in and check-out, or departure date)" },
-              { label: "Department / Project", ok: !!(extracted.department || "").trim(), askSender: true, ask: "Which project or department this request is for" },
-              ...selectedTypes.flatMap((type) => {
-                const entry = typeEntries[type];
-                if (!entry) return [];
-                return [
-                  { label: `${type} — vendor/supplier`, ok: !!entry.vendor.trim(), askSender: true, ask: `Their preferred ${type.toLowerCase()} supplier/vendor, if they have one in mind` },
-                  // With no PR yet, the number comes later (once I raise it) — not a gap now.
-                  ...(prStage === "none" ? [] : [{ label: `${type} — PR number`, ok: !!entry.prNumber.trim(), askSender: true, ask: "The PR number you raised for this request" }]),
-                ];
-              }),
-            ];
-            const missing = checks.filter((c) => !c.ok);
-            const askSenderItems = missing.filter((c) => c.askSender);
-            const lowSignal = emailText.trim().length > 0 && emailText.replace(/\\par[d]?|\\[a-z]+\d*|[{}]/gi, "").trim().length < 40;
-
-            const copyQuestionsForSender = async () => {
-              const who = extracted.beneficiary || extracted.owner || "you";
-              const lines = [
-                `Hi, to process ${who === "you" ? "your" : `${who}'s`} ${selectedTypes.join("/") || "service"} request, could you please confirm:`,
-                "",
-                ...askSenderItems.map((c) => `- ${c.ask}`),
-                "",
-                "Thanks!",
-              ];
-              try {
-                await navigator.clipboard.writeText(lines.join("\n"));
-                appToast("Copied — paste it into a reply to whoever sent this email.");
-              } catch (err) {
-                appToast("Could not copy — select the text manually.");
-              }
-            };
-
-            return (
-              <div
-                className="p-3 text-sm"
-                style={{
-                  background: missing.length ? "var(--sap-amber-bg)" : "var(--sap-green-bg)",
-                  border: `1px solid ${missing.length ? "#F5DFA6" : "#BFE3CB"}`,
-                  borderRadius: "10px",
-                }}
-              >
-                {lowSignal && (
-                  <p className="font-semibold mb-2" style={{ color: "var(--sap-red)" }}>
-                    ⚠️ This email's content looks unreadable or mostly empty (possibly an unsupported Rich Text format) — the fields below are likely incomplete. Check them carefully, or ask the sender directly.
-                  </p>
-                )}
-                <p className="font-semibold mb-1.5" style={{ color: missing.length ? "var(--sap-amber)" : "var(--sap-green)" }}>
-                  {missing.length
-                    ? `⚠️ ${missing.length} field${missing.length === 1 ? "" : "s"} still need${missing.length === 1 ? "s" : ""} filling in`
-                    : "✅ All fields are complete"}
-                </p>
-                <ul className="flex flex-col gap-0.5">
-                  {checks.map((c) => (
-                    <li key={c.label} style={{ color: c.ok ? "var(--sap-green)" : "var(--sap-red)" }}>
-                      {c.ok ? "✓" : "✗"} {c.label}
-                      {!c.ok && c.label === "Requester" ? " — required to save" : ""}
-                    </li>
-                  ))}
-                </ul>
-                {missing.length > 0 && (
-                  <p className="text-xs mt-1.5" style={{ color: "var(--sap-gray)" }}>
-                    A missing PR number is normal before SAP approves it — fill it in once you have it. The rest, fill in above.
-                  </p>
-                )}
-                {askSenderItems.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={copyQuestionsForSender}
-                    className="sap-btn sap-btn-outline mt-2"
-                  >
-                    📧 Copy questions for sender
-                  </button>
-                )}
-              </div>
-            );
-          })()}
-
           <div>
             <label className="sap-label">Additional Notes (shared)</label>
             <textarea value={extracted.notes} onChange={(e) => setExtracted({ ...extracted, notes: e.target.value })} rows="3" className="sap-textarea"></textarea>
@@ -6992,6 +7183,12 @@ function emptyForm() {
     waitingOn: "Me",
     // "me" = I raise the PR in SAP; "requester" = it arrived already raised.
     prRaisedBy: "me",
+    // "cost_center" | "project" — a project needs its Network and Activity.
+    chargeTo: "",
+    costCenter: "",
+    projectName: "",
+    network: "",
+    activity: "",
     stageSince: "",
     notes: "",
     attachments: [],
@@ -7150,6 +7347,10 @@ function RequestForm({ initial, onSave, onCancel, requests }) {
           <option value="requester">The requester — it arrived already raised</option>
         </select>
       </div>
+      <div className="md:col-span-2">
+        <label className="sap-label">Charged to</label>
+        <ChargeFields value={form} onChange={(v) => setForm({ ...form, chargeTo: v.chargeTo, projectName: v.projectName, network: v.network, activity: v.activity, costCenter: v.costCenter })} />
+      </div>
       <div>
         <label className="sap-label">PO Number</label>
         <input value={form.poNumber} onChange={set("poNumber")} className="sap-input" />
@@ -7183,6 +7384,10 @@ function StatusUpdateForm({ req, onSave, onCancel }) {
   const [completedDate, setCompletedDate] = useState(req.completedDate || "");
   const [attachments, setAttachments] = useState(req.attachments || []);
   const [waitingOn, setWaitingOn] = useState(req.waitingOn || DEFAULT_WAITING_ON[req.status] || "");
+  const [charge, setCharge] = useState({
+    chargeTo: req.chargeTo || "", projectName: req.projectName || "", network: req.network || "",
+    activity: req.activity || "", costCenter: req.costCenter || "",
+  });
 
   // Moving to a new stage normally hands the request to a different party;
   // follow that automatically so the queue stays truthful without extra work.
@@ -7197,6 +7402,18 @@ function StatusUpdateForm({ req, onSave, onCancel }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    // Raising the PR myself needs to know who pays — and for a project, its
+    // Network and Activity. SAP rejects the PR without them, so the tracker does too.
+    if (req.status === "Pending" && status !== "Pending" && status !== "Cancelled" && req.prRaisedBy !== "requester") {
+      if (!charge.chargeTo) {
+        appToast("Choose Project or Cost Center below before moving past Pending.");
+        return;
+      }
+      if (charge.chargeTo === "project" && (!charge.network.trim() || !charge.activity.trim())) {
+        appToast("The PR can't be created without the project's Network and Activity — enter them below first.");
+        return;
+      }
+    }
     if (status === "Waiting PO approval" && !prNumber) {
       if (!(await appConfirm("Make sure to enter the PR number now that it's approved. Continue without a PR number?"))) return;
     }
@@ -7219,6 +7436,11 @@ function StatusUpdateForm({ req, onSave, onCancel }) {
       notes,
       attachments,
       waitingOn,
+      chargeTo: charge.chargeTo,
+      projectName: charge.chargeTo === "project" ? charge.projectName.trim() : "",
+      network: charge.chargeTo === "project" ? charge.network.trim() : "",
+      activity: charge.chargeTo === "project" ? charge.activity.trim() : "",
+      costCenter: charge.chargeTo === "cost_center" ? charge.costCenter.trim() : "",
       // Restart the clock only when the request actually moved on, so "5 days
       // with SAP" means exactly that, not "5 days since I last edited a note".
       stageSince: stageChanged ? new Date().toISOString() : (req.stageSince || req.createdAt),
@@ -7269,6 +7491,10 @@ function StatusUpdateForm({ req, onSave, onCancel }) {
           <label className="sap-label">PO Number</label>
           <input value={poNumber} onChange={(e) => setPoNumber(e.target.value)} className="sap-input" />
         </div>
+      </div>
+      <div>
+        <label className="sap-label">Charged to</label>
+        <ChargeFields value={charge} onChange={setCharge} compact />
       </div>
       <div>
         <label className="sap-label">Completed Date</label>
@@ -7777,6 +8003,7 @@ function CopyForSapModal({ req, onClose }) {
       serviceType: req.serviceType, requester: req.owner, traveller: req.beneficiary || req.owner,
       from: req.serviceDateFrom, to: req.serviceDateTo, requiredBy: req.requiredDate,
       department: req.department, vendor: req.vendor, budget: req.budget,
+      chargedTo: req.chargeTo === "project" ? `Project ${req.projectName || ""} (Network ${req.network || "?"}, Activity ${req.activity || "?"})` : req.chargeTo === "cost_center" ? `Cost center ${req.costCenter || ""}` : "",
       emailSummary: req.emailSummary || "", notes: (req.notes || "").slice(0, 1500),
       ...(mode === "PO" && prExists ? { basedOnPR: req.prNumber } : {}),
     };
@@ -7814,6 +8041,19 @@ function CopyForSapModal({ req, onClose }) {
     >
       {label}
     </button>
+  );
+  const chargeRows = req.chargeTo === "project" ? (
+    <>
+      <CopyRow label="Network" value={req.network} hint={!req.network ? "⛔ Required — ask the requester" : "Project account assignment"} />
+      <CopyRow label="Activity" value={req.activity} hint={!req.activity ? "⛔ Required — ask the requester" : ""} />
+      {req.projectName && <CopyRow label="Project" value={req.projectName} hint="For reference" />}
+    </>
+  ) : req.chargeTo === "cost_center" ? (
+    <CopyRow label="Cost Center" value={req.costCenter} hint={!req.costCenter ? "Enter the cost center on the SAP screen" : ""} />
+  ) : (
+    <div className="p-2 text-xs my-1" style={{ background: "var(--sap-amber-bg)", border: "1px solid #F5DFA6", borderRadius: 8, color: "var(--sap-amber)" }}>
+      ⚠ Not set whether this is charged to a Project (Network + Activity) or a Cost Center — set it in Update Status.
+    </div>
   );
   const headerNote = aiNote || (mode === "PO" && prExists ? `${buildHeaderNote(req)} Based on approved PR ${req.prNumber}.` : buildHeaderNote(req));
   const noteButton = sample && (
@@ -7856,8 +8096,9 @@ function CopyForSapModal({ req, onClose }) {
           <CopyRow label="Requisnr." value={req.owner} hint="Requester" />
           <CopyRow label="Quantity" value="1" />
           {pgrRow}
+          {chargeRows}
           <div className="p-3 text-xs mt-3" style={{ background: "#F5F6F7", border: "1px solid var(--sap-border)", borderRadius: "10px", color: "var(--sap-gray)" }}>
-            Fill in manually on the SAP screen (not auto-filled — these vary per request): <strong>Account Assignment Category</strong>, <strong>Item Category</strong>, <strong>Plant</strong>, <strong>Storage Location</strong>, <strong>Cost Center</strong>. Purchasing Organization is always <strong>OM01</strong>.
+            Fill in manually on the SAP screen (not auto-filled — these vary per request): <strong>Account Assignment Category</strong> (matching {req.chargeTo === "project" ? "the project Network" : req.chargeTo === "cost_center" ? "the cost center" : "how it's charged"}), <strong>Item Category</strong>, <strong>Plant</strong>, <strong>Storage Location</strong>{req.chargeTo === "cost_center" && !req.costCenter ? <>, <strong>Cost Center</strong></> : null}. Purchasing Organization is always <strong>OM01</strong>.
           </div>
         </>
       )}
@@ -7880,6 +8121,7 @@ function CopyForSapModal({ req, onClose }) {
           <CopyRow label="Vendor" value={req.vendor} />
           <CopyRow label="Purch. Org." value="OM01" />
           {pgrRow}
+          {chargeRows}
           <CopyRow label="Delivery Date" value={toSapDate(req.serviceDateFrom || req.requiredDate)} />
           <CopyRow label="Net Price" value={req.finalAmount || req.budget || ""} hint={req.finalAmount ? "Final amount" : "Budget — replace with the supplier's quoted price"} />
           <CopyRow label="Header Note" value={headerNote} hint={aiNote ? "✨ Written by AI" : "Paste into the PO header text"} multiline />
@@ -7906,7 +8148,8 @@ function requestsForAssistant(requests) {
     .map((r) => ({
       pr: r.prNumber || "", prBy: r.prRaisedBy === "requester" ? "requester" : "me", po: r.poNumber || "", requester: r.owner || "", for: r.beneficiary || "",
       service: r.serviceType || "", vendor: r.vendor || "", status: r.status || "",
-      dept: r.department || "", from: r.serviceDateFrom || "", to: r.serviceDateTo || "",
+      dept: r.department || "", charge: r.chargeTo || "", project: r.projectName || "", network: r.network || "", activity: r.activity || "", costCenter: r.costCenter || "",
+      missing: isOpenReq(r) ? requestGaps(r) : [], from: r.serviceDateFrom || "", to: r.serviceDateTo || "",
       requiredBy: r.requiredDate || "", budget: r.budget || "", ses: !!r.serviceEntrySheet,
       files: (r.attachments || []).length, created: String(r.createdAt || "").slice(0, 10),
       summary: (r.emailSummary || "").slice(0, 160),
@@ -8024,7 +8267,7 @@ function AssistantChat({ requests }) {
     const data = requestsForAssistant(requests);
     const rules = [
       "You are the assistant built into a PR/PO tracker used by a procurement coordinator (hotels, car rentals, tickets for staff travel; requests become SAP Purchase Requisitions then POs).",
-      `Today is ${todayIso()}. Company flow: PR (Purchase Requisition) → PR approval → PO (Purchase Order, created from the approved PR) → PO approval. Statuses: Pending (no PR yet — the coordinator must create it) → Waiting PR approval (PR exists, follow up its approval) → Waiting PO approval (PR approved; if "po" is empty the coordinator still has to create the PO) → Completed (or Cancelled). "prBy": "requester" means the PR arrived already raised by the requester (only follow up), "me" means the coordinator raises it. "ses" = Service Entry Sheet done.`,
+      `Today is ${todayIso()}. Company flow: PR (Purchase Requisition) → PR approval → PO (Purchase Order, created from the approved PR) → PO approval. Statuses: Pending (no PR yet — the coordinator must create it) → Waiting PR approval (PR exists, follow up its approval) → Waiting PO approval (PR approved; if "po" is empty the coordinator still has to create the PO) → Completed (or Cancelled). "prBy": "requester" means the PR arrived already raised by the requester (only follow up), "me" means the coordinator raises it. "ses" = Service Entry Sheet done. "charge": "project" requests are charged to the project and need both "network" and "activity" before the PR/PO can be created; "cost_center" requests only need the cost center. "missing" lists what a request still lacks — always point these out and offer to draft the email asking for them.`,
       "Answer from the data below only — never invent requests, numbers or names. If the data can't answer, say so.",
       "Reply in the language the coordinator writes in (Arabic or English). Be concise and well-organized; use short lists when helpful. When asked to draft an email, SAP text or a message, write it ready to paste.",
       `Tracker data (${data.shown} of ${data.total} requests, newest first, one JSON object per line):`,
@@ -8126,6 +8369,52 @@ function AssistantChat({ requests }) {
   );
 }
 
+// The tracker's journey, as one clickable bar: each step is a filter.
+const isOpenReq = (r) => r.status !== "Completed" && r.status !== "Cancelled";
+const STAGE_FILTERS = [
+  { id: "Pending", icon: "🆕", label: "Create PR", test: (r) => r.status === "Pending", color: "var(--sap-amber)", bg: "var(--sap-amber-bg)" },
+  { id: "Waiting PR approval", icon: "⏳", label: "PR approval", test: (r) => r.status === "Waiting PR approval", color: "var(--sap-blue)", bg: "#EAF2FC" },
+  { id: "__createPO", icon: "🧾", label: "Create PO", test: (r) => r.status === "Waiting PO approval" && !(r.poNumber || "").trim(), color: "var(--sap-purple)", bg: "var(--sap-purple-bg)" },
+  { id: "__poApproval", icon: "⏳", label: "PO approval", test: (r) => r.status === "Waiting PO approval" && !!(r.poNumber || "").trim(), color: "var(--sap-purple)", bg: "var(--sap-purple-bg)" },
+  { id: "Completed", icon: "✅", label: "Completed", test: (r) => r.status === "Completed", color: "var(--sap-green)", bg: "var(--sap-green-bg)" },
+];
+const EXTRA_FILTERS = [
+  { id: "__missing", icon: "⚠️", label: "Missing info", test: (r) => isOpenReq(r) && requestGaps(r).length > 0, color: "var(--sap-red)", bg: "var(--sap-red-bg)" },
+  { id: "__overdue", icon: "⏰", label: "Overdue", test: (r) => isOpenReq(r) && isOverdue(r), color: "var(--sap-red)", bg: "var(--sap-red-bg)" },
+];
+function matchesStageFilter(r, id) {
+  if (id === "all") return true;
+  const f = [...STAGE_FILTERS, ...EXTRA_FILTERS].find((x) => x.id === id);
+  return f ? f.test(r) : r.status === id;
+}
+
+function StagePill({ f, count, active, onClick, arrow }) {
+  return (
+    <>
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex flex-col items-start px-4 py-3"
+        style={{
+          flex: "1 1 120px",
+          minWidth: 120,
+          borderRadius: 14,
+          cursor: "pointer",
+          background: active ? f.bg : "#fff",
+          border: `2px solid ${active ? f.color : "var(--sap-border)"}`,
+          boxShadow: active ? "0 8px 20px rgba(16,24,40,.08)" : "none",
+          textAlign: "left",
+        }}
+        title={`Show only: ${f.label}`}
+      >
+        <span className="text-2xl font-bold" style={{ color: count ? f.color : "var(--sap-gray)" }}>{count}</span>
+        <span className="text-xs font-semibold" style={{ color: "var(--sap-text)", whiteSpace: "nowrap" }}>{f.icon} {f.label}</span>
+      </button>
+      {arrow && <span className="hidden md:flex items-center" style={{ color: "var(--sap-gray)" }}>→</span>}
+    </>
+  );
+}
+
 function App() {
   const [requests, setRequests] = useState(loadRequests);
   const [showAssistant, setShowAssistant] = useState(false);
@@ -8212,7 +8501,7 @@ function App() {
     // the traveller's name, the stay dates spelled out as month names, and the
     // text pulled out of attached PDFs.
     if (search.trim()) list = list.filter((r) => matchesSearch(r, search.trim()));
-    if (statusFilter !== "all") list = list.filter((r) => r.status === statusFilter);
+    if (statusFilter !== "all") list = list.filter((r) => matchesStageFilter(r, statusFilter));
     if (ownerFilter !== "all") list = list.filter((r) => r.owner === ownerFilter);
     if (serviceFilter !== "all") list = list.filter((r) => r.serviceType === serviceFilter);
     if (waitingFilter !== "all") list = list.filter((r) => (r.waitingOn || "") === waitingFilter);
@@ -8380,7 +8669,7 @@ function App() {
       .filter((r) => r.status !== "Completed" && r.status !== "Cancelled")
       .map((r) => ({ req: r, alert: getAlertLevel(r), breach: slaBreach(r, sla) }))
       .filter(({ req, alert, breach }) =>
-        alert || breach ||
+        alert || breach || requestGaps(req).length > 0 ||
         (req.status === "Waiting PO approval" && (!req.prNumber || !req.poNumber)))
       // What's sitting with me comes first — that's the part I can actually
       // move today; the rest is chasing other people.
@@ -8494,12 +8783,51 @@ function App() {
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-6">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-          <StatCard label="Total" value={stats.total} borderColor="var(--sap-gray)" />
-          <StatCard label="Pending" value={stats.pending} borderColor="var(--sap-amber)" />
-          <StatCard label="Waiting PR approval" value={stats.processing} borderColor="var(--sap-blue)" />
-          <StatCard label="Completed" value={stats.completed} borderColor="var(--sap-green)" />
-          <StatCard label="Overdue" value={stats.overdue} borderColor="var(--sap-red)" />
+        <div className="sap-card p-4 mb-6">
+          <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+            <p className="font-semibold" style={{ color: "var(--sap-text)" }}>Where every request stands</p>
+            <div className="flex items-center gap-3">
+              <span className="text-xs" style={{ color: "var(--sap-gray)" }}>{stats.total} total · click a step to filter</span>
+              {statusFilter !== "all" && (
+                <button type="button" onClick={() => setStatusFilter("all")} className="sap-link">Show all</button>
+              )}
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2 items-stretch">
+            {STAGE_FILTERS.map((f, i) => (
+              <StagePill
+                key={f.id}
+                f={f}
+                count={requests.filter(f.test).length}
+                active={statusFilter === f.id}
+                onClick={() => setStatusFilter(statusFilter === f.id ? "all" : f.id)}
+                arrow={i < STAGE_FILTERS.length - 1}
+              />
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2 mt-2">
+            {EXTRA_FILTERS.map((f) => {
+              const count = requests.filter(f.test).length;
+              const active = statusFilter === f.id;
+              return (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => setStatusFilter(active ? "all" : f.id)}
+                  className="text-xs font-semibold px-3 py-1.5"
+                  style={{
+                    borderRadius: 999,
+                    cursor: "pointer",
+                    background: active || count ? f.bg : "#fff",
+                    color: count ? f.color : "var(--sap-gray)",
+                    border: `1.5px solid ${active ? f.color : "var(--sap-border)"}`,
+                  }}
+                >
+                  {f.icon} {f.label}: {count}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         <div className="sap-card p-4 mb-6 flex flex-wrap gap-3 items-end">
@@ -8517,6 +8845,9 @@ function App() {
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="sap-select">
               <option value="all">All</option>
               {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
+              {[...STAGE_FILTERS, ...EXTRA_FILTERS].filter((f) => f.id.startsWith("__")).map((f) => (
+                <option key={f.id} value={f.id}>{f.label}</option>
+              ))}
             </select>
           </div>
           <div>
@@ -8670,7 +9001,21 @@ function App() {
                           <span style={{ color: "var(--sap-gray)" }}>—</span>
                         )}
                       </td>
-                      <td>{r.serviceType}</td>
+                      <td style={{ minWidth: 140 }}>
+                        {r.serviceType}
+                        {chargeLine(r) && (
+                          <div className="text-xs" style={{ color: "var(--sap-gray)", whiteSpace: "nowrap" }}>{chargeLine(r)}</div>
+                        )}
+                        {r.status !== "Completed" && r.status !== "Cancelled" && requestGaps(r).length > 0 && (
+                          <div
+                            className="text-xs font-semibold"
+                            style={{ color: requestGaps(r).some((g) => g === "Network" || g === "Activity") ? "var(--sap-red)" : "var(--sap-amber)", whiteSpace: "nowrap" }}
+                            title="Still missing before the PR/PO can go into SAP"
+                          >
+                            ⚠ Missing: {requestGaps(r).join(", ")}
+                          </div>
+                        )}
+                      </td>
                       <td>{r.vendor || "—"}</td>
                       <td>
                         <span className="sap-badge" style={STATUS_INLINE_STYLE[r.status]}>
@@ -8794,6 +9139,9 @@ function App() {
                         </p>
                       )}
                       {missingPr && <p className="font-semibold" style={{ color: "var(--sap-red)" }}>💾 Reminder: PR number not entered for this request</p>}
+                      {requestGaps(req).length > 0 && (
+                        <p className="font-semibold" style={{ color: "var(--sap-red)" }}>⚠ Still missing: {requestGaps(req).join(", ")}</p>
+                      )}
                       {missingPo && <p className="font-semibold" style={{ color: "var(--sap-red)" }}>🧾 PR approved — the PO isn't created yet (or its number isn't entered)</p>}
                       <p style={{ color: "var(--sap-blue-dark)" }}><span className="font-semibold">Next step:</span> {getNextAction(req)}</p>
                     </div>
