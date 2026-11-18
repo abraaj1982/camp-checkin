@@ -8662,6 +8662,136 @@ function AssistantChat({ requests }) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Desktop reminders every few hours
+//
+// A web page can't run once the browser is closed, but while the tracker is
+// open — even in a background tab or a minimized window — it checks every
+// minute and, every 3 or 4 hours during working hours, pops up a system
+// notification listing what's still waiting on me. Where the browser blocks
+// notifications (e.g. inside an embedded viewer), it falls back to the
+// in-page popup, the voice reminder and a count in the tab title.
+// ---------------------------------------------------------------------------
+const REMINDER_PREFS_KEY = "prpo-desktop-reminders";
+const REMINDER_LAST_KEY = "prpo-desktop-reminders-last";
+const DEFAULT_REMINDER_PREFS = { hours: 0, workFrom: 7, workTo: 18, workdaysOnly: true, voice: true };
+
+function loadReminderPrefs() {
+  try { return { ...DEFAULT_REMINDER_PREFS, ...JSON.parse(localStorage.getItem(REMINDER_PREFS_KEY) || "{}") }; }
+  catch (e) { return { ...DEFAULT_REMINDER_PREFS }; }
+}
+function saveReminderPrefs(p) { try { localStorage.setItem(REMINDER_PREFS_KEY, JSON.stringify(p)); } catch (e) { /* ignore */ } }
+function readLastReminder() { try { return Number(localStorage.getItem(REMINDER_LAST_KEY) || 0); } catch (e) { return 0; } }
+function writeLastReminder(t) { try { localStorage.setItem(REMINDER_LAST_KEY, String(t)); } catch (e) { /* ignore */ } }
+
+function notificationSupport() {
+  if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
+  return Notification.permission; // "default" | "granted" | "denied"
+}
+
+// Fri/Sat weekend, as in Saudi Arabia.
+function withinWorkingHours(prefs, d = new Date()) {
+  if (prefs.workdaysOnly && (d.getDay() === 5 || d.getDay() === 6)) return false;
+  const h = d.getHours() + d.getMinutes() / 60;
+  return h >= prefs.workFrom && h < prefs.workTo;
+}
+
+function showDesktopNotification(title, body, onClick) {
+  if (notificationSupport() !== "granted") return false;
+  try {
+    const n = new Notification(title, { body, tag: "prpo-reminder", renotify: true, requireInteraction: true });
+    n.onclick = () => { try { window.focus(); } catch (e) { /* ignore */ } n.close(); if (onClick) onClick(); };
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function ReminderSettings({ prefs, onChange, onTest, permission, onAskPermission, nextAt, count }) {
+  const set = (patch) => onChange({ ...prefs, ...patch });
+  const choice = (hours, label) => (
+    <button
+      type="button"
+      onClick={() => set({ hours })}
+      className="text-sm font-semibold px-4 py-2"
+      style={{
+        borderRadius: 12,
+        cursor: "pointer",
+        border: `2px solid ${prefs.hours === hours ? "#3D5AFE" : "var(--sap-border)"}`,
+        background: prefs.hours === hours ? "#EEF1FF" : "#fff",
+        color: prefs.hours === hours ? "#3D5AFE" : "var(--sap-text)",
+      }}
+    >
+      {label}
+    </button>
+  );
+  const hourOpts = Array.from({ length: 24 }, (_, h) => h);
+  return (
+    <div className="flex flex-col gap-4 text-sm">
+      <div>
+        <p className="font-semibold mb-2" style={{ color: "var(--sap-text)" }}>Remind me about requests that still need my action</p>
+        <div className="flex flex-wrap gap-2">
+          {choice(0, "Off")}
+          {choice(2, "Every 2 hours")}
+          {choice(3, "Every 3 hours")}
+          {choice(4, "Every 4 hours")}
+        </div>
+      </div>
+
+      {prefs.hours > 0 && (
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <span style={{ color: "var(--sap-text)" }}>Only between</span>
+            <select value={prefs.workFrom} onChange={(e) => set({ workFrom: Number(e.target.value) })} className="sap-select" style={{ width: 100 }}>
+              {hourOpts.map((h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>)}
+            </select>
+            <span style={{ color: "var(--sap-text)" }}>and</span>
+            <select value={prefs.workTo} onChange={(e) => set({ workTo: Number(e.target.value) })} className="sap-select" style={{ width: 100 }}>
+              {hourOpts.map((h) => h + 1).map((h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>)}
+            </select>
+          </div>
+          <label className="flex items-center gap-2" style={{ color: "var(--sap-text)" }}>
+            <input type="checkbox" checked={prefs.workdaysOnly} onChange={(e) => set({ workdaysOnly: e.target.checked })} />
+            Working days only (skip Friday and Saturday)
+          </label>
+          <label className="flex items-center gap-2" style={{ color: "var(--sap-text)" }}>
+            <input type="checkbox" checked={prefs.voice} onChange={(e) => set({ voice: e.target.checked })} />
+            Also say it out loud
+          </label>
+
+          <div className="p-3" style={{ background: "#F7F8FD", border: "1px solid var(--sap-border)", borderRadius: 12 }}>
+            {permission === "granted" && <p style={{ color: "var(--sap-green)" }} className="font-semibold">✅ Desktop notifications are on — they pop up in the corner of your screen even when this tab is in the background.</p>}
+            {permission === "default" && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span style={{ color: "var(--sap-text)" }}>Allow desktop notifications so reminders pop up outside this page.</span>
+                <button type="button" onClick={onAskPermission} className="sap-btn sap-btn-blue">Allow notifications</button>
+              </div>
+            )}
+            {(permission === "denied" || permission === "unsupported") && (
+              <p style={{ color: "var(--sap-amber)" }}>
+                ⚠️ {permission === "denied" ? "Notifications are blocked for this page" : "This view can't show desktop notifications"} — reminders will use the popup inside the tracker{prefs.voice ? ", the voice reminder" : ""} and the count in the tab title instead.
+                {permission === "denied" && " To allow them, click the lock icon next to the address bar → Notifications → Allow."}
+              </p>
+            )}
+          </div>
+
+          <p className="text-xs" style={{ color: "var(--sap-gray)" }}>
+            {count > 0 ? `${count} request${count === 1 ? "" : "s"} need your action right now.` : "Nothing needs your action right now — no reminder will be sent until something does."}
+            {nextAt ? ` Next reminder around ${nextAt}.` : ""}
+          </p>
+          <p className="text-xs" style={{ color: "var(--sap-gray)" }}>
+            Keep the tracker open in a browser tab (tip: right-click the tab → Pin). It can be in the background or minimized, but the browser has to be running.
+          </p>
+        </>
+      )}
+
+      <div className="flex justify-end">
+        <button type="button" onClick={onTest} className="sap-btn sap-btn-outline">🔔 Send a test reminder now</button>
+      </div>
+    </div>
+  );
+}
+
 // The tracker's journey, as one clickable bar: each step is a filter.
 const isOpenReq = (r) => r.status !== "Completed" && r.status !== "Cancelled";
 const STAGE_FILTERS = [
@@ -8990,6 +9120,79 @@ function App() {
   }, [dailyItems]);
 
   const [showAutoReminder, setShowAutoReminder] = useState(false);
+  const [showReminderSettings, setShowReminderSettings] = useState(false);
+  const [reminderPrefs, setReminderPrefs] = useState(loadReminderPrefs);
+  const [notifPermission, setNotifPermission] = useState(notificationSupport);
+
+  // What a reminder is about: open requests sitting with me, missing info,
+  // or flagged in Today's Follow-up.
+  const actionItems = useMemo(() => {
+    const flagged = new Set(dailyItems.map((x) => x.req.id));
+    return requests.filter((r) => isOpenReq(r) && (r.waitingOn === "Me" || requestGaps(r).length > 0 || flagged.has(r.id)));
+  }, [requests, dailyItems]);
+
+  const fireReminder = (isTest) => {
+    const n = actionItems.length;
+    const title = n
+      ? `PR/PO Tracker — ${n} request${n === 1 ? "" : "s"} need${n === 1 ? "s" : ""} your action`
+      : "PR/PO Tracker — nothing needs your action";
+    const lines = actionItems.slice(0, 3).map((r) => `• ${r.serviceType} – ${r.beneficiary || r.owner}: ${getNextAction(r)}`);
+    if (n > 3) lines.push(`…and ${n - 3} more`);
+    const body = lines.join("\n") || "All requests are moving. 🎉";
+    const shown = showDesktopNotification(title, body, () => setShowDaily(true));
+    if (!shown) setShowAutoReminder(true);
+    if (reminderPrefs.voice && n) speakReminder(`You have ${n} request${n === 1 ? "" : "s"} that need your action.`);
+    if (!isTest) writeLastReminder(Date.now());
+  };
+
+  const updateReminderPrefs = (p) => {
+    // Turning reminders on (or changing the interval) starts the clock now,
+    // so the first one comes after the chosen interval, not immediately.
+    if (p.hours !== reminderPrefs.hours && p.hours > 0) writeLastReminder(Date.now());
+    setReminderPrefs(p);
+    saveReminderPrefs(p);
+  };
+
+  const askNotificationPermission = async () => {
+    if (notificationSupport() === "unsupported") { setNotifPermission("unsupported"); return; }
+    try {
+      const res = await Notification.requestPermission();
+      setNotifPermission(res);
+      if (res === "granted") appToast("Desktop notifications are on.");
+    } catch (e) {
+      setNotifPermission(notificationSupport());
+    }
+  };
+
+  // The clock: checks once a minute; the last reminder time is stored, so a
+  // reload doesn't restart the count or send a duplicate.
+  const fireRef = useRef(fireReminder);
+  fireRef.current = fireReminder;
+  useEffect(() => {
+    if (!reminderPrefs.hours) return undefined;
+    const tick = () => {
+      if (!withinWorkingHours(reminderPrefs)) return;
+      const due = readLastReminder() + reminderPrefs.hours * 3600 * 1000;
+      if (Date.now() < due) return;
+      if (actionItems.length === 0) return;
+      fireRef.current(false);
+    };
+    tick();
+    const id = setInterval(tick, 60 * 1000);
+    return () => clearInterval(id);
+  }, [reminderPrefs, actionItems.length]);
+
+  // The count on the tab itself, visible on a pinned tab at a glance.
+  useEffect(() => {
+    const base = "PR / PO Tracker";
+    document.title = actionItems.length ? `(${actionItems.length}) ${base}` : base;
+  }, [actionItems.length]);
+
+  const nextReminderAt = useMemo(() => {
+    if (!reminderPrefs.hours) return "";
+    const t = new Date(Math.max(Date.now(), readLastReminder() + reminderPrefs.hours * 3600 * 1000));
+    return t.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }, [reminderPrefs, showReminderSettings]);
   useEffect(() => {
     if (spokenRef.current || !reminderMessage) return;
     spokenRef.current = true;
@@ -9047,6 +9250,13 @@ function App() {
                 🔊 Voice reminder
               </button>
             )}
+            <button
+              onClick={() => { setNotifPermission(notificationSupport()); setShowReminderSettings(true); }}
+              className="sap-btn sap-btn-ghost"
+              title="Pop-up reminders every few hours about requests that still need your action"
+            >
+              🔔 Reminders{reminderPrefs.hours ? ` · every ${reminderPrefs.hours}h` : ""}
+            </button>
             <button
               onClick={() => setShowAssistant(true)}
               className="sap-btn"
@@ -9382,10 +9592,32 @@ function App() {
         </Modal>
       )}
 
+      {showReminderSettings && (
+        <Modal title="🔔 Reminders" onClose={() => setShowReminderSettings(false)}>
+          <ReminderSettings
+            prefs={reminderPrefs}
+            onChange={updateReminderPrefs}
+            onTest={() => fireReminder(true)}
+            permission={notifPermission}
+            onAskPermission={askNotificationPermission}
+            nextAt={nextReminderAt}
+            count={actionItems.length}
+          />
+        </Modal>
+      )}
       {showAutoReminder && (
         <Modal title="🔔 Reminder" onClose={() => setShowAutoReminder(false)}>
           <div className="flex flex-col gap-4">
-            <p className="text-sm" style={{ color: "var(--sap-text)" }}>{reminderMessage}</p>
+            <p className="text-sm" style={{ color: "var(--sap-text)" }}>
+              {reminderMessage || (actionItems.length ? `You have ${actionItems.length} request${actionItems.length === 1 ? "" : "s"} that need your action.` : "Nothing needs your action right now. 🎉")}
+            </p>
+            {actionItems.length > 0 && (
+              <ul className="text-sm flex flex-col gap-1" style={{ color: "var(--sap-text)" }}>
+                {actionItems.slice(0, 5).map((r) => (
+                  <li key={r.id}>• <strong>{r.serviceType} – {r.beneficiary || r.owner}:</strong> {getNextAction(r)}</li>
+                ))}
+              </ul>
+            )}
             <div className="flex justify-end gap-2">
               <button
                 type="button"
