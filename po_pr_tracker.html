@@ -5053,17 +5053,17 @@ function batchColorFor(batchId) {
 }
 
 // ---------------------------------------------------------------------------
-// After the PO: invoice → Goods Receipt / Service Entry Sheet (14 days)
+// After the PO: Service Entry Sheet / Goods Receipt
 //
-// Once the PO is out, the supplier's invoice arrives some time later. From
-// the day it arrives there are 14 days to post a Service Entry Sheet (for a
-// service — hotel, car, tickets) or a Goods Receipt (for material) in SAP,
-// with the invoice attached, so Finance can pay the supplier.
+// Once the PO is out and the supplier's invoice comes in, a Service Entry
+// Sheet (for a service — hotel, car, tickets) or a Goods Receipt (for
+// material) is posted in SAP so Finance can pay. The tracker doesn't time
+// it — it just keeps every PO without its SES/GR visible and in the
+// reminders, and a request only counts as Closed once that box is ticked.
 // ---------------------------------------------------------------------------
-const GR_SES_DAYS = 14;
 const RECEIPT_TYPES = {
-  SES: { short: "SES", label: "Service Entry Sheet", icon: "🛎️", kind: "Service" },
-  GR: { short: "GR", label: "Goods Receipt", icon: "📦", kind: "Material" },
+  SES: { short: "SES", label: "Service Entry Sheet" },
+  GR: { short: "GR", label: "Goods Receipt" },
 };
 function receiptTypeFor(req) {
   if (req.receiptType === "SES" || req.receiptType === "GR") return req.receiptType;
@@ -5071,215 +5071,19 @@ function receiptTypeFor(req) {
 }
 function receiptShort(req) { const t = receiptTypeFor(req); return t ? RECEIPT_TYPES[t].short : "SES / GR"; }
 function receiptLabel(req) { const t = receiptTypeFor(req); return t ? RECEIPT_TYPES[t].label : "Service Entry Sheet / Goods Receipt"; }
-function addDaysIso(iso, n) {
-  const d = new Date(iso + "T00:00:00");
-  d.setDate(d.getDate() + n);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-function signedDays(fromIso, toIso) {
-  return Math.round((new Date(toIso + "T00:00:00") - new Date(fromIso + "T00:00:00")) / 86400000);
-}
-function localTodayIso() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
 
-// "none" (PO not done yet) → "waiting_invoice" → "due" (clock running) → "done".
+// "none" (PO not done yet) → "pending" (SES/GR still open) → "done" (Closed).
 function grSesState(req) {
   if (req.status !== "Completed") return { stage: "none" };
-  if (req.serviceEntrySheet) return { stage: "done" };
-  if (!req.invoiceDate) return { stage: "waiting_invoice" };
-  const due = addDaysIso(req.invoiceDate, GR_SES_DAYS);
-  const daysLeft = signedDays(localTodayIso(), due);
-  return { stage: "due", due, daysLeft, overdue: daysLeft < 0, soon: daysLeft >= 0 && daysLeft <= 3 };
+  return { stage: req.serviceEntrySheet ? "done" : "pending" };
 }
 
-// Rule-based first read of an invoice PDF's text.
-function parseInvoiceText(text) {
-  const t = String(text || "");
-  const grab = (re) => { const m = t.match(re); return m ? m[1].trim() : ""; };
-  const invoiceNumber =
-    grab(/(?:tax\s+)?invoice\s*(?:no\.?|number|#|num)\s*[:\-]?\s*([A-Z0-9][A-Z0-9\-\/]{2,24})/i) ||
-    grab(/(?:رقم الفاتورة)\s*[:\-]?\s*([A-Z0-9][A-Z0-9\-\/]{2,24})/i);
-  const amount = grab(/(?:grand\s+total|total\s+amount|amount\s+due|net\s+amount|total\s+due|total|الإجمالي|المجموع|المبلغ الإجمالي)[^\d\n]{0,25}([\d,]+(?:\.\d{1,2})?)/i).replace(/,/g, "");
-  const poNumber = grab(/(?:P\.?O\.?|purchase\s+order)\s*(?:no\.?|number|#)?\s*[:\-]?\s*(\d{6,12})/i);
-  return { invoiceNumber, amount, poNumber };
-}
-
-function InvoiceModal({ req, startDone, onSave, onCancel }) {
-  const sample = useSample();
-  const [type, setType] = useState(receiptTypeFor(req) || "SES");
-  const [receivedOn, setReceivedOn] = useState(req.invoiceDate || localTodayIso());
-  const [invoiceNumber, setInvoiceNumber] = useState(req.invoiceNumber || "");
-  const [amount, setAmount] = useState(req.invoiceAmount || "");
-  const [files, setFiles] = useState([]); // new invoice files to attach
-  const [done, setDone] = useState(!!startDone || !!req.serviceEntrySheet);
-  const [docNumber, setDocNumber] = useState(req.grSesNumber || "");
-  const [doneOn, setDoneOn] = useState(req.grSesDate || localTodayIso());
-  const [reading, setReading] = useState(false);
-  const [check, setCheck] = useState(null); // AI's cross-check of invoice vs. request
-  const existingInvoices = (req.attachments || []).filter((a) => a.kind === "invoice");
-  const hasInvoiceFile = existingInvoices.length > 0 || files.length > 0;
-  const due = receivedOn ? addDaysIso(receivedOn, GR_SES_DAYS) : "";
-  const left = due ? signedDays(localTodayIso(), due) : null;
-  const T = RECEIPT_TYPES[type];
-
-  const readInvoice = async (att) => {
-    const text = att.text || "";
-    if (!text.trim()) return;
-    const rules = parseInvoiceText(text);
-    if (rules.invoiceNumber) setInvoiceNumber((v) => v || rules.invoiceNumber);
-    if (rules.amount) setAmount((v) => v || rules.amount);
-    if (!sample) {
-      if (rules.poNumber && req.poNumber && rules.poNumber !== String(req.poNumber).trim()) {
-        setCheck({ ok: false, notes: [`The invoice mentions PO ${rules.poNumber}, but this request's PO is ${req.poNumber}.`] });
-      }
-      return;
-    }
-    setReading(true);
-    try {
-      const r = await sample.json([
-        "Read this supplier invoice and check it against the purchase order it should belong to.",
-        'Reply with ONLY this JSON: {"invoiceNumber":"","invoiceDate":"","amount":"","currency":"","vendor":"","poNumber":"","guest":"","issues":[""]}',
-        "- amount: the total payable, digits and decimal point only. invoiceDate as YYYY-MM-DD. Use \"\" for anything not on the invoice; never guess.",
-        "- issues: short plain notes on anything that doesn't match the PO details below (different PO number, supplier, traveller/guest name, dates, or an amount above the budget). Empty array if it all matches.",
-        "",
-        "PO details: " + JSON.stringify({ poNumber: req.poNumber, vendor: req.vendor, traveller: req.beneficiary || req.owner, from: req.serviceDateFrom, to: req.serviceDateTo, budget: req.budget, service: req.serviceType }),
-        "",
-        "INVOICE TEXT:",
-        text.slice(0, 15000),
-      ].join("\n"));
-      const str = (v) => (typeof v === "string" ? v.trim() : typeof v === "number" ? String(v) : "");
-      if (str(r.invoiceNumber)) setInvoiceNumber(str(r.invoiceNumber));
-      if (str(r.amount)) setAmount(str(r.amount).replace(/[^\d.]/g, ""));
-      const issues = Array.isArray(r.issues) ? r.issues.map(str).filter(Boolean).slice(0, 5) : [];
-      setCheck({ ok: issues.length === 0, notes: issues, vendor: str(r.vendor), currency: str(r.currency), invoiceDate: str(r.invoiceDate) });
-    } catch (e) {
-      const m = sampleErrorText(e);
-      if (m) appToast(m);
-    } finally {
-      setReading(false);
-    }
-  };
-
-  const onFiles = async (e) => {
-    const list = Array.from(e.target.files || []);
-    e.target.value = "";
-    for (const f of list) {
-      const att = { ...(await ingestAttachment(f)), kind: "invoice" };
-      setFiles((prev) => [...prev, att]);
-      readInvoice(att);
-    }
-  };
-
-  const save = async () => {
-    if (!receivedOn) { appToast("Enter the date the invoice arrived."); return; }
-    if (done && !hasInvoiceFile) {
-      if (!(await appConfirm(`No invoice is attached. The ${T.label} in SAP needs the invoice — mark it done anyway?`))) return;
-    }
-    onSave({
-      receiptType: type,
-      invoiceDate: receivedOn,
-      invoiceNumber: invoiceNumber.trim(),
-      invoiceAmount: String(amount).trim(),
-      finalAmount: req.finalAmount || String(amount).trim(),
-      attachments: [...(req.attachments || []), ...files],
-      serviceEntrySheet: done,
-      grSesNumber: done ? docNumber.trim() : "",
-      grSesDate: done ? doneOn : "",
-    });
-  };
-
-  const typeBtn = (id) => {
-    const on = type === id;
-    const t = RECEIPT_TYPES[id];
-    return (
-      <button
-        key={id}
-        type="button"
-        onClick={() => setType(id)}
-        className="text-left p-3"
-        style={{ borderRadius: 12, cursor: "pointer", flex: 1, background: on ? "#EEF1FF" : "#fff", border: `2px solid ${on ? "#3D5AFE" : "var(--sap-border)"}` }}
-      >
-        <div className="text-sm font-semibold" style={{ color: on ? "#3D5AFE" : "var(--sap-text)" }}>{t.icon} {t.kind} → {t.label}</div>
-      </button>
-    );
-  };
-
-  return (
-    <div className="flex flex-col gap-4 text-sm">
-      <div className="flex gap-2 flex-wrap">{typeBtn("SES")}{typeBtn("GR")}</div>
-
-      <div className="p-3" style={{ background: "#fff", border: "1px solid var(--sap-border)", borderRadius: 14 }}>
-        <p className="font-semibold mb-2" style={{ color: "var(--sap-text)" }}>🧾 The invoice</p>
-        <div className="flex flex-wrap items-center gap-2 mb-3">
-          <label className="sap-btn sap-btn-outline" style={{ cursor: "pointer" }}>
-            📎 Attach invoice{sample ? " — AI reads it" : ""}
-            <input type="file" accept=".pdf,image/*" multiple onChange={onFiles} style={{ display: "none" }} />
-          </label>
-          {[...existingInvoices, ...files].map((a, i) => (
-            <span key={i} className="text-xs px-2 py-1" style={{ background: "#F1F3F9", borderRadius: 999 }}>📄 {a.name}</span>
-          ))}
-          {reading && <span className="text-xs font-semibold" style={{ color: "#3D5AFE" }}>✨ Reading the invoice…</span>}
-        </div>
-        {check && (
-          <div className="p-2 mb-3 text-xs" style={{ borderRadius: 10, background: check.ok ? "var(--sap-green-bg)" : "var(--sap-amber-bg)", color: check.ok ? "var(--sap-green)" : "var(--sap-amber)", border: `1px solid ${check.ok ? "#BFE3CB" : "#F5DFA6"}` }}>
-            {check.ok ? (
-              <span className="font-semibold">✅ The invoice matches this PO{check.vendor ? ` (${check.vendor})` : ""}.</span>
-            ) : (
-              <>
-                <p className="font-semibold mb-0.5">⚠️ Check before posting:</p>
-                {check.notes.map((n, i) => <p key={i} dir="auto">• {n}</p>)}
-              </>
-            )}
-          </div>
-        )}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div>
-            <label className="sap-label">Invoice received on *</label>
-            <input type="date" value={receivedOn} onChange={(e) => setReceivedOn(e.target.value)} className="sap-input" />
-          </div>
-          <div>
-            <label className="sap-label">Invoice number</label>
-            <input value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} className="sap-input" />
-          </div>
-          <div>
-            <label className="sap-label">Amount{check && check.currency ? ` (${check.currency})` : ""}</label>
-            <input value={amount} onChange={(e) => setAmount(e.target.value)} className="sap-input" />
-          </div>
-        </div>
-        {due && !done && (
-          <p className="mt-2 font-semibold" style={{ color: left < 0 ? "var(--sap-red)" : left <= 3 ? "var(--sap-amber)" : "var(--sap-blue-dark)" }}>
-            ⏱ {T.label} due by {toSapDate(due)} — {left < 0 ? `${-left} day(s) overdue` : left === 0 ? "due today" : `${left} day(s) left`} (14 days from the invoice).
-          </p>
-        )}
-      </div>
-
-      <div className="p-3" style={{ background: done ? "var(--sap-green-bg)" : "#fff", border: `1px solid ${done ? "#BFE3CB" : "var(--sap-border)"}`, borderRadius: 14 }}>
-        <label className="flex items-center gap-2 font-semibold" style={{ color: "var(--sap-text)", cursor: "pointer" }}>
-          <input type="checkbox" checked={done} onChange={(e) => setDone(e.target.checked)} style={{ width: 18, height: 18 }} />
-          ✅ {T.label} done in SAP (invoice attached there)
-        </label>
-        {done && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-            <div>
-              <label className="sap-label">{T.short} document number (optional)</label>
-              <input value={docNumber} onChange={(e) => setDocNumber(e.target.value)} className="sap-input" />
-            </div>
-            <div>
-              <label className="sap-label">Done on</label>
-              <input type="date" value={doneOn} onChange={(e) => setDoneOn(e.target.value)} className="sap-input" />
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="flex justify-end gap-2">
-        <button type="button" onClick={onCancel} className="sap-btn sap-btn-outline">Cancel</button>
-        <button type="button" onClick={save} disabled={reading} className="sap-btn sap-btn-blue">Save</button>
-      </div>
-    </div>
-  );
+// What the badge says: a completed PO isn't "Closed" until its SES/GR is done.
+function displayStatus(req) {
+  const g = grSesState(req);
+  if (g.stage === "pending") return { label: `${receiptShort(req)} pending`, style: { background: "var(--sap-orange-bg)", color: "var(--sap-orange)", borderColor: "#F7D6B0" } };
+  if (g.stage === "done") return { label: "Closed", style: STATUS_INLINE_STYLE.Completed };
+  return { label: STATUS_LABELS[req.status] || req.status, style: STATUS_INLINE_STYLE[req.status] };
 }
 
 // ---------------------------------------------------------------------------
@@ -5711,16 +5515,10 @@ function getNextAction(req) {
       if (!req.prNumber) return "Enter the approved PR number this PO is based on";
       if (!req.poNumber) return `PR ${req.prNumber} is approved — create the PO in SAP with reference to it (📋 Copy for SAP), then enter the PO number`;
       return "Waiting for PO approval — confirm booking/delivery once approved";
-    case "Completed": {
-      const g = grSesState(req);
-      if (g.stage === "waiting_invoice") return "PO sent — when the supplier's invoice arrives, click 🧾 Invoice received";
-      if (g.stage === "due") {
-        return g.overdue
-          ? `${receiptLabel(req)} is ${-g.daysLeft} day(s) overdue — post it in SAP with the invoice now`
-          : `Post the ${receiptLabel(req)} in SAP with the invoice — due ${toSapDate(g.due)} (${g.daysLeft === 0 ? "today" : `${g.daysLeft} day(s) left`})`;
-      }
-      return `Closed — invoice received and ${receiptShort(req)} done`;
-    }
+    case "Completed":
+      return req.serviceEntrySheet
+        ? `Closed — ${receiptShort(req)} done`
+        : `PO done — post the ${receiptLabel(req)} in SAP (with the invoice), then tick it here to close`;
     case "Cancelled":
       return "Cancelled — no action needed";
     default:
@@ -6544,8 +6342,7 @@ const EXCEL_BORDER = { style: "thin", color: { rgb: "E7EAF3" } };
 const EXCEL_COLUMNS = [
   "PR Number", "PR Raised By", "PO Number", "Requester", "Beneficiary", "Service From", "Service To",
   "Department", "Charged To", "Project", "Network", "Activity", "Cost Center", "Service Type", "Vendor", "Status", "Budget", "Final Amount",
-  "Required Date", "Completed Date", "Invoice Received", "Invoice No.", "Invoice Amount",
-  "SES/GR Type", "SES/GR Due", "SES/GR Status", "SES/GR No.", "Notes", "Created",
+  "Required Date", "Completed Date", "SES/GR Type", "SES/GR Status", "Notes", "Created",
 ];
 
 async function exportToExcel(requests) {
@@ -6569,24 +6366,13 @@ async function exportToExcel(requests) {
     "Cost Center": r.costCenter || "",
     "Service Type": r.serviceType,
     "Vendor": r.vendor,
-    "Status": STATUS_LABELS[r.status] || r.status,
+    "Status": displayStatus(r).label,
     "Budget": r.budget,
     "Final Amount": r.finalAmount,
     "Required Date": r.requiredDate,
     "Completed Date": r.completedDate,
-    "Invoice Received": r.invoiceDate || "",
-    "Invoice No.": r.invoiceNumber || "",
-    "Invoice Amount": r.invoiceAmount || "",
     "SES/GR Type": r.status === "Completed" ? receiptShort(r) : "",
-    "SES/GR Due": r.invoiceDate ? addDaysIso(r.invoiceDate, GR_SES_DAYS) : "",
-    "SES/GR Status": (() => {
-      const g = grSesState(r);
-      if (g.stage === "done") return `Done${r.grSesDate ? " " + r.grSesDate : ""}`;
-      if (g.stage === "due") return g.overdue ? `Overdue ${-g.daysLeft} day(s)` : `Due in ${g.daysLeft} day(s)`;
-      if (g.stage === "waiting_invoice") return "Waiting invoice";
-      return "";
-    })(),
-    "SES/GR No.": r.grSesNumber || "",
+    "SES/GR Status": r.status === "Completed" ? (r.serviceEntrySheet ? "Done — Closed" : "Pending") : "",
     "Notes": r.notes,
     "Created": r.createdAt ? r.createdAt.slice(0, 10) : "",
   }));
@@ -6613,12 +6399,13 @@ async function exportToExcel(requests) {
       if (!ws[addr]) return;
       const isStatus = colIdx === statusColIdx;
       const label = STATUS_LABELS[r.status] || r.status;
+      const sesPending = r.status === "Completed" && !r.serviceEntrySheet;
       ws[addr].s = {
         border: { top: EXCEL_BORDER, bottom: EXCEL_BORDER, left: EXCEL_BORDER, right: EXCEL_BORDER },
         ...(isStatus
           ? {
-              font: { bold: true, color: { rgb: EXCEL_STATUS_FONT[label] || "6B7186" } },
-              fill: { fgColor: { rgb: EXCEL_STATUS_FILL[label] || "F4F6FB" } },
+              font: { bold: true, color: { rgb: sesPending ? "E8702A" : (EXCEL_STATUS_FONT[label] || "6B7186") } },
+              fill: { fgColor: { rgb: sesPending ? "FFEEE0" : (EXCEL_STATUS_FILL[label] || "F4F6FB") } },
               alignment: { horizontal: "center" },
             }
           : {}),
@@ -6629,7 +6416,7 @@ async function exportToExcel(requests) {
   ws["!cols"] = [
     { wch: 12 }, { wch: 13 }, { wch: 12 }, { wch: 18 }, { wch: 18 }, { wch: 12 }, { wch: 12 },
     { wch: 14 }, { wch: 13 }, { wch: 18 }, { wch: 14 }, { wch: 10 }, { wch: 13 }, { wch: 12 }, { wch: 16 }, { wch: 16 }, { wch: 10 }, { wch: 12 },
-    { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 13 }, { wch: 11 }, { wch: 12 }, { wch: 18 }, { wch: 14 }, { wch: 30 }, { wch: 12 },
+    { wch: 12 }, { wch: 14 }, { wch: 11 }, { wch: 14 }, { wch: 30 }, { wch: 12 },
   ];
   ws["!autofilter"] = { ref: `A1:${XLSX.utils.encode_col(EXCEL_COLUMNS.length - 1)}1` };
 
@@ -8622,7 +8409,7 @@ function CopyForSapModal({ req, onClose }) {
       <div className="flex items-center gap-1 p-1 mb-3 self-start" style={{ background: "#F1F3F9", borderRadius: 999 }}>
         {tab("PR", "1 · Purchase Requisition")}
         {tab("PO", "2 · Purchase Order")}
-        {tab("SES", `3 · ${receiptTypeFor(req) === "GR" ? "Goods Receipt" : receiptTypeFor(req) === "SES" ? "Service Entry Sheet" : "SES / GR"}`)}
+        {tab("SES", `3 · ${receiptLabel(req)}`)}
       </div>
 
       {mode === "PR" && (
@@ -8681,41 +8468,31 @@ function CopyForSapModal({ req, onClose }) {
 
       {mode === "SES" && (() => {
         const g = grSesState(req);
-        const invoices = (req.attachments || []).filter((a) => a.kind === "invoice");
         return (
           <>
-            {req.status !== "Completed" ? (
+            {g.stage === "none" ? (
               <div className="p-3 text-sm mb-2" style={{ background: "var(--sap-amber-bg)", border: "1px solid #F5DFA6", borderRadius: 10, color: "var(--sap-amber)" }}>
-                This step comes after the PO is approved and sent, and the supplier's invoice has arrived.
+                This step comes after the PO is approved and sent, once the supplier's invoice is in.
               </div>
-            ) : !req.invoiceDate ? (
-              <div className="p-3 text-sm mb-2" style={{ background: "#F1F3F9", border: "1px solid var(--sap-border)", borderRadius: 10, color: "var(--sap-text)" }}>
-                🧾 No invoice recorded yet — use <strong>Invoice received</strong> in the table when it arrives; the 14-day clock starts from that day.
+            ) : g.stage === "pending" ? (
+              <div className="p-3 text-sm mb-2 font-semibold" style={{ background: "var(--sap-orange-bg)", border: "1px solid #F7D6B0", borderRadius: 10, color: "var(--sap-orange)" }}>
+                ⏳ {receiptLabel(req)} still pending — this PO stays open until it's ticked.
               </div>
-            ) : g.stage === "due" ? (
-              <div className="p-3 text-sm mb-2 font-semibold" style={{ background: g.overdue ? "var(--sap-red-bg)" : "#EAF2FC", border: `1px solid ${g.overdue ? "#F5C2C2" : "#BEDAF7"}`, borderRadius: 10, color: g.overdue ? "var(--sap-red)" : "var(--sap-blue-dark)" }}>
-                ⏱ {receiptLabel(req)} due by {toSapDate(g.due)} — {g.overdue ? `${-g.daysLeft} day(s) overdue` : g.daysLeft === 0 ? "due today" : `${g.daysLeft} day(s) left`}.
-              </div>
-            ) : g.stage === "done" ? (
+            ) : (
               <div className="p-3 text-sm mb-2 font-semibold" style={{ background: "var(--sap-green-bg)", border: "1px solid #BFE3CB", borderRadius: 10, color: "var(--sap-green)" }}>
-                ✅ {receiptLabel(req)} done{req.grSesDate ? ` on ${toSapDate(req.grSesDate)}` : ""}.
+                ✅ {receiptLabel(req)} done — Closed.
               </div>
-            ) : null}
+            )}
             <p className="text-sm mb-2" style={{ color: "var(--sap-gray)" }}>
               Post the {receiptLabel(req)} against the PO in SAP and attach the invoice, so Finance can pay the supplier.
             </p>
             <CopyRow label="PO Number" value={req.poNumber} />
             <CopyRow label="Vendor" value={req.vendor} />
-            <CopyRow label="Invoice No." value={req.invoiceNumber || ""} hint={!req.invoiceNumber ? "Not recorded yet" : ""} />
-            <CopyRow label="Invoice Date" value={req.invoiceDate ? toSapDate(req.invoiceDate) : ""} hint="Date the invoice arrived" />
-            <CopyRow label="Amount" value={req.invoiceAmount || req.finalAmount || ""} />
+            <CopyRow label="Amount" value={req.finalAmount || req.budget || ""} />
             <CopyRow label="Short Text" value={`${receiptShort(req)} - ${shortText}`} />
             {chargeRows}
             <div className="p-3 text-xs mt-3" style={{ background: "#F5F6F7", border: "1px solid var(--sap-border)", borderRadius: "10px", color: "var(--sap-gray)" }}>
-              {invoices.length
-                ? <>Invoice file{invoices.length > 1 ? "s" : ""} to attach in SAP: <strong>{invoices.map((a) => a.name).join(", ")}</strong> (open it from 📎 Files in the table).</>
-                : <>No invoice file attached here yet — attach it under <strong>Invoice received</strong> so it's on hand for SAP.</>}
-              {" "}Then tick the box in the table (or <strong>Invoice → Service Entry Sheet / GR</strong>) to close the PO.
+              When it's done in SAP, tick the {receiptShort(req)} box in the table — that's what closes the request.
             </div>
           </>
         );
@@ -8740,8 +8517,7 @@ function requestsForAssistant(requests) {
       dept: r.department || "", charge: r.chargeTo || "", project: r.projectName || "", network: r.network || "", activity: r.activity || "", costCenter: r.costCenter || "",
       missing: isOpenReq(r) ? requestGaps(r) : [], from: r.serviceDateFrom || "", to: r.serviceDateTo || "",
       requiredBy: r.requiredDate || "", budget: r.budget || "", ses: !!r.serviceEntrySheet,
-      invoiceReceived: r.invoiceDate || "", invoiceNo: r.invoiceNumber || "",
-      afterPo: (() => { const g = grSesState(r); return g.stage === "due" ? `${receiptShort(r)} due ${g.due}${g.overdue ? " (OVERDUE)" : ""}` : g.stage; })(),
+      afterPo: (() => { const g = grSesState(r); return g.stage === "pending" ? `${receiptShort(r)} pending` : g.stage === "done" ? "closed" : ""; })(),
       files: (r.attachments || []).length, created: String(r.createdAt || "").slice(0, 10),
       summary: (r.emailSummary || "").slice(0, 160),
     }));
@@ -8858,7 +8634,7 @@ function AssistantChat({ requests }) {
     const data = requestsForAssistant(requests);
     const rules = [
       "You are the assistant built into a PR/PO tracker used by a procurement coordinator (hotels, car rentals, tickets for staff travel; requests become SAP Purchase Requisitions then POs).",
-      `Today is ${todayIso()}. Company flow: PR (Purchase Requisition) → PR approval → PO (Purchase Order, created from the approved PR) → PO approval. Statuses: Pending (no PR yet — the coordinator must create it) → Waiting PR approval (PR exists, follow up its approval) → Waiting PO approval (PR approved; if "po" is empty the coordinator still has to create the PO) → Completed (or Cancelled). "prBy": "requester" means the PR arrived already raised by the requester (only follow up), "me" means the coordinator raises it. After the PO is approved and sent, the supplier's invoice arrives; from the day it arrives there are 14 days to post a Service Entry Sheet (SES, for services) or a Goods Receipt (GR, for material) in SAP with the invoice attached, so Finance can pay. "afterPo" shows that step: waiting_invoice, "SES/GR due <date>" (flag OVERDUE ones first), or done. "ses" = SES/GR done. "charge": "project" requests are charged to the project and need both "network" and "activity" before the PR/PO can be created; "cost_center" requests only need the cost center. "missing" lists what a request still lacks — always point these out and offer to draft the email asking for them.`,
+      `Today is ${todayIso()}. Company flow: PR (Purchase Requisition) → PR approval → PO (Purchase Order, created from the approved PR) → PO approval. Statuses: Pending (no PR yet — the coordinator must create it) → Waiting PR approval (PR exists, follow up its approval) → Waiting PO approval (PR approved; if "po" is empty the coordinator still has to create the PO) → Completed (or Cancelled). "prBy": "requester" means the PR arrived already raised by the requester (only follow up), "me" means the coordinator raises it. After the PO is approved and sent (status Completed), a Service Entry Sheet (SES, for services) or Goods Receipt (GR, for material) still has to be posted in SAP with the invoice so Finance can pay; the request is only Closed once that is ticked. "afterPo": "SES pending"/"GR pending" means it is still open — always remind about these; "closed" means done. "charge": "project" requests are charged to the project and need both "network" and "activity" before the PR/PO can be created; "cost_center" requests only need the cost center. "missing" lists what a request still lacks — always point these out and offer to draft the email asking for them.`,
       "Answer from the data below only — never invent requests, numbers or names. If the data can't answer, say so.",
       "Reply in the language the coordinator writes in (Arabic or English). Be concise and well-organized; use short lists when helpful. When asked to draft an email, SAP text or a message, write it ready to paste.",
       `Tracker data (${data.shown} of ${data.total} requests, newest first, one JSON object per line):`,
@@ -9097,14 +8873,12 @@ const STAGE_FILTERS = [
   { id: "Waiting PR approval", icon: "⏳", label: "PR approval", test: (r) => r.status === "Waiting PR approval", color: "var(--sap-blue)", bg: "#EAF2FC" },
   { id: "__createPO", icon: "🧾", label: "Create PO", test: (r) => r.status === "Waiting PO approval" && !(r.poNumber || "").trim(), color: "var(--sap-purple)", bg: "var(--sap-purple-bg)" },
   { id: "__poApproval", icon: "⏳", label: "PO approval", test: (r) => r.status === "Waiting PO approval" && !!(r.poNumber || "").trim(), color: "var(--sap-purple)", bg: "var(--sap-purple-bg)" },
-  { id: "__waitInvoice", icon: "🧾", label: "Waiting invoice", test: (r) => grSesState(r).stage === "waiting_invoice", color: "var(--sap-gray)", bg: "#F1F3F9" },
-  { id: "__grSesDue", icon: "📥", label: "SES / GR due", test: (r) => grSesState(r).stage === "due", color: "var(--sap-orange)", bg: "var(--sap-orange-bg)" },
+  { id: "__grSesPending", icon: "📥", label: "SES / GR pending", test: (r) => grSesState(r).stage === "pending", color: "var(--sap-orange)", bg: "var(--sap-orange-bg)" },
   { id: "__closed", icon: "✅", label: "Closed", test: (r) => grSesState(r).stage === "done", color: "var(--sap-green)", bg: "var(--sap-green-bg)" },
 ];
 const EXTRA_FILTERS = [
   { id: "__missing", icon: "⚠️", label: "Missing info", test: (r) => isOpenReq(r) && requestGaps(r).length > 0, color: "var(--sap-red)", bg: "var(--sap-red-bg)" },
   { id: "__overdue", icon: "⏰", label: "Overdue", test: (r) => isOpenReq(r) && isOverdue(r), color: "var(--sap-red)", bg: "var(--sap-red-bg)" },
-  { id: "__grSesLate", icon: "🚨", label: "SES / GR past 14 days", test: (r) => !!grSesState(r).overdue, color: "var(--sap-red)", bg: "var(--sap-red-bg)" },
 ];
 function matchesStageFilter(r, id) {
   if (id === "all") return true;
@@ -9325,16 +9099,19 @@ function App() {
     }
   };
 
-  const [invoiceReq, setInvoiceReq] = useState(null); // { req, startDone }
   const handleToggleSes = async (req) => {
     if (req.serviceEntrySheet) {
-      if (await appConfirm(`Mark the ${receiptLabel(req)} as not done again?`)) {
-        handleFieldUpdate(req.id, { serviceEntrySheet: false, grSesDate: "", grSesNumber: "" });
+      if (await appConfirm(`Reopen this PO — mark the ${receiptLabel(req)} as not done?`)) {
+        handleFieldUpdate(req.id, { serviceEntrySheet: false, grSesDate: "" });
       }
       return;
     }
-    setInvoiceReq({ req, startDone: true });
+    const today = new Date().toISOString().slice(0, 10);
+    handleFieldUpdate(req.id, { serviceEntrySheet: true, grSesDate: today, receiptType: receiptTypeFor(req) || "SES" });
+    appToast(`${receiptShort(req)} done — request Closed ✅`);
   };
+  // SES ⇄ GR for one request (services default to SES).
+  const flipReceiptType = (req) => handleFieldUpdate(req.id, { receiptType: receiptTypeFor(req) === "GR" ? "SES" : "GR" });
 
   const handleAttachPoClick = (req) => {
     setAttachPoRowId(req.id);
@@ -9400,11 +9177,11 @@ function App() {
 
   const dailyItems = useMemo(() => {
     return requests
-      .filter((r) => (r.status !== "Completed" && r.status !== "Cancelled") || grSesState(r).stage === "due")
+      .filter((r) => (r.status !== "Completed" && r.status !== "Cancelled") || grSesState(r).stage === "pending")
       .map((r) => ({ req: r, alert: r.status === "Completed" ? null : getAlertLevel(r), breach: r.status === "Completed" ? null : slaBreach(r, sla) }))
       .filter(({ req, alert, breach }) =>
         alert || breach || (req.status !== "Completed" && requestGaps(req).length > 0) ||
-        (grSesState(req).stage === "due" && (grSesState(req).overdue || grSesState(req).soon)) ||
+        grSesState(req).stage === "pending" ||
         (req.status === "Waiting PO approval" && (!req.prNumber || !req.poNumber)))
       // What's sitting with me comes first — that's the part I can actually
       // move today; the rest is chasing other people.
@@ -9441,7 +9218,7 @@ function App() {
     const flagged = new Set(dailyItems.map((x) => x.req.id));
     return requests.filter((r) =>
       (isOpenReq(r) && (r.waitingOn === "Me" || requestGaps(r).length > 0 || flagged.has(r.id))) ||
-      grSesState(r).stage === "due");
+      grSesState(r).stage === "pending");
   }, [requests, dailyItems]);
 
   const fireReminder = (isTest) => {
@@ -9738,7 +9515,7 @@ function App() {
                   <th>Service</th>
                   <th>Vendor</th>
                   <th>Status</th>
-                  <th style={{ whiteSpace: "nowrap" }}>Invoice → Service Entry Sheet / GR</th>
+                  <th style={{ whiteSpace: "nowrap" }}>Service Entry Sheet / GR</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -9837,51 +9614,38 @@ function App() {
                       </td>
                       <td>{r.vendor || "—"}</td>
                       <td>
-                        <span className="sap-badge" style={STATUS_INLINE_STYLE[r.status]}>
-                          {STATUS_LABELS[r.status]}
+                        <span className="sap-badge" style={displayStatus(r).style}>
+                          {displayStatus(r).label}
                         </span>
                       </td>
                       <td style={{ minWidth: 190 }}>
                         {(() => {
                           const g = grSesState(r);
                           if (g.stage === "none") return <span style={{ color: "var(--sap-gray)" }}>— after the PO</span>;
-                          const tick = (
-                            <input
-                              type="checkbox"
-                              checked={!!r.serviceEntrySheet}
-                              onChange={() => handleToggleSes(r)}
-                              title={r.serviceEntrySheet ? `${receiptLabel(r)} done — untick to reopen` : `Tick once the ${receiptLabel(r)} is done in SAP`}
-                              style={{ width: 18, height: 18, cursor: "pointer", flexShrink: 0 }}
-                            />
-                          );
-                          if (g.stage === "waiting_invoice") {
-                            return (
-                              <div className="flex items-center gap-2">
-                                {tick}
-                                <button type="button" onClick={() => setInvoiceReq({ req: r, startDone: false })} className="text-xs font-semibold px-2.5 py-1" style={{ borderRadius: 999, border: "1px solid var(--sap-border)", background: "#fff", color: "var(--sap-text)", cursor: "pointer", whiteSpace: "nowrap" }}>
-                                  🧾 Invoice received
-                                </button>
-                              </div>
-                            );
-                          }
-                          if (g.stage === "due") {
-                            const tone = g.overdue ? { bg: "var(--sap-red-bg)", fg: "var(--sap-red)" } : g.soon ? { bg: "var(--sap-amber-bg)", fg: "var(--sap-amber)" } : { bg: "#EAF2FC", fg: "var(--sap-blue)" };
-                            return (
-                              <div className="flex items-center gap-2">
-                                {tick}
-                                <button type="button" onClick={() => setInvoiceReq({ req: r, startDone: false })} className="text-xs font-semibold px-2.5 py-1 text-left" style={{ borderRadius: 10, border: "none", background: tone.bg, color: tone.fg, cursor: "pointer", whiteSpace: "nowrap" }} title={`Invoice received ${toSapDate(r.invoiceDate)} — the ${receiptLabel(r)} is due 14 days later`}>
-                                  {receiptShort(r)} {g.overdue ? `overdue ${-g.daysLeft}d` : g.daysLeft === 0 ? "due today" : `due in ${g.daysLeft}d`}
-                                  <span style={{ fontWeight: 400 }}> · {toSapDate(g.due)}</span>
-                                </button>
-                              </div>
-                            );
-                          }
                           return (
                             <div className="flex items-center gap-2">
-                              {tick}
-                              <button type="button" onClick={() => setInvoiceReq({ req: r, startDone: true })} className="text-xs" style={{ background: "none", border: "none", padding: 0, color: "var(--sap-green)", cursor: "pointer", whiteSpace: "nowrap" }}>
-                                ✓ {receiptShort(r)} done{r.grSesDate ? ` ${toSapDate(r.grSesDate)}` : ""}{r.grSesNumber ? ` · ${r.grSesNumber}` : ""}
-                              </button>
+                              <input
+                                type="checkbox"
+                                checked={!!r.serviceEntrySheet}
+                                onChange={() => handleToggleSes(r)}
+                                title={r.serviceEntrySheet ? `${receiptLabel(r)} done — untick to reopen` : `Tick once the ${receiptLabel(r)} is done in SAP — this closes the request`}
+                                style={{ width: 18, height: 18, cursor: "pointer", flexShrink: 0 }}
+                              />
+                              {g.stage === "pending" ? (
+                                <button
+                                  type="button"
+                                  onClick={() => flipReceiptType(r)}
+                                  className="text-xs font-semibold px-2.5 py-1"
+                                  style={{ borderRadius: 999, border: "none", background: "var(--sap-orange-bg)", color: "var(--sap-orange)", cursor: "pointer", whiteSpace: "nowrap" }}
+                                  title="Click to switch between Service Entry Sheet (service) and Goods Receipt (material)"
+                                >
+                                  ⏳ {receiptShort(r)} pending ⇄
+                                </button>
+                              ) : (
+                                <span className="text-xs" style={{ color: "var(--sap-green)", whiteSpace: "nowrap" }}>
+                                  ✓ {receiptShort(r)} done{r.grSesDate ? ` ${toSapDate(r.grSesDate)}` : ""}
+                                </span>
+                              )}
                             </div>
                           );
                         })()}
@@ -10001,7 +9765,7 @@ function App() {
                   <div key={req.id} className="sap-card p-3" style={style ? style.rowStyle : { background: "#F5F6F7" }}>
                     <div className="flex items-center justify-between">
                       <span className="font-semibold" style={{ color: "var(--sap-text)" }}>{req.owner} — {req.serviceType} {req.vendor ? `(${req.vendor})` : ""}</span>
-                      <span className="sap-badge" style={STATUS_INLINE_STYLE[req.status]}>{STATUS_LABELS[req.status]}</span>
+                      <span className="sap-badge" style={displayStatus(req).style}>{displayStatus(req).label}</span>
                     </div>
                     <div className="text-sm mt-1 space-y-0.5">
                       {style && <p className="font-semibold" style={{ color: style.text }}>⚠️ {style.label}</p>}
@@ -10029,9 +9793,9 @@ function App() {
                       >
                         Update status now
                       </button>
-                      {grSesState(req).stage === "due" && (
-                        <button onClick={() => { setShowDaily(false); setInvoiceReq({ req, startDone: true }); }} className="sap-link" style={{ color: "var(--sap-green)" }}>
-                          ✅ {receiptShort(req)} done
+                      {grSesState(req).stage === "pending" && (
+                        <button onClick={() => handleToggleSes(req)} className="sap-link" style={{ color: "var(--sap-green)" }}>
+                          ✅ {receiptShort(req)} done — close it
                         </button>
                       )}
                       {req.status !== "Completed" && requestGaps(req).length > 0 && (
@@ -10061,25 +9825,6 @@ function App() {
         </Modal>
       )}
 
-      {invoiceReq && (
-        <Modal
-          title={`🧾 Invoice & ${receiptShort(invoiceReq.req)} — ${invoiceReq.req.serviceType} for ${invoiceReq.req.beneficiary || invoiceReq.req.owner}${invoiceReq.req.poNumber ? ` · PO ${invoiceReq.req.poNumber}` : ""}`}
-          onClose={() => setInvoiceReq(null)}
-          wide
-        >
-          <InvoiceModal
-            key={invoiceReq.req.id}
-            req={invoiceReq.req}
-            startDone={invoiceReq.startDone}
-            onCancel={() => setInvoiceReq(null)}
-            onSave={(patch) => {
-              handleFieldUpdate(invoiceReq.req.id, patch);
-              setInvoiceReq(null);
-              appToast(patch.serviceEntrySheet ? `${receiptShort({ ...invoiceReq.req, ...patch })} recorded as done ✅` : `Invoice saved — ${receiptShort({ ...invoiceReq.req, ...patch })} due ${toSapDate(addDaysIso(patch.invoiceDate, GR_SES_DAYS))}`);
-            }}
-          />
-        </Modal>
-      )}
       {draftReq && (
         <Modal title={`✉️ Missing info — ${draftReq.serviceType} for ${draftReq.beneficiary || draftReq.owner}`} onClose={() => setDraftReq(null)} wide>
           <MissingInfoDraft key={draftReq.id} {...draftPropsForRequest(draftReq)} />
@@ -10115,7 +9860,7 @@ function App() {
                   <p className="font-semibold" style={{ color: "var(--sap-text)" }}>{r.serviceType} {r.vendor ? `— ${r.vendor}` : ""}</p>
                   <p className="text-xs" style={{ color: "var(--sap-gray)" }}>PR: {r.prNumber || "—"} · PO: {r.poNumber || "—"}</p>
                 </div>
-                <span className="sap-badge" style={STATUS_INLINE_STYLE[r.status]}>{STATUS_LABELS[r.status]}</span>
+                <span className="sap-badge" style={displayStatus(r).style}>{displayStatus(r).label}</span>
               </div>
             ))}
           </div>
