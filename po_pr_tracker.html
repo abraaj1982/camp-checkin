@@ -9566,6 +9566,13 @@ function App() {
 
   const [showAutoReminder, setShowAutoReminder] = useState(false);
   const [showReminderSettings, setShowReminderSettings] = useState(false);
+  const [uiLang, setUiLang] = useState(() => (window.prpoGetLang ? window.prpoGetLang() : "en"));
+  useEffect(() => {
+    const on = () => setUiLang(window.prpoGetLang ? window.prpoGetLang() : "en");
+    window.addEventListener("prpo-lang", on);
+    on();
+    return () => window.removeEventListener("prpo-lang", on);
+  }, []);
   const [reminderPrefs, setReminderPrefs] = useState(loadReminderPrefs);
   const [notifPermission, setNotifPermission] = useState(notificationSupport);
 
@@ -9697,6 +9704,14 @@ function App() {
                 🔊 Voice reminder
               </button>
             )}
+            <button
+              onClick={() => window.prpoToggleLang && window.prpoToggleLang()}
+              className="sap-btn sap-btn-ghost"
+              title="Switch the interface language / تغيير لغة الواجهة"
+              data-no-translate
+            >
+              🌐 {uiLang === "ar" ? "English" : "العربية"}
+            </button>
             <button
               onClick={() => { setNotifPermission(notificationSupport()); setShowReminderSettings(true); }}
               className="sap-btn sap-btn-ghost"
@@ -10264,6 +10279,100 @@ class ErrorBoundary extends React.Component {
 ReactDOM.createRoot(document.getElementById("root")).render(
   <ErrorBoundary><App /></ErrorBoundary>
 );
+</script>
+<script>
+(function(){
+  var AR={"PR / PO Tracker": "متتبع طلبات الشراء PR / PO", "Purchase request & approval tracking": "متابعة طلبات الشراء والموافقات", "Purchase request &amp; approval tracking": "متابعة طلبات الشراء والموافقات", "Local to this browser only": "محفوظ في هذا المتصفح فقط", "Today's Follow-up": "متابعة اليوم", "Voice reminder": "تذكير صوتي", "Reminders": "التذكيرات", "AI Assistant": "المساعد الذكي", "Import Excel": "استيراد Excel", "Export Excel": "تصدير Excel", "Attach Email": "إرفاق إيميل", "Reports": "التقارير", "Setup": "الإعدادات", "+ New Request": "+ طلب جديد", "New Request": "طلب جديد", "Where every request stands": "وين وصل كل طلب", "click a step to filter": "اضغط على مرحلة للتصفية", "Show all": "عرض الكل", "total": "إجمالي", "Create PR": "إنشاء PR", "PR approval": "موافقة PR", "Create PO": "إنشاء PO", "PO approval": "موافقة PO", "SES / GR pending": "SES / GR معلّق", "Closed": "مقفل", "Missing info": "معلومات ناقصة", "Overdue": "متأخر", "Search": "بحث", "Status": "الحالة", "Owner": "المسؤول", "Service Type": "نوع الخدمة", "Waiting On": "بانتظار", "Waiting on": "بانتظار", "Date (service or required)": "التاريخ (الخدمة أو المطلوب)", "All": "الكل", "shown": "معروض", "Delete selected": "حذف المحدد", "Deep search: traveller, hotel, month, PR/PO, amount, text inside attached PDFs…": "بحث شامل: المسافر، الفندق، الشهر، PR/PO، المبلغ، نص داخل ملفات PDF…", "PR": "PR", "PO": "PO", "Requester / For": "الطالب / لصالح", "Files": "الملفات", "Service": "الخدمة", "Vendor": "المورد", "Actions": "الإجراءات", "Service Entry Sheet / GR": "Service Entry Sheet / GR", "Update Status": "تحديث الحالة", "Attach PO": "إرفاق PO", "Copy for SAP": "نسخ لـ SAP", "Delete": "حذف", "No matching requests": "لا توجد طلبات مطابقة", "Pending": "قيد الانتظار", "Waiting PR approval": "بانتظار موافقة PR", "Waiting PO approval": "بانتظار موافقة PO", "Completed": "مكتمل", "Cancelled": "ملغي", "Missing:": "ناقص:", "raised by requester": "الـ PR من الطالب", "→ create PO": "← أنشئ الـ PO", "— after the PO": "— بعد إصدار الـ PO", "pending": "معلّق", "done": "تم", "Hotel": "فندق", "Car": "سيارة", "Tickets": "تذاكر", "Other": "أخرى", "Load the email file directly (.msg from Outlook, or .eml)": "حمّل ملف الإيميل مباشرة (.msg من Outlook أو .eml)", "...or paste the email content here": "...أو الصق نص الإيميل هنا", "Paste the email text from the department or SAP here...": "الصق نص الإيميل هنا...", "Read the email": "قراءة الإيميل", "Start over": "البدء من جديد", "AI reading": "قراءة الذكاء الاصطناعي", "Quick read": "قراءة سريعة", "Re-read": "إعادة القراءة", "Found in the email": "الموجود في الإيميل", "Missing": "الناقص", "What to ask the sender": "ماذا نسأل المرسل", "Questions for the sender": "أسئلة للمرسل", "Requester": "الطالب", "Traveller / for": "المسافر / لصالح", "Dates": "التواريخ", "City": "المدينة", "Purpose": "الغرض", "Department": "القسم", "Charged to": "على حساب", "Project": "المشروع", "Network": "Network", "Activity": "Activity", "Cost Center": "مركز التكلفة", "PR number": "رقم الـ PR", "Budget": "الميزانية", "required": "مطلوب", "optional": "اختياري", "ask the sender": "اسأل المرسل", "you fill it in": "تعبّيه أنت", "blocks the PR": "يمنع إنشاء الـ PR", "Where is the PR for this request?": "وين وصل الـ PR لهذا الطلب؟", "No PR yet — I'll create it": "ما فيه PR — أنا أنشئه", "PR already created — not approved yet": "الـ PR موجود — لم يُعتمد بعد", "PR already approved — create the PO": "الـ PR معتمد — أنشئ الـ PO", "Cost Center (if given)": "مركز التكلفة (إن وُجد)", "Project (name / number)": "المشروع (الاسم / الرقم)", "Network *": "Network *", "Activity *": "Activity *", "Purpose of travel (goes into the Header Note)": "الغرض من السفر (يدخل في الـ Header Note)", "Additional Notes (shared)": "ملاحظات إضافية", "Notes": "ملاحظات", "Save": "حفظ", "Cancel": "إلغاء", "Save Request": "حفظ الطلب", "Drop tickets or documents here, or press Ctrl+V to paste a screenshot": "اسحب التذاكر أو المستندات هنا، أو اضغط Ctrl+V للصق لقطة شاشة", "Choose files": "اختيار ملفات", "Reading…": "جارٍ القراءة…", "Add as many as you need — a ticket per traveller, the Travel Form (project, reason), screenshots. The AI reads them all together.": "أضف ما تحتاج — تذكرة لكل مسافر، نموذج السفر (المشروع والسبب)، لقطات شاشة. الذكاء الاصطناعي يقرأها كلها معاً.", "Email to the sender": "إيميل للمرسل", "To (name)": "إلى (الاسم)", "Email address": "عنوان الإيميل", "Subject": "الموضوع", "Message": "الرسالة", "Your signature (saved for next time)": "توقيعك (يُحفظ للمرة القادمة)", "Copy": "نسخ", "Open in email": "فتح في الإيميل", "Rewrite with AI": "إعادة الكتابة بالذكاء الاصطناعي", "Written by AI": "كتبه الذكاء الاصطناعي", "Fill-in form": "نموذج للتعبئة", "List": "قائمة", "Draft the email to the sender with AI": "اكتب الإيميل للمرسل بالذكاء الاصطناعي", "Draft the email to the sender": "اكتب الإيميل للمرسل", "Hide the email": "إخفاء الإيميل", "Copy all in SAP order": "نسخ الكل بترتيب SAP", "Copy the item line": "نسخ سطر الـ Item", "in the same order as the SAP screen": "بنفس ترتيب شاشة SAP", "fields ready": "حقول جاهزة", "Header — Texts": "Header — النصوص", "Item line — in column order": "سطر الـ Item — بترتيب الأعمدة", "Account assignment": "Account assignment", "Organisation": "Organisation", "Header": "Header", "1 · Purchase Requisition": "1 · طلب الشراء PR", "2 · Purchase Order": "2 · أمر الشراء PO", "Purchase Order": "أمر الشراء", "Purchasing Group": "مجموعة المشتريات", "Short Text": "Short Text", "Header Note": "Header Note", "Delivery Date": "تاريخ التسليم", "Quantity": "الكمية", "Net Price": "السعر الصافي", "Reference PR": "الـ PR المرجعي", "Fill in on SAP": "عبّيه في SAP", "Done": "تم", "New Status": "الحالة الجديدة", "PR Number": "رقم PR", "PO Number": "رقم PO", "PR raised by": "من أنشأ الـ PR", "Me — I create it in SAP": "أنا — أنشئه في SAP", "The requester — it arrived already raised": "الطالب — وصلني جاهز", "Completed Date": "تاريخ الإكمال", "Next step:": "الخطوة التالية:", "Attachments (ticket, confirmation, etc.)": "المرفقات (تذكرة، تأكيد، إلخ)", "Remove": "إزالة", "No requests need attention today 🎉": "لا توجد طلبات تحتاج متابعة اليوم 🎉", "Update status now": "حدّث الحالة الآن", "Dismiss": "إغلاق", "View details": "عرض التفاصيل", "Remind me about requests that still need my action": "ذكّرني بالطلبات التي تنتظر إجراءً مني", "Off": "إيقاف", "Every 2 hours": "كل ساعتين", "Every 3 hours": "كل 3 ساعات", "Every 4 hours": "كل 4 ساعات", "Only between": "فقط بين", "and": "و", "Working days only (skip Friday and Saturday)": "أيام العمل فقط (تجاهل الجمعة والسبت)", "Also say it out loud": "وانطق التذكير بصوت", "Allow notifications": "السماح بالإشعارات", "Send a test reminder now": "إرسال تذكير تجريبي الآن", "Ask about your requests…": "اسأل عن طلباتك…", "Send": "إرسال", "Stop": "إيقاف", "New": "جديد", "Back to chat": "الرجوع للمحادثة", "Remove key": "حذف المفتاح", "Turn on the AI assistant": "تشغيل المساعد الذكي", "Your Anthropic API key": "مفتاح Anthropic API الخاص بك", "What needs my action today?": "ايش يحتاج إجراء مني اليوم؟", "Which requests are still waiting PR approval?": "أي طلبات لسا بانتظار موافقة PR؟", "Summarize this week's requests by department": "لخّص طلبات هذا الأسبوع حسب القسم", "Draft a follow-up email for the oldest pending request": "اكتب إيميل متابعة لأقدم طلب معلّق", "Requests by stage": "الطلبات حسب المرحلة", "Open requests": "الطلبات المفتوحة", "Volume by service type": "الحجم حسب نوع الخدمة", "Spend by supplier (top 8)": "الإنفاق حسب المورد (أعلى 8)", "Where the open work is sitting": "وين الشغل المفتوح الآن", "Waiting on me": "بانتظاري أنا", "Import From Excel": "استيراد من Excel", "Choose an Excel file": "اختر ملف Excel", "Setup — suppliers & stage targets": "الإعدادات — الموردون وأهداف المراحل", "Stage targets (SLA)": "أهداف المراحل (SLA)", "No files attached to this request.": "لا توجد ملفات مرفقة بهذا الطلب.", "Open file": "فتح الملف", "Close (Esc)": "إغلاق (Esc)", "Confirm": "تأكيد", "Reload": "إعادة تحميل", "Reading and extracting the email…": "جارٍ قراءة الإيميل واستخراج البيانات…", "Claude is reading the email…": "الذكاء الاصطناعي يقرأ الإيميل…", "Claude is writing…": "الذكاء الاصطناعي يكتب…", "From the attachments:": "من المرفقات:", "Supplier suggestions — click to use:": "اقتراحات الموردين — اضغط للاستخدام:", "General suggestions are not verified — confirm availability and rates before booking.": "الاقتراحات العامة غير موثّقة — تأكد من التوفر والأسعار قبل الحجز.", "Vendor / Supplier": "المورد", "Suggested actions:": "إجراءات مقترحة:", "Add a new action...": "أضف إجراءً جديداً...", "+ Add": "+ إضافة", "Owner (requester) *": "الطالب (المسؤول) *", "Beneficiary / traveller (who the service is for)": "المستفيد / المسافر (لمن الخدمة)", "Leave blank if the requester is also the traveller": "اتركه فارغاً إذا الطالب هو المسافر", "Required Date": "التاريخ المطلوب", "Service start (check-in / departure)": "بداية الخدمة (الدخول / المغادرة)", "Service end (check-out / return)": "نهاية الخدمة (الخروج / العودة)", "Final Amount": "المبلغ النهائي", "— Select —": "— اختر —"};
+
+  AR["ask"]="اطلب"; AR["Attach the travellers' tickets here — drop them, or Ctrl+V to paste"]="أرفق تذاكر المسافرين هنا — اسحبها أو اضغط Ctrl+V للصق"; AR["Choose File"]="اختيار ملف"; AR["Service Entry Sheet / GR"]="Service Entry Sheet / GR"; AR["Invoice"]="الفاتورة";
+  AR["Waiting on me"]="بانتظاري"; AR["Me"]="أنا"; AR["SAP"]="SAP"; AR["Supplier"]="المورد"; AR["Requester"]="الطالب";
+  var keys = Object.keys(AR).sort(function (a, b) { return b.length - a.length; });
+  var textOrig = new WeakMap();   // text node -> { orig, shown }
+  var attrOrig = new WeakMap();   // element -> { attr: { orig, shown } }
+  var lang = "en";
+  try { lang = localStorage.getItem("prpo-lang") === "ar" ? "ar" : "en"; } catch (e) {}
+  var busy = false;
+
+  function tr(str) {
+    var t = str.trim();
+    if (!t) return str;
+    if (AR[t]) return str.replace(t, AR[t]);
+    var out = str;
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      if (k.length >= 5 && out.indexOf(k) !== -1) out = out.split(k).join(AR[k]);
+    }
+    return out;
+  }
+  function skip(node) {
+    var p = node.parentNode;
+    return !p || /^(SCRIPT|STYLE|TEXTAREA|INPUT)$/.test(p.nodeName) || (p.closest && p.closest("[data-no-translate]"));
+  }
+  function doText(node) {
+    if (skip(node)) return;
+    var rec = textOrig.get(node);
+    if (rec && node.nodeValue !== rec.shown) rec = null; // React rewrote it: new original
+    var orig = rec ? rec.orig : node.nodeValue;
+    var next = lang === "ar" ? tr(orig) : orig;
+    textOrig.set(node, { orig: orig, shown: next });
+    if (node.nodeValue !== next) node.nodeValue = next;
+  }
+  var ATTRS = ["placeholder", "title"];
+  function doAttrs(el) {
+    if (!el.getAttribute) return;
+    var rec = attrOrig.get(el) || {};
+    ATTRS.forEach(function (a) {
+      var cur = el.getAttribute(a);
+      if (cur === null) return;
+      var r = rec[a];
+      if (r && cur !== r.shown) r = null;
+      var orig = r ? r.orig : cur;
+      var next = lang === "ar" ? tr(orig) : orig;
+      rec[a] = { orig: orig, shown: next };
+      if (cur !== next) el.setAttribute(a, next);
+    });
+    attrOrig.set(el, rec);
+  }
+  function walk(root) {
+    if (root.nodeType === 3) { doText(root); return; }
+    if (root.nodeType !== 1) return;
+    doAttrs(root);
+    var w = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, null);
+    var n;
+    while ((n = w.nextNode())) { if (n.nodeType === 3) doText(n); else doAttrs(n); }
+  }
+  function applyAll() {
+    busy = true;
+    try {
+      document.documentElement.setAttribute("lang", lang);
+      document.documentElement.setAttribute("dir", lang === "ar" ? "rtl" : "ltr");
+      walk(document.body);
+    } finally { busy = false; }
+  }
+  var pending = false;
+  var obs = new MutationObserver(function (muts) {
+    if (busy || (lang === "en" && !muts.length)) return;
+    if (lang === "en") return; // nothing to translate; originals are untouched
+    if (pending) return;
+    pending = true;
+    requestAnimationFrame(function () {
+      pending = false;
+      busy = true;
+      try { walk(document.body); } finally { busy = false; obs.takeRecords(); }
+    });
+  });
+  obs.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ATTRS });
+
+  window.prpoGetLang = function () { return lang; };
+  window.prpoSetLang = function (l) {
+    lang = l === "ar" ? "ar" : "en";
+    try { localStorage.setItem("prpo-lang", lang); } catch (e) {}
+    applyAll();
+    window.dispatchEvent(new Event("prpo-lang"));
+  };
+  window.prpoToggleLang = function () { window.prpoSetLang(lang === "ar" ? "en" : "ar"); };
+  if (lang === "ar") { applyAll(); }
+})();
 </script>
 </body>
 </html>
