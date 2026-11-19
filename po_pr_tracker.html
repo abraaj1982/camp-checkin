@@ -5107,6 +5107,175 @@ function displayStatus(req) {
 }
 
 // ---------------------------------------------------------------------------
+// K&A Global Travel Policy (2016-10-01)
+//
+// What the policy says that matters when raising a request: hotels must come
+// from the approved list (Annex B) unless a non-approved one is cheaper; the
+// hotel class depends on the traveller's level; hotels are booked at least 7
+// days ahead and flights 14 days ahead; flights are economy (business only for
+// Directors on 4h+ flights and for Senior Directors / VP / SVP); no open-return
+// tickets; trips over a month are Short Term Assignments with a separate
+// policy; changes, leisure add-ons and companions need the Region / Division
+// manager's approval.
+// ---------------------------------------------------------------------------
+const TRAVEL_GRADES = [
+  { id: "vp", label: "VP / SVP", stars: 5, room: "Superior" },
+  { id: "director", label: "Director / Senior Director", stars: 5, room: "Standard" },
+  { id: "manager", label: "Manager / Senior Manager", stars: 4, room: "Superior" },
+  { id: "engineer", label: "Design Engineer → Senior Project Engineer / Architect", stars: 4, room: "Standard" },
+  { id: "other", label: "All other staff", stars: 3, room: "Standard" },
+];
+const gradeById = (id) => TRAVEL_GRADES.find((g) => g.id === id) || null;
+
+// [country, city, stars, hotel, room types]
+const APPROVED_HOTELS = [
+  ["Lebanon", "Beirut", 5, "Movenpick", "Deluxe Sea view / Classic Room"],
+  ["Lebanon", "Beirut", 4, "Four Points", "Preferred Room / Classic Room"],
+  ["Lebanon", "Beirut", 3, "Golden Tulip", "Standard Room"],
+  ["Qatar", "Doha", 5, "Marriott Marquis Doha", "Club Room / Standard Room"],
+  ["Qatar", "Doha", 4, "Copthorne Hotel", "Superior Room / Standard Room"],
+  ["Qatar", "Doha", 3, "Kings Gate Hotel", "Standard Room"],
+  ["Egypt", "Cairo", 5, "Marriott (Mohandessin)", "Deluxe Nile View / Deluxe Garden"],
+  ["Egypt", "Cairo", 5, "Four Seasons Nile Plaza", "Superior / Deluxe / Nile View / Premier"],
+  ["Egypt", "Cairo", 5, "Nile Ritz Carlton", "Deluxe / Deluxe Terrace City View"],
+  ["Egypt", "Cairo", 5, "Fairmont Nile City", "Fairmont / Deluxe / Deluxe Nile / Signature"],
+  ["Egypt", "Cairo", 4, "Golden Tulip Hotel Flamenco Cairo", "Standard / Superior sea view"],
+  ["Egypt", "Cairo", 4, "Horizon Shahrazad", "Standard / Superior"],
+  ["Egypt", "Cairo", 4, "Hilton Cairo Zamalek Residences", "Hilton Guest / Deluxe Nile View"],
+  ["Egypt", "Cairo", 3, "Swiss Inn", "Standard Room"],
+  ["Egypt", "Cairo", 5, "Intercontinental City Stars (Nasr City)", "Executive / Deluxe"],
+  ["Egypt", "Cairo", 5, "Fairmont Heliopolis (Nasr City)", "Deluxe / Standard"],
+  ["Egypt", "Cairo", 4, "Sonesta (Nasr City)", "Deluxe / Standard"],
+  ["KSA", "Riyadh", 5, "Four Seasons Hotel", "Superior Room"],
+  ["KSA", "Riyadh", 5, "Radisson Blu Hotel", "Standard Room"],
+  ["KSA", "Riyadh", 5, "Crowne Plaza Riyadh Minhal", "Standard Room"],
+  ["KSA", "Riyadh", 4, "Grand Plaza Gulf Hotel", "Standard Room"],
+  ["KSA", "Riyadh", 4, "Al Mutlaq Hotel Riyadh", "Standard Room"],
+  ["KSA", "Riyadh", 3, "Best Western Orchid Hotel", "Standard Room"],
+  ["KSA", "Jeddah", 5, "Intercontinental Hotel Jeddah", "Deluxe / Classic Room"],
+  ["KSA", "Jeddah", 4, "Mercure Jeddah Al Hamra", "Superior Single / Junior Suite"],
+  ["KSA", "Jeddah", 3, "Sands", "Standard Room"],
+  ["KSA", "Khobar", 5, "Movenpick", "Premium / Deluxe Room"],
+  ["KSA", "Khobar", 4, "Gosaibi", "Superior / Deluxe Room"],
+  ["KSA", "Khobar", 3, "Al-Nimran", "Standard Room"],
+  ["KSA", "Khobar", 3, "Ramada Gulf", "Standard Room"],
+  ["UAE", "Abu Dhabi", 5, "Le Royal Meridien Abu Dhabi", "Deluxe / Club room"],
+  ["UAE", "Abu Dhabi", 5, "St. Regis Abu Dhabi", "Superior / Grand Deluxe"],
+  ["UAE", "Abu Dhabi", 4, "Novotel Hotel", "Executive / Superior"],
+  ["UAE", "Abu Dhabi", 4, "Le Meridien Abu Dhabi", "Deluxe / Club"],
+  ["UAE", "Abu Dhabi", 3, "Centro Capital Center", "Classic / Premium"],
+  ["UAE", "Abu Dhabi", 3, "Ibis Hotel", "Standard Room"],
+  ["UAE", "Dubai", 5, "Al Bustan Rotana", "Club (SUPR) / Classic (STRD)"],
+  ["UAE", "Dubai", 5, "Al-Murooj Rotana", "Club (SUPR) / Classic (STRD)"],
+  ["UAE", "Dubai", 5, "Media Rotana", "Club (SUPR) / Classic (STRD)"],
+  ["UAE", "Dubai", 4, "Novotel Al-Barsha", "Executive (SUPR) / Superior (STRD)"],
+  ["UAE", "Dubai", 4, "Millenium DXB Airport", "Superior (SUPR) / Deluxe (STRD)"],
+  ["UAE", "Dubai", 3, "Centro Al-Barsha", "Standard Room"],
+  ["UAE", "Dubai", 3, "Holiday Inn Express", "Standard Room"],
+  ["UAE", "Sharjah", 5, "Hilton Sharjah", "Executive (SUPR) / Deluxe (STRD)"],
+  ["UAE", "Sharjah", 4, "Copthorne Sharjah", "Premium (SUPR) / Superior (STRD)"],
+  ["UAE", "Sharjah", 4, "Grand Excelsior", "Executive (SUPR) / Deluxe (STRD)"],
+  ["UAE", "Sharjah", 3, "Premier Inn", "Standard Room"],
+  ["Oman", "Muscat", 5, "Grand Hyatt", "Club View (SUPR) / Standard (STRD)"],
+  ["Oman", "Muscat", 5, "The Chedi Muscat", "Deluxe Club (SUPR) / Standard (STRD)"],
+  ["Oman", "Muscat", 4, "Muscat Holiday", "Standard (STRD)"],
+  ["Oman", "Muscat", 4, "Crowne Plaza", "Standard (STRD) & Sea view (SUPR)"],
+  ["Oman", "Muscat", 4, "Best Western Muscat", "Superior Standard (SUPR)"],
+  ["Oman", "Muscat", 4, "Garden residence - Salalah", "Deluxe Studio (STRD)"],
+  ["Oman", "Muscat", 3, "Beach bay hotel", "Standard (STRD)"],
+  ["Oman", "Muscat", 3, "Hamdan Plaza - Salalah", "Standard (STRD)"],
+  ["Bahrain", "Manama", 5, "Crown Plaza Bahrain", "Standard / Deluxe Room"],
+  ["Bahrain", "Manama", 5, "Gulf Hotel", "Superior / Deluxe Room"],
+  ["Bahrain", "Manama", 4, "MERCURE Grand Hotel Seef", "Executive 1 / 2 Bed Suite"],
+  ["Bahrain", "Manama", 4, "Ibis Manama Seef", "Standard Room / Executive Suite"],
+  ["Bahrain", "Manama", 3, "Al Commodore Suites", "Standard / Superior 1 Bed Room"],
+  ["Bahrain", "Manama", 3, "Imperial Suites Hotel", "Standard / Junior Suite"],
+].map(([country, city, stars, hotel, rooms]) => ({ country, city, stars, hotel, rooms }));
+
+const POLICY_CITY_ALIASES = {
+  Beirut: ["beirut", "بيروت", "lebanon", "لبنان"],
+  Doha: ["doha", "qatar", "الدوحة", "قطر"],
+  Cairo: ["cairo", "القاهرة", "egypt", "مصر"],
+  Riyadh: ["riyadh", "الرياض"],
+  Jeddah: ["jeddah", "jedda", "جدة", "جده"],
+  Khobar: ["khobar", "الخبر"],
+  "Abu Dhabi": ["abu dhabi", "abudhabi", "ابوظبي", "أبوظبي", "أبو ظبي"],
+  Dubai: ["dubai", "دبي"],
+  Sharjah: ["sharjah", "الشارقة"],
+  Muscat: ["muscat", "oman", "salalah", "مسقط", "سلطنة عمان", "صلالة"],
+  Manama: ["manama", "bahrain", "المنامة", "البحرين"],
+};
+function detectPolicyCity(text) {
+  const t = String(text || "").toLowerCase();
+  for (const [city, aliases] of Object.entries(POLICY_CITY_ALIASES)) {
+    if (aliases.some((a) => t.includes(a))) return city;
+  }
+  return "";
+}
+const normHotel = (x) => String(x || "").toLowerCase().replace(/[^a-z0-9؀-ۿ]/g, "");
+function matchApprovedHotel(vendor) {
+  const v = normHotel(vendor);
+  if (v.length < 4) return null;
+  return APPROVED_HOTELS.find((h) => {
+    const n = normHotel(h.hotel.replace(/\(.*?\)/g, ""));
+    return n.length >= 4 && (v.includes(n) || n.includes(v));
+  }) || null;
+}
+// Approved hotels for a city, those matching the traveller's class first.
+function approvedHotelsFor(city, gradeId) {
+  const g = gradeById(gradeId);
+  const list = APPROVED_HOTELS.filter((h) => h.city === city);
+  return {
+    list,
+    fit: g ? list.filter((h) => h.stars === g.stars) : [],
+    grade: g,
+  };
+}
+function policyToday() {
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+function policyDaysUntil(iso) {
+  if (!iso) return null;
+  return Math.round((new Date(iso + "T00:00:00") - policyToday()) / 86400000);
+}
+
+// Plain-language findings against the policy for one request. level: "warn" =
+// needs a decision/approval, "info" = a rule to keep in mind.
+function policyWarnings(req) {
+  const out = [];
+  if (!req || req.status === "Cancelled" || req.status === "Completed") return out;
+  const from = req.serviceDateFrom;
+  const to = req.serviceDateTo;
+  if (from && to) {
+    const len = Math.round((new Date(to + "T00:00:00") - new Date(from + "T00:00:00")) / 86400000);
+    if (len > 31) out.push({ level: "warn", text: `The trip is ${len} days — over 1 month. That is a Short Term Assignment with its own policy, not Business Travel.` });
+  }
+  const ahead = policyDaysUntil(from);
+  const g = gradeById(req.grade);
+  if (req.serviceType === "Hotel") {
+    if (ahead !== null && ahead >= 0 && ahead < 7) out.push({ level: "warn", text: `Check-in is in ${ahead} day(s) — the policy asks for hotel bookings at least 7 days ahead.` });
+    const city = req.city || detectPolicyCity(`${req.city || ""} ${req.vendor || ""} ${req.emailSummary || ""} ${req.notes || ""}`);
+    if (req.vendor) {
+      const ap = matchApprovedHotel(req.vendor);
+      if (ap) {
+        if (g && ap.stars > g.stars) out.push({ level: "warn", text: `${ap.hotel} is ${ap.stars}★ — this traveller's level (${g.label}) is entitled to ${g.stars}★ ${g.room} rooms. Needs approval.` });
+      } else if (city && APPROVED_HOTELS.some((h) => h.city === city)) {
+        out.push({ level: "warn", text: `"${req.vendor}" isn't on the approved hotel list for ${city}. Allowed only if it is cheaper than the approved hotel's rate — keep the price comparison.` });
+      }
+    }
+    if (!g) out.push({ level: "info", text: "Traveller level not set — it decides the hotel class (VP/SVP 5★ Superior … others 3★ Standard)." });
+    out.push({ level: "info", text: "Book the best available rate; voluntary changes or cancellations need the Region/Division manager's approval." });
+  }
+  if (req.serviceType === "Tickets") {
+    if (ahead !== null && ahead >= 0 && ahead < 14) out.push({ level: "warn", text: `Departure is in ${ahead} day(s) — the policy asks for flights to be booked at least 14 days ahead for the lowest fare.` });
+    out.push({ level: "info", text: "Economy class only (business class: Directors on flights over 4 hours; Senior Directors, VP, SVP always). Lowest fare, e-ticket, no open-return tickets." });
+    if (g && g.id === "other") out.push({ level: "info", text: "Economy is mandatory for this level." });
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // Who pays: a Cost Center or a Project
 //
 // A cost-center request is simply charged to that cost center. A project
@@ -6792,7 +6961,7 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
       "You help a procurement coordinator log a travel/service request from an email into a tracker, before they raise an SAP Purchase Requisition (PR) and then a Purchase Order (PO).",
       "Read the whole email carefully, the way an experienced coordinator would — including forwarded messages, signatures that reveal the department, and any attachment text. When messages in a thread disagree, the latest one wins. Work out what is actually provided and what is missing.",
       "Read the email below and reply with ONLY one JSON object, exactly this shape:",
-      '{"owner":"","beneficiary":"","serviceTypes":["Hotel"],"serviceDateFrom":"","serviceDateTo":"","requiredDate":"","budget":"","department":"","city":"","vendors":{"Hotel":""},"prNumber":"","prStage":"none","prStageEvidence":"","chargeTo":"","projectName":"","network":"","activity":"","costCenter":"","senderName":"","senderEmail":"","purpose":"","attachmentsRead":[{"name":"","kind":"ticket","note":""}],"fromAttachments":"","summary":"","questionsForSender":[""],"vendorSuggestions":[{"type":"Hotel","name":"","why":"","source":"your list"}]}',
+      '{"owner":"","beneficiary":"","serviceTypes":["Hotel"],"serviceDateFrom":"","serviceDateTo":"","requiredDate":"","budget":"","department":"","city":"","vendors":{"Hotel":""},"prNumber":"","prStage":"none","prStageEvidence":"","chargeTo":"","projectName":"","network":"","activity":"","costCenter":"","senderName":"","senderEmail":"","grade":"","purpose":"","attachmentsRead":[{"name":"","kind":"ticket","note":""}],"fromAttachments":"","summary":"","questionsForSender":[""],"vendorSuggestions":[{"type":"Hotel","name":"","why":"","source":"your list"}]}',
       "Rules:",
       "- owner: the person who asked for the service (never a signature footer, disclaimer or company name). beneficiary: who the service is for (traveller/guest names, comma-separated); \"\" if the same person.",
       '- serviceTypes: every service requested, each one of "Hotel", "Car", "Tickets", "Other".',
@@ -6813,9 +6982,14 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
       "- budget: digits only, or \"\".",
       "- summary: one or two plain sentences on what is being requested, for whom, where and when.",
       "- questionsForSender: short, polite questions for anything missing or ambiguous that only the sender can answer (exact dates, number of nights/rooms, traveller names, city, project/department, preferences). Only if the email says a PR already exists but gives no number, ask for the PR number; otherwise never ask about PR or PO numbers. If it is unclear whether this is charged to a project or a cost center, ask. If it is a project and the Network or Activity number is missing, always ask for it (the PR cannot be created without both). Empty array if nothing is missing.",
+      `- grade: the traveller's level, from the Travel Form, signature or email, as exactly one of: ${TRAVEL_GRADES.map((g) => `"${g.id}" (${g.label})`).join(", ")}, or "" if not stated (never guess). If several travellers have different levels, use the highest.`,
+      "- city: the destination city of the trip.",
+      "- COMPANY TRAVEL POLICY: hotels must come from the APPROVED HOTELS list below (the hotel class depends on the traveller's level; a non-approved hotel is allowed only if cheaper). For a Hotel request in a city that has approved hotels, vendorSuggestions must be ONLY from that list (source \"approved list\"), at the star class for the traveller's level when known, otherwise the approved hotels of that city; say in `why` the star class and room type. Never invent hotels for those cities. For other cities or other services, general suggestions are allowed (source \"suggestion\").",
       "- vendorSuggestions: up to 3 per requested service that has no vendor yet. Prefer the coordinator's registered or previous suppliers below when they fit the city; set source to \"your list\" for those and \"suggestion\" for general well-known options in that city.",
       "",
       "Coordinator's own data: " + JSON.stringify(known),
+      "APPROVED HOTELS (country, city, stars, hotel, room types): " + JSON.stringify(APPROVED_HOTELS.map((h) => [h.country, h.city, h.stars, h.hotel, h.rooms])),
+      "Hotel class by level: " + JSON.stringify(TRAVEL_GRADES.map((g) => [g.id, `${g.stars}-star ${g.room} room`])),
       "",
       "EMAIL:",
       emailText.slice(0, 24000),
@@ -6850,6 +7024,8 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
           activity: str(r.activity) || p.activity || "",
           costCenter: str(r.costCenter) || p.costCenter || "",
           purpose: str(r.purpose) || p.purpose || "",
+          grade: gradeById(str(r.grade)) ? str(r.grade) : (p.grade || ""),
+          city: str(r.city) || p.city || "",
           senderName: p.senderName || str(r.senderName),
           senderEmail: p.senderEmail || (/@/.test(str(r.senderEmail)) ? str(r.senderEmail) : ""),
           notes: p.notes || emailText.slice(0, 500),
@@ -6962,6 +7138,8 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
       department: "",
       prNumber: data.prNumber,
       ...detectCharge(text),
+      grade: "",
+      city: detectPolicyCity(text),
       ...(() => { const h = parseEmailHeader(text); return { senderName: h.name, senderEmail: h.email, emailSubject: h.subject }; })(),
       notes: text.slice(0, 500),
     });
@@ -7151,6 +7329,8 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
       serviceDateTo: extracted.serviceDateTo || "",
       budget: extracted.budget,
       department: extracted.department || "",
+      grade: extracted.grade || "",
+      city: extracted.city || "",
       notes: extracted.notes,
       attachments,
       serviceType: type,
@@ -7310,6 +7490,7 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
                     kw: /\bPR\b|requisition/i,
                   }))
                 : []),
+              ...(selectedTypes.includes("Hotel") ? [{ label: "Traveller level", value: x.grade ? (gradeById(x.grade) || {}).label : "", ask: "The traveller's grade/level (it decides the hotel class under the travel policy)", kw: /grade|level|vp|director|manager|مستوى|درجة/i }] : []),
               ...selectedTypes.map((type) => ({
                 label: `${type} supplier`,
                 value: (typeEntries[type] && typeEntries[type].vendor) || "",
@@ -7489,6 +7670,70 @@ function EmailParserForm({ requests, onSave, onCancel, onContentReplaced }) {
                   <p className="text-xs mt-1.5" style={{ color: "var(--sap-gray)" }}>General suggestions are not verified — confirm availability and rates before booking.</p>
                 </div>
               )}
+              </div>
+            );
+          })()}
+
+          {(() => {
+            const pseudo = selectedTypes.map((type) => ({
+              serviceType: type, status: "Pending", vendor: (typeEntries[type] && typeEntries[type].vendor) || "",
+              serviceDateFrom: extracted.serviceDateFrom, serviceDateTo: extracted.serviceDateTo,
+              grade: extracted.grade, city: extracted.city, emailSummary: (ai && ai.summary) || "", notes: extracted.notes,
+            }));
+            const seen = new Set();
+            const warns = pseudo.flatMap((r) => policyWarnings(r)).filter((w) => (seen.has(w.text) ? false : (seen.add(w.text), true)));
+            const hasHotel = selectedTypes.includes("Hotel");
+            const city = extracted.city || detectPolicyCity(`${emailText} ${ai ? ai.city : ""}`);
+            const ap = hasHotel && city ? approvedHotelsFor(city, extracted.grade) : null;
+            const shownHotels = ap ? (ap.fit.length ? ap.fit : ap.list) : [];
+            const g = gradeById(extracted.grade);
+            return (
+              <div className="p-3" style={{ background: "#fff", border: "1px solid var(--sap-border)", borderRadius: 14 }}>
+                <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                  <p className="font-semibold text-sm" style={{ color: "var(--sap-text)" }}>⚖️ Travel policy</p>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs" style={{ color: "var(--sap-gray)" }}>Traveller level</label>
+                    <select value={extracted.grade || ""} onChange={(e) => setExtracted({ ...extracted, grade: e.target.value })} className="sap-select" style={{ width: 260 }}>
+                      <option value="">— not known —</option>
+                      {TRAVEL_GRADES.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}
+                    </select>
+                  </div>
+                </div>
+                {g && hasHotel && (
+                  <p className="text-xs mb-2" style={{ color: "var(--sap-text)" }}>🏨 Entitled to a <strong>{g.stars}★ {g.room}</strong> room.</p>
+                )}
+                {warns.length > 0 && (
+                  <ul className="flex flex-col gap-1 mb-2">
+                    {warns.map((w, i) => (
+                      <li key={i} className="text-xs p-2" dir="auto" style={{ borderRadius: 8, background: w.level === "warn" ? "var(--sap-amber-bg)" : "#F5F6F7", color: w.level === "warn" ? "var(--sap-amber)" : "var(--sap-gray)", border: `1px solid ${w.level === "warn" ? "#F5DFA6" : "var(--sap-border)"}` }}>
+                        {w.level === "warn" ? "⚠️ " : "ℹ️ "}{w.text}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {shownHotels.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold mb-1" style={{ color: "var(--sap-text)" }}>✅ Approved hotels in {city}{g ? ` — ${g.stars}★` : ""} — click to use:</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {shownHotels.map((h) => (
+                        <button
+                          key={h.hotel}
+                          type="button"
+                          onClick={() => {
+                            setTypeEntries((prev) => ({ ...prev, Hotel: { ...(prev.Hotel || makeTypeEntry("Hotel", "", customActions)), vendor: h.hotel.replace(/\s*\(.*?\)/g, "") } }));
+                            appToast(`Hotel set to "${h.hotel}"`);
+                          }}
+                          className="text-xs px-2.5 py-1 text-left"
+                          style={{ background: "var(--sap-green-bg)", border: "1px solid #BFE3CB", borderRadius: 10, color: "var(--sap-green)", cursor: "pointer" }}
+                          title={h.rooms}
+                        >
+                          {h.stars}★ {h.hotel}<span style={{ color: "var(--sap-gray)" }}> · {h.rooms}</span>
+                        </button>
+                      ))}
+                    </div>
+                    {!g && <p className="text-xs mt-1" style={{ color: "var(--sap-gray)" }}>Choose the traveller level to see only the class they're entitled to.</p>}
+                  </div>
+                )}
               </div>
             );
           })()}
@@ -7789,6 +8034,8 @@ function emptyForm() {
     waitingOn: "Me",
     // "me" = I raise the PR in SAP; "requester" = it arrived already raised.
     prRaisedBy: "me",
+    grade: "",
+    city: "",
     // "cost_center" | "project" — a project needs its Network and Activity.
     chargeTo: "",
     costCenter: "",
@@ -8649,7 +8896,7 @@ const ADD_INFO_FIELDS = [
   ["beneficiary", "Traveller(s)"], ["serviceDateFrom", "Service start"], ["serviceDateTo", "Service end"],
   ["department", "Department"], ["chargeTo", "Charged to"], ["projectName", "Project"], ["network", "Network"],
   ["activity", "Activity"], ["costCenter", "Cost Center"], ["travelPurpose", "Purpose of travel"],
-  ["prNumber", "PR number"], ["vendor", "Vendor"],
+  ["prNumber", "PR number"], ["vendor", "Vendor"], ["grade", "Traveller level"], ["city", "City"],
 ];
 
 function AddInfoModal({ req, onSave, onCancel }) {
@@ -8682,7 +8929,8 @@ function AddInfoModal({ req, onSave, onCancel }) {
         ADD_INFO_FIELDS.forEach(([k]) => { current[k] = req[k] || ""; });
         const prompt = [
           "A procurement coordinator already logged this service request but information was missing. New material has arrived (the sender's reply and/or more attachments such as tickets or a Travel Form). Read it and return ONLY one JSON object with the values it supplies:",
-          '{"beneficiary":"","serviceDateFrom":"","serviceDateTo":"","department":"","chargeTo":"","projectName":"","network":"","activity":"","costCenter":"","travelPurpose":"","prNumber":"","vendor":"","note":"","conflicts":[""]}',
+          '{"beneficiary":"","serviceDateFrom":"","serviceDateTo":"","department":"","chargeTo":"","projectName":"","network":"","activity":"","costCenter":"","travelPurpose":"","prNumber":"","vendor":"","grade":"","city":"","note":"","conflicts":[""]}',
+          `- grade: the traveller's level as exactly one of: ${TRAVEL_GRADES.map((g) => `"${g.id}" (${g.label})`).join(", ")}, or "".`,
           `- Dates as YYYY-MM-DD (today is ${todayIso()}). chargeTo: "project" or "cost_center" or "". department: exactly one of: ${PURCHASING_GROUPS.map((g) => g.label).join(" | ")}, or "".`,
           "- beneficiary: all traveller names, comma-separated. Use \"\" for anything the new material does not state — never guess, never repeat what is already known unless the material states it.",
           "- note: one short sentence on what the new material added. conflicts: short notes where the new material contradicts the current values below (e.g. a different date); empty array if none.",
@@ -8716,6 +8964,7 @@ function AddInfoModal({ req, onSave, onCancel }) {
       if ((k === "serviceDateFrom" || k === "serviceDateTo") && !ISO_DATE.test(v)) return;
       if (k === "department" && !PURCHASING_GROUPS.some((g) => g.label === v)) return;
       if (k === "chargeTo" && !["project", "cost_center"].includes(v)) return;
+      if (k === "grade" && !gradeById(v)) return;
       if (!String(req[k] || "").trim()) patch[k] = v;
     });
     if (!req.chargeTo && !patch.chargeTo && (patch.network || patch.activity)) patch.chargeTo = "project";
@@ -8725,7 +8974,7 @@ function AddInfoModal({ req, onSave, onCancel }) {
   useEffect(() => () => { if (ctl.current) ctl.current.abort(); }, []);
 
   const label = (k) => (ADD_INFO_FIELDS.find(([x]) => x === k) || [k, k])[1];
-  const show = (k, v) => (k === "chargeTo" ? (v === "project" ? "Project" : "Cost Center") : v);
+  const show = (k, v) => (k === "chargeTo" ? (v === "project" ? "Project" : "Cost Center") : k === "grade" ? (gradeById(v) || { label: v }).label : v);
   const patch = found ? found.patch : {};
 
   const save = () => {
@@ -9040,7 +9289,8 @@ function requestsForAssistant(requests) {
     .map((r) => ({
       pr: r.prNumber || "", prBy: r.prRaisedBy === "requester" ? "requester" : "me", po: r.poNumber || "", requester: r.owner || "", for: r.beneficiary || "",
       service: r.serviceType || "", vendor: r.vendor || "", status: r.status || "",
-      dept: r.department || "", charge: r.chargeTo || "", project: r.projectName || "", network: r.network || "", activity: r.activity || "", costCenter: r.costCenter || "",
+      dept: r.department || "", level: r.grade || "", city: r.city || "", policy: policyWarnings(r).filter((w) => w.level === "warn").map((w) => w.text),
+      charge: r.chargeTo || "", project: r.projectName || "", network: r.network || "", activity: r.activity || "", costCenter: r.costCenter || "",
       missing: isOpenReq(r) ? requestGaps(r) : [], from: r.serviceDateFrom || "", to: r.serviceDateTo || "",
       requiredBy: r.requiredDate || "", budget: r.budget || "", ses: !!r.serviceEntrySheet,
       afterPo: (() => { const g = grSesState(r); return g.stage === "pending" ? `${receiptShort(r)} pending` : g.stage === "done" ? "closed" : ""; })(),
@@ -9161,7 +9411,7 @@ function AssistantChat({ requests }) {
     const rules = [
       "You are the assistant built into a PR/PO tracker used by a procurement coordinator (hotels, car rentals, tickets for staff travel; requests become SAP Purchase Requisitions then POs).",
       `Today is ${todayIso()}. Company flow: PR (Purchase Requisition) → PR approval → PO (Purchase Order, created from the approved PR) → PO approval. Statuses: Pending (no PR yet — the coordinator must create it) → Waiting PR approval (PR exists, follow up its approval) → Waiting PO approval (PR approved; if "po" is empty the coordinator still has to create the PO) → Completed (or Cancelled). "prBy": "requester" means the PR arrived already raised by the requester (only follow up), "me" means the coordinator raises it. After the PO is approved and sent (status Completed), a Service Entry Sheet (SES, for services) or Goods Receipt (GR, for material) still has to be posted in SAP with the invoice so Finance can pay; the request is only Closed once that is ticked. "afterPo": "SES pending"/"GR pending" means it is still open — always remind about these; "closed" means done. "charge": "project" requests are charged to the project and need both "network" and "activity" before the PR/PO can be created; "cost_center" requests only need the cost center. "missing" lists what a request still lacks — always point these out and offer to draft the email asking for them.`,
-      "Answer from the data below only — never invent requests, numbers or names. If the data can't answer, say so.",
+      "Company travel policy (K&A Global Travel Policy): hotels come from the approved list unless a non-approved one is cheaper; hotel class by level: VP/SVP 5-star Superior, Director/Senior Director 5-star Standard, Manager/Senior Manager 4-star Superior, Design Engineer to Senior Project Engineer/Architect 4-star Standard, others 3-star Standard; hotels booked at least 7 days ahead, flights 14 days ahead; flights economy only (business: Directors on 4h+ flights, Senior Directors/VP/SVP always); no open-return tickets; trips over 1 month are Short Term Assignments (separate policy); changes, cancellations, leisure add-ons and companions need the Region/Division manager\'s approval. Each request\'s policy field lists what to check. Answer from the data below only — never invent requests, numbers or names. If the data can't answer, say so.",
       "Reply in the language the coordinator writes in (Arabic or English). Be concise and well-organized; use short lists when helpful. When asked to draft an email, SAP text or a message, write it ready to paste.",
       `Tracker data (${data.shown} of ${data.total} requests, newest first, one JSON object per line):`,
       data.text || "(no requests yet)",
@@ -10142,6 +10392,12 @@ function App() {
                         {chargeLine(r) && (
                           <div className="text-xs" style={{ color: "var(--sap-gray)", whiteSpace: "nowrap" }}>{chargeLine(r)}</div>
                         )}
+                        {(() => {
+                          const w = policyWarnings(r).filter((x) => x.level === "warn");
+                          return w.length ? (
+                            <div className="text-xs font-semibold" style={{ color: "var(--sap-amber)", whiteSpace: "nowrap" }} title={w.map((x) => x.text).join("\n")}>⚖️ Policy: {w.length} to check</div>
+                          ) : null;
+                        })()}
                         {r.status !== "Completed" && r.status !== "Cancelled" && requestGaps(r).length > 0 && (
                           <button
                             type="button"
