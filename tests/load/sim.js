@@ -6,7 +6,8 @@ const { seed } = require('./lib/seed'); const { createEmu } = require('./lib/emu
 // The client model reads the real values from supervisor.html so before/after comparisons follow the code.
 const SUP = fs.readFileSync(path.join(__dirname, '..', '..', 'supervisor.html'), 'utf8');
 const GPS_MS = Number((SUP.match(/const LOC_INTERVAL_MS = (\d+)/) || [])[1]) || 20000;
-const DROP_AFTER = /if \(op\.tries < 5\) break;/.test(SUP) ? 5 : Infinity; // old client gave a record up after 5 failed tries
+const OLD_CLIENT = /if \(op\.tries < 5\) break;/.test(SUP); // the old client gave a record up after 5 failed tries; the new one never does
+const DROP_AFTER = OLD_CLIENT ? 5 : Infinity;
 const PRESETS = {
   quick: { students: 96, durationMs: 150000, viewers: 6, extraPollers: 3 },
   expected: { durationMs: 300000, viewers: 6, extraPollers: 3 },
@@ -44,11 +45,17 @@ async function run(sc) {
     async function flush() {
       if (flushing || !queue.length || isOffline(u)) return; flushing = true;
       try {
-        while (queue.length) {
-          const op = queue[0]; let r;
+        const nextOp = () => { const t = Date.now(), held = {}; for (let i = 0; i < queue.length; i++) { const o = queue[i], k = o.body.studentId ? 's' + o.body.studentId : 'o' + i; if (!held[k] && !(o.nextAt > t)) return i; held[k] = true; } return -1; };
+        let i;
+        while ((i = OLD_CLIENT ? (queue.length ? 0 : -1) : nextOp()) !== -1) {
+          const op = queue[i]; let r;
           try { r = await api(u, Object.assign({ token: tok }, op.body)); } catch (e) { break; }
-          if (!r || (r.success === false && !r.code)) { op.tries = (op.tries || 0) + 1; M.retries++; if (op.tries < DROP_AFTER) break; M.drops.push({ u, kind: op.kind, id: op.body.studentId, err: r && r.error }); }
-          queue.shift();
+          if (!r || (r.success === false && !r.code)) {
+            op.tries = (op.tries || 0) + 1; M.retries++;
+            if (OLD_CLIENT) { if (op.tries < 5) break; M.drops.push({ u, kind: op.kind, id: op.body.studentId, err: r && r.error }); }
+            else { op.nextAt = Date.now() + [5000, 15000, 30000, 60000][Math.min(op.tries, 4) - 1] * S; continue; } // new client: never gives up
+          }
+          queue.splice(queue.indexOf(op), 1);
           if (op.kind === 'scan' && r && r.success) M.confirm.push(now() - op.t);
         }
       } finally { flushing = false; }

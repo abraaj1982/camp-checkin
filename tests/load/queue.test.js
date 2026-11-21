@@ -113,6 +113,13 @@ const busId = (b, k) => String(1000 + b + 8 * k);    // students of bus b
   await pz.click('#logoutBtn'); await sleep(800); pz = await B.login(srv, cz, 'sup1'); await waitFor(() => P.every(id => rowsBy(id, 'sup1') === 1), 30000);
   chk(leak === 0 && q2len === 0 && P.every(id => rowsBy(id, 'sup1') === 1) && !tokenInStore, `Q13 shared phone: sup1's 2 waiting records were NOT sent by sup2 (leak=${leak}, sup2 queue=${q2len}); sent under sup1 when he logged back in; no token stored with the queue`);
 
+  // ---- Q16 records saved by the PREVIOUS version (queue stored under the display name) are moved, not lost ----
+  const c16 = await mk({}); let p16 = await B.login(srv, c16, 'sup3'); const Z = busId(3, 30);
+  await p16.evaluate(z => { const k = 'mk_sup_' + sessionStorage.getItem('mukhayyam_fullName') + 'queue'; localStorage.setItem(k, JSON.stringify([{ kind: 'scan', body: { clientId: 'old-version-1', action: 'scan', op: 'board', studentId: z, method: 'qr' } }])); }, Z);
+  await p16.reload(); await waitFor(() => rowsBy(Z, 'sup3') === 1, 20000);
+  const oldLeft = await p16.evaluate(() => localStorage.getItem('mk_sup_' + sessionStorage.getItem('mukhayyam_fullName') + 'queue'));
+  chk(rowsBy(Z, 'sup3') === 1 && !oldLeft, 'Q16 [C5] a record left by the previous version (queue under the display name) is moved to the new queue and sent once');
+
   // ---- Q14 safety ----
   const escaped = phones.reduce((n, x) => n + ((x.__stats && x.__stats.escaped) || 0), 0);
   chk(escaped === 0, `Q14 safety: requests that tried to leave the machine = ${escaped}; every Google request was answered by the local emulator`);

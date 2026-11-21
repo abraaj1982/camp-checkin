@@ -30,7 +30,13 @@ const UNDO_MS = 110 * 1000; // matches the server (2 min) with a small safety ma
 try { perms = JSON.parse(sessionStorage.getItem('mukhayyam_permissions') || '[]'); } catch (e) {}
 if (!token || (perms.indexOf('*') === -1 && perms.indexOf('checkin') === -1)) { location.href = token ? 'hub.html' : 'login.html'; }
 const me = { name: sessionStorage.getItem('mukhayyam_fullName') || '', bus: sessionStorage.getItem('mukhayyam_assignedBus') || '' };
-const NS = 'mk_sup_' + (me.name || 'x');
+// The offline queue belongs to the ACCOUNT (username from the token), not the display name: two people sharing a phone never share a queue.
+const ME_USER = (() => { try { return String(JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).sub || ''); } catch (e) { return ''; } })();
+const NS = 'mk_sup_' + (ME_USER ? 'u:' + ME_USER.toLowerCase() : (me.name || 'x'));
+(function moveOldQueue() { // records saved by the previous version under the display name are kept, not lost
+  try { const oldK = 'mk_sup_' + (me.name || 'x') + 'queue'; if (!ME_USER || oldK === NS + 'queue') return; const o = JSON.parse(localStorage.getItem(oldK) || '[]'); if (!o.length) return;
+    const n = JSON.parse(localStorage.getItem(NS + 'queue') || '[]'); localStorage.setItem(NS + 'queue', JSON.stringify(n.concat(o))); localStorage.removeItem(oldK); } catch (e) {}
+})();
 const store = { get(k, d) { try { const v = localStorage.getItem(NS + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(NS + k, JSON.stringify(v)); } catch (e) {} } };
 const pref = { get(k, d) { try { return localStorage.getItem('mk_pref_' + k) || d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('mk_pref_' + k, v); } catch (e) {} } };
 
@@ -39,7 +45,7 @@ const I = {
  ar: { dir: 'rtl', bus: n => 'باص ' + n, sup: n => 'مشرف: ' + n, boarded: 'صعدوا', remaining: n => n > 0 ? 'ناقص ' + n : 'اكتمل الباص', how: 'كيف تريد التعرف على الطالب؟',
   m_qr: 'السوار', m_face: 'الوجه', m_name: 'الاسم', m_num: 'الرقم', soon: 'قريباً', scanQr: 'وجّه الكاميرا إلى سوار الطالب', startCam: 'تشغيل الكاميرا', stopCam: 'إيقاف الكاميرا', noCam: 'تعذّر تشغيل الكاميرا. استخدم الاسم أو الرقم.', camDenied: 'لم يُسمح بالكاميرا. من إعدادات المتصفح للموقع اسمح بالكاميرا ثم أعد تحميل الصفحة.',
   nameLbl: 'اكتب اسم الطالب', numLbl: 'اكتب رقم الطالب', none: 'لا توجد نتيجة', student: 'طالب', team: 'الفريق', cls: 'الصف',
-  rc: 'جولة التحقق', rcStart: 'بدء جولة التحقق', rcSub: 'نادِ على الأسماء وتأكد أن كل مسجَّل موجود فعلًا في الباص.', rcDepart: 'عند الانطلاق', rcArrive: 'عند الوصول', rcLast: (ph, t, c, tot, ab) => 'آخر جولة (' + (ph === 'arrive' ? 'وصول' : 'انطلاق') + ') ' + t + ': ' + c + ' / ' + tot + (ab ? ' — ' + ab + ' غير موجود' : ' ✓'), rcNever: 'لم تُجرَ جولة بعد', rcHere: 'موجود ✓', rcGone: 'غير موجود ✗', rcBack: 'رجوع', rcOf: (a, b) => 'تم التحقق ' + a + ' من ' + b, rcExit: 'خروج', rcDone: 'انتهت الجولة', rcOk: n => 'كل الطلاب (' + n + ') موجودون ✓', rcGap: n => n + ' مسجَّلون غير موجودين في الباص', rcSend: 'اعتماد وإرسال', rcFix: 'بعد الإرسال سجّل الطالب غير المسجَّل بالاسم، أو تراجع عن تسجيل من ليس موجودًا.', rcSent: 'أُرسلت نتيجة الجولة للقائد', rcNone: 'لا يوجد من سُجّل صعوده بعد.', rcPending: 'تغيير', sendFailed: n => 'تعذّر إرسال تسجيل ' + n + ' بعد عدة محاولات. سجّله مرة أخرى.', board: 'تسجيل الصعود', undo: 'تراجع عن آخر تسجيل', next: 'الطالب التالي', done: 'سُجّل الصعود', undone: 'تم التراجع', undoLocked: 'لا يمكنك التراجع الآن (آخر تسجيل لك وخلال دقيقتين فقط). اطلب من المشرف العام.', undoRow: 'تراجع', confirmUndo: 'التراجع عن صعود هذا الطالب؟',
+  rc: 'جولة التحقق', rcStart: 'بدء جولة التحقق', rcSub: 'نادِ على الأسماء وتأكد أن كل مسجَّل موجود فعلًا في الباص.', rcDepart: 'عند الانطلاق', rcArrive: 'عند الوصول', rcLast: (ph, t, c, tot, ab) => 'آخر جولة (' + (ph === 'arrive' ? 'وصول' : 'انطلاق') + ') ' + t + ': ' + c + ' / ' + tot + (ab ? ' — ' + ab + ' غير موجود' : ' ✓'), rcNever: 'لم تُجرَ جولة بعد', rcHere: 'موجود ✓', rcGone: 'غير موجود ✗', rcBack: 'رجوع', rcOf: (a, b) => 'تم التحقق ' + a + ' من ' + b, rcExit: 'خروج', rcDone: 'انتهت الجولة', rcOk: n => 'كل الطلاب (' + n + ') موجودون ✓', rcGap: n => n + ' مسجَّلون غير موجودين في الباص', rcSend: 'اعتماد وإرسال', rcFix: 'بعد الإرسال سجّل الطالب غير المسجَّل بالاسم، أو تراجع عن تسجيل من ليس موجودًا.', rcSent: 'أُرسلت نتيجة الجولة للقائد', rcNone: 'لا يوجد من سُجّل صعوده بعد.', rcPending: 'تغيير', retrying: names => 'لم يُرسَل بعد، ويُعاد إرساله تلقائياً (لا تُعِد تسجيله): ' + names, board: 'تسجيل الصعود', undo: 'تراجع عن آخر تسجيل', next: 'الطالب التالي', done: 'سُجّل الصعود', undone: 'تم التراجع', undoLocked: 'لا يمكنك التراجع الآن (آخر تسجيل لك وخلال دقيقتين فقط). اطلب من المشرف العام.', undoRow: 'تراجع', confirmUndo: 'التراجع عن صعود هذا الطالب؟',
   dup: t => 'مسجَّل صعوده مسبقاً' + (t ? ' الساعة ' + t : '') + '. لا يُسجَّل مرتين.', other: (b, s) => 'ليس من باصك. هو في باص ' + b + (s ? ' (المشرف: ' + s + ')' : '') + '. يمكنك الاطلاع فقط.', withdrawn: 'الطالب خرج بإذن.', notFound: 'الطالب غير موجود.',
   otherOffline: 'هذا الطالب ليس في باصك، والبحث في بقية الباصات يحتاج اتصالاً.', bags: 'الأغراض', load: 'تحميل', unload: 'تنزيل', bagCount: 'عدد الحقائب', expected: n => 'المتوقع: ' + n, saveBags: 'تسجيل الأغراض', bagsSaved: 'سُجّلت الأغراض', bagShort: n => 'ينقص ' + n + ' من الحقائب المتوقعة.',
   missing: 'لم يصعدوا بعد', boardedList: 'صعدوا (الأحدث أولاً)', allList: 'الكل', remainShort: 'المتبقي', boardedShort: 'صعدوا', notYet: 'لم يصعد', withdrawnShort: 'خرج', noneBoarded: 'لم يصعد أحد بعد', allIn: 'اكتمل الباص', trip: 'حالة الرحلة', st_boarding: 'الصعود', st_departed: 'انطلق', st_onway: 'في الطريق', st_arrived: 'وصل', shareLoc: 'مشاركة الموقع مع القائد', locOn: 'الموقع يُرسَل', locOff: 'الموقع متوقف', lastSent: t => 'آخر إرسال ' + t,
@@ -48,7 +54,7 @@ const I = {
  en: { dir: 'ltr', bus: n => 'Bus ' + n, sup: n => 'Supervisor: ' + n, boarded: 'Boarded', remaining: n => n > 0 ? n + ' remaining' : 'Bus full', how: 'How do you want to identify the student?',
   m_qr: 'Wristband', m_face: 'Face', m_name: 'Name', m_num: 'Number', soon: 'Soon', scanQr: 'Point the camera at the wristband', startCam: 'Start camera', stopCam: 'Stop camera', noCam: 'Camera unavailable. Use name or number.', camDenied: 'Camera access was blocked. Allow the camera for this site in the browser settings, then reload.',
   nameLbl: "Type the student's name", numLbl: "Type the student's number", none: 'No result', student: 'Student', team: 'Team', cls: 'Grade',
-  rc: 'Round check', rcStart: 'Start round check', rcSub: 'Call the names and confirm everyone recorded is really on the bus.', rcDepart: 'At departure', rcArrive: 'At arrival', rcLast: (ph, t, c, tot, ab) => 'Last round (' + (ph === 'arrive' ? 'arrival' : 'departure') + ') ' + t + ': ' + c + ' / ' + tot + (ab ? ' — ' + ab + ' missing' : ' ✓'), rcNever: 'No round yet', rcHere: 'Here ✓', rcGone: 'Not here ✗', rcBack: 'Back', rcOf: (a, b) => 'Checked ' + a + ' of ' + b, rcExit: 'Exit', rcDone: 'Round finished', rcOk: n => 'All students (' + n + ') are here ✓', rcGap: n => n + ' recorded but not on the bus', rcSend: 'Confirm and send', rcFix: 'After sending, record the unregistered student by name, or undo the one who is not here.', rcSent: 'The round result was sent to the leader', rcNone: 'Nobody has boarded yet.', rcPending: 'Change', sendFailed: n => 'Could not send the record for ' + n + ' after several tries. Please record it again.', board: 'Mark as boarded', undo: 'Undo last record', next: 'Next student', done: 'Boarding recorded', undone: 'Undone', undoLocked: 'You can no longer undo (only your last record, within 2 minutes). Ask the general supervisor.', undoRow: 'Undo', confirmUndo: 'Undo this student’s boarding?',
+  rc: 'Round check', rcStart: 'Start round check', rcSub: 'Call the names and confirm everyone recorded is really on the bus.', rcDepart: 'At departure', rcArrive: 'At arrival', rcLast: (ph, t, c, tot, ab) => 'Last round (' + (ph === 'arrive' ? 'arrival' : 'departure') + ') ' + t + ': ' + c + ' / ' + tot + (ab ? ' — ' + ab + ' missing' : ' ✓'), rcNever: 'No round yet', rcHere: 'Here ✓', rcGone: 'Not here ✗', rcBack: 'Back', rcOf: (a, b) => 'Checked ' + a + ' of ' + b, rcExit: 'Exit', rcDone: 'Round finished', rcOk: n => 'All students (' + n + ') are here ✓', rcGap: n => n + ' recorded but not on the bus', rcSend: 'Confirm and send', rcFix: 'After sending, record the unregistered student by name, or undo the one who is not here.', rcSent: 'The round result was sent to the leader', rcNone: 'Nobody has boarded yet.', rcPending: 'Change', retrying: names => 'Not sent yet, retrying automatically (do not record again): ' + names, board: 'Mark as boarded', undo: 'Undo last record', next: 'Next student', done: 'Boarding recorded', undone: 'Undone', undoLocked: 'You can no longer undo (only your last record, within 2 minutes). Ask the general supervisor.', undoRow: 'Undo', confirmUndo: 'Undo this student’s boarding?',
   dup: t => 'Already boarded' + (t ? ' at ' + t : '') + '. Cannot be recorded twice.', other: (b, s) => 'Not on your bus. Student is on bus ' + b + (s ? ' (supervisor: ' + s + ')' : '') + '. View only.', withdrawn: 'Student has withdrawn.', notFound: 'Student not found.',
   otherOffline: 'This student is not on your bus, and searching other buses needs a connection.', bags: 'Belongings', load: 'Loading', unload: 'Unloading', bagCount: 'Number of bags', expected: n => 'Expected: ' + n, saveBags: 'Save belongings', bagsSaved: 'Belongings saved', bagShort: n => n + ' of the expected bags missing.',
   missing: 'Not boarded yet', boardedList: 'Boarded (latest first)', allList: 'All', remainShort: 'Remaining', boardedShort: 'Boarded', notYet: 'Not yet', withdrawnShort: 'Withdrawn', noneBoarded: 'No one has boarded yet', allIn: 'Bus full', trip: 'Trip status', st_boarding: 'Boarding', st_departed: 'Departed', st_onway: 'On the way', st_arrived: 'Arrived', shareLoc: 'Share location with the leader', locOn: 'Location is being sent', locOff: 'Location sharing off', lastSent: t => 'Last sent ' + t,
@@ -69,24 +75,32 @@ async function api(payload) {
 const AUTH_ERR = /EXPIRED|IDLE_TIMEOUT|REVOKED|BAD_SIGNATURE|MALFORMED|USER_NOT_FOUND|ACCOUNT_DISABLED|BAD_PAYLOAD/;
 let queue = store.get('queue', []);
 const saveQueue = () => store.set('queue', queue);
+const RETRY_MS = [5000, 15000, 30000, 60000];
+// Next record to send: the first one that is not waiting for a retry, and never ahead of an earlier record of the SAME student
+// (a board and its undo must reach the server in the order they were made).
+function nextOp() {
+  const now = Date.now(), held = {};
+  for (let i = 0; i < queue.length; i++) { const op = queue[i], k = op.body.studentId ? 's:' + op.body.studentId : 'o:' + i; if (!held[k] && !(op.nextAt > now)) return i; held[k] = true; }
+  return -1;
+}
 let flushing = false;
 async function flush() {
   if (flushing || !queue.length || !navigator.onLine) return;
   flushing = true;
   try {
-    while (queue.length) {
-      const op = queue[0];
+    let i;
+    while ((i = nextOp()) !== -1) {
+      const op = queue[i];
       let r;
       try { r = await api(op.body); } catch (e) { break; } // network problem: keep the queue, retry later
       if (r && r.code && AUTH_ERR.test(r.code)) { st.banner = { cls: 'bad', msg: L().sessionEnd }; render(); setTimeout(() => { sessionStorage.clear(); location.href = 'login.html'; }, 1500); break; }
       if (!r || (r.success === false && !r.code)) {
-        // The server could not process it (busy / temporary error): keep it and retry on the next round.
-        op.tries = (op.tries || 0) + 1; saveQueue();
-        if (op.tries < 5) break;
-        // After 5 failed tries give up on this one (so it never blocks the others) and tell the supervisor.
-        const fs = rosterFind(op.body.studentId); st.banner = { cls: 'bad', msg: L().sendFailed(fs ? fs.name : (op.body.studentId || '')) };
+        // The server could not process it (busy / temporary error). It is NEVER given up: it waits a little longer each time
+        // (5 s, 15 s, 30 s, then every 60 s) while other students' records go ahead, and stays listed on screen until it is sent.
+        op.tries = (op.tries || 0) + 1; op.nextAt = Date.now() + RETRY_MS[Math.min(op.tries, RETRY_MS.length) - 1]; saveQueue(); render();
+        continue;
       }
-      queue.shift(); saveQueue();
+      queue.splice(queue.indexOf(op), 1); saveQueue();
       applyServerResult(op, r);
     }
   } finally { flushing = false; }
@@ -226,8 +240,14 @@ function head() {
   $('busTitle').textContent = l.bus(me.bus || '—'); $('supName').textContent = l.sup(me.name);
   $('langBtn').textContent = l.lang; $('themeBtn').textContent = st.theme === 'light' ? l.dark : l.light; $('logoutBtn').textContent = l.logout;
 }
+// Records the server refused for a temporary reason: listed until they are really sent (not a banner the next scan would clear).
+function failBox() {
+  const bad = queue.filter(op => op.tries > 0); if (!bad.length) return '';
+  const names = bad.slice(0, 5).map(op => { const s = op.body.studentId ? rosterFind(op.body.studentId) : null; return s ? s.name : (op.body.studentId || op.kind); });
+  return `<div class="banner warn" id="failbox" role="status">${esc(L().retrying(names.join('، ') + (bad.length > 5 ? ' …(+' + (bad.length - 5) + ')' : '')))}</div>`;
+}
 function render() {
-  if (st.round) { head(); bar(); $('app').innerHTML = roundView(); return; }
+  if (st.round) { head(); bar(); $('app').innerHTML = failBox() + roundView(); return; }
   const keepReader = st.cam ? document.getElementById('reader') : null; if (keepReader) keepReader.remove(); // the live video must survive re-renders
   head(); bar();
   const l = L(), c = counts(), left = c.t - c.b, R = st.roster;
@@ -242,7 +262,7 @@ function render() {
   else if (st.last) card = `<div class="card ok-b"><span class="pill ok">${l.done}</span><div class="big2">${esc(st.last.name)}</div><div style="display:flex;gap:8px;margin-top:12px"><button class="btn" style="flex:1" onclick="resetCur(); st.last=null; render()">${l.next}</button>${(canUndoAny() || Date.now() - (st.last.at || 0) < UNDO_MS) ? `<button class="btn alt" style="flex:1" onclick="undo()">${l.undo}</button>` : ''}</div></div>`;
   const miss = R.students.filter(s => s.state !== 'boarded' && s.state !== 'withdrawn');
   const done = R.students.filter(s => s.state === 'boarded').sort((a, b) => String(b.at).localeCompare(String(a.at)));
-  $('app').innerHTML = `${st.banner ? `<div class="banner ${st.banner.cls}" role="alert">${esc(st.banner.msg)}</div>` : ''}
+  $('app').innerHTML = `${failBox()}${st.banner ? `<div class="banner ${st.banner.cls}" role="alert">${esc(st.banner.msg)}</div>` : ''}
   <section class="card"><div style="display:flex;justify-content:space-between;align-items:flex-end;gap:8px"><div><div class="kl">${l.boarded}</div><div class="kv">${c.b} <span class="muted" style="font-size:16px;font-weight:500">/ ${c.t}</span></div></div><span class="pill ${left > 0 ? 'warn' : 'ok'}">${l.remaining(left)}</span></div><div class="bar"><i style="width:${c.t ? Math.round(c.b / c.t * 100) : 0}%"></i></div></section>
   ${card}
   ${roundCard()}
