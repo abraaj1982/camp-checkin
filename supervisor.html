@@ -20,7 +20,7 @@
 </div>
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4lEBGPNxghwq9UmK0iljI5QdS-8iCvC-K09dDtbZCXGvGZyA4repTE3rFVVRp5zS4yw/exec';
-const LOC_INTERVAL_MS = 20000;
+const LOC_INTERVAL_MS = 45000; // C4: was 20 s. Every position update takes the shared write lock; 45 s keeps the leader map "fresh" (< 90 s, see ageClass in leader.html)
 
 /* ---------- session ---------- */
 const token = sessionStorage.getItem('mukhayyam_token');
