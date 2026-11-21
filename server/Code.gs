@@ -323,11 +323,16 @@ function handleScan_(data) {
         }
       }
       if (action === 'withdraw' && cur && cur.state === 'withdrawn') return { success: false, code: 'ALREADY_WITHDRAWN', error: 'خرج مسبقاً' };
-      appendSafe_(scansSheet_(), [new Date(), student.id, action, student.bus, user.Username, String(data.method || '').slice(0, 20), clientId, String(data.notes || '').slice(0, 200)]);
+      const now = new Date(), method = String(data.method || '').slice(0, 20), notes = String(data.notes || '').slice(0, 200);
+      appendSafe_(scansSheet_(), [now, student.id, action, student.bus, user.Username, method, clientId, notes]);
       if (action === 'undo') writeAudit_(user.Username, 'SCAN_UNDO', student.id, 'bus=' + student.bus);
-      const sc2 = scanStates_();
-      const c = busCounts_(student.bus, readStudents_().students, sc2.states);
-      return { success: true, student: publicStudent_(student, sc2.states[student.id], false), boarded: c.boarded, total: c.total };
+      // C3: the new state comes from the row we just wrote, by the SAME rules as scanStates_ (no second full read of the log inside the lock).
+      const states = Object.assign({}, sc.states);
+      if (action === 'board') { const viaG = method === 'guardian'; states[student.id] = { state: 'boarded', at: now, by: user.Username, bus: String(student.bus), via: viaG ? 'guardian' : '', note: viaG ? notes : '' }; }
+      else if (action === 'withdraw') states[student.id] = { state: 'withdrawn', at: now, by: user.Username, bus: String(student.bus), prev: sc.states[student.id] || null };
+      else if (action === 'undo') delete states[student.id];
+      const c = busCounts_(student.bus, readStudents_().students, states);
+      return { success: true, student: publicStudent_(student, states[student.id], false), boarded: c.boarded, total: c.total };
     } finally {
       lock.releaseLock();
     }

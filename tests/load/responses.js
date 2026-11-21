@@ -8,9 +8,10 @@ function runOps() {
   const norm = o => JSON.stringify(o).replace(/"at":"[^"]*"/g, '"at":"T"');
   for (let i = 0; i < 400; i++) {
     const u = users[Math.floor(rnd() * users.length)], id = String(1001 + Math.floor(rnd() * 40)), op = ['board', 'board', 'undo', 'withdraw'][Math.floor(rnd() * 4)];
-    out.push(norm(s.post({ action: 'scan', op, token: s.tokens[u], studentId: id, clientId: rnd() < 0.1 && i > 0 ? 'c' + (i - 1) : 'c' + i, method: 'qr' })));
+    const method = ['qr', 'qr', 'name', 'guardian', '=cmd'][Math.floor(rnd() * 5)], notes = ['', '', 'ملاحظة', '=SUM(A1)', '+1'][Math.floor(rnd() * 5)];
+    out.push(norm(s.post({ action: 'scan', op, token: s.tokens[u], studentId: id, clientId: rnd() < 0.1 && i > 0 ? 'c' + (i - 1) : 'c' + i, method, notes })));
   }
-  const rosters = ['sup1', 'sup2'].map(u => norm(s.post({ action: 'roster', token: s.tokens[u] })));
+  const rosters = ['sup1', 'sup2'].map(u => norm(s.post({ action: 'roster', token: s.tokens[u] }))).concat([norm(s.post({ action: 'leaderAll', token: s.tokens.admin }).summary)]);
   return { out, rosters, rows: s.book.Scans.rows.length };
 }
 const [mode, file] = process.argv.slice(2); if (!mode || !file) { console.log('usage: responses.js record|compare <file>'); process.exit(2); }
