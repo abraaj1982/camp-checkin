@@ -296,19 +296,12 @@ function findUserRow_(username) {
   return rows.find(r => sameUsername_(r.Username, username));
 }
 
-// Batched write of FailedAttempts, LockedUntil, TokenEpoch, LastActivityAt,
-// CreatedAt, LastLogin in ONE range call instead of 6 separate setValue()
-// calls — these 6 columns are contiguous (H:M) by design.
+// Writes FailedAttempts, LockedUntil (H:I) and LastActivityAt, CreatedAt, LastLogin (K:M) in two range calls.
+// TokenEpoch (J) is deliberately NOT written: login read it earlier without the lock, and writing that old value
+// back could undo a password reset / session revocation that happened in between.
 function writeLoginSuccessRow_(sheet, headers, user, now) {
-  const startCol = colIndexByName_(headers, 'FailedAttempts');
-  sheet.getRange(user._rowNumber, startCol, 1, 6).setValues([[
-    0,                         // FailedAttempts
-    '',                        // LockedUntil
-    Number(user.TokenEpoch) || 0, // TokenEpoch (unchanged)
-    now,                       // LastActivityAt
-    user.CreatedAt,            // CreatedAt (unchanged)
-    now                        // LastLogin
-  ]]);
+  sheet.getRange(user._rowNumber, colIndexByName_(headers, 'FailedAttempts'), 1, 2).setValues([[0, '']]);
+  sheet.getRange(user._rowNumber, colIndexByName_(headers, 'LastActivityAt'), 1, 3).setValues([[now, user.CreatedAt, now]]);
 }
 
 function handleLogin_(data) {
@@ -336,10 +329,24 @@ function handleLogin_(data) {
   }
 
   // Old accounts store a slow legacy hash (login takes ~9 s): upgrade it silently on the first good login.
+  // Done under the lock, and only if the password was not changed meanwhile (e.g. by an admin reset).
   if (String(user.PasswordHash || '').indexOf('$') === -1) {
     const up = hashPassword_(data.password);
-    setCellByColumnName_(sheet, headers, user._rowNumber, 'PasswordHash', up.hashHex);
-    setCellByColumnName_(sheet, headers, user._rowNumber, 'Salt', up.saltB64);
+    const lock = LockService.getScriptLock();
+    let locked = false;
+    try { lock.waitLock(10000); locked = true; } catch (e) { /* busy */ }
+    if (locked) {
+      try {
+        const fresh = readSheetAsObjects_(USERS_SHEET);
+        const cur = fresh.rows.find(r => r.Username === user.Username);
+        if (cur && String(cur.PasswordHash) === String(user.PasswordHash)) {
+          setCellByColumnName_(fresh.sheet, fresh.headers, cur._rowNumber, 'PasswordHash', up.hashHex);
+          setCellByColumnName_(fresh.sheet, fresh.headers, cur._rowNumber, 'Salt', up.saltB64);
+        }
+      } finally {
+        lock.releaseLock();
+      }
+    } // lock busy: skip the upgrade this time (the login still works; it is upgraded on a later login)
   }
 
   writeLoginSuccessRow_(sheet, headers, user, now);
@@ -545,12 +552,22 @@ function handleResetPassword_(data) {
     return { success: false, code: 'WEAK_PASSWORD', error: 'كلمة المرور قصيرة: ' + MIN_PASSWORD_LEN_ + ' أحرف على الأقل' };
   }
   const { saltB64, hashHex } = hashPassword_(data.newPassword);
-  setCellByColumnName_(sheet, headers, target._rowNumber, 'PasswordHash', hashHex);
-  setCellByColumnName_(sheet, headers, target._rowNumber, 'Salt', saltB64);
-  setCellByColumnName_(sheet, headers, target._rowNumber, 'FailedAttempts', 0);
-  setCellByColumnName_(sheet, headers, target._rowNumber, 'LockedUntil', '');
-  const newEpoch = (Number(target.TokenEpoch) || 0) + 1;
-  setCellByColumnName_(sheet, headers, target._rowNumber, 'TokenEpoch', newEpoch);
+  // Written under the lock from a FRESH read, so it cannot interleave with a login's password upgrade
+  // and the session counter (TokenEpoch) is always incremented from its current value.
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const fresh = readSheetAsObjects_(USERS_SHEET);
+    const cur = fresh.rows.find(r => r.Username === target.Username);
+    if (!cur) return { success: false, error: 'User not found' };
+    setCellByColumnName_(fresh.sheet, fresh.headers, cur._rowNumber, 'PasswordHash', hashHex);
+    setCellByColumnName_(fresh.sheet, fresh.headers, cur._rowNumber, 'Salt', saltB64);
+    setCellByColumnName_(fresh.sheet, fresh.headers, cur._rowNumber, 'FailedAttempts', 0);
+    setCellByColumnName_(fresh.sheet, fresh.headers, cur._rowNumber, 'LockedUntil', '');
+    setCellByColumnName_(fresh.sheet, fresh.headers, cur._rowNumber, 'TokenEpoch', (Number(cur.TokenEpoch) || 0) + 1);
+  } finally {
+    lock.releaseLock();
+  }
 
   writeAudit_(auth.user.Username, 'RESET_PASSWORD', data.targetUsername, '');
   return { success: true };
