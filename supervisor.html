@@ -68,9 +68,16 @@ const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"']
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2));
 
 /* ---------- API + offline queue ---------- */
+// C7: a request gets 30 s (the slowest measured under heavy load is ~22 s). A connection that never answers is cut,
+// so the queue cannot freeze behind it; the record stays queued and is resent (the server ignores duplicates by clientId).
+const API_TIMEOUT_MS = 30000;
 async function api(payload) {
-  const res = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(Object.assign({ token: token }, payload)) });
-  return res.json();
+  const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+  const timer = ctl ? setTimeout(() => ctl.abort(), API_TIMEOUT_MS) : null;
+  try {
+    const res = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(Object.assign({ token: token }, payload)), signal: ctl ? ctl.signal : undefined });
+    return await res.json();
+  } finally { if (timer) clearTimeout(timer); }
 }
 const AUTH_ERR = /EXPIRED|IDLE_TIMEOUT|REVOKED|BAD_SIGNATURE|MALFORMED|USER_NOT_FOUND|ACCOUNT_DISABLED|BAD_PAYLOAD/;
 let queue = store.get('queue', []);
