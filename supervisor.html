@@ -118,15 +118,26 @@ function applyServerResult(op, r) {
     st.banner = { cls: 'bad', msg: (r.code === 'OTHER_BUS' ? L().other(r.student ? r.student.bus : '', r.student ? r.student.supervisor : '') : L().notFound) };
   }
 }
-function enqueue(kind, body) { queue.push({ kind: kind, body: Object.assign({ clientId: uid() }, body) }); saveQueue(); flush(); }
+function enqueue(kind, body) { queue.push({ kind: kind, body: Object.assign({ clientId: uid() }, body), at: new Date().toTimeString().slice(0, 5) }); saveQueue(); flush(); }
 
 /* ---------- roster ---------- */
 function rosterFind(id) { return st.roster && st.roster.students.find(s => s.id === String(id).trim()); }
+// The server's list does not know yet about records still waiting on THIS phone: show them as the supervisor made them
+// (boarded ⏳ / undone), otherwise a refresh makes students he already recorded look "not boarded" and he records them again.
+function withQueue(r) {
+  queue.forEach(op => {
+    if (op.kind !== 'scan') return;
+    const s = r.students.find(x => x.id === String(op.body.studentId)); if (!s || s.state === 'withdrawn') return;
+    if (op.body.op === 'board' && s.state !== 'boarded') { s.state = 'boarded'; s.at = op.at || ''; s.pending = true; }
+    else if (op.body.op === 'undo' && s.state === 'boarded') { s.state = 'none'; s.at = ''; s.pending = true; }
+  });
+  return r;
+}
 async function refreshRoster(silent) {
   if (!navigator.onLine) return;
   try {
     const r = await api({ action: 'roster' });
-    if (r.success) { st.roster = r; store.set('roster', r); if (r.bus) { me.bus = r.bus; $('busTitle').textContent = L().bus(r.bus); } }
+    if (r.success) { st.roster = withQueue(r); store.set('roster', st.roster); if (r.bus) { me.bus = r.bus; $('busTitle').textContent = L().bus(r.bus); } }
     else if (r.code && AUTH_ERR.test(r.code)) { sessionStorage.clear(); location.href = 'login.html'; }
     else { st.loadErr = r.error || 'تعذّر تحميل القائمة'; render(); }
   } catch (e) { /* offline: keep cached roster */ }

@@ -69,6 +69,12 @@ const busId = (b, k) => String(1000 + b + 8 * k);    // students of bus b
   chk(shown.q > 0 && shown.ok.length === q8.length, `Q8 [C6] roster refreshed while ${shown.q} are still queued: ${shown.ok.length}/6 still shown as boarded (⏳)`);
   fault.delayMs = null; await waitFor(() => q8.every(id => rowsBy(id) === 1), 90000, 1000);
   chk(q8.every(id => rowsBy(id) === 1), 'Q8b all 6 recorded once afterwards');
+  fault.delayMs = j => j.action === 'scan' ? 8000 : 0; const U8 = bus1(36); await B.scan(p, U8); await sleep(9500);
+  await p.evaluate(id => { st.last = { id, name: 'x', canUndo: true, at: Date.now() }; undo(); }, U8);
+  await p.evaluate(() => refreshRoster(true).then(render)); await sleep(300);
+  const u8 = await p.evaluate(id => (st.roster.students.find(s => s.id === id) || {}).state, U8); fault.delayMs = null;
+  await waitFor(async () => (await B.queueLen(p)) === 0, 60000, 1000);
+  chk(u8 === 'none' && srv.scans().filter(r => String(r[1]) === U8).map(r => r[2]).join(',') === 'board,undo', 'Q8c [C6] an undo still waiting shows the student as NOT boarded after a refresh; server gets board then undo, in order');
 
   // ---- Q9 a connection that never answers must not freeze the queue ----
   let hung = false; fault.hang = j => { if (!hung && j.action === 'scan' && j.studentId === bus1(28)) { hung = true; return true; } return false; };
