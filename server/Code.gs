@@ -299,6 +299,7 @@ function handleScan_(data) {
       return { success: false, code: 'OTHER_BUS', error: 'هذا الطالب ليس في باصك', student: publicStudent_(student, scanStates_().states[student.id], true) };
     }
     const clientId = String(data.clientId || '').slice(0, 60);
+    scansSheet_(); // C2: open the spreadsheet BEFORE taking the lock (opening costs ~0.4 s; the lock is shared by every write)
     const lock = LockService.getScriptLock();
     lock.waitLock(10000);
     try {
@@ -522,6 +523,7 @@ function handleBag_(data) {
     if (!student) return { success: false, code: 'NOT_FOUND', error: 'الطالب غير موجود' };
     if (!canRecordFor_(user, student)) return { success: false, code: 'OTHER_BUS', error: 'هذا الطالب ليس في باصك' };
     const clientId = String(data.clientId || '').slice(0, 60);
+    bagsSheet_(); // C2: open the spreadsheet BEFORE taking the lock
     const lock = LockService.getScriptLock();
     lock.waitLock(10000);
     try {

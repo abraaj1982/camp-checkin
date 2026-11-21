@@ -42,6 +42,7 @@ function handleReceptionArrive_(data) {
     if (name.length < 3) return { success: false, code: 'BAD_REQUEST', error: 'اكتب اسم ولي الأمر' };
     const relation = GUARDIAN_RELATIONS_.indexOf(String(data.relation)) !== -1 ? String(data.relation) : '';
     const clientId = String(data.clientId || '').slice(0, 60);
+    scansSheet_(); // C2: open the spreadsheet BEFORE taking the lock
     const lock = LockService.getScriptLock();
     lock.waitLock(10000);
     try {
@@ -63,6 +64,7 @@ function handleReceptionUndo_(data) {
   return withAuth_(data, requirePerm_('reception'), function(user) {
     const student = findStudent_(data.studentId);
     if (!student) return { success: false, code: 'NOT_FOUND', error: 'الطالب غير موجود' };
+    scansSheet_(); // C2: open the spreadsheet BEFORE taking the lock
     const lock = LockService.getScriptLock();
     lock.waitLock(10000);
     try {
