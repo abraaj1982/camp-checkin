@@ -91,11 +91,20 @@ function readSheetAsObjects_(sheetName) {
 function readUsersCached_() {
   const cache = CacheService.getScriptCache();
   try { const hit = cache.get('users_v1'); if (hit) return JSON.parse(hit); } catch (e) { /* fall through */ }
+  const startedAt = Date.now();
   const rows = readSheetAsObjects_(USERS_SHEET).rows;
-  try { cache.put('users_v1', JSON.stringify(rows), 60); } catch (e) { /* too large: skip */ }
+  try {
+    // If the Users tab was written while we were reading (password reset, disable, ...), our copy may be stale and must
+    // not stay cached (a revoked session could keep working for a minute). Cache it, THEN check: clearUsersCache_ stamps
+    // the time before removing, so whichever order the two run in, a stale copy is always removed.
+    cache.put('users_v1', JSON.stringify(rows), 60);
+    if ((Number(cache.get('users_cleared_at')) || 0) >= startedAt) cache.remove('users_v1');
+  } catch (e) { /* too large: skip */ }
   return rows;
 }
-function clearUsersCache_() { try { CacheService.getScriptCache().remove('users_v1'); } catch (e) { /* ignore */ } }
+function clearUsersCache_() {
+  try { const cache = CacheService.getScriptCache(); cache.put('users_cleared_at', String(Date.now()), 600); cache.remove('users_v1'); } catch (e) { /* ignore */ }
+}
 
 function colIndexByName_(headers, name) {
   const idx = headers.indexOf(name);
@@ -393,15 +402,16 @@ function authorize_(token, requiredCheckFn) {
   }
 
   if (!lastActivity || (now - lastActivity) > ACTIVITY_WRITE_DEBOUNCE_MS) {
-    const lock = LockService.getScriptLock();
+    // One cell, NO lock: a request must never wait for the busy write lock just to note "last activity"
+    // (it used to wait up to 5 s, and under load an active user could even be timed out).
+    // Safe without the lock: it runs only AFTER the token, epoch, active flag and idle limit were all checked,
+    // it touches only LastActivityAt, and two simultaneous writes both store "now".
     try {
-      lock.waitLock(5000);
-      const fresh = readSheetAsObjects_(USERS_SHEET);
-      setCellByColumnName_(fresh.sheet, fresh.headers, user._rowNumber, 'LastActivityAt', new Date());
+      const sheet = getSheetByName_(USERS_SHEET);
+      const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      setCellByColumnName_(sheet, headers, user._rowNumber, 'LastActivityAt', new Date());
     } catch (e) {
       // best-effort
-    } finally {
-      lock.releaseLock();
     }
   }
 

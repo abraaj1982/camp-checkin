@@ -39,7 +39,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const inflight = Array.from({ length: 20 }, () => emu.call({ action: 'roster', token: s.tokens.sup2 }));
   const rv = emu.call({ action: 'resetPassword', token: s.tokens.admin, targetUsername: 'sup2', newPassword: 'new-pass-123' });
   await Promise.all(inflight); const r1 = (await rv).out; const a1 = (await emu.call({ action: 'roster', token: s.tokens.sup2 })).out;
-  chk(r1.success && a1.code === 'REVOKED', 'S1 password reset during 20 in-flight requests -> old token REVOKED afterwards');
+  chk(r1.success && a1.code === 'REVOKED', 'S1 password reset during 20 in-flight requests -> old token REVOKED afterwards' + (r1.success && a1.code === 'REVOKED' ? '' : ` (reset: ${r1.success ? 'ok' : r1.error}; old token afterwards: ${a1.code || 'ACCEPTED'})`));
   row('sup3')[iL] = old; flush();
   const inf2 = Array.from({ length: 20 }, () => emu.call({ action: 'roster', token: s.tokens.sup3 }));
   await emu.call({ action: 'setUserActive', token: s.tokens.admin, targetUsername: 'sup3', active: false }); await Promise.all(inf2);
@@ -56,6 +56,15 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const longW = Array.from({ length: 40 }, (_, i) => emu.call({ action: 'scan', op: 'board', token: s.tokens.all1, studentId: String(1005 + 8 * i), clientId: 'L' + i, method: 'qr' }));
   await sleep(150); const r5 = await emu.call({ action: 'roster', token: s.tokens.sup1 }); await Promise.all(longW);
   chk(r5.out.success && r5.ms < 1500 && +new Date(row('sup1')[iL]) > +old, `S5 [C1] while 40 writes queue on the lock, a read answers fast (${Math.round(r5.ms)} ms, target < 1500) and last-activity is written`);
+  // S6: a request that READ the users table just before a password reset must not put that stale copy
+  // back into the cache (otherwise the old session keeps working for up to 60 s). Deterministic: the reader is paused mid-read.
+  flush(); let rel6; const g6 = { hit: false, wait: new Promise(r => { rel6 = r; }) };
+  emu.cfg.gate = (op, a, act) => { if (!g6.hit && act === 'roster' && op === 'cput' && a[0] === 'users_v1') { g6.hit = true; return g6.wait; } return null; };
+  const reader = emu.call({ action: 'roster', token: s.tokens.sup6 }); const t6 = Date.now(); while (!g6.hit && Date.now() - t6 < 5000) await sleep(10);
+  const rs6 = (await emu.call({ action: 'resetPassword', token: s.tokens.admin, targetUsername: 'sup6', newPassword: 'new-pass-666' })).out;
+  rel6(); emu.cfg.gate = null; await reader;
+  const a6 = (await emu.call({ action: 'roster', token: s.tokens.sup6 })).out;
+  chk(g6.hit && rs6.success && a6.code === 'REVOKED', 'S6 [C1] a request that read the users table just before a password reset does not keep the old session alive' + (a6.code === 'REVOKED' ? '' : ` (old token afterwards: ${a6.code || 'ACCEPTED'})`));
   await emu.close();
 
   // ---------------- L: login racing a password reset / disable  [C1b] ----------------

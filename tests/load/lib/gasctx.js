@@ -1,7 +1,7 @@
 // Loads the REAL server code (server/*.gs) into an isolated vm context with fake Google services.
 // Nothing here can reach Google: SpreadsheetApp/CacheService/LockService/PropertiesService are all local fakes.
 const vm = require('vm'), fs = require('fs'), crypto = require('crypto');
-const SRC = require('path').join(__dirname, '..', '..', '..', 'server') + '/';
+const SRC = (process.env.MK_SERVER_DIR || require('path').join(__dirname, '..', '..', '..', 'server')) + '/'; // MK_SERVER_DIR: compare another version of the code
 const FILES = ['Auth', 'Code', 'Custody', 'Health', 'Media', 'Shirts', 'Reports', 'Reception'];
 let CODE = FILES.map(f => fs.readFileSync(SRC + f + '.gs', 'utf8')).join('\n');
 const SCRIPT = new vm.Script(CODE, { filename: 'server.gs' });
