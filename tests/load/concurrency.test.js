@@ -112,5 +112,63 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   }
   chk(dviol === 0, `L3 login racing an account disable (4 trials): no usable session afterwards — violations: ${dviol}`);
   await emu.close();
+
+  // ---------------- R: reception — unique student numbers (RC4) ----------------
+  s = seed({ supervisors: 9 }); emu = createEmu(s, { slots: 30, netOverheadMs: 0, lat: SMALL });
+  const rcall = b => emu.call(b).then(x => x.out); const extra = () => s.book.ExtraStudents.rows.slice(1);
+  const dupIds = () => { const all = extra().map(r => r[0]).concat(s.book.Bus.rows.slice(1).map(r => r[3])); return all.filter((x, i) => all.indexOf(x) !== i); };
+  const add = (name, k, bus) => rcall({ action: 'receptionAdd', token: s.tokens.secr, name, cls: '6', team: 'الأزرق', bus: bus === undefined ? '1' : bus, clientId: 'radd-' + k });
+  let ra = await Promise.all(Array.from({ length: 10 }, (_, i) => add('متأخر متزامن تجريبي ' + i, i)));
+  chk(ra.every(x => x.success) && new Set(ra.map(x => x.id)).size === 10 && !dupIds().length, 'R1 [D1] 10 late students added at the same instant: 10 different numbers');
+  // stale cache: a reader loads the student list BEFORE an add and stores it AFTER (deterministic pause)
+  const pauseStudentsCachePut = () => { let rel; const g = { hit: false, wait: new Promise(r => { rel = r; }) }; g.release = () => rel();
+    emu.cfg.gate = (op, a, act) => { if (!g.hit && act === 'roster' && op === 'cput' && a[0] === 'students_v2') { g.hit = true; return g.wait; } return null; }; return g; };
+  flush(); let g7 = pauseStudentsCachePut(); const reader7 = rcall({ action: 'roster', token: s.tokens.sup1 }); let t7 = Date.now(); while (!g7.hit && Date.now() - t7 < 5000) await sleep(10);
+  const A = await add('متأخر أ تجريبي', 'a'); g7.release(); emu.cfg.gate = null; await reader7;
+  const vis = await Promise.all([rcall({ action: 'roster', token: s.tokens.sup1 }), rcall({ action: 'receptionFind', token: s.tokens.secr, q: A.id.toLowerCase() }), rcall({ action: 'reportData', token: s.tokens.admin, report: 'busAttendance', filters: { bus: '1' } })]);
+  const seen = [vis[0].students && vis[0].students.some(x => x.id === A.id), vis[1].results && vis[1].results.some(x => x.id === A.id), vis[2].rows && vis[2].rows.some(x => x.id === A.id)];
+  chk(g7.hit && seen.every(Boolean), `R2 [D1] a student list read before an add and cached after it does not hide the new student (roster/reception/report: ${seen.join('/')})`);
+  const B2 = await add('متأخر ب تجريبي', 'b');
+  chk(A.success && B2.success && A.id !== B2.id && !dupIds().length, `R3 [D1] RC4 the next add after that stale cache gets a NEW number (${A.id} / ${B2.id}; duplicates: ${dupIds().join(',') || 'none'})`);
+  // a number already used in the REGISTRATION sheet is never reused
+  const ix = s.book.Bus.rows[0].indexOf('Student ID'); const used = 'X' + (Math.max(...extra().map(r => Number(String(r[0]).slice(1)))) + 1); s.book.Bus.rows[5][ix] = used; flush();
+  const C3 = await add('متأخر ج تجريبي', 'c');
+  chk(C3.success && C3.id !== used && !dupIds().length, `R4 [D1] a number already used in the registration sheet (${used}) is not given again (got ${C3.id})`);
+  // 20 additions while supervisors keep reading the roster (natural interleavings)
+  let stop = false; const pollers = Array.from({ length: 6 }, (_, k) => (async () => { while (!stop) { flush(); await rcall({ action: 'roster', token: s.tokens['sup' + (k + 1)] }); } })());
+  ra = await Promise.all(Array.from({ length: 20 }, (_, i) => add('متأخر مع قراءات تجريبي ' + i, 'p' + i))); stop = true; await Promise.all(pollers);
+  chk(ra.every(x => x.success) && new Set(ra.map(x => x.id)).size === 20 && !dupIds().length, `R5 [D1] 20 additions at once while 6 supervisors keep reloading their rosters: all numbers unique (${extra().length} hand-added, no duplicate)`);
+  // existing records untouched
+  chk(extra().every(r => r[9] === true) && s.book.Bus.rows.length === 301, 'R6 [D1] existing students and earlier hand-added records are untouched');
+  // bus validation
+  const bad = await add('باص غير موجود تجريبي', 'bad', '99'), none = await add('بلا باص تجريبي', 'nob', ''), ok8 = await add('باص صحيح تجريبي', 'okb', '8');
+  chk(bad.code === 'BAD_REQUEST' && !bad.success && none.success && ok8.success && !extra().some(r => r[1] === 'باص غير موجود تجريبي'), `R7 [D3] bus that does not exist is refused (${bad.code}: ${bad.error}); no bus (arrives with guardian) and an existing bus are accepted`);
+  await emu.close();
+
+  // ---------------- B: concurrent wrong passwords cannot bypass the lockout [D2] ----------------
+  const LOCKMSG = 'Account temporarily locked. Try again later.';
+  async function lockState(sx, u) { const U2 = sx.book.Users.rows, H2 = U2[0], r = U2.find(x => x[0] === u); return { fa: Number(r[H2.indexOf('FailedAttempts')]) || 0, locked: !!r[H2.indexOf('LockedUntil')] && new Date(r[H2.indexOf('LockedUntil')]) > new Date() }; }
+  s = seed({ supervisors: 4 }); emu = createEmu(s, { slots: 60, netOverheadMs: 0 });
+  await Promise.all(Array.from({ length: 50 }, (_, i) => emu.call({ action: 'login', username: 'sup1', password: 'wrong-' + i })));
+  let ls = await lockState(s, 'sup1'); const right = (await emu.call({ action: 'login', username: 'sup1', password: 'load-test-1' })).out;
+  chk(ls.locked && ls.fa >= 5 && !right.success, `B1 [D2] 50 wrong passwords at the same time: counted ${ls.fa}, account locked: ${ls.locked}; correct password right after refused: ${!right.success}`);
+  const mixed = await Promise.all(Array.from({ length: 51 }, (_, i) => emu.call({ action: 'login', username: 'sup2', password: i === 25 ? 'load-test-1' : 'bad-' + i }).then(x => x.out)));
+  ls = await lockState(s, 'sup2'); const good = mixed[25], wrongMsgs = new Set(mixed.filter((_, i) => i !== 25).map(x => x.error));
+  chk(ls.locked && (good.success || wrongMsgs.has(good.error)), `B2 [D2] 50 wrong + 1 correct at the same time: account locked; the correct one ${good.success ? 'got in before the lock' : 'got the SAME answer as wrong guesses ("' + good.error + '") — no hint that it was right'}`);
+  // a correct login paused just before writing, while 6 wrong ones arrive: it must not erase the lock they cause
+  { let rel; const g = { hit: false, wait: new Promise(r => { rel = r; }) };
+    emu.cfg.gate = (op, a, act) => { if (!g.hit && act === 'login' && op === 'setValues' && a[0] === 'Users' && Array.isArray(a[3]) && a[3][0] && a[3][0].length === 2) { g.hit = true; return g.wait; } return null; };
+    const lg = emu.call({ action: 'login', username: 'sup3', password: 'load-test-1' }); let t = Date.now(); while (!g.hit && Date.now() - t < 8000) await sleep(10);
+    const wrongs = Promise.all(Array.from({ length: 6 }, (_, i) => emu.call({ action: 'login', username: 'sup3', password: 'w-' + i })));
+    let wd = false; wrongs.then(() => { wd = true; }); t = Date.now(); while (!wd && Date.now() - t < 3000) await sleep(20); rel(); emu.cfg.gate = null; await lg; await wrongs;
+    ls = await lockState(s, 'sup3');
+    chk(g.hit && ls.locked && ls.fa >= 5, `B3 [D2] a correct login finishing while 6 wrong attempts arrive does not erase the lock (counted ${ls.fa}, locked: ${ls.locked})`); }
+  // normal behaviour kept
+  for (let i = 0; i < 3; i++) await emu.call({ action: 'login', username: 'sup4', password: 'oops-' + i });
+  const n4 = (await emu.call({ action: 'login', username: 'sup4', password: 'load-test-1' })).out; ls = await lockState(s, 'sup4');
+  chk(n4.success && n4.token && ls.fa === 0 && !ls.locked, 'B4 [D2] 3 wrong then the right password: logs in, counter back to 0 (unchanged behaviour)');
+  const un = (await emu.call({ action: 'unlockAccount', token: s.tokens.admin, targetUsername: 'sup1' })).out; const after = (await emu.call({ action: 'login', username: 'sup1', password: 'load-test-1' })).out;
+  chk(un.success && after.success, 'B5 [D2] after the admin unlocks the account, the right password works again');
+  await emu.close();
   done();
 })().catch(e => { console.error(e); process.exit(2); });

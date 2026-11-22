@@ -163,10 +163,11 @@ function realValue_(v) {
   return /^(|لا|لايوجد|لاتوجد|لاشيء|لاشي|ليس|ليسلديه|ليسلديهحساسية|لايعاني|سليم|none|no|non|na|nil|nothing|0)$/.test(k) ? '' : t;
 }
 
-function readStudents_() {
+// fresh=true skips the cache (used inside the lock when a new student number is chosen).
+function readStudents_(fresh) {
   const cache = CacheService.getScriptCache();
-  const hit = cache.get('students_v2');
-  if (hit) { try { return JSON.parse(hit); } catch (e) { /* fall through */ } }
+  if (!fresh) { const hit = cache.get('students_v2'); if (hit) { try { return JSON.parse(hit); } catch (e) { /* fall through */ } } }
+  const startedAt = Date.now();
   const sheet = SpreadsheetApp.openById(getStudentSpreadsheetId_()).getSheetByName(SHEET_NAME);
   if (!sheet) throw new Error('تبويب Bus غير موجود في شيت الطلاب');
   const data = sheet.getDataRange().getValues();
@@ -193,8 +194,16 @@ function readStudents_() {
   }
   readExtraStudents_().forEach(function(x) { if (!students.some(function(s) { return s.id === x.id; })) students.push(x); }); // students added by hand
   const result = { students: students, cols: cols };
-  try { cache.put('students_v2', JSON.stringify(result), 60); } catch (e) { /* too large: skip cache */ }
+  try {
+    // A student added while we were reading must not be hidden by our older copy (see clearStudentsCache_):
+    // cache it, THEN check, so whichever order the two run in, a stale copy is always removed.
+    cache.put('students_v2', JSON.stringify(result), 60);
+    if ((Number(cache.get('students_cleared_at')) || 0) >= startedAt) cache.remove('students_v2');
+  } catch (e) { /* too large: skip cache */ }
   return result;
+}
+function clearStudentsCache_() {
+  try { const cache = CacheService.getScriptCache(); cache.put('students_cleared_at', String(Date.now()), 600); cache.remove('students_v2'); } catch (e) { /* ignore */ }
 }
 
 function findStudent_(id) {
@@ -729,7 +738,7 @@ function checkStudentSheet_() {
   const report = { ok: true, problems: [], notes: [] };
   let result;
   try {
-    CacheService.getScriptCache().remove('students_v2');
+    clearStudentsCache_();
     result = readStudents_();
   } catch (err) {
     report.ok = false;

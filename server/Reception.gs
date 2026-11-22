@@ -110,12 +110,16 @@ function handleReceptionAdd_(data) {
     try {
       const extra = readExtraStudents_();
       if (clientId) { const dup = extra.filter(function(x) { return x.clientId === clientId; })[0]; if (dup) return { success: true, repeated: true, id: dup.id, name: dup.name }; }
-      const same = readStudents_().students.filter(function(s) { return s.name === name; })[0];
+      // Everything below uses a FRESH read made inside the lock (never the shared cache, which may be up to a minute old):
+      // the registration sheet AND every hand-added student, so a number is never given twice.
+      const all = readStudents_(true).students;
+      const same = all.filter(function(s) { return s.name === name; })[0];
       if (same && !data.confirmDuplicate) return { success: false, code: 'POSSIBLE_DUPLICATE', error: 'يوجد طالب بنفس الاسم', existing: { id: same.id, name: same.name, team: same.team, bus: same.bus, cls: same.cls } };
-      let n = 0; readStudents_().students.forEach(function(s) { const m = /^X(\d+)$/.exec(s.id); if (m) n = Math.max(n, Number(m[1])); });
-      const id = 'X' + (n + 1);
+      const taken = {}; let n = 0;
+      all.concat(extra).forEach(function(s) { taken[s.id] = true; const m = /^X(\d+)$/.exec(s.id); if (m) n = Math.max(n, Number(m[1])); });
+      let id = 'X' + (n + 1); while (taken[id]) { n++; id = 'X' + (n + 1); }
       appendSafe_(extraSheet_(), [id, name, cls, team, bus, shirt, note, new Date(), user.Username, true, clientId]);
-      try { CacheService.getScriptCache().remove('students_v2'); } catch (e) { /* ignore */ }
+      clearStudentsCache_(); // every screen sees the new student at once
       writeAudit_(user.Username, 'STUDENT_ADDED', id, 'bus=' + bus);
       return { success: true, id: id, name: name };
     } finally {
