@@ -506,6 +506,8 @@ r=post({action:'custodySummary',token:tsc});assert(!r.success,'scout has no acce
  const tr1=post({action:'login',username:'recp',password:'prc-12345'}).token,tb1=post({action:'login',username:'sup1',password:'p1-12345'}).token;
  for(const a of ['receptionFind','receptionList','receptionAdd','receptionArrive','receptionUndo'])assert(!post({action:a,token:tb1,q:'x',name:'طالب جديد',studentId:'1002',guardian:'ولي أمر'}).success,'supervisor cannot use '+a);
  let q=post({action:'receptionAdd',token:tr1,name:'سالم متأخر',cls:'6',team:'zzz',bus:'1'});assert(!q.success&&q.code==='BAD_REQUEST','unknown team rejected');
+ q=post({action:'receptionAdd',token:tr1,name:'طالب باص وهمي',cls:'6',bus:'99',clientId:'adbus'});assert(!q.success&&q.code==='BAD_REQUEST'&&!book.ExtraStudents.rows.some(x=>x[1]==='طالب باص وهمي'),'a bus that does not exist is refused by the server');
+ q=post({action:'receptionAdd',token:tr1,name:'طالب باص وهمي',cls:'6',bus:'99',clientId:'adbus'});assert(!q.success&&q.code==='BAD_REQUEST','retrying the refused request is still refused (nothing was added)');
  q=post({action:'receptionAdd',token:tr1,name:'ab'});assert(!q.success,'a full name is required');
  q=post({action:'receptionAdd',token:tr1,name:'سالم متأخر',cls:'6',team:'أزرق',bus:'1',shirt:'xl',note:'سجّل قبل المخيم بيومين',clientId:'ad1'});assert(q.success&&q.id==='X1','late student added with an automatic id (X1)');const nid=q.id;
  q=post({action:'receptionAdd',token:tr1,name:'سالم متأخر',cls:'6',clientId:'ad1'});assert(q.success&&q.repeated&&q.id===nid,'same request twice adds him once');

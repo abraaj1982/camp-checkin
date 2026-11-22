@@ -113,6 +113,9 @@ function handleReceptionAdd_(data) {
       // Everything below uses a FRESH read made inside the lock (never the shared cache, which may be up to a minute old):
       // the registration sheet AND every hand-added student, so a number is never given twice.
       const all = readStudents_(true).students;
+      // The bus must be one of the buses of the registration sheet (the screen offers only those; the server now checks too).
+      // An empty bus stays allowed: a student who comes with his guardian may have no bus.
+      if (bus && !all.some(function(s) { return !s.manual && s.bus === bus; })) return { success: false, code: 'BAD_REQUEST', error: 'باص غير موجود' };
       const same = all.filter(function(s) { return s.name === name; })[0];
       if (same && !data.confirmDuplicate) return { success: false, code: 'POSSIBLE_DUPLICATE', error: 'يوجد طالب بنفس الاسم', existing: { id: same.id, name: same.name, team: same.team, bus: same.bus, cls: same.cls } };
       const taken = {}; let n = 0;
