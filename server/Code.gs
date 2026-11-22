@@ -499,7 +499,7 @@ function leaderExtra_() {
   const sv = scansSheet_().getDataRange().getValues(), sh = sv[0];
   for (let r = sv.length - 1; r >= 1 && feed.length < 12; r--) {
     const id = String(sv[r][sh.indexOf('StudentID')]), t = sv[r][sh.indexOf('Time')];
-    feed.push({ time: t instanceof Date ? t.toISOString() : String(t), action: String(sv[r][sh.indexOf('Action')]), bus: String(sv[r][sh.indexOf('Bus')]), name: byId[id] ? byId[id].name : id, by: String(sv[r][sh.indexOf('Supervisor')]) });
+    feed.push({ time: t instanceof Date ? t.toISOString() : String(t), action: String(sv[r][sh.indexOf('Action')]), bus: String(sv[r][sh.indexOf('Bus')]), name: byId[id] ? byId[id].name : id, by: String(sv[r][sh.indexOf('Supervisor')]), via: sh.indexOf('Method') !== -1 && String(sv[r][sh.indexOf('Method')]) === 'guardian' ? 'guardian' : '' });
   }
   let rounds = {}; try { rounds = latestRounds_(); } catch (e) { /* tab missing */ }
   return { rounds: rounds, missingByBus: missingByBus, supervisors: supervisors, byTeam: Object.keys(byTeam).sort().map(function(k) { return byTeam[k]; }), committees: committees, nextEvent: nextEvent, feed: feed, present: present, withdrawals: withdrawals };
@@ -574,7 +574,8 @@ function computeLeaderSummary_() {
     students.forEach(function(s) { buses[s.bus] = true; });
     const perBus = Object.keys(buses).sort().map(function(b) {
       const c = busCounts_(b, students, sc.states);
-      return { bus: b, total: c.total, boarded: c.boarded, missing: c.missing.length };
+      let withGuardian = 0; students.forEach(function(s) { const x = sc.states[s.id]; if (s.bus === b && x && x.state === 'boarded' && x.via === 'guardian') withGuardian++; }); // came with the guardian, not on the bus (already counted in boarded)
+      return { bus: b, total: c.total, boarded: c.boarded, missing: c.missing.length, guardian: withGuardian };
     });
     let withdrawn = 0;
     Object.keys(sc.states).forEach(function(k) { if (sc.states[k].state === 'withdrawn') withdrawn++; });

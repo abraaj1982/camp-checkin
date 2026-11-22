@@ -530,6 +530,8 @@ r=post({action:'custodySummary',token:tsc});assert(!r.success,'scout has no acce
  const rep=post({action:'reportData',token:T,report:'busAttendance',filters:{bus:'1'}}).rows.find(x=>x.id==='X1');assert(rep.state==='حضر مع ولي الأمر','report says: came with guardian');
  q=post({action:'receptionList',token:tr1});const ar=q.arrivals.find(x=>x.id==='X1');assert(ar&&ar.guardian==='محمد سالم'&&ar.relation==='father'&&q.added.some(x=>x.id==='X1')&&q.teams.length>0,'list shows the guardian and the added students');
  assert(!JSON.stringify(q).includes('9999000'),'no phone numbers on the reception screen');
+ {const la=post({action:'leaderAll',token:T});assert(la.summary.perBus.some(x=>x.bus==='1'&&x.guardian>=1),'leader: the bus row counts who came with the guardian');
+  assert(la.extra.feed.some(f=>f.via==='guardian'&&f.action==='board'),'leader feed marks the guardian arrival');}
  q=post({action:'receptionUndo',token:tr1,studentId:'X1'});assert(q.success,'arrival can be undone');
  q=post({action:'receptionUndo',token:tr1,studentId:'X1'});assert(!q.success&&q.code==='NOTHING_TO_UNDO','nothing left to undo');
  {const tb2=post({action:'login',username:'sup2',password:'p2-12345'}).token;post({action:'scan',token:tb2,studentId:'X2',op:'board',clientId:'bx2'});
