@@ -20,6 +20,9 @@ function seed(opts) {
   book.Bus = mkSheet(rows);
   const post = o => JSON.parse(ctx.doPost({ postData: { contents: JSON.stringify(o) } }).t);
   ctx.SETUP_createTabs();
+  if (opts.bare) { // fresh deployment: tabs exist, NO users yet (for rehearsing the real LOAD setup, which bootstraps its own admin)
+    return { ctx, post, lockState, cache, book, props, tokens: {}, students: rows.slice(1).map(r => ({ id: r[3], bus: r[2], bags: r[9] })), mkSheet, bootstrapSecret: () => vm.runInContext('getBootstrapSecret_()', ctx) };
+  }
   post({ action: 'createUser', username: 'admin', password: 'load-test-1', fullName: 'مدير تجريبي', bootstrapSecret: vm.runInContext('getBootstrapSecret_()', ctx) });
   const T = post({ action: 'login', username: 'admin', password: 'load-test-1' }).token;
   const users = [];

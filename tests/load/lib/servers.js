@@ -15,6 +15,7 @@ async function startServers(opts) {
   const api = http.createServer((req, res) => {
     const h = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'content-type': 'application/json' };
     if (req.method === 'OPTIONS') { res.writeHead(204, h); return res.end(); }
+    if (req.method === 'GET') { res.writeHead(200, h); return res.end(JSON.stringify({ ok: true, service: 'mukhayyam', version: 'emulator' })); } // same shape as doGet
     let b = ''; req.on('data', c => b += c); req.on('end', async () => { let out; try { out = (await emu.call(JSON.parse(b))).out; } catch (e) { out = { success: false, error: 'Server error' }; } res.writeHead(200, h); res.end(JSON.stringify(out)); });
   });
   const web = http.createServer((req, res) => {
