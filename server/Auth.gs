@@ -318,41 +318,46 @@ function handleLogin_(data) {
   }
 
   const passwordOk = verifyPassword_(data.password, user.Salt, user.PasswordHash);
-  if (!passwordOk) {
-    const attempts = (Number(user.FailedAttempts) || 0) + 1;
-    setCellByColumnName_(sheet, headers, user._rowNumber, 'FailedAttempts', attempts);
-    if (attempts >= MAX_FAILED_ATTEMPTS) {
-      setCellByColumnName_(sheet, headers, user._rowNumber, 'LockedUntil', new Date(now.getTime() + LOCKOUT_MS));
-      writeAudit_(data.username, 'ACCOUNT_LOCKED', data.username, 'too many failed attempts');
+  // Old accounts store a slow legacy hash (login takes ~9 s): it is upgraded silently on the first good login.
+  const upgrade = passwordOk && String(user.PasswordHash || '').indexOf('$') === -1 ? hashPassword_(data.password) : null; // slow work: outside the lock
+
+  // The security decision (count a failure / lock the account / accept the login) is taken under the lock, on a FRESH row:
+  // simultaneous wrong guesses are all counted, and a login finishing at the same moment cannot erase a lock they caused.
+  // If the lock is busy the request fails with the same generic error whether the password was right or wrong.
+  let failed = false, lockedNow = false, epoch = 0;
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const fresh = readSheetAsObjects_(USERS_SHEET);
+    const cur = fresh.rows.find(r => r.Username === user.Username);
+    if (!cur) return { success: false, error: 'Invalid username or password' };
+    if (cur.LockedUntil && new Date(cur.LockedUntil) > now) return { success: false, error: 'Account temporarily locked. Try again later.' }; // same answer for right and wrong guesses
+    if (cur.Active !== true) return { success: false, error: 'Account disabled' };
+    if (!passwordOk || String(cur.PasswordHash) !== String(user.PasswordHash)) { // wrong (or the password was changed meanwhile)
+      const attempts = (Number(cur.FailedAttempts) || 0) + 1;
+      setCellByColumnName_(fresh.sheet, fresh.headers, cur._rowNumber, 'FailedAttempts', attempts);
+      if (attempts >= MAX_FAILED_ATTEMPTS) {
+        setCellByColumnName_(fresh.sheet, fresh.headers, cur._rowNumber, 'LockedUntil', new Date(now.getTime() + LOCKOUT_MS));
+        lockedNow = attempts === MAX_FAILED_ATTEMPTS;
+      }
+      failed = true;
+    } else {
+      if (upgrade) {
+        setCellByColumnName_(fresh.sheet, fresh.headers, cur._rowNumber, 'PasswordHash', upgrade.hashHex);
+        setCellByColumnName_(fresh.sheet, fresh.headers, cur._rowNumber, 'Salt', upgrade.saltB64);
+      }
+      writeLoginSuccessRow_(fresh.sheet, fresh.headers, cur, now);
+      epoch = Number(cur.TokenEpoch) || 0;
     }
+  } finally {
+    lock.releaseLock();
+  }
+  if (failed) {
+    if (lockedNow) writeAudit_(data.username, 'ACCOUNT_LOCKED', data.username, 'too many failed attempts');
     return { success: false, error: 'Invalid username or password' };
   }
-
-  // Old accounts store a slow legacy hash (login takes ~9 s): upgrade it silently on the first good login.
-  // Done under the lock, and only if the password was not changed meanwhile (e.g. by an admin reset).
-  if (String(user.PasswordHash || '').indexOf('$') === -1) {
-    const up = hashPassword_(data.password);
-    const lock = LockService.getScriptLock();
-    let locked = false;
-    try { lock.waitLock(10000); locked = true; } catch (e) { /* busy */ }
-    if (locked) {
-      try {
-        const fresh = readSheetAsObjects_(USERS_SHEET);
-        const cur = fresh.rows.find(r => r.Username === user.Username);
-        if (cur && String(cur.PasswordHash) === String(user.PasswordHash)) {
-          setCellByColumnName_(fresh.sheet, fresh.headers, cur._rowNumber, 'PasswordHash', up.hashHex);
-          setCellByColumnName_(fresh.sheet, fresh.headers, cur._rowNumber, 'Salt', up.saltB64);
-        }
-      } finally {
-        lock.releaseLock();
-      }
-    } // lock busy: skip the upgrade this time (the login still works; it is upgraded on a later login)
-  }
-
-  writeLoginSuccessRow_(sheet, headers, user, now);
   clearUsersCache_(); // otherwise a cached copy still says "idle for 40 min" and the fresh login is rejected for up to a minute
 
-  const epoch = Number(user.TokenEpoch) || 0;
   const token = signToken_({
     sub: user.Username,
     iat: now.getTime(),
@@ -581,8 +586,14 @@ function handleUnlockAccount_(data) {
   const target = rows.find(r => r.Username === data.targetUsername);
   if (!target) return { success: false, error: 'User not found' };
 
-  setCellByColumnName_(sheet, headers, target._rowNumber, 'FailedAttempts', 0);
-  setCellByColumnName_(sheet, headers, target._rowNumber, 'LockedUntil', '');
+  const lock = LockService.getScriptLock(); // same cells as the failed-login counter: never interleave with it
+  lock.waitLock(10000);
+  try {
+    setCellByColumnName_(sheet, headers, target._rowNumber, 'FailedAttempts', 0);
+    setCellByColumnName_(sheet, headers, target._rowNumber, 'LockedUntil', '');
+  } finally {
+    lock.releaseLock();
+  }
 
   writeAudit_(auth.user.Username, 'UNLOCK_ACCOUNT', data.targetUsername, '');
   return { success: true };
