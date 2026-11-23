@@ -314,7 +314,7 @@ function handleRoster_(data) {
     const stages = readStages_(), nowMs = Date.now(), open = stages ? openStages_(stages, nowMs) : [];
     const list = students.filter(function(s) { return s.bus === bus; }).map(function(s) {
       const o = publicStudent_(s, states[s.id], false); o.photo = s.photo; o.bagsExpected = s.bags;
-      if (stages) { o.inStage = open.some(function(x) { return stageIncludes_(x, s); }); o.stageDone = open.some(function(x) { return !!stageRec_(sc, s.id, x); }); }
+      if (stages) { o.inStage = open.some(function(x) { return stageIncludes_(x, s); }); o.stageDone = open.some(function(x) { return !!stageRec_(sc, s.id, x); }); o.stagesOk = stagesOf_(stages, s); }
       return o;
     });
     const c = busCounts_(bus, students, states);
@@ -322,6 +322,7 @@ function handleRoster_(data) {
     // What the supervisor is doing NOW, from the clock: the stages open at this moment (movement, who is accepted, his share) and the next one.
     if (stages) {
       out.stages = true;
+      out.allStages = stages.map(stageBrief_); // the phone decides "which stage is open" with its own clock too (works offline)
       out.openStages = open.map(function(x) { return Object.assign(stageBrief_(x), { mine: stageMine_(x, user, students, sc) }); });
       out.stage = out.openStages[0] || null; if (out.stage) out.mine = out.stage.mine;
       const n = nextStageAfter_(stages, nowMs); out.next = n ? stageBrief_(n) : null;
@@ -336,9 +337,9 @@ function handleLookup_(data) {
     const q = String(data.q === undefined ? '' : data.q).trim().toLowerCase();
     if (q.length < 1 || q.length > 60) return { success: true, results: [] };
     const students = readStudents_().students;
-    const states = scanStates_().states;
+    const states = scanStates_().states, stages = readStages_();
     const res = students.filter(function(s) { return s.id.toLowerCase() === q || s.id.indexOf(q) === 0 || (q.length >= 2 && s.name.toLowerCase().indexOf(q) !== -1); })
-      .slice(0, 8).map(function(s) { return publicStudent_(s, states[s.id], true); });
+      .slice(0, 8).map(function(s) { const o = publicStudent_(s, states[s.id], true); if (stages) o.stagesOk = stagesOf_(stages, s); return o; });
     return { success: true, results: res };
   });
 }
@@ -518,6 +519,8 @@ function clearStagesCache_() { try { CacheService.getScriptCache().remove('stage
 function stageStatusAt_(x, ms) { return !x.startMs ? 'none' : ms < x.startMs ? 'next' : ms <= x.endMs ? 'live' : 'done'; }
 // Stages open for scanning at that moment (the window plus the 15-minute grace for scans made offline).
 function openStages_(stages, ms) { return (stages || []).filter(function(x) { return x.startMs && ms >= x.startMs && ms <= x.endMs + STAGE_GRACE_MS_; }); }
+// The ids of the stages that include this student (the phone combines them with the clock).
+function stagesOf_(stages, s) { return (stages || []).filter(function(x) { return stageIncludes_(x, s); }).map(function(x) { return x.id; }); }
 function nextStageAfter_(stages, ms) { return (stages || []).filter(function(x) { return x.startMs > ms; }).sort(function(a, b) { return a.startMs - b.startMs; })[0] || null; }
 function orderNow_(stages) { let o = 0; const t = Date.now(); (stages || []).forEach(function(x) { if (x.startMs && x.startMs <= t && x.order > o) o = x.order; }); return o; }
 // When the scan was made: the phone's clock if it sent one and it is believable (not in the future, not older than 6 h), else now.
@@ -533,7 +536,7 @@ function stageWho_(stage) {
 }
 function stageBrief_(x) {
   return { id: x.id, order: x.order, name: x.name, dir: x.dir, who: stageWho_(x), tripOnly: x.tripOnly, anyBus: x.anyBus, day: x.day, from: x.from, to: x.to,
-    time: x.from && x.to ? x.from + ' – ' + x.to : '', status: stageStatusAt_(x, Date.now()) };
+    time: x.from && x.to ? x.from + ' – ' + x.to : '', status: stageStatusAt_(x, Date.now()), startMs: x.startMs, endMs: x.endMs };
 }
 // Which stage a scan belongs to: the one open at that moment that includes this student.
 function stageForStudent_(stages, student, ms) {

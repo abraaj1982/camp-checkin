@@ -582,6 +582,8 @@ assert(book.Scans.rows.length===1,'nothing written while no stage is open');
 r=post({action:'roster',token:t1});assert(r.stages===true&&r.stage===null&&r.openStages.length===0&&r.next&&r.next.id==='S1'&&r.next.time==='14:00 – 20:00','roster: nothing open now, shows the next stage and its window');
 // ---- S1 open (by the clock): 7-11 arrival
 win('S1',-HR,HR);
+r=post({action:'roster',token:t1});assert(r.allStages.length===6&&r.allStages[0].startMs>0&&r.students.find(x=>x.id==='7001').stagesOk.join()==='S1,S3,S5,S6'&&r.students.find(x=>x.id==='7004').stagesOk.join()==='S2,S4','roster gives the phone every window (ms) and, per student, the stages that include him');
+r=post({action:'lookup',token:t1,q:'7003'});assert(r.results[0].stagesOk.join()==='S1,S6','lookup (other buses) also says which stages include the student');
 r=post({action:'roster',token:t1});assert(r.stage&&r.stage.id==='S1'&&r.stage.status==='live'&&r.stage.who==='الصفوف 7-11'&&r.mine.total===5&&r.mine.done===0,'roster: the stage open now, who is accepted, his share (bus 1, grades 7-11)');
 assert(r.students.find(x=>x.id==='7004').inStage===false&&r.students.find(x=>x.id==='7001').inStage===true,'roster marks who belongs to the stage');
 r=post({action:'scan',token:t1,studentId:'7004',op:'board'});assert(!r.success&&r.code==='NOT_IN_STAGE'&&/وصول 7-11/.test(r.error),'grade 5 refused during the 7-11 arrival (and nothing is recorded)');

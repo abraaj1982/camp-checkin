@@ -14,7 +14,7 @@
     <div class="brand"><div class="logo">م</div><div style="min-width:0"><div class="t" id="campT"></div><div class="s" id="campS"></div></div></div>
     <div class="tools"><button class="tool" id="langBtn" aria-label="Language"></button><button class="tool" id="themeBtn"></button><button class="tool" id="logoutBtn"></button></div>
   </header>
-  <section class="hero compact"><div class="ic" aria-hidden="true">🚌</div><div><h1 id="busTitle">—</h1><p id="supName"></p></div></section>
+  <section class="hero compact"><div class="ic" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#17301C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="15" rx="3"/><path d="M4 11h16"/><circle cx="8.5" cy="14.5" r=".7"/><circle cx="15.5" cy="14.5" r=".7"/><path d="M6.5 18v2.5M17.5 18v2.5"/></svg></div><div><h1 id="busTitle">—</h1><p id="supName"></p></div></section>
   <div id="netbar" class="netbar" hidden></div>
   <main id="app"></main>
 </div>
@@ -42,8 +42,8 @@ const pref = { get(k, d) { try { return localStorage.getItem('mk_pref_' + k) || 
 
 /* ---------- i18n ---------- */
 const I = {
- ar: { dir: 'rtl', bus: n => 'باص ' + n, sup: n => 'مشرف: ' + n, boarded: 'صعدوا', remaining: n => n > 0 ? 'ناقص ' + n : 'اكتمل الباص', how: 'كيف تريد التعرف على الطالب؟',
-  m_qr: 'السوار', m_face: 'الوجه', m_name: 'الاسم', m_num: 'الرقم', soon: 'قريباً', scanQr: 'وجّه الكاميرا إلى سوار الطالب', startCam: 'تشغيل الكاميرا', stopCam: 'إيقاف الكاميرا', noCam: 'تعذّر تشغيل الكاميرا. استخدم الاسم أو الرقم.', camDenied: 'لم يُسمح بالكاميرا. من إعدادات المتصفح للموقع اسمح بالكاميرا ثم أعد تحميل الصفحة.',
+ ar: { dir: 'rtl', stTitle: 'المرحلة الآن', stNone: 'لا توجد مرحلة الآن. المسح متوقف حتى تبدأ المرحلة التالية.', stNext: 'القادمة', stIn: 'دخول', stOut: 'خروج', stShare: (d, t) => 'سُجّل ' + d + ' من ' + t + ' في باصك', stAnyBus: 'في هذه المرحلة تمسح أي طالب رحلة من أي باص.', noStageStudent: 'لا توجد مرحلة لهذا الطالب الآن', notInStage: n => 'ليس ضمن مرحلة «' + n + '» الجارية الآن', stTrip: 'في الرحلة', stLeft: 'غادر', warnNoArrival: 'تنبيه: لا يوجد تسجيل وصول لهذا الطالب. سُجّل خروجه وسيراه السكرتارية.', warnAlreadyIn: 'تنبيه: الطالب مسجّل داخل المخيم مسبقاً.', bus: n => 'باص ' + n, sup: n => 'مشرف: ' + n, boarded: 'صعدوا', remaining: n => n > 0 ? 'ناقص ' + n : 'اكتمل الباص', how: 'اختر طريقة التسجيل',
+  m_qr: 'QR Code', m_name: 'بحث بالاسم', m_num: 'بحث برقم الطالب', soon: 'قريباً', scanQr: 'وجّه الكاميرا إلى رمز QR الخاص بالطالب', startCam: 'تشغيل الكاميرا', stopCam: 'إيقاف الكاميرا', noCam: 'تعذّر تشغيل الكاميرا. استخدم الاسم أو الرقم.', camDenied: 'لم يُسمح بالكاميرا. من إعدادات المتصفح للموقع اسمح بالكاميرا ثم أعد تحميل الصفحة.',
   nameLbl: 'اكتب اسم الطالب', numLbl: 'اكتب رقم الطالب', none: 'لا توجد نتيجة', student: 'طالب', team: 'الفريق', cls: 'الصف',
   rc: 'جولة التحقق', rcStart: 'بدء جولة التحقق', rcSub: 'نادِ على الأسماء وتأكد أن كل مسجَّل موجود فعلًا في الباص.', rcDepart: 'عند الانطلاق', rcArrive: 'عند الوصول', rcLast: (ph, t, c, tot, ab) => 'آخر جولة (' + (ph === 'arrive' ? 'وصول' : 'انطلاق') + ') ' + t + ': ' + c + ' / ' + tot + (ab ? ' — ' + ab + ' غير موجود' : ' ✓'), rcNever: 'لم تُجرَ جولة بعد', rcHere: 'موجود ✓', rcGone: 'غير موجود ✗', rcBack: 'رجوع', rcOf: (a, b) => 'تم التحقق ' + a + ' من ' + b, rcExit: 'خروج', rcDone: 'انتهت الجولة', rcOk: n => 'كل الطلاب (' + n + ') موجودون ✓', rcGap: n => n + ' مسجَّلون غير موجودين في الباص', rcSend: 'اعتماد وإرسال', rcFix: 'بعد الإرسال سجّل الطالب غير المسجَّل بالاسم، أو تراجع عن تسجيل من ليس موجودًا.', rcSent: 'أُرسلت نتيجة الجولة للقائد', rcNone: 'لا يوجد من سُجّل صعوده بعد.', rcPending: 'تغيير', retrying: names => 'لم يُرسَل بعد، ويُعاد إرساله تلقائياً (لا تُعِد تسجيله): ' + names, board: 'تسجيل الصعود', undo: 'تراجع عن آخر تسجيل', next: 'الطالب التالي', done: 'سُجّل الصعود', undone: 'تم التراجع', undoLocked: 'لا يمكنك التراجع الآن (آخر تسجيل لك وخلال دقيقتين فقط). اطلب من المشرف العام.', undoRow: 'تراجع', confirmUndo: 'التراجع عن صعود هذا الطالب؟',
   dup: t => 'مسجَّل صعوده مسبقاً' + (t ? ' الساعة ' + t : '') + '. لا يُسجَّل مرتين.', other: (b, s) => 'ليس من باصك. هو في باص ' + b + (s ? ' (المشرف: ' + s + ')' : '') + '. يمكنك الاطلاع فقط.', withdrawn: 'الطالب خرج بإذن.', notFound: 'الطالب غير موجود.',
@@ -51,8 +51,8 @@ const I = {
   missing: 'لم يصعدوا بعد', boardedList: 'صعدوا (الأحدث أولاً)', allList: 'الكل', remainShort: 'المتبقي', boardedShort: 'صعدوا', notYet: 'لم يصعد', withdrawnShort: 'خرج', noneBoarded: 'لم يصعد أحد بعد', allIn: 'اكتمل الباص', trip: 'حالة الرحلة', st_boarding: 'الصعود', st_departed: 'انطلق', st_onway: 'في الطريق', st_arrived: 'وصل', shareLoc: 'مشاركة الموقع مع القائد', locOn: 'الموقع يُرسَل', locOff: 'الموقع متوقف', lastSent: t => 'آخر إرسال ' + t,
   tracking: 'تتبع الباص', trackNote: 'يُرسَل موقع باصك تلقائياً للقائد ما دامت هذه الصفحة مفتوحة. أبقِ الشاشة مضاءة والجوال على الشاحن.', locDenied: 'لم يُسمح بالموقع. افتح إعدادات المتصفح للموقع واسمح بالوصول للموقع ثم أعد تحميل الصفحة.', confirmDepart: n => n > 0 ? 'ينقص ' + n + ' طالباً. هل تؤكد الانطلاق؟' : 'اكتمل الباص. تأكيد الانطلاق؟', yes: 'نعم', cancel: 'إلغاء',
   offline: 'غير متصل. ما تسجّله يُحفظ ويُرسَل تلقائياً.', pending: n => n + ' بانتظار الإرسال', synced: 'تم الإرسال', loading: 'جارٍ التحميل...', report: 'إبلاغ الإدارة', reportAsk: 'اكتب المشكلة باختصار (طالب، باص، مفقود...)', reportSent: 'أُرسل البلاغ إلى الإدارة', logout: 'خروج', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح', err: 'حدث خطأ. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.', paper: 'عند انقطاع الإنترنت يُستخدم الكشف الورقي.' },
- en: { dir: 'ltr', bus: n => 'Bus ' + n, sup: n => 'Supervisor: ' + n, boarded: 'Boarded', remaining: n => n > 0 ? n + ' remaining' : 'Bus full', how: 'How do you want to identify the student?',
-  m_qr: 'Wristband', m_face: 'Face', m_name: 'Name', m_num: 'Number', soon: 'Soon', scanQr: 'Point the camera at the wristband', startCam: 'Start camera', stopCam: 'Stop camera', noCam: 'Camera unavailable. Use name or number.', camDenied: 'Camera access was blocked. Allow the camera for this site in the browser settings, then reload.',
+ en: { dir: 'ltr', stTitle: 'Stage now', stNone: 'No stage now. Scanning is stopped until the next stage starts.', stNext: 'Next', stIn: 'In', stOut: 'Out', stShare: (d, t) => d + ' of ' + t + ' recorded on your bus', stAnyBus: 'In this stage you scan any trip student from any bus.', noStageStudent: 'No stage for this student now', notInStage: n => 'Not part of the stage open now: ' + n, stTrip: 'On the trip', stLeft: 'Left', warnNoArrival: 'Note: no arrival was recorded for this student. His exit is recorded; the secretariat will see it.', warnAlreadyIn: 'Note: the student is already recorded inside the camp.', bus: n => 'Bus ' + n, sup: n => 'Supervisor: ' + n, boarded: 'Boarded', remaining: n => n > 0 ? n + ' remaining' : 'Bus full', how: 'Choose how to record',
+  m_qr: 'QR Code', m_name: 'Search by name', m_num: 'Search by student number', soon: 'Soon', scanQr: 'Point the camera at the student\'s QR code', startCam: 'Start camera', stopCam: 'Stop camera', noCam: 'Camera unavailable. Use name or number.', camDenied: 'Camera access was blocked. Allow the camera for this site in the browser settings, then reload.',
   nameLbl: "Type the student's name", numLbl: "Type the student's number", none: 'No result', student: 'Student', team: 'Team', cls: 'Grade',
   rc: 'Round check', rcStart: 'Start round check', rcSub: 'Call the names and confirm everyone recorded is really on the bus.', rcDepart: 'At departure', rcArrive: 'At arrival', rcLast: (ph, t, c, tot, ab) => 'Last round (' + (ph === 'arrive' ? 'arrival' : 'departure') + ') ' + t + ': ' + c + ' / ' + tot + (ab ? ' — ' + ab + ' missing' : ' ✓'), rcNever: 'No round yet', rcHere: 'Here ✓', rcGone: 'Not here ✗', rcBack: 'Back', rcOf: (a, b) => 'Checked ' + a + ' of ' + b, rcExit: 'Exit', rcDone: 'Round finished', rcOk: n => 'All students (' + n + ') are here ✓', rcGap: n => n + ' recorded but not on the bus', rcSend: 'Confirm and send', rcFix: 'After sending, record the unregistered student by name, or undo the one who is not here.', rcSent: 'The round result was sent to the leader', rcNone: 'Nobody has boarded yet.', rcPending: 'Change', retrying: names => 'Not sent yet, retrying automatically (do not record again): ' + names, board: 'Mark as boarded', undo: 'Undo last record', next: 'Next student', done: 'Boarding recorded', undone: 'Undone', undoLocked: 'You can no longer undo (only your last record, within 2 minutes). Ask the general supervisor.', undoRow: 'Undo', confirmUndo: 'Undo this student’s boarding?',
   dup: t => 'Already boarded' + (t ? ' at ' + t : '') + '. Cannot be recorded twice.', other: (b, s) => 'Not on your bus. Student is on bus ' + b + (s ? ' (supervisor: ' + s + ')' : '') + '. View only.', withdrawn: 'Student has withdrawn.', notFound: 'Student not found.',
@@ -116,6 +116,14 @@ async function flush() {
 }
 function applyServerResult(op, r) {
   if (!r) return;
+  if (op.kind === 'scan' && op.body.op === 'board') {
+    const who = rosterFind(op.body.studentId), nm = who ? who.name : op.body.studentId;
+    if (!r.success && ['NOT_IN_STAGE', 'NO_STAGE', 'STAGE_ENDED'].indexOf(r.code) !== -1) { // refused by the stage rules: undo what the screen showed, and say why
+      if (who) { who.state = 'none'; who.at = ''; who.pending = false; who.stageDone = false; }
+      st.banner = { cls: 'bad', msg: nm + ': ' + (r.error || '') }; return;
+    }
+    if (r.success && r.warn) st.banner = { cls: 'warn', msg: nm + ': ' + (r.warn === 'NO_ARRIVAL' ? L().warnNoArrival : L().warnAlreadyIn) };
+  }
   if (op.kind === 'scan' && op.body.op === 'undo' && !r.success && (r.code === 'UNDO_EXPIRED' || r.code === 'NOT_LAST')) {
     st.banner = { cls: 'bad', msg: L().undoLocked }; // the roster is refreshed right after the flush, so the student shows as boarded again
     return;
@@ -125,7 +133,7 @@ function applyServerResult(op, r) {
     st.banner = { cls: 'bad', msg: (r.code === 'OTHER_BUS' ? L().other(r.student ? r.student.bus : '', r.student ? r.student.supervisor : '') : L().notFound) };
   }
 }
-function enqueue(kind, body) { queue.push({ kind: kind, body: Object.assign({ clientId: uid() }, body), at: new Date().toTimeString().slice(0, 5) }); saveQueue(); flush(); }
+function enqueue(kind, body, extra) { queue.push(Object.assign({ kind: kind, body: Object.assign({ clientId: uid(), clientTime: Date.now() }, body), at: new Date().toTimeString().slice(0, 5) }, extra || {})); saveQueue(); flush(); } // clientTime: when it was scanned (the server places an offline scan in the right stage by it)
 
 /* ---------- roster ---------- */
 function rosterFind(id) { return st.roster && st.roster.students.find(s => s.id === String(id).trim()); }
@@ -135,8 +143,9 @@ function withQueue(r) {
   queue.forEach(op => {
     if (op.kind !== 'scan') return;
     const s = r.students.find(x => x.id === String(op.body.studentId)); if (!s || s.state === 'withdrawn') return;
-    if (op.body.op === 'board' && s.state !== 'boarded') { s.state = 'boarded'; s.at = op.at || ''; s.pending = true; }
-    else if (op.body.op === 'undo' && s.state === 'boarded') { s.state = 'none'; s.at = ''; s.pending = true; }
+    const want = op.optState || 'boarded';
+    if (op.body.op === 'board' && s.state !== want) { s.state = want; s.at = op.at || ''; s.pending = true; }
+    else if (op.body.op === 'undo' && ['boarded', 'on_trip', 'departed'].indexOf(s.state) !== -1) { s.state = 'none'; s.at = ''; s.pending = true; }
   });
   return r;
 }
@@ -144,7 +153,7 @@ async function refreshRoster(silent) {
   if (!navigator.onLine) return;
   try {
     const r = await api({ action: 'roster' });
-    if (r.success) { st.roster = withQueue(r); store.set('roster', st.roster); if (r.bus) { me.bus = r.bus; $('busTitle').textContent = L().bus(r.bus); } }
+    if (r.success) { st.roster = withQueue(r); store.set('roster', st.roster); if (r.bus) { me.bus = r.bus; paintHero(); } }
     else if (r.code && AUTH_ERR.test(r.code)) { sessionStorage.clear(); location.href = 'login.html'; }
     else { st.loadErr = r.error || 'تعذّر تحميل القائمة'; render(); }
   } catch (e) { /* offline: keep cached roster */ }
@@ -160,19 +169,49 @@ async function identify(idOrObj) {
   if (mine) { st.cur = Object.assign({ mine: true }, mine); }
   else if (navigator.onLine) {
     try { const r = await api({ action: 'lookup', q: id }); const hit = r.success && r.results.find(x => x.id === id); st.cur = hit ? Object.assign({ mine: false }, hit) : { notFound: true, id: id }; }
-    catch (e) { st.cur = { offlineOther: true, id: id }; }
-  } else st.cur = { offlineOther: true, id: id };
+    catch (e) { st.cur = blindTrip(id); }
+  } else st.cur = blindTrip(id);
   render();
 }
+// No connection and the student is not on this bus: only a trip stage allows it (he may be any bus's); the server checks him when it is sent.
+function blindTrip(id) { const ids = stagesNow() ? stagesNow().open.filter(x => x.anyBus).map(x => x.id) : []; return ids.length ? { mine: false, id: id, name: id, team: '', cls: '', bus: '', stagesOk: ids, blind: true } : { offlineOther: true, id: id }; }
 async function pickRemote(s) { st.cur = Object.assign({ mine: false }, s); st.banner = null; render(); }
 function board() {
-  const c = st.cur; if (!c || !c.mine) return;
-  const s = rosterFind(c.id); if (!s || s.state === 'boarded') return;
-  s.state = 'boarded'; s.at = new Date().toTimeString().slice(0, 5); s.pending = true; store.set('roster', st.roster);
-  enqueue('scan', { action: 'scan', op: 'board', studentId: c.id, method: st.method });
+  const c = st.cur; if (!c) return;
+  const chk = stageCheck(c);
+  if (!chk.ok) { st.banner = { cls: 'bad', msg: chk.msg }; return render(); } // refused here already (the server decides again)
+  const stg = chk.stage || null, out = !!(stg && stg.dir === 'out'), optState = out ? (stg.tripOnly ? 'on_trip' : 'departed') : 'boarded';
+  if (!c.mine) { // a student of another bus: only a trip stage lets any supervisor record him
+    if (!(stg && stg.anyBus)) return;
+    enqueue('scan', { action: 'scan', op: 'board', studentId: c.id, method: st.method }, { optState: optState });
+    st.last = { id: c.id, name: c.name || c.id, canUndo: true, at: Date.now() }; st.cur = null; st.q = ''; st.remote = [];
+    return render();
+  }
+  const s = rosterFind(c.id); if (!s || (out ? (s.stageDone || s.state === optState) : s.state === 'boarded')) return;
+  s.state = optState; s.stageDone = true; s.at = new Date().toTimeString().slice(0, 5); s.pending = true; store.set('roster', st.roster);
+  enqueue('scan', { action: 'scan', op: 'board', studentId: c.id, method: st.method }, { optState: optState });
   if (st.bagN > 0 || (s.bagsExpected || 0) > 0) enqueue('bag', { action: 'bag', studentId: c.id, mode: st.bagMode, count: st.bagN });
   st.last = { id: c.id, name: c.name, canUndo: true, at: Date.now() }; st.cur = null; st.q = ''; st.remote = [];
   render();
+}
+/* ---------- stages (by date + time): the screen shows which stage is open and who is accepted ---------- */
+const STAGE_GRACE_MS = 15 * 60 * 1000; // the same grace as the server
+function stagesNow() { const R = st.roster; if (!R || !R.stages) return null; const t = Date.now(), all = R.allStages || []; return { all: all, open: all.filter(x => x.startMs && t >= x.startMs && t <= x.endMs + STAGE_GRACE_MS) }; }
+function stageCheck(s) { // can this student be recorded now? uses the phone's clock, so it also works offline
+  const sn = stagesNow(); if (!sn) return { ok: true };
+  const ok = s.stagesOk || [];
+  if (!sn.open.length) { const t = Date.now(), nx = sn.all.filter(x => x.startMs > t && ok.indexOf(x.id) !== -1).sort((a, b) => a.startMs - b.startMs)[0]; return { ok: false, msg: L().noStageStudent + (nx ? '. ' + L().stNext + ': ' + nx.name + ' · ' + nx.day + ' ' + nx.from : '') }; }
+  const mine = sn.open.filter(x => ok.indexOf(x.id) !== -1);
+  if (!mine.length) return { ok: false, msg: L().notInStage(sn.open.map(x => x.name).join('، ')) };
+  return { ok: true, stage: mine[mine.length - 1] };
+}
+function stageCard() {
+  const l = L(), sn = stagesNow(); if (!sn) return '';
+  if (!sn.open.length) { const t = Date.now(), nx = sn.all.filter(x => x.startMs > t).sort((a, b) => a.startMs - b.startMs)[0];
+    return `<section class="card" style="border-color:var(--warn)"><div class="kl">${l.stTitle}</div><div class="banner warn" style="margin-top:8px">${l.stNone}${nx ? `<div style="margin-top:4px">${l.stNext}: <b>${esc(nx.name)}</b> · ${esc(nx.day)} · ${esc(nx.time)}</div>` : ''}</div></section>`; }
+  const mineOf = id => ((st.roster.openStages || []).find(x => x.id === id) || {}).mine;
+  return `<section class="card" style="border-color:var(--brand)"><div class="kl">${l.stTitle}</div>` + sn.open.map(x => { const m = mineOf(x.id);
+    return `<div style="margin-top:8px"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b style="font-size:19px">${esc(x.name)}</b><span class="pill ${x.dir === 'out' ? 'bad' : 'ok'}">${x.dir === 'out' ? l.stOut : l.stIn}</span></div><div class="muted" style="font-size:13.5px;margin-top:2px">${esc(x.day)} · ${esc(x.time)} · ${esc(x.who)}</div>${m ? `<div style="margin-top:6px;font-size:13.5px">${esc(l.stShare(m.done, m.total))}</div>` : ''}${x.anyBus ? `<div class="muted" style="font-size:12.5px;margin-top:4px">${l.stAnyBus}</div>` : ''}</div>`; }).join('') + `</section>`;
 }
 function undo() {
   const l = st.last; if (!l) return;
@@ -255,9 +294,11 @@ function bar() {
 }
 function head() {
   const l = L(); document.documentElement.lang = st.lang; document.documentElement.dir = l.dir; document.documentElement.dataset.theme = st.theme;
-  $('busTitle').textContent = l.bus(me.bus || '—'); $('supName').textContent = l.sup(me.name);
+  paintHero();
   $('langBtn').textContent = l.lang; $('themeBtn').textContent = st.theme === 'light' ? l.dark : l.light; $('logoutBtn').textContent = l.logout;
 }
+// Top card: "Welcome" + the user's name, and his bus underneath.
+function paintHero() { const h = $('busTitle'); h.textContent = 'Welcome ' + (me.name || ME_USER); h.style.direction = 'ltr'; h.style.textAlign = document.documentElement.dir === 'rtl' ? 'right' : 'left'; $('supName').textContent = me.bus ? L().bus(me.bus) : ''; }
 // Records the server refused for a temporary reason: listed until they are really sent (not a banner the next scan would clear).
 function failBox() {
   const bad = queue.filter(op => op.tries > 0); if (!bad.length) return '';
@@ -270,23 +311,23 @@ function render() {
   head(); bar();
   const l = L(), c = counts(), left = c.t - c.b, R = st.roster;
   if (!R) { $('app').innerHTML = st.loadErr ? `<div class="banner bad">${esc(st.loadErr)}</div><div class="card muted"><a href="hub.html">${l.home || 'الرئيسية'}</a></div>` : `<div class="card muted">${l.loading}</div>`; return; }
-  const methods = [['qr', l.m_qr, '▣'], ['face', l.m_face, '◉'], ['name', l.m_name, 'Aa'], ['num', l.m_num, '#']];
+  const methods = [['qr', l.m_qr, '▣'], ['name', l.m_name, 'Aa'], ['num', l.m_num, '#']];
   let body = '';
   if (st.method === 'qr') body = `<div class="scan">${st.cam ? '<div id="reader" style="width:100%"></div>' : `<div style="font-size:30px" aria-hidden="true">▣</div><b>${l.scanQr}</b>`}</div><button class="btn full" style="margin-top:10px" onclick="${st.cam ? 'stopCam()' : 'startCam()'}">${st.cam ? l.stopCam : l.startCam}</button>`;
-  else if (st.method === 'face') body = `<div class="scan"><div style="font-size:30px" aria-hidden="true">◉</div><b>${l.soon}</b></div>`;
   else { const num = st.method === 'num'; body = `<label for="q" class="lbl">${num ? l.numLbl : l.nameLbl}</label><input id="q" type="${num ? 'search' : 'text'}" ${num ? 'inputmode="numeric"' : ''} value="${esc(st.q)}" oninput="onQ(this.value)" autocomplete="off"><div id="qres">${resList()}</div>`; }
   let card = '';
   if (st.cur) card = curCard();
   else if (st.last) card = `<div class="card ok-b"><span class="pill ok">${l.done}</span><div class="big2">${esc(st.last.name)}</div><div style="display:flex;gap:8px;margin-top:12px"><button class="btn" style="flex:1" onclick="resetCur(); st.last=null; render()">${l.next}</button>${(canUndoAny() || Date.now() - (st.last.at || 0) < UNDO_MS) ? `<button class="btn alt" style="flex:1" onclick="undo()">${l.undo}</button>` : ''}</div></div>`;
-  const miss = R.students.filter(s => s.state !== 'boarded' && s.state !== 'withdrawn');
+  const miss = R.students.filter(s => ['boarded', 'withdrawn', 'on_trip', 'departed'].indexOf(s.state) === -1);
   const done = R.students.filter(s => s.state === 'boarded').sort((a, b) => String(b.at).localeCompare(String(a.at)));
   $('app').innerHTML = `${failBox()}${st.banner ? `<div class="banner ${st.banner.cls}" role="alert">${esc(st.banner.msg)}</div>` : ''}
+  ${stageCard()}
   <section class="card"><div style="display:flex;justify-content:space-between;align-items:flex-end;gap:8px"><div><div class="kl">${l.boarded}</div><div class="kv">${c.b} <span class="muted" style="font-size:16px;font-weight:500">/ ${c.t}</span></div></div><span class="pill ${left > 0 ? 'warn' : 'ok'}">${l.remaining(left)}</span></div><div class="bar"><i style="width:${c.t ? Math.round(c.b / c.t * 100) : 0}%"></i></div></section>
   ${card}
   
-  <section class="card"><div class="kl" style="margin-bottom:8px">${l.how}</div><div class="methods">${methods.map(m => `<button class="m ${st.method === m[0] ? 'on' : ''}" ${m[0] === 'face' ? '' : ''} onclick="setMethod('${m[0]}')"><span aria-hidden="true" style="font-size:16px">${m[2]}</span>${m[1]}</button>`).join('')}</div><div style="margin-top:12px">${body}</div></section>
+  <section class="card"><div class="kl" style="margin-bottom:8px">${l.how}</div><div class="methods" style="grid-template-columns:repeat(3,1fr)">${methods.map(m => `<button class="m ${st.method === m[0] ? 'on' : ''}" ${m[0] === 'face' ? '' : ''} onclick="setMethod('${m[0]}')"><span aria-hidden="true" style="font-size:16px">${m[2]}</span>${m[1]}</button>`).join('')}</div><div style="margin-top:12px">${body}</div></section>
   <section class="card" id="lists"><div class="tabs" role="tablist"><button class="${st.listTab === 'all' ? 'on' : ''}" data-ltab="all">${l.allList} (${R.students.length})</button><button class="${st.listTab === 'missing' ? 'on' : ''}" data-ltab="missing">${l.remainShort} (${miss.length})</button><button class="${st.listTab === 'done' ? 'on' : ''}" data-ltab="done">${l.boardedShort} (${done.length})</button></div>
-  <div style="max-height:340px;overflow:auto;margin-top:8px">${(rows => rows.length ? rows.map(s => `<div class="row"><span>${esc(s.name)}<span class="muted" style="font-size:12.5px"> · ${esc(s.id)}</span></span><span style="display:flex;gap:6px;align-items:center">${s.state === 'boarded' ? `<span class="pill ok">${s.via === 'guardian' ? '🚗' : '✓'} ${esc(s.at || '')}${s.pending ? ' ⏳' : ''}</span>${canUndoAny() ? `<button class="chip" data-undoid="${esc(s.id)}">${l.undoRow}</button>` : ''}` : s.state === 'withdrawn' ? `<span class="pill bad">${l.withdrawnShort}${s.at ? ' · ' + esc(s.at) : ''}</span>` : `<span class="pill warn">${l.notYet}</span>`}</span></div>`).join('') : `<div class="muted">${st.listTab === 'done' ? l.noneBoarded : l.allIn}</div>`)(R.students.filter(s => st.listTab === 'all' || (st.listTab === 'missing' ? (s.state !== 'boarded' && s.state !== 'withdrawn') : s.state === 'boarded')).slice().sort((a, b) => st.listTab === 'done' ? String(b.at).localeCompare(String(a.at)) : a.name.localeCompare(b.name, 'ar')))}</div></section>
+  <div style="max-height:340px;overflow:auto;margin-top:8px">${(rows => rows.length ? rows.map(s => `<div class="row"><span>${esc(s.name)}<span class="muted" style="font-size:12.5px"> · ${esc(s.id)}</span></span><span style="display:flex;gap:6px;align-items:center">${s.state === 'boarded' ? `<span class="pill ok">${s.via === 'guardian' ? '🚗' : '✓'} ${esc(s.at || '')}${s.pending ? ' ⏳' : ''}</span>${canUndoAny() ? `<button class="chip" data-undoid="${esc(s.id)}">${l.undoRow}</button>` : ''}` : s.state === 'on_trip' || s.state === 'departed' ? `<span class="pill">${s.state === 'on_trip' ? l.stTrip : l.stLeft}${s.at ? ' · ' + esc(s.at) : ''}${s.pending ? ' ⏳' : ''}</span>` : s.state === 'withdrawn' ? `<span class="pill bad">${l.withdrawnShort}${s.at ? ' · ' + esc(s.at) : ''}</span>` : `<span class="pill warn">${l.notYet}</span>`}</span></div>`).join('') : `<div class="muted">${st.listTab === 'done' ? l.noneBoarded : l.allIn}</div>`)(R.students.filter(s => st.listTab === 'all' || (st.listTab === 'missing' ? (s.state !== 'boarded' && s.state !== 'withdrawn') : s.state === 'boarded')).slice().sort((a, b) => st.listTab === 'done' ? String(b.at).localeCompare(String(a.at)) : a.name.localeCompare(b.name, 'ar')))}</div></section>
   <section class="card"><h2 class="h2" style="margin-bottom:8px">${l.tracking}</h2>
   <button class="tick ${st.loc ? 'on' : ''}" onclick="toggleLoc()"><span class="sq">✓</span><span style="flex:1">${l.shareLoc}</span><span class="pill ${st.loc ? 'ok' : (st.locDenied ? 'bad' : '')}">${st.loc ? l.locOn : l.locOff}</span></button>
   ${st.locDenied ? `<div class="banner bad">${l.locDenied}</div>` : ''}${st.lastSent ? `<div class="muted" style="font-size:12.5px;margin-top:6px">${l.lastSent(st.lastSent)}</div>` : ''}<div class="muted" style="font-size:12.5px;margin-top:6px">${l.trackNote}</div></section>
@@ -353,11 +394,13 @@ function curCard() {
   const l = L(), c = st.cur;
   if (c.notFound) return `<div class="card"><div class="banner bad">${l.notFound} (${esc(c.id)})</div><button class="btn alt full" style="margin-top:10px" onclick="resetCur()">${l.next}</button></div>`;
   if (c.offlineOther) return `<div class="card"><div class="banner warn">${l.otherOffline}</div><button class="btn alt full" style="margin-top:10px" onclick="resetCur()">${l.next}</button></div>`;
-  const dup = c.mine && c.state === 'boarded', wd = c.state === 'withdrawn';
+  const chk = stageCheck(c), stg = chk.stage || null, anyBusOk = !c.mine && !!(stg && stg.anyBus);
+  const dup = c.mine && (stg && stg.dir === 'out' ? !!c.stageDone : c.state === 'boarded'), wd = c.state === 'withdrawn';
   let act;
-  if (!c.mine) act = `<div class="banner bad">${l.other(c.bus, c.supervisor)}</div><button class="btn full" style="margin-top:12px" disabled>${l.board}</button>`;
+  if (!c.mine && !anyBusOk) act = `<div class="banner bad">${l.other(c.bus, c.supervisor)}</div><button class="btn full" style="margin-top:12px" disabled>${l.board}</button>`;
   else if (wd) act = `<div class="banner bad">${l.withdrawn}</div><button class="btn full" style="margin-top:12px" disabled>${l.board}</button>`;
   else if (dup) act = `<div class="banner warn">${l.dup(c.at)}</div><button class="btn full" style="margin-top:12px" disabled>${l.board}</button>`;
+  else if (!chk.ok) act = `<div class="banner bad">${esc(chk.msg)}</div><button class="btn full" style="margin-top:12px" disabled>${l.board}</button>`;
   else act = `<button class="btn full" style="margin-top:14px;position:sticky;bottom:12px;z-index:5;box-shadow:0 6px 18px rgba(0,0,0,.25)" onclick="board()">${l.board}</button>`;
   const exp = c.bagsExpected || 0;
   const bags = (c.mine && !dup && !wd) ? `<div class="bags"><div style="display:flex;gap:8px"><button class="chip ${st.bagMode === 'load' ? 'on' : ''}" style="flex:1" onclick="st.bagMode='load';render()">${l.load}</button><button class="chip ${st.bagMode === 'unload' ? 'on' : ''}" style="flex:1" onclick="st.bagMode='unload';render()">${l.unload}</button></div><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px"><div><b>${l.bagCount}</b><div class="muted" style="font-size:12.5px">${l.expected(exp)}</div></div><div style="display:inline-flex;align-items:center;gap:10px"><button class="step" aria-label="−" onclick="st.bagN=Math.max(0,st.bagN-1);render()">−</button><b style="min-width:28px;text-align:center;font-size:22px">${st.bagN}</b><button class="step" aria-label="+" onclick="st.bagN=Math.min(20,st.bagN+1);render()">+</button></div></div>${exp > 0 && st.bagMode === 'load' && st.bagN < exp ? `<div class="banner warn">${l.bagShort(exp - st.bagN)}</div>` : ''}</div>` : '';
