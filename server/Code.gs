@@ -96,6 +96,9 @@ const ACTIONS_ = {
   resSave: function(d) { return handleResSave_(d); },
   resStatus: function(d) { return handleResStatus_(d); },
   bulletin: function(d) { return handleBulletin_(d); },
+  stages: function(d) { return handleStages_(d); },
+  stageStart: function(d) { return handleStageStart_(d); },
+  stageEnd: function(d) { return handleStageEnd_(d); },
   feed: function(d) { return handleFeed_(d); }
 };
 
@@ -140,7 +143,8 @@ const STUDENT_HEADERS_ = {
   shirt: ['shirt size', 'shirt', 'size', 'مقاس القميص', 'المقاس'],
   bags: ['bags', 'bag count', 'عدد الحقائب'],
   foodAllergy: ['food allergy', 'food allergies', 'allergy', 'الحساسية الغذائية', 'حساسية الطعام'],
-  medical: ['medical notes', 'medical', 'health', 'chronic', 'ملاحظات طبية', 'الحالة الصحية']
+  medical: ['medical notes', 'medical', 'health', 'chronic', 'ملاحظات طبية', 'الحالة الصحية'],
+  trip: ['trip', 'external trip', 'رحلة', 'الرحلة', 'رحلة خارجية', 'الرحلة الخارجية']
 };
 const STUDENT_REQUIRED_ = ['id', 'name', 'bus'];
 
@@ -189,6 +193,7 @@ function readStudents_(fresh) {
       bags: Number(cell(data[i], 'bags')) || 0,
       foodAllergy: realValue_(cell(data[i], 'foodAllergy')),
       medical: realValue_(cell(data[i], 'medical')),
+      trip: isYes_(cell(data[i], 'trip')),
       _row: i + 1
     });
   }
@@ -229,25 +234,57 @@ function canRecordFor_(user, student) {
 function scansSheet_() { return getSheetByName_('Scans'); }
 
 // Current state per student, derived from the append-only log.
+// Movements ('board' = in the camp, 'exit' = left: on the trip or went home) are ordered by their STAGE, not by the
+// moment they reached the server: a trip-exit queued offline and sent after the trip came back must not put the student
+// back "on the trip". Rows without a stage (before stages existed, guardian arrivals) take the stage running at that time.
+// Withdrawal (guardian took him, approved by the secretariat) is a layer on top: 'readmit' removes it.
 function scanStates_() {
   const data = scansSheet_().getDataRange().getValues();
   const h = data[0] || [];
   const ix = function(n) { return h.indexOf(n); };
-  const iT = ix('Time'), iS = ix('StudentID'), iA = ix('Action'), iB = ix('Bus'), iU = ix('Supervisor'), iC = ix('ClientId'), iM = ix('Method'), iN = ix('Notes');
-  const states = {}, clients = {};
+  const iT = ix('Time'), iS = ix('StudentID'), iA = ix('Action'), iB = ix('Bus'), iU = ix('Supervisor'), iC = ix('ClientId'), iM = ix('Method'), iN = ix('Notes'), iG = ix('StageId');
+  const stages = readStages_() || [], byId = {};
+  stages.forEach(function(x) { byId[x.id] = x; });
+  const started = stages.filter(function(x) { return x.startedMs; });
+  const orderAt = function(t) { let o = 0; started.forEach(function(x) { if (x.startedMs <= t && x.order > o) o = x.order; }); return o; };
+  const hist = {}, wd = {}, clients = {};
   for (let r = 1; r < data.length; r++) {
     const id = String(data[r][iS]).trim();
     if (!id) continue;
     const act = String(data[r][iA]);
     const when = data[r][iT] instanceof Date ? data[r][iT] : new Date(data[r][iT]);
     if (iC !== -1 && data[r][iC]) clients[String(data[r][iC])] = { id: id, act: act };
-    if (act === 'board') { const viaG = iM !== -1 && String(data[r][iM]) === 'guardian'; states[id] = { state: 'boarded', at: when, by: data[r][iU], bus: String(data[r][iB]), via: viaG ? 'guardian' : '', note: viaG && iN !== -1 ? String(data[r][iN]) : '' }; }
-    else if (act === 'withdraw') states[id] = { state: 'withdrawn', at: when, by: data[r][iU], bus: String(data[r][iB]), prev: states[id] || null };
-    else if (act === 'readmit') { const pv = states[id] && states[id].prev; if (pv) states[id] = pv; else delete states[id]; } // back to what he was before the withdrawal
-    else if (act === 'undo') delete states[id];
+    if (act === 'board' || act === 'exit') {
+      const sid = iG !== -1 ? String(data[r][iG] || '').trim() : '', stg = byId[sid] || null;
+      const viaG = act === 'board' && iM !== -1 && String(data[r][iM]) === 'guardian';
+      addMove_(hist, id, { state: act === 'board' ? 'boarded' : (stg && stg.tripOnly ? 'on_trip' : 'departed'), at: when, by: data[r][iU], bus: String(data[r][iB]),
+        via: viaG ? 'guardian' : '', note: viaG && iN !== -1 ? String(data[r][iN]) : '', stage: stg ? stg.id : '', anyBus: !!(stg && stg.anyBus),
+        ord: stg ? stg.order : orderAt(when.getTime()), seq: r });
+    }
+    else if (act === 'withdraw') wd[id] = { state: 'withdrawn', at: when, by: data[r][iU], bus: String(data[r][iB]) };
+    else if (act === 'readmit') delete wd[id]; // back to what he was before the withdrawal
+    else if (act === 'undo') { if (hist[id]) hist[id].pop(); }
   }
-  return { states: states, clients: clients };
+  const states = {};
+  Object.keys(hist).forEach(function(id) { stateOf_(states, hist, wd, id); });
+  Object.keys(wd).forEach(function(id) { stateOf_(states, hist, wd, id); });
+  return { states: states, clients: clients, hist: hist, wd: wd };
 }
+// Keep each student's movements sorted by (stage order, arrival order); the last one is where he is now.
+function addMove_(hist, id, rec) {
+  const list = hist[id] || (hist[id] = []);
+  let k = list.length;
+  while (k > 0 && list[k - 1].ord > rec.ord) k--;
+  list.splice(k, 0, rec);
+}
+function stateOf_(states, hist, wd, id) {
+  const list = hist[id] || [], top = list.length ? list[list.length - 1] : null;
+  if (wd[id]) states[id] = Object.assign({}, wd[id], { prev: top });
+  else if (top) states[id] = top;
+  else delete states[id];
+  return states[id];
+}
+const MOVE_STATES_ = ['boarded', 'on_trip', 'departed'];
 
 function fmtTime_(d) { return Utilities.formatDate(d, 'Asia/Muscat', 'HH:mm'); }
 
@@ -256,7 +293,7 @@ function busCounts_(bus, students, states) {
   const missing = [], boarded = [];
   mine.forEach(function(s) {
     const st = states[s.id];
-    if (st && st.state === 'boarded') boarded.push(s); else if (!st || st.state !== 'withdrawn') missing.push(s);
+    if (st && st.state === 'boarded') boarded.push(s); else if (!st) missing.push(s); // left (trip / home / withdrawn) is not "missing"
   });
   return { total: mine.length, boarded: boarded.length, missing: missing };
 }
@@ -275,12 +312,22 @@ function handleRoster_(data) {
     const all = hasPerm_(user, 'allbuses');
     const bus = all && data.bus ? String(data.bus) : String(user.AssignedBus).trim();
     if (!bus) return { success: false, error: 'لا يوجد باص مخصَّص لحسابك' };
-    const states = scanStates_().states;
+    const sc = scanStates_(), states = sc.states;
+    const stages = readStages_(), live = liveStage_(stages);
     const list = students.filter(function(s) { return s.bus === bus; }).map(function(s) {
-      const o = publicStudent_(s, states[s.id], false); o.photo = s.photo; o.bagsExpected = s.bags; return o;
+      const o = publicStudent_(s, states[s.id], false); o.photo = s.photo; o.bagsExpected = s.bags;
+      if (live) { o.inStage = stageIncludes_(live, s); o.stageDone = !!stageRec_(sc, s.id, live); }
+      return o;
     });
     const c = busCounts_(bus, students, states);
-    return { success: true, bus: bus, students: list, total: c.total, boarded: c.boarded, lastRound: latestRounds_()[bus] || null };
+    const out = { success: true, bus: bus, students: list, total: c.total, boarded: c.boarded, lastRound: latestRounds_()[bus] || null };
+    // What the supervisor is doing NOW: the running stage (movement, who is accepted) and his share of it; or the next one.
+    if (stages) {
+      out.stages = true; out.stage = live ? stageBrief_(live) : null;
+      const n = nextStage_(stages); out.next = n ? stageBrief_(n) : null;
+      if (live) out.mine = stageMine_(live, user, students, sc);
+    }
+    return out;
   });
 }
 
@@ -303,50 +350,289 @@ function handleScan_(data) {
     if (['board', 'undo', 'withdraw'].indexOf(action) === -1) return { success: false, code: 'BAD_REQUEST', error: 'Invalid scan action' };
     const student = findStudent_(data.studentId);
     if (!student) return { success: false, code: 'NOT_FOUND', error: 'الطالب غير موجود' };
-    // Scope comes from the SHEET's bus for this student, never from the client.
-    if (!canRecordFor_(user, student)) {
+    // Stages: once the Stages tab exists, a scan records the movement of the stage that is running, for its students only.
+    const stages = readStages_();
+    let stage = null, late = false;
+    if (stages && action === 'board') {
+      const pick = pickScanStage_(stages, data);
+      if (!pick.ok) return { success: false, code: pick.code, error: pick.error, student: publicStudent_(student, scanStates_().states[student.id], false), stage: pick.stage ? stageBrief_(pick.stage) : null };
+      stage = pick.stage; late = pick.late;
+      if (!stageIncludes_(stage, student)) {
+        return { success: false, code: 'NOT_IN_STAGE', error: 'ليس ضمن مرحلة «' + stage.name + '»', student: publicStudent_(student, scanStates_().states[student.id], true), stage: stageBrief_(stage) };
+      }
+    }
+    // Scope comes from the SHEET's bus for this student, never from the client. Trip stages: any trip bus (the bus he really took is recorded).
+    const anyBus = !!(stage && stage.anyBus);
+    if (action !== 'undo' && !anyBus && !canRecordFor_(user, student)) {
       return { success: false, code: 'OTHER_BUS', error: 'هذا الطالب ليس في باصك', student: publicStudent_(student, scanStates_().states[student.id], true) };
     }
+    const recBus = anyBus ? (hasPerm_(user, 'allbuses') && data.bus ? String(data.bus).slice(0, 10) : (String(user.AssignedBus || '').trim() || student.bus)) : student.bus;
     const clientId = String(data.clientId || '').slice(0, 60);
-    scansSheet_(); // C2: open the spreadsheet BEFORE taking the lock (opening costs ~0.4 s; the lock is shared by every write)
+    const sheet = scansSheet_(); // C2: open the spreadsheet BEFORE taking the lock (opening costs ~0.4 s; the lock is shared by every write)
+    const iStage = stage ? scanHeaders_(sheet).indexOf('StageId') : -1;
     const lock = LockService.getScriptLock();
     lock.waitLock(10000);
     try {
       const sc = scanStates_();
       if (clientId && sc.clients[clientId]) { // retry of an already-applied request: idempotent
         const c0 = busCounts_(student.bus, readStudents_().students, sc.states);
-        return { success: true, repeated: true, student: publicStudent_(student, sc.states[student.id], false), boarded: c0.boarded, total: c0.total };
+        return { success: true, repeated: true, student: publicStudent_(student, sc.states[student.id], false), boarded: c0.boarded, total: c0.total, stage: stage ? stageBrief_(stage) : null };
       }
       const cur = sc.states[student.id];
+      if (action === 'undo' && !canRecordFor_(user, student) && !(cur && cur.anyBus && cur.by === user.Username)) {
+        return { success: false, code: 'OTHER_BUS', error: 'هذا الطالب ليس في باصك', student: publicStudent_(student, cur, true) };
+      }
+      let warn = '';
       if (action === 'board') {
-        if (cur && cur.state === 'boarded') return { success: false, code: 'DUPLICATE', error: 'مسجَّل صعوده مسبقاً', at: fmtTime_(cur.at), student: publicStudent_(student, cur, false) };
         if (cur && cur.state === 'withdrawn') return { success: false, code: 'WITHDRAWN', error: 'الطالب خرج بإذن', student: publicStudent_(student, cur, false) };
+        if (!stage || stage.dir === 'in') {
+          // Same stage twice = duplicate. Already "in" from an EARLIER stage (e.g. his trip-exit, scanned offline, has not reached us yet):
+          // recorded anyway, so the late exit, filed under its older stage, can never put him back "on the trip".
+          if (cur && cur.state === 'boarded' && (!stage || cur.stage === stage.id || cur.ord >= stage.order)) return { success: false, code: 'DUPLICATE', error: 'مسجَّل صعوده مسبقاً', at: fmtTime_(cur.at), student: publicStudent_(student, cur, false) };
+          if (cur && cur.state === 'boarded') warn = 'ALREADY_IN';
+        } else {
+          if (cur && cur.stage === stage.id) return { success: false, code: 'DUPLICATE', error: 'مسجَّل خروجه مسبقاً', at: fmtTime_(cur.at), student: publicStudent_(student, cur, false) };
+          if (cur && cur.state !== 'boarded' && cur.ord >= stage.order) return { success: false, code: 'DUPLICATE', error: 'مسجَّل خروجه مسبقاً', at: fmtTime_(cur.at), student: publicStudent_(student, cur, false) };
+          if (!cur || cur.state !== 'boarded') warn = 'NO_ARRIVAL'; // recorded anyway: he is leaving now; the secretariat sees it
+        }
       }
       if (action === 'undo') {
-        if (!cur || cur.state !== 'boarded') return { success: false, code: 'NOTHING_TO_UNDO', error: 'لا يوجد تسجيل للتراجع عنه' };
+        if (!cur || MOVE_STATES_.indexOf(cur.state) === -1) return { success: false, code: 'NOTHING_TO_UNDO', error: 'لا يوجد تسجيل للتراجع عنه' };
         if (!hasPerm_(user, 'undo')) { // only holders of the 'undo' permission may undo any student at any time
           if (Date.now() - cur.at.getTime() > UNDO_WINDOW_MS) return { success: false, code: 'UNDO_EXPIRED', error: 'انتهت مهلة التراجع. اطلب من المشرف العام' };
           let lastMine = 0;
-          Object.keys(sc.states).forEach(function(k) { const x = sc.states[k]; if (x.state === 'boarded' && x.by === user.Username && x.at.getTime() > lastMine) lastMine = x.at.getTime(); });
+          Object.keys(sc.states).forEach(function(k) { const x = sc.states[k]; if (MOVE_STATES_.indexOf(x.state) !== -1 && x.by === user.Username && x.at.getTime() > lastMine) lastMine = x.at.getTime(); });
           if (cur.by !== user.Username || cur.at.getTime() !== lastMine) return { success: false, code: 'NOT_LAST', error: 'يمكنك التراجع عن آخر تسجيل لك فقط. اطلب من المشرف العام' };
         }
       }
       if (action === 'withdraw' && cur && cur.state === 'withdrawn') return { success: false, code: 'ALREADY_WITHDRAWN', error: 'خرج مسبقاً' };
-      const now = new Date(), method = String(data.method || '').slice(0, 20), notes = String(data.notes || '').slice(0, 200);
-      appendSafe_(scansSheet_(), [now, student.id, action, student.bus, user.Username, method, clientId, notes]);
-      if (action === 'undo') writeAudit_(user.Username, 'SCAN_UNDO', student.id, 'bus=' + student.bus);
+      const now = new Date(), method = String(data.method || '').slice(0, 20);
+      let notes = String(data.notes || '').slice(0, 200);
+      if (late) notes = (notes ? notes + ' · ' : '') + 'وصل بعد إنهاء المرحلة (مسح بلا إنترنت)';
+      const act = action === 'board' && stage && stage.dir === 'out' ? 'exit' : action;
+      const stageId = stage ? stage.id : (action === 'undo' && cur && cur.stage ? cur.stage : '');
+      const row = [now, student.id, act, recBus, user.Username, method, clientId, notes];
+      const iG = stage ? iStage : (stageId ? scanHeaders_(sheet).indexOf('StageId') : -1);
+      if (stageId && iG !== -1) { while (row.length < iG) row.push(''); row[iG] = stageId; }
+      appendSafe_(sheet, row);
+      if (action === 'undo') writeAudit_(user.Username, 'SCAN_UNDO', student.id, 'bus=' + student.bus + (stageId ? ' stage=' + stageId : ''));
       // C3: the new state comes from the row we just wrote, by the SAME rules as scanStates_ (no second full read of the log inside the lock).
-      const states = Object.assign({}, sc.states);
-      if (action === 'board') { const viaG = method === 'guardian'; states[student.id] = { state: 'boarded', at: now, by: user.Username, bus: String(student.bus), via: viaG ? 'guardian' : '', note: viaG ? notes : '' }; }
-      else if (action === 'withdraw') states[student.id] = { state: 'withdrawn', at: now, by: user.Username, bus: String(student.bus), prev: sc.states[student.id] || null };
-      else if (action === 'undo') delete states[student.id];
-      const c = busCounts_(student.bus, readStudents_().students, states);
-      return { success: true, student: publicStudent_(student, states[student.id], false), boarded: c.boarded, total: c.total };
+      if (action === 'board') {
+        const viaG = method === 'guardian';
+        addMove_(sc.hist, student.id, { state: act === 'board' ? 'boarded' : (stage.tripOnly ? 'on_trip' : 'departed'), at: now, by: user.Username, bus: String(recBus),
+          via: viaG ? 'guardian' : '', note: viaG ? notes : '', stage: stage ? stage.id : '', anyBus: anyBus, ord: stage ? stage.order : orderNow_(stages), seq: Infinity });
+      } else if (action === 'withdraw') sc.wd[student.id] = { state: 'withdrawn', at: now, by: user.Username, bus: String(student.bus) };
+      else if (action === 'undo' && sc.hist[student.id]) sc.hist[student.id].pop();
+      const st = stateOf_(sc.states, sc.hist, sc.wd, student.id);
+      const students = readStudents_().students, c = busCounts_(student.bus, students, sc.states);
+      const out = { success: true, student: publicStudent_(student, st, false), boarded: c.boarded, total: c.total };
+      if (stage) { out.stage = stageBrief_(stage); out.mine = stageMine_(stage, user, students, sc); }
+      if (warn) out.warn = warn;
+      return out;
     } finally {
       lock.releaseLock();
     }
   });
 }
+
+// ---------------- Stages (مراحل المخيم): the secretariat starts / ends each movement; the scan follows the running stage ----------------
+// The Stages tab is created (with the camp's six stages) by SETUP_createTabs. No tab = the old behaviour (no stages).
+const STAGES_HEADERS_ = ['StageId', 'Order', 'Name', 'Direction', 'Grades', 'TripOnly', 'AnyBus', 'Day', 'PlannedTime', 'Status', 'StartedAt', 'StartedBy', 'EndedAt', 'EndedBy'];
+// Text cells start with ' so Sheets keeps them as typed ("7-11" would otherwise become a date, "16:15" a time).
+const STAGES_SEED_ = [
+  ['S1', 1, 'وصول 7-11', 'in', "'7-11", false, false, 'الأربعاء 30/12', "'16:15"],
+  ['S2', 2, 'وصول 4-6', 'in', "'4-6", false, false, 'الجمعة 1/1', "'07:30"],
+  ['S3', 3, 'خروج الرحلة', 'out', '', true, true, 'الجمعة 1/1', "'08:00"],
+  ['S4', 4, 'مغادرة 4-6', 'out', "'4-6", false, false, 'السبت 2/1', "'10:00"],
+  ['S5', 5, 'عودة الرحلة', 'in', '', true, true, 'السبت 2/1', "'12:00"],
+  ['S6', 6, 'مغادرة 7-11', 'out', "'7-11", false, false, 'السبت 2/1', "'17:45"]
+];
+const STAGE_LATE_MS_ = 2 * 60 * 1000; // a scan made offline may reach us after the stage ended: accepted if made before the end (+2 min)
+
+function isYes_(v) { return v === true || /^(نعم|ن|yes|y|true|1|✓|✔|x)$/i.test(String(v === undefined || v === null ? '' : v).trim()); }
+function latinDigits_(t) { return String(t).replace(/[٠-٩]/g, function(d) { return String(d.charCodeAt(0) - 0x0660); }).replace(/[۰-۹]/g, function(d) { return String(d.charCodeAt(0) - 0x06F0); }); }
+const GRADE_WORDS_ = [['الحادي عشر', 11], ['الثاني عشر', 12], ['الرابع', 4], ['الخامس', 5], ['السادس', 6], ['السابع', 7], ['الثامن', 8], ['التاسع', 9], ['العاشر', 10]];
+function gradeOf_(cls) {
+  const t = latinDigits_(cls === undefined || cls === null ? '' : cls), m = /\d+/.exec(t);
+  if (m) return Number(m[0]);
+  for (let i = 0; i < GRADE_WORDS_.length; i++) if (t.indexOf(GRADE_WORDS_[i][0]) !== -1) return GRADE_WORDS_[i][1];
+  return null;
+}
+// "7-11" -> [7..11]; "4,5,6" -> [4,5,6]; empty -> null (every grade). A cell Sheets turned into a date (7-11 -> 11 July) is read back.
+function parseGrades_(v) {
+  if (v instanceof Date) v = (v.getMonth() + 1) + '-' + v.getDate();
+  const t = latinDigits_(v === undefined || v === null ? '' : v).trim();
+  if (!t) return null;
+  const r = /^(\d+)\s*[-–]\s*(\d+)$/.exec(t);
+  if (r) { const out = []; for (let g = Number(r[1]); g <= Number(r[2]); g++) out.push(g); return out; }
+  const list = (t.match(/\d+/g) || []).map(Number);
+  return list.length ? list : null;
+}
+function gradesText_(g) { return !g ? '' : g.length > 2 && g[g.length - 1] - g[0] === g.length - 1 ? g[0] + '-' + g[g.length - 1] : g.join('، '); }
+
+function stagesSheetOrNull_() { try { return getSheetByName_('Stages'); } catch (e) { return null; } }
+function readStages_() {
+  const cache = CacheService.getScriptCache();
+  try { const hit = cache.get('stages_v1'); if (hit) { const o = JSON.parse(hit); return o.list || null; } } catch (e) { /* fall through */ }
+  const startedAt = Date.now();
+  const sh = stagesSheetOrNull_();
+  let list = null;
+  if (sh) {
+    const v = sh.getDataRange().getValues(), h = v[0] || [];
+    const g = function(r, n) { const i = h.indexOf(n); return i === -1 ? '' : v[r][i]; };
+    const ms = function(x) { const d = x instanceof Date ? x : (x ? new Date(x) : null); return d && !isNaN(d.getTime()) ? d.getTime() : 0; };
+    list = [];
+    for (let r = 1; r < v.length; r++) {
+      const id = String(g(r, 'StageId')).trim();
+      if (!id) continue;
+      const st = String(g(r, 'Status')).trim().toLowerCase(), pt = g(r, 'PlannedTime');
+      list.push({ id: id, order: Number(g(r, 'Order')) || r, name: String(g(r, 'Name')).trim() || id, dir: String(g(r, 'Direction')).trim().toLowerCase() === 'out' ? 'out' : 'in',
+        grades: parseGrades_(g(r, 'Grades')), tripOnly: isYes_(g(r, 'TripOnly')), anyBus: isYes_(g(r, 'AnyBus')),
+        day: String(g(r, 'Day')).trim(), time: pt instanceof Date ? fmtTime_(pt) : String(pt).trim(),
+        status: st === 'live' || st === 'done' ? st : 'next', startedMs: ms(g(r, 'StartedAt')), startedBy: String(g(r, 'StartedBy')), endedMs: ms(g(r, 'EndedAt')), endedBy: String(g(r, 'EndedBy')), _row: r + 1 });
+    }
+    list.sort(function(a, b) { return a.order - b.order; });
+    if (!list.length) list = null; // an empty tab = no stages
+  }
+  try {
+    cache.put('stages_v1', JSON.stringify({ list: list }), 60);
+    if ((Number(cache.get('stages_cleared_at')) || 0) >= startedAt) cache.remove('stages_v1');
+  } catch (e) { /* ignore */ }
+  return list;
+}
+function clearStagesCache_() {
+  try { const cache = CacheService.getScriptCache(); cache.put('stages_cleared_at', String(Date.now()), 600); cache.remove('stages_v1'); } catch (e) { /* ignore */ }
+}
+function liveStage_(stages) { return (stages || []).filter(function(x) { return x.status === 'live'; })[0] || null; }
+function nextStage_(stages) { return (stages || []).filter(function(x) { return x.status === 'next'; })[0] || null; }
+function orderNow_(stages) { let o = 0; const t = Date.now(); (stages || []).forEach(function(x) { if (x.startedMs && x.startedMs <= t && x.order > o) o = x.order; }); return o; }
+function stageIncludes_(stage, s) {
+  if (stage.tripOnly && !s.trip) return false;
+  if (stage.grades && stage.grades.indexOf(gradeOf_(s.cls)) === -1) return false;
+  return true;
+}
+function stageWho_(stage) {
+  if (stage.tripOnly) return 'المسجّلون في الرحلة فقط' + (stage.grades ? ' (' + gradesText_(stage.grades) + ')' : '');
+  return stage.grades ? 'الصفوف ' + gradesText_(stage.grades) : 'كل الطلاب';
+}
+function stageBrief_(x) {
+  return { id: x.id, order: x.order, name: x.name, dir: x.dir, who: stageWho_(x), tripOnly: x.tripOnly, anyBus: x.anyBus, day: x.day, time: x.time, status: x.status,
+    startedAt: x.startedMs ? fmtTime_(new Date(x.startedMs)) : '', endedAt: x.endedMs ? fmtTime_(new Date(x.endedMs)) : '' };
+}
+// Which stage a scan belongs to: the one the phone saw running when it scanned (sent as stageId, offline-safe), else the running one.
+function pickScanStage_(stages, data) {
+  const live = liveStage_(stages), want = String(data.stageId || '').trim();
+  if (want) {
+    const x = stages.filter(function(y) { return y.id === want; })[0];
+    if (!x) return { ok: false, code: 'NO_STAGE', error: 'مرحلة غير معروفة' };
+    if (x.status === 'live') return { ok: true, stage: x, late: false };
+    if (x.status === 'done') {
+      const made = Number(data.clientTime) || 0, limit = x.endedMs + STAGE_LATE_MS_;
+      if ((made && made <= limit) || (!made && Date.now() <= limit)) return { ok: true, stage: x, late: true };
+      return { ok: false, code: 'STAGE_ENDED', error: 'انتهت مرحلة «' + x.name + '» قبل هذا المسح', stage: x };
+    }
+    return { ok: false, code: 'NO_STAGE', error: 'مرحلة «' + x.name + '» لم تبدأ بعد', stage: x };
+  }
+  if (!live) { const n = nextStage_(stages); return { ok: false, code: 'NO_STAGE', error: 'لا توجد مرحلة جارية الآن' + (n ? '. التالية: ' + n.name : ''), stage: null }; }
+  return { ok: true, stage: live, late: false };
+}
+// The student's record in this stage (still standing, i.e. not undone), even if a later stage moved him again.
+function stageRec_(sc, id, stage) { const l = sc.hist[id] || []; for (let i = l.length - 1; i >= 0; i--) if (l[i].stage === stage.id) return l[i]; return null; }
+// The supervisor's own share of the stage: his bus (or, on a trip stage, everyone he scanned + all trip students).
+function stageMine_(stage, user, students, sc) {
+  const bus = String(user.AssignedBus || '').trim();
+  const everyBus = stage.anyBus || (!bus && hasPerm_(user, 'allbuses'));
+  const mine = students.filter(function(s) { return stageIncludes_(stage, s) && (everyBus || s.bus === bus); });
+  const done = mine.filter(function(s) { return stageRec_(sc, s.id, stage); });
+  const byMe = stage.anyBus ? students.filter(function(s) { const x = stageRec_(sc, s.id, stage); return x && String(x.bus) === bus; }).length : done.length;
+  return { total: mine.length, done: done.length, onMyBus: byMe };
+}
+// Per-stage numbers for the secretariat. Names only for the running stage (never phones).
+function stageStats_(stage, students, sc, withNames) {
+  const inc = students.filter(function(s) { return stageIncludes_(stage, s); });
+  const perBus = {};
+  let done = 0, withdrawn = 0;
+  const remaining = [];
+  inc.forEach(function(s) {
+    const st = sc.states[s.id], moved = stageRec_(sc, s.id, stage);
+    const b = moved && stage.anyBus ? String(moved.bus) : s.bus;
+    const x = perBus[b] || (perBus[b] = { bus: b, total: 0, done: 0 });
+    if (!stage.anyBus || !moved) x.total++;
+    if (moved) { done++; x.done++; if (stage.anyBus) x.total++; }
+    else if (st && st.state === 'withdrawn') withdrawn++;
+    else if (withNames) remaining.push({ id: s.id, name: s.name, team: s.team, cls: s.cls, bus: s.bus });
+  });
+  const out = { expected: inc.length, done: done, withdrawn: withdrawn, perBus: Object.keys(perBus).sort().map(function(k) { return perBus[k]; }) };
+  if (withNames) out.remaining = remaining;
+  return out;
+}
+function handleStages_(data) {
+  return withAuth_(data, requireAnyPerm_(['stages', 'manage', 'dashboard']), function(user) {
+    const stages = readStages_();
+    if (!stages) return { success: true, enabled: false, stages: [] };
+    const students = readStudents_().students, sc = scanStates_();
+    const list = stages.map(function(x) {
+      const o = stageBrief_(x);
+      Object.assign(o, stageStats_(x, students, sc, x.status === 'live'));
+      o.startedBy = x.startedBy; o.endedBy = x.endedBy;
+      return o;
+    });
+    return { success: true, enabled: true, stages: list, canControl: hasPerm_(user, 'stages') || hasPerm_(user, 'manage') };
+  });
+}
+function setStageRow_(x, fields) {
+  const sh = getSheetByName_('Stages'), h = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  Object.keys(fields).forEach(function(k) { const i = h.indexOf(k); if (i !== -1) sh.getRange(x._row, i + 1).setValue(fields[k]); });
+}
+function handleStageStart_(data) {
+  return withAuth_(data, requireAnyPerm_(['stages', 'manage']), function(user) {
+    const lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    try {
+      clearStagesCache_();
+      const stages = readStages_();
+      if (!stages) return { success: false, code: 'NO_STAGES', error: 'تبويب المراحل غير موجود' };
+      const x = stages.filter(function(y) { return y.id === String(data.stageId || ''); })[0];
+      if (!x) return { success: false, code: 'NOT_FOUND', error: 'مرحلة غير معروفة' };
+      if (x.status === 'live') return { success: true, repeated: true, stage: stageBrief_(x) };
+      const live = liveStage_(stages);
+      if (live) return { success: false, code: 'OTHER_LIVE', error: 'أنهِ مرحلة «' + live.name + '» أولاً', stage: stageBrief_(live) };
+      const now = new Date();
+      setStageRow_(x, { Status: 'live', StartedAt: now, StartedBy: user.Username, EndedAt: '', EndedBy: '' });
+      clearStagesCache_();
+      writeAudit_(user.Username, x.status === 'done' ? 'STAGE_REOPENED' : 'STAGE_STARTED', x.id, x.name);
+      x.status = 'live'; x.startedMs = now.getTime(); x.endedMs = 0;
+      return { success: true, stage: stageBrief_(x) };
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+function handleStageEnd_(data) {
+  return withAuth_(data, requireAnyPerm_(['stages', 'manage']), function(user) {
+    const lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    try {
+      clearStagesCache_();
+      const stages = readStages_();
+      if (!stages) return { success: false, code: 'NO_STAGES', error: 'تبويب المراحل غير موجود' };
+      const x = stages.filter(function(y) { return y.id === String(data.stageId || ''); })[0];
+      if (!x) return { success: false, code: 'NOT_FOUND', error: 'مرحلة غير معروفة' };
+      if (x.status !== 'live') return { success: false, code: 'NOT_LIVE', error: 'المرحلة ليست جارية' };
+      const now = new Date();
+      setStageRow_(x, { Status: 'done', EndedAt: now, EndedBy: user.Username });
+      clearStagesCache_();
+      x.status = 'done'; x.endedMs = now.getTime();
+      const st = stageStats_(x, readStudents_().students, scanStates_(), false);
+      writeAudit_(user.Username, 'STAGE_ENDED', x.id, x.name + ' done=' + st.done + '/' + st.expected);
+      return { success: true, stage: stageBrief_(x), expected: st.expected, done: st.done };
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+// Scans tab header, so the StageId lands in its own column wherever it is.
+function scanHeaders_(sheet) { return sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0].map(String); }
 
 function handleBusState_(data) {
   return withAuth_(data, requirePerm_('checkin'), function(user) {
@@ -757,6 +1043,16 @@ function checkStudentSheet_() {
   if (result.cols.cls === -1) report.notes.push('عمود Class غير موجود (اختياري)');
   if (result.cols.photo === -1) report.notes.push('عمود Photo URL غير موجود (لازم للتعرف على الوجه)');
   if (result.cols.team === -1) report.notes.push('عمود Team name غير موجود (لازم للأساور)');
+  const stages = readStages_();
+  if (stages) {
+    const noGrade = result.students.filter(function(st) { return gradeOf_(st.cls) === null; });
+    if (noGrade.length) { report.ok = false; report.problems.push('طلاب صفّهم غير مفهوم (المراحل تعتمد على الصف): ' + noGrade.slice(0, 20).map(function(st) { return st.manual ? st.id : 'صف ' + st._row; }).join(', ') + (noGrade.length > 20 ? ' …' : '')); }
+    const trip = result.students.filter(function(st) { return st.trip; });
+    if (result.cols.trip === -1) report.notes.push('عمود «رحلة» غير موجود: لا أحد مسجّل في الرحلة الخارجية');
+    else report.notes.push('المسجّلون في الرحلة الخارجية: ' + trip.length);
+    const perStage = stages.map(function(x) { return x.name + ': ' + result.students.filter(function(st) { return stageIncludes_(x, st); }).length; });
+    report.notes.push('عدد الطلاب في كل مرحلة — ' + perStage.join(' · '));
+  }
   report.total = result.students.length;
   report.perBus = perBus;
   return report;

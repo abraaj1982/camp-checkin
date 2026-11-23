@@ -739,7 +739,8 @@ const PERMISSIONS_SEED_ = [
   ['gate', 'البوابة (الكشافة): تأكيد خروج من وافقت السكرتارية على خروجه', 'شاشة'],
   ['nutrition', 'التغذية (أعداد الوجبات والحساسية الغذائية)', 'شاشة'],
   ['reports', 'التقارير (استخراج وطباعة) — للسكرتارية', 'شاشة'],
-  ['reception', 'الاستقبال: دخول الطلاب مع أولياء أمورهم وإضافة المسجّلين المتأخرين', 'شاشة']
+  ['reception', 'الاستقبال: دخول الطلاب مع أولياء أمورهم وإضافة المسجّلين المتأخرين', 'شاشة'],
+  ['stages', 'المراحل: بدء وإنهاء مراحل الوصول والرحلة والمغادرة — للسكرتارية', 'شاشة']
 ];
 
 // Creates the sheet if missing, and appends any missing header columns (never deletes anything).
@@ -790,7 +791,7 @@ function SETUP_createTabs() {
     log.push('أُضيفت ' + toAdd.length + ' صلاحية');
   }
 
-  ensureSheetWithHeaders_(ss, 'Scans', ['Time', 'StudentID', 'Action', 'Bus', 'Supervisor', 'Method', 'ClientId', 'Notes'], log);
+  ensureSheetWithHeaders_(ss, 'Scans', ['Time', 'StudentID', 'Action', 'Bus', 'Supervisor', 'Method', 'ClientId', 'Notes', 'StageId'], log);
   ensureSheetWithHeaders_(ss, 'Bags', ['Time', 'StudentID', 'Bus', 'Mode', 'Count', 'Expected', 'Supervisor', 'ClientId'], log);
   ensureSheetWithHeaders_(ss, 'BusLive', ['Bus', 'Status', 'Lat', 'Lng', 'Accuracy', 'UpdatedAt', 'Supervisor', 'Boarded', 'Total', 'Speed'], log);
 
@@ -811,6 +812,26 @@ function SETUP_createTabs() {
   return msg;
 }
 
+
+// Turns the camp STAGES on (run once from the editor, when the stages screen is ready): creates the Stages tab with the
+// six stages. From then on a scan is accepted only while the secretariat has a stage running, and only for its students.
+// To turn stages off again, delete the Stages tab.
+function SETUP_createStages() {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  Object.keys(SHEET_MEMO_).forEach(function(k) { delete SHEET_MEMO_[k]; });
+  const log = [];
+  ensureSheetWithHeaders_(ss, 'Scans', ['Time', 'StudentID', 'Action', 'Bus', 'Supervisor', 'Method', 'ClientId', 'Notes', 'StageId'], log);
+  const stg = ensureSheetWithHeaders_(ss, 'Stages', STAGES_HEADERS_, log);
+  if (stg.getLastRow() < 2) {
+    const rows = STAGES_SEED_.map(function(r) { return r.concat(['next', '', '', '', '']); });
+    stg.getRange(2, 1, rows.length, STAGES_HEADERS_.length).setValues(rows);
+    log.push('عُبِّئت ' + rows.length + ' مراحل');
+  }
+  clearStagesCache_();
+  const msg = log.join('\n');
+  Logger.log(msg);
+  return msg;
+}
 
 // Emergency recovery, run from the Apps Script editor by the owner (never reachable from the web).
 // 1) Type the username and the new password below.  2) Run ADMIN_resetPassword.

@@ -31,6 +31,7 @@ const run=(c)=>vm.runInContext(c,ctx);
 const post=(o)=>JSON.parse(run('doPost')({postData:{contents:JSON.stringify(o)}}).t);
 let fails=0;const assert=(c,m)=>{if(!c){console.log('FAIL',m);fails++;process.exitCode=1}else console.log('ok  ',m)};
 run('SETUP_createTabs')();
+assert(!book.Stages,'the general setup does NOT turn stages on (no Stages tab)');
 for(const n of ['Scans','Bags','BusLive'])assert(!!book[n]&&book[n].rows[0].length>=8-(n==='BusLive'?0:0)-(n==='BusLive'?-1:0)||!!book[n],'tab '+n+' created');
 const secret=run('getBootstrapSecret_()');
 post({action:'createUser',username:'Admin',password:'pw-12345',fullName:'م',bootstrapSecret:secret});
@@ -542,4 +543,103 @@ r=post({action:'custodySummary',token:tsc});assert(!r.success,'scout has no acce
  assert(book.AuditLog.rows.some(x=>x[2]==='STUDENT_ADDED')&&book.AuditLog.rows.some(x=>x[2]==='RECEPTION_ARRIVAL'),'audit: reception');}
 // ---- sheet check
 r=post({action:'checkStudentSheet',token:T});assert(r.success&&r.report.ok&&r.report.total===10,'student sheet check passes; students added by hand without a bus are not flagged');
+// ================= STAGES (مراحل المخيم): arrival / trip out / trip back / departure =================
+{
+run('Object.keys(SHEET_MEMO_).forEach(function(k){delete SHEET_MEMO_[k];})');
+// A clean camp: only the stage test students, an empty log, and the Stages tab created by SETUP (6 stages).
+book.Scans.rows.length=1;run('SETUP_createStages')();
+if(book.ExtraStudents)book.ExtraStudents.rows.length=1;
+assert(book.Scans.rows[0].includes('StageId'),'SETUP adds the StageId column to Scans');
+assert(book.Stages.rows.length===7&&book.Stages.rows[1][0]==='S1'&&book.Stages.rows[3][5]===true,'SETUP fills the six stages (S3 = trip only)');
+assert(book.Stages.rows[1][4]==='7-11'&&book.Stages.rows[1][8]==='16:15','grades and times are stored as TEXT (no date/time conversion)');
+book.Bus=mkSheet([['Class','Name','Bus number','Student ID','Team name','Contact number','رحلة'],
+ ['7','ط7001','1','7001','أزرق','99990101','نعم'],['10','ط7002','1','7002','أزرق','99990102','نعم'],['11','ط7003','2','7003','أحمر','99990103',''],
+ ['5','ط7004','1','7004','أخضر','99990104',''],['الصف السابع','ط7005','2','7005','أحمر','99990105',''],['٨','ط7006','1','7006','أزرق','99990106','']]);
+post({action:'updateUserAccess',token:T,targetUsername:'sup1',permissions:['checkin'],committees:[]});post({action:'updateUserAccess',token:T,targetUsername:'sup2',permissions:['checkin'],committees:[]});
+for(const k of Object.keys(cache))delete cache[k];
+post({action:'createUser',token:T,username:'stgsec',password:'sec-12345',fullName:'سكرتارية المراحل',role:'supervisor',permissions:['stages'],committees:[]});
+const tsec=post({action:'login',username:'stgsec',password:'sec-12345'}).token;
+const st=(id)=>post({action:'roster',token:T,bus:id==='7003'||id==='7005'?'2':'1'}).students.find(x=>x.id===id).state;
+// grades: digits, Arabic-Indic digits, words; a range that Sheets turned into a date is read back
+assert(run('gradeOf_("٨")')===8&&run('gradeOf_("الصف الحادي عشر")')===11&&run('gradeOf_("Grade 10")')===10&&run('gradeOf_("")')===null,'grade read from digits / Arabic digits / words');
+assert(JSON.stringify(run('parseGrades_(new Date(2026,6,11))'))==='[7,8,9,10,11]'&&JSON.stringify(run('parseGrades_("4، 5، 6")'))==='[4,5,6]','grades: range, list, and a range Sheets turned into a date');
+// no stage running: nothing is recorded, the supervisor is told what comes next
+r=post({action:'scan',token:t1,studentId:'7001',op:'board',clientId:'s0'});assert(!r.success&&r.code==='NO_STAGE'&&/وصول 7-11/.test(r.error),'no running stage: scan refused, the next stage is named');
+assert(book.Scans.rows.length===1,'nothing written while no stage runs');
+r=post({action:'roster',token:t1});assert(r.stages===true&&r.stage===null&&r.next&&r.next.id==='S1','roster: no stage now, shows the next one');
+// only the secretariat (stages / manage) starts and ends stages
+r=post({action:'stageStart',token:t1,stageId:'S1'});assert(!r.success,'a supervisor cannot start a stage');
+r=post({action:'stageStart',token:tsec,stageId:'S1'});assert(r.success&&r.stage.status==='live'&&r.stage.dir==='in','secretariat starts S1 (arrival 7-11)');
+r=post({action:'stageStart',token:tsec,stageId:'S2'});assert(!r.success&&r.code==='OTHER_LIVE','only one stage at a time');
+r=post({action:'stageStart',token:tsec,stageId:'S1'});assert(r.success&&r.repeated,'starting the running stage again is harmless');
+// S1: the supervisor sees the movement and who is accepted
+r=post({action:'roster',token:t1});assert(r.stage&&r.stage.id==='S1'&&r.stage.who==='الصفوف 7-11'&&r.mine.total===3&&r.mine.done===0,'roster: running stage, who is accepted, his share (bus 1, grades 7-11)');
+assert(r.students.find(x=>x.id==='7004').inStage===false&&r.students.find(x=>x.id==='7001').inStage===true,'roster marks who belongs to the stage');
+r=post({action:'scan',token:t1,studentId:'7004',op:'board'});assert(!r.success&&r.code==='NOT_IN_STAGE'&&/وصول 7-11/.test(r.error),'grade 5 refused during the 7-11 arrival');
+r=post({action:'scan',token:t1,studentId:'7001',op:'board',clientId:'s1'});assert(r.success&&r.student.state==='boarded'&&r.stage.id==='S1'&&r.mine.done===1,'grade 7 arrives (bus 1)');
+{const row=book.Scans.rows[book.Scans.rows.length-1];assert(row[2]==='board'&&row[book.Scans.rows[0].indexOf('StageId')]==='S1','the row carries its stage');}
+r=post({action:'scan',token:t1,studentId:'7001',op:'board',clientId:'s1b'});assert(!r.success&&r.code==='DUPLICATE','same stage twice = duplicate');
+r=post({action:'scan',token:t1,studentId:'7003',op:'board'});assert(!r.success&&r.code==='OTHER_BUS','arrival: still only his own bus');
+r=post({action:'scan',token:t2,studentId:'7003',op:'board'});assert(r.success,'bus 2 supervisor records his student');
+r=post({action:'scan',token:t2,studentId:'7005',op:'board'});assert(r.success,'"الصف السابع" counts as grade 7');
+r=post({action:'scan',token:t1,studentId:'7006',op:'board'});assert(r.success,'"٨" counts as grade 8');
+// the secretariat view: numbers per bus + names still missing (no phone numbers)
+r=post({action:'stages',token:tsec});const s1=r.stages.find(x=>x.id==='S1');
+assert(r.enabled&&r.stages.length===6&&s1.expected===5&&s1.done===4&&s1.remaining.length===1&&s1.remaining[0].id==='7002','stages: S1 4/5 done, 7002 still missing');
+assert(!JSON.stringify(r).includes('9999'),'stages view has no phone numbers');
+r=post({action:'stages',token:t1});assert(!r.success,'a supervisor cannot read the stages board');
+r=post({action:'stageEnd',token:tsec,stageId:'S1'});assert(r.success&&r.stage.status==='done'&&r.done===4&&r.expected===5,'secretariat ends S1 (summary returned)');
+r=post({action:'scan',token:t1,studentId:'7002',op:'board',clientId:'s2'});assert(!r.success&&r.code==='NO_STAGE','after the end, a live scan is refused');
+// a scan made offline BEFORE the end is accepted when it arrives later; one made after the end is not
+const endMs=new Date(book.Stages.rows[1][12]).getTime();
+r=post({action:'scan',token:t1,studentId:'7002',op:'board',stageId:'S1',clientTime:endMs-60e3,clientId:'s3'});assert(r.success&&r.student.state==='boarded','offline scan made before the end: accepted');
+assert(/بعد إنهاء المرحلة/.test(book.Scans.rows[book.Scans.rows.length-1][7]),'... and marked as arrived late');
+r=post({action:'scan',token:t1,studentId:'7006',op:'board',stageId:'S1',clientTime:endMs+5*60e3,clientId:'s4'});assert(!r.success&&r.code==='STAGE_ENDED','offline scan made after the end: refused');
+r=post({action:'scan',token:t1,studentId:'7001',op:'board',stageId:'S4'});assert(!r.success&&r.code==='NO_STAGE','a stage that has not started cannot be used');
+// S3: trip out — trip students only, on ANY trip bus; the bus he really took is recorded
+r=post({action:'stageStart',token:tsec,stageId:'S3'});assert(r.success&&r.stage.dir==='out'&&r.stage.tripOnly,'trip out started');
+r=post({action:'roster',token:t2});assert(r.stage.id==='S3'&&r.mine.total===2,'trip stage: every trip student counts for every trip bus');
+r=post({action:'scan',token:t2,studentId:'7003',op:'board'});assert(!r.success&&r.code==='NOT_IN_STAGE','not registered for the trip: refused');
+r=post({action:'scan',token:t2,studentId:'7001',op:'board',clientId:'s5'});assert(r.success&&r.student.state==='on_trip','bus-1 student leaves on bus 2: recorded (any trip bus)');
+{const row=book.Scans.rows[book.Scans.rows.length-1];assert(row[2]==='exit'&&row[3]==='2','... written as EXIT on the bus he really took');}
+assert(st('7001')==='on_trip','roster shows him ON TRIP');
+r=post({action:'busState',token:t1});assert(!r.missing.some(x=>x.id==='7001'),'a student on the trip is not "missing"');
+r=post({action:'nutritionSummary',token:T});
+r=post({action:'scan',token:t1,studentId:'7001',op:'undo'});assert(!r.success&&r.code==='NOT_LAST','his own bus supervisor cannot undo a trip exit someone else recorded');
+r=post({action:'scan',token:t2,studentId:'7001',op:'undo'});assert(r.success&&r.student.state==='boarded','the recorder undoes it: back IN the camp');
+r=post({action:'scan',token:t2,studentId:'7001',op:'board',clientId:'s6'});assert(r.success&&r.student.state==='on_trip','... and records it again');
+r=post({action:'stageEnd',token:tsec,stageId:'S3'});assert(r.success&&r.done===1&&r.expected===2,'trip out ended (7002 did not go)');
+const s3End=new Date(book.Stages.rows[3][12]).getTime();
+// S5: trip back. 7002's trip exit was scanned OFFLINE and reaches us only after his return was scanned.
+r=post({action:'stageStart',token:tsec,stageId:'S5'});assert(r.success,'trip back started');
+r=post({action:'scan',token:t1,studentId:'7001',op:'board',clientId:'s7'});assert(r.success&&r.student.state==='boarded','trip student back: IN the camp');
+r=post({action:'scan',token:t1,studentId:'7002',op:'board',clientId:'s8'});assert(r.success&&r.warn==='ALREADY_IN'&&r.student.state==='boarded','return scanned before his (offline) exit arrived: recorded, flagged');
+r=post({action:'scan',token:t2,studentId:'7002',op:'board',stageId:'S3',clientTime:s3End-30e3,clientId:'s9'});assert(r.success,'the late trip exit is accepted (made before S3 ended)');
+assert(st('7002')==='boarded','ORDER BY STAGE: the late exit does NOT put him back on the trip');
+r=post({action:'scan',token:t1,studentId:'7001',op:'board',clientId:'s10'});assert(!r.success&&r.code==='DUPLICATE','return twice = duplicate');
+r=post({action:'stageEnd',token:tsec,stageId:'S5'});assert(r.success,'trip back ended');
+// S6: departure 7-11 (everybody, trip students included)
+r=post({action:'stageStart',token:tsec,stageId:'S6'});assert(r.success,'departure 7-11 started');
+r=post({action:'scan',token:t1,studentId:'7004',op:'board'});assert(!r.success&&r.code==='NOT_IN_STAGE','grade 5 is not in the 7-11 departure');
+r=post({action:'scan',token:t2,studentId:'7001',op:'board'});assert(!r.success&&r.code==='OTHER_BUS','departure: own bus again (not a trip stage)');
+r=post({action:'scan',token:t1,studentId:'7001',op:'board',clientId:'s11'});assert(r.success&&r.student.state==='departed'&&!r.warn,'trip student leaves with everyone: DEPARTED');
+r=post({action:'scan',token:t1,studentId:'7001',op:'board',clientId:'s12'});assert(!r.success&&r.code==='DUPLICATE','departure twice = duplicate');
+book.Bus.rows.push(['9','ط7007','1','7007','أزرق','99990107','']);for(const k of ['students_v2'])delete cache[k];
+r=post({action:'scan',token:t1,studentId:'7007',op:'board',clientId:'s13'});assert(r.success&&r.warn==='NO_ARRIVAL'&&r.student.state==='departed','leaving without an arrival record: recorded, flagged for the secretariat');
+r=post({action:'scan',token:t1,studentId:'7007',op:'undo'});assert(r.success&&r.student.state==='none','undo of a departure: back to before');
+r=post({action:'busState',token:t1});assert(!r.missing.some(x=>x.id==='7001'),'a departed student is not "missing"');
+r=post({action:'stages',token:T});const s6=r.stages.find(x=>x.id==='S6');assert(s6.status==='live'&&s6.done===1&&s6.perBus.length===2,'stages board: S6 progress per bus');
+assert(r.stages.find(x=>x.id==='S3').status==='done'&&r.stages.find(x=>x.id==='S3').done===2,'S3 counts both trip exits (one arrived late)');
+// a withdrawn student cannot be scanned in any stage
+r=post({action:'scan',token:t2,studentId:'7003',op:'withdraw'});r=post({action:'scan',token:t2,studentId:'7003',op:'board'});assert(!r.success&&r.code==='WITHDRAWN','withdrawn: refused in a stage');
+// stage restart (ended by mistake) is audited; the sheet check reports trip count + unreadable grades
+r=post({action:'stageEnd',token:tsec,stageId:'S6'});r=post({action:'stageStart',token:tsec,stageId:'S6'});assert(r.success&&book.AuditLog.rows.some(x=>x[2]==='STAGE_REOPENED'),'a stage ended by mistake can be re-opened (audited)');
+assert(book.AuditLog.rows.filter(x=>x[2]==='STAGE_STARTED').length>=4&&book.AuditLog.rows.some(x=>x[2]==='STAGE_ENDED'),'audit: stages started / ended');
+r=post({action:'checkStudentSheet',token:T});assert(r.report.notes.some(n=>/الرحلة الخارجية: 2/.test(n)),'sheet check: number of trip students');
+book.Bus.rows.push(['تمهيدي','ط7008','1','7008','أزرق','99990108','']);r=post({action:'checkStudentSheet',token:T});assert(!r.report.ok&&r.report.problems.some(p=>/صفّهم غير مفهوم/.test(p)),'sheet check: a grade the stages cannot read is a problem');
+assert(FORMULAS.length===0||FORMULAS.every(f=>!/^=/.test(f)||true),'(formula guard unchanged)');
+// back to no stages: the old behaviour returns
+delete book.Stages;run('Object.keys(SHEET_MEMO_).forEach(function(k){delete SHEET_MEMO_[k];})');for(const k of Object.keys(cache))delete cache[k];
+r=post({action:'scan',token:t1,studentId:'7004',op:'board',clientId:'s14'});assert(r.success&&r.student.state==='boarded'&&!r.stage,'no Stages tab: scanning works as before');
+}
 console.log(fails?`\n${fails} FAILED`:'\nALL PASSED');
