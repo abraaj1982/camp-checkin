@@ -52,6 +52,7 @@ const ACTIONS_ = {
   createCase: function(d) { return handleCreateCase_(d); },
   listCases: function(d) { return handleListCases_(d); },
   updateCase: function(d) { return handleUpdateCase_(d); },
+  myCases: function(d) { return handleMyCases_(d); },
   history: function(d) { return handleHistory_(d); },
   custodyFind: function(d) { return handleCustodyFind_(d); },
   custodyRecord: function(d) { return handleCustodyRecord_(d); },
@@ -928,6 +929,15 @@ function casesForList_() {
 function handleListCases_(data) {
   return withAuth_(data, requireAnyPerm_(['dashboard', 'stats', 'manage']), function() {
     return { success: true, cases: casesForList_() };
+  });
+}
+// A supervisor sees ONLY the reports he sent himself (text + status), never others'.
+function handleMyCases_(data) {
+  return withAuth_(data, requirePerm_('checkin'), function(user) {
+    const mine = readCases_().filter(function(c) { return c.by === user.Username; })
+      .sort(function(a, b) { return a.time < b.time ? 1 : -1; }).slice(0, 8)
+      .map(function(c) { return { id: c.id, time: c.time, text: c.text, status: c.status }; });
+    return { success: true, cases: mine };
   });
 }
 function handleUpdateCase_(data) {

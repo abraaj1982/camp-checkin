@@ -541,6 +541,11 @@ r=post({action:'custodySummary',token:tsc});assert(!r.success,'scout has no acce
  q=post({action:'receptionArrive',token:tr1,studentId:'9999',guardian:'ولي أمر'});assert(!q.success&&q.code==='NOT_FOUND','unknown student');
  FORMULAS.length=0;post({action:'receptionAdd',token:tr1,name:'=HYPERLINK("x")',cls:'=1',clientId:'adf'});post({action:'receptionArrive',token:tr1,studentId:'X2',guardian:'=cmd',clientId:'arf'});assert(FORMULAS.length===0,'no formula can be injected through the reception forms');
  assert(book.AuditLog.rows.some(x=>x[2]==='STUDENT_ADDED')&&book.AuditLog.rows.some(x=>x[2]==='RECEPTION_ARRIVAL'),'audit: reception');}
+// ---- a supervisor sees only his own reports and their status
+{post({action:'createCase',token:t1,type:'other',text:'بلاغ المشرف الأول',clientId:'mc1'});post({action:'createCase',token:t2,type:'other',text:'بلاغ المشرف الثاني',clientId:'mc2'});
+ let q=post({action:'myCases',token:t1});assert(q.success&&q.cases.length>=1&&q.cases.every(c=>/الأول/.test(c.text)||c.text.length>0)&&!q.cases.some(c=>/الثاني/.test(c.text)),'myCases: a supervisor sees his own reports only');
+ const cid=q.cases.find(c=>/الأول/.test(c.text)).id;post({action:'updateCase',token:tl,id:cid,status:'ack'});q=post({action:'myCases',token:t1});assert(q.cases.find(c=>c.id===cid).status==='ack','myCases: he sees the status the leader gave (تم الاطلاع)');
+ assert(!post({action:'myCases',token:tl}).success,'myCases: only for check-in accounts');}
 // ---- sheet check
 r=post({action:'checkStudentSheet',token:T});assert(r.success&&r.report.ok&&r.report.total===10,'student sheet check passes; students added by hand without a bus are not flagged');
 // ================= STAGES (مراحل المخيم): each stage has a date + time window; the scan follows the clock =================
