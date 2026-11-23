@@ -314,7 +314,7 @@ function handleRoster_(data) {
     const stages = readStages_(), nowMs = Date.now(), open = stages ? openStages_(stages, nowMs) : [];
     const list = students.filter(function(s) { return s.bus === bus; }).map(function(s) {
       const o = publicStudent_(s, states[s.id], false); o.photo = s.photo; o.bagsExpected = s.bags;
-      if (stages) { o.inStage = open.some(function(x) { return stageIncludes_(x, s); }); o.stageDone = open.some(function(x) { return !!stageRec_(sc, s.id, x); }); o.stagesOk = stagesOf_(stages, s); }
+      if (stages) { o.inStage = open.some(function(x) { return stageIncludes_(x, s); }); o.stageDone = open.some(function(x) { return !!stageRec_(sc, s.id, x); }); o.stagesOk = stagesOf_(stages, s); o.stagesDone = stages.filter(function(x) { return !!stageRec_(sc, s.id, x); }).map(function(x) { return x.id; }); }
       return o;
     });
     const c = busCounts_(bus, students, states);
@@ -322,7 +322,8 @@ function handleRoster_(data) {
     // What the supervisor is doing NOW, from the clock: the stages open at this moment (movement, who is accepted, his share) and the next one.
     if (stages) {
       out.stages = true;
-      out.allStages = stages.map(stageBrief_); // the phone decides "which stage is open" with its own clock too (works offline)
+      out.allStages = stages.map(stageBrief_); // the stages the supervisor can choose from (the clock only suggests one)
+      out.mineByStage = {}; stages.forEach(function(x) { out.mineByStage[x.id] = stageMine_(x, user, students, sc); });
       out.openStages = open.map(function(x) { return Object.assign(stageBrief_(x), { mine: stageMine_(x, user, students, sc) }); });
       out.stage = out.openStages[0] || null; if (out.stage) out.mine = out.stage.mine;
       const n = nextStageAfter_(stages, nowMs); out.next = n ? stageBrief_(n) : null;
@@ -351,12 +352,19 @@ function handleScan_(data) {
     const student = findStudent_(data.studentId);
     if (!student) return { success: false, code: 'NOT_FOUND', error: 'الطالب غير موجود' };
     // Stages: once the Stages tab exists, a scan records the movement of the stage that is open NOW for this student (by date + time).
-    const stages = readStages_(), atMs = scanTime_(data);
+    const stages = readStages_(), atMs = scanTime_(data), want = String(data.stageId || '').trim();
     let stage = null, late = false;
     if (stages && action === 'board') {
-      const pick = stageForStudent_(stages, student, atMs);
-      if (!pick.ok) return { success: false, code: pick.code, error: pick.error, student: publicStudent_(student, scanStates_().states[student.id], false), stage: pick.stage ? stageBrief_(pick.stage) : null };
-      stage = pick.stage; late = atMs > stage.endMs;
+      if (want) { // the supervisor CHOSE the stage (the organisers tell him which): no clock check; only "does this student belong to it?"
+        const x = stages.filter(function(y) { return y.id === want; })[0];
+        if (!x) return { success: false, code: 'NO_STAGE', error: 'مرحلة غير معروفة', student: publicStudent_(student, scanStates_().states[student.id], false) };
+        if (!stageIncludes_(x, student)) return { success: false, code: 'NOT_IN_STAGE', error: 'ليس ضمن مرحلة «' + x.name + '»', student: publicStudent_(student, scanStates_().states[student.id], false), stage: stageBrief_(x) };
+        stage = x;
+      } else { // no stage sent (an old phone page): the stage open now by the clock, as before
+        const pick = stageForStudent_(stages, student, atMs);
+        if (!pick.ok) return { success: false, code: pick.code, error: pick.error, student: publicStudent_(student, scanStates_().states[student.id], false), stage: pick.stage ? stageBrief_(pick.stage) : null };
+        stage = pick.stage; late = atMs > stage.endMs;
+      }
     }
     // Scope comes from the SHEET's bus for this student, never from the client. Trip stages: any trip bus (the bus he really took is recorded).
     const anyBus = !!(stage && stage.anyBus);

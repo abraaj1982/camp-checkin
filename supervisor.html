@@ -42,7 +42,7 @@ const pref = { get(k, d) { try { return localStorage.getItem('mk_pref_' + k) || 
 
 /* ---------- i18n ---------- */
 const I = {
- ar: { dir: 'rtl', locIos: 'لم يُسمح بالموقع. على الآيفون: اضغط «aA» بجانب عنوان الصفحة ← «إعدادات الموقع» ← «الموقع» ← «السماح». ثم اضغط «إعادة المحاولة».', locAndroid: 'لم يُسمح بالموقع. اضغط أيقونة القفل بجانب عنوان الصفحة ← «الأذونات» ← «الموقع» ← «السماح». ثم اضغط «إعادة المحاولة».', retry: 'إعادة المحاولة', snd: 'صوت واهتزاز عند المسح', torchOn: 'تشغيل إضاءة الكاميرا', torchOff: 'إيقاف إضاءة الكاميرا', stTitle: 'المرحلة الآن', stNone: 'لا توجد مرحلة الآن. المسح متوقف حتى تبدأ المرحلة التالية.', stNext: 'القادمة', stIn: 'دخول', stOut: 'خروج', stShare: (d, t) => 'سُجّل ' + d + ' من ' + t + ' في باصك', stAnyBus: 'في هذه المرحلة تمسح أي طالب رحلة من أي باص.', noStageStudent: 'لا توجد مرحلة لهذا الطالب الآن', notInStage: n => 'ليس ضمن مرحلة «' + n + '» الجارية الآن', stTrip: 'في الرحلة', stLeft: 'غادر', warnNoArrival: 'تنبيه: لا يوجد تسجيل وصول لهذا الطالب. سُجّل خروجه وسيراه السكرتارية.', warnAlreadyIn: 'تنبيه: الطالب مسجّل داخل المخيم مسبقاً.', bus: n => 'باص ' + n, sup: n => 'مشرف: ' + n, boarded: 'صعدوا', remaining: n => n > 0 ? 'ناقص ' + n : 'اكتمل الباص', how: 'اختر طريقة التسجيل',
+ ar: { dir: 'rtl', locIos: 'لم يُسمح بالموقع. على الآيفون: اضغط «aA» بجانب عنوان الصفحة ← «إعدادات الموقع» ← «الموقع» ← «السماح». ثم اضغط «إعادة المحاولة».', locAndroid: 'لم يُسمح بالموقع. اضغط أيقونة القفل بجانب عنوان الصفحة ← «الأذونات» ← «الموقع» ← «السماح». ثم اضغط «إعادة المحاولة».', retry: 'إعادة المحاولة', snd: 'صوت واهتزاز عند المسح', torchOn: 'تشغيل إضاءة الكاميرا', torchOff: 'إيقاف إضاءة الكاميرا', stTitle: 'اختر المرحلة', stNone: 'لا توجد مرحلة الآن. المسح متوقف حتى تبدأ المرحلة التالية.', stNext: 'القادمة', stIn: 'دخول', stOut: 'خروج', stShare: (d, t) => 'سُجّل ' + d + ' من ' + t + ' في باصك', stAnyBus: 'في هذه المرحلة تمسح أي طالب رحلة من أي باص.', noStageStudent: 'لا توجد مرحلة لهذا الطالب الآن', notInStage: n => 'ليس ضمن المرحلة المختارة «' + n + '»', stDiff: n => 'تنبيه: المرحلة المقترحة حسب الوقت الآن: ' + n, stUse: 'استخدم المقترحة', stTrip: 'في الرحلة', stLeft: 'غادر', warnNoArrival: 'تنبيه: لا يوجد تسجيل وصول لهذا الطالب. سُجّل خروجه وسيراه السكرتارية.', warnAlreadyIn: 'تنبيه: الطالب مسجّل داخل المخيم مسبقاً.', bus: n => 'باص ' + n, sup: n => 'مشرف: ' + n, boarded: 'صعدوا', remaining: n => n > 0 ? 'ناقص ' + n : 'اكتمل الباص', how: 'اختر طريقة التسجيل',
   m_qr: 'QR Code', m_name: 'بحث بالاسم', m_num: 'بحث برقم الطالب', soon: 'قريباً', scanQr: 'وجّه الكاميرا إلى رمز QR الخاص بالطالب', startCam: 'تشغيل الكاميرا', stopCam: 'إيقاف الكاميرا', noCam: 'تعذّر تشغيل الكاميرا. استخدم الاسم أو الرقم.', camDenied: 'لم يُسمح بالكاميرا. من إعدادات المتصفح للموقع اسمح بالكاميرا ثم أعد تحميل الصفحة.',
   nameLbl: 'اكتب اسم الطالب', numLbl: 'اكتب رقم الطالب', none: 'لا توجد نتيجة', student: 'طالب', team: 'الفريق', cls: 'الصف',
   rc: 'جولة التحقق', rcStart: 'بدء جولة التحقق', rcSub: 'نادِ على الأسماء وتأكد أن كل مسجَّل موجود فعلًا في الباص.', rcDepart: 'عند الانطلاق', rcArrive: 'عند الوصول', rcLast: (ph, t, c, tot, ab) => 'آخر جولة (' + (ph === 'arrive' ? 'وصول' : 'انطلاق') + ') ' + t + ': ' + c + ' / ' + tot + (ab ? ' — ' + ab + ' غير موجود' : ' ✓'), rcNever: 'لم تُجرَ جولة بعد', rcHere: 'موجود ✓', rcGone: 'غير موجود ✗', rcBack: 'رجوع', rcOf: (a, b) => 'تم التحقق ' + a + ' من ' + b, rcExit: 'خروج', rcDone: 'انتهت الجولة', rcOk: n => 'كل الطلاب (' + n + ') موجودون ✓', rcGap: n => n + ' مسجَّلون غير موجودين في الباص', rcSend: 'اعتماد وإرسال', rcFix: 'بعد الإرسال سجّل الطالب غير المسجَّل بالاسم، أو تراجع عن تسجيل من ليس موجودًا.', rcSent: 'أُرسلت نتيجة الجولة للقائد', rcNone: 'لا يوجد من سُجّل صعوده بعد.', rcPending: 'تغيير', retrying: names => 'لم يُرسَل بعد، ويُعاد إرساله تلقائياً (لا تُعِد تسجيله): ' + names, board: 'تسجيل الصعود', undo: 'تراجع عن آخر تسجيل', next: 'الطالب التالي', done: 'سُجّل الصعود', undone: 'تم التراجع', undoLocked: 'لا يمكنك التراجع الآن (آخر تسجيل لك وخلال دقيقتين فقط). اطلب من المشرف العام.', undoRow: 'تراجع', confirmUndo: 'التراجع عن صعود هذا الطالب؟',
@@ -51,7 +51,7 @@ const I = {
   missing: 'لم يصعدوا بعد', boardedList: 'صعدوا (الأحدث أولاً)', allList: 'الكل', remainShort: 'المتبقي', boardedShort: 'صعدوا', notYet: 'لم يصعد', withdrawnShort: 'خرج', noneBoarded: 'لم يصعد أحد بعد', allIn: 'اكتمل الباص', trip: 'حالة الرحلة', st_boarding: 'الصعود', st_departed: 'انطلق', st_onway: 'في الطريق', st_arrived: 'وصل', shareLoc: 'مشاركة الموقع مع القائد', locOn: 'الموقع يُرسَل', locOff: 'الموقع متوقف', lastSent: t => 'آخر إرسال ' + t,
   tracking: 'تتبع الباص', trackNote: 'يُرسَل موقع باصك تلقائياً للقائد ما دامت هذه الصفحة مفتوحة. أبقِ الشاشة مضاءة والجوال على الشاحن.', locDenied: 'لم يُسمح بالموقع. افتح إعدادات المتصفح للموقع واسمح بالوصول للموقع ثم أعد تحميل الصفحة.', confirmDepart: n => n > 0 ? 'ينقص ' + n + ' طالباً. هل تؤكد الانطلاق؟' : 'اكتمل الباص. تأكيد الانطلاق؟', yes: 'نعم', cancel: 'إلغاء',
   offline: 'غير متصل. ما تسجّله يُحفظ ويُرسَل تلقائياً.', pending: n => n + ' بانتظار الإرسال', synced: 'تم الإرسال', loading: 'جارٍ التحميل...', report: 'إبلاغ الإدارة', reportAsk: 'اكتب المشكلة باختصار (طالب، باص، مفقود...)', reportSent: 'أُرسل البلاغ إلى الإدارة', logout: 'خروج', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح', err: 'حدث خطأ. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.', paper: 'عند انقطاع الإنترنت يُستخدم الكشف الورقي.' },
- en: { dir: 'ltr', locIos: 'Location was blocked. On iPhone: tap "aA" next to the page address → "Website Settings" → "Location" → "Allow". Then tap "Try again".', locAndroid: 'Location was blocked. Tap the lock icon next to the address → "Permissions" → "Location" → "Allow". Then tap "Try again".', retry: 'Try again', snd: 'Sound & vibration on scan', torchOn: 'Camera light on', torchOff: 'Camera light off', stTitle: 'Stage now', stNone: 'No stage now. Scanning is stopped until the next stage starts.', stNext: 'Next', stIn: 'In', stOut: 'Out', stShare: (d, t) => d + ' of ' + t + ' recorded on your bus', stAnyBus: 'In this stage you scan any trip student from any bus.', noStageStudent: 'No stage for this student now', notInStage: n => 'Not part of the stage open now: ' + n, stTrip: 'On the trip', stLeft: 'Left', warnNoArrival: 'Note: no arrival was recorded for this student. His exit is recorded; the secretariat will see it.', warnAlreadyIn: 'Note: the student is already recorded inside the camp.', bus: n => 'Bus ' + n, sup: n => 'Supervisor: ' + n, boarded: 'Boarded', remaining: n => n > 0 ? n + ' remaining' : 'Bus full', how: 'Choose how to record',
+ en: { dir: 'ltr', locIos: 'Location was blocked. On iPhone: tap "aA" next to the page address → "Website Settings" → "Location" → "Allow". Then tap "Try again".', locAndroid: 'Location was blocked. Tap the lock icon next to the address → "Permissions" → "Location" → "Allow". Then tap "Try again".', retry: 'Try again', snd: 'Sound & vibration on scan', torchOn: 'Camera light on', torchOff: 'Camera light off', stTitle: 'Choose the stage', stNone: 'No stage now. Scanning is stopped until the next stage starts.', stNext: 'Next', stIn: 'In', stOut: 'Out', stShare: (d, t) => d + ' of ' + t + ' recorded on your bus', stAnyBus: 'In this stage you scan any trip student from any bus.', noStageStudent: 'No stage for this student now', notInStage: n => 'Not part of the chosen stage: ' + n, stDiff: n => 'Note: the stage suggested by the time now is: ' + n, stUse: 'Use the suggested one', stTrip: 'On the trip', stLeft: 'Left', warnNoArrival: 'Note: no arrival was recorded for this student. His exit is recorded; the secretariat will see it.', warnAlreadyIn: 'Note: the student is already recorded inside the camp.', bus: n => 'Bus ' + n, sup: n => 'Supervisor: ' + n, boarded: 'Boarded', remaining: n => n > 0 ? n + ' remaining' : 'Bus full', how: 'Choose how to record',
   m_qr: 'QR Code', m_name: 'Search by name', m_num: 'Search by student number', soon: 'Soon', scanQr: 'Point the camera at the student\'s QR code', startCam: 'Start camera', stopCam: 'Stop camera', noCam: 'Camera unavailable. Use name or number.', camDenied: 'Camera access was blocked. Allow the camera for this site in the browser settings, then reload.',
   nameLbl: "Type the student's name", numLbl: "Type the student's number", none: 'No result', student: 'Student', team: 'Team', cls: 'Grade',
   rc: 'Round check', rcStart: 'Start round check', rcSub: 'Call the names and confirm everyone recorded is really on the bus.', rcDepart: 'At departure', rcArrive: 'At arrival', rcLast: (ph, t, c, tot, ab) => 'Last round (' + (ph === 'arrive' ? 'arrival' : 'departure') + ') ' + t + ': ' + c + ' / ' + tot + (ab ? ' — ' + ab + ' missing' : ' ✓'), rcNever: 'No round yet', rcHere: 'Here ✓', rcGone: 'Not here ✗', rcBack: 'Back', rcOf: (a, b) => 'Checked ' + a + ' of ' + b, rcExit: 'Exit', rcDone: 'Round finished', rcOk: n => 'All students (' + n + ') are here ✓', rcGap: n => n + ' recorded but not on the bus', rcSend: 'Confirm and send', rcFix: 'After sending, record the unregistered student by name, or undo the one who is not here.', rcSent: 'The round result was sent to the leader', rcNone: 'Nobody has boarded yet.', rcPending: 'Change', retrying: names => 'Not sent yet, retrying automatically (do not record again): ' + names, board: 'Mark as boarded', undo: 'Undo last record', next: 'Next student', done: 'Boarding recorded', undone: 'Undone', undoLocked: 'You can no longer undo (only your last record, within 2 minutes). Ask the general supervisor.', undoRow: 'Undo', confirmUndo: 'Undo this student’s boarding?',
@@ -119,7 +119,7 @@ function applyServerResult(op, r) {
   if (op.kind === 'scan' && op.body.op === 'board') {
     const who = rosterFind(op.body.studentId), nm = who ? who.name : op.body.studentId;
     if (!r.success && ['NOT_IN_STAGE', 'NO_STAGE', 'STAGE_ENDED'].indexOf(r.code) !== -1) { // refused by the stage rules: undo what the screen showed, and say why
-      if (who) { who.state = 'none'; who.at = ''; who.pending = false; who.stageDone = false; }
+      if (who) { who.state = 'none'; who.at = ''; who.pending = false; }
       st.banner = { cls: 'bad', msg: nm + ': ' + (r.error || '') }; feedback('bad'); return;
     }
     if (r.success && r.warn) st.banner = { cls: 'warn', msg: nm + ': ' + (r.warn === 'NO_ARRIVAL' ? L().warnNoArrival : L().warnAlreadyIn) };
@@ -175,7 +175,7 @@ async function identify(idOrObj) {
   render();
 }
 // No connection and the student is not on this bus: only a trip stage allows it (he may be any bus's); the server checks him when it is sent.
-function blindTrip(id) { const ids = stagesNow() ? stagesNow().open.filter(x => x.anyBus).map(x => x.id) : []; return ids.length ? { mine: false, id: id, name: id, team: '', cls: '', bus: '', stagesOk: ids, blind: true } : { offlineOther: true, id: id }; }
+function blindTrip(id) { const x = chosenStage(); return x && x.anyBus ? { mine: false, id: id, name: id, team: '', cls: '', bus: '', stagesOk: [x.id], blind: true } : { offlineOther: true, id: id }; }
 async function pickRemote(s) { st.cur = Object.assign({ mine: false }, s); st.banner = null; feedback(cardRefused(st.cur) ? 'bad' : 'ok'); render(); }
 function board(auto) {
   const c = st.cur; if (!c) return;
@@ -184,13 +184,13 @@ function board(auto) {
   const stg = chk.stage || null, out = !!(stg && stg.dir === 'out'), optState = out ? (stg.tripOnly ? 'on_trip' : 'departed') : 'boarded';
   if (!c.mine) { // a student of another bus: only a trip stage lets any supervisor record him
     if (!(stg && stg.anyBus)) return;
-    enqueue('scan', { action: 'scan', op: 'board', studentId: c.id, method: st.method }, { optState: optState });
+    enqueue('scan', { action: 'scan', op: 'board', studentId: c.id, method: st.method, stageId: stg ? stg.id : undefined }, { optState: optState });
     st.last = { id: c.id, name: c.name || c.id, canUndo: true, at: Date.now() }; st.cur = null; st.q = ''; st.remote = [];
     return render();
   }
-  const s = rosterFind(c.id); if (!s || (out ? (s.stageDone || s.state === optState) : s.state === 'boarded')) return;
-  s.state = optState; s.stageDone = true; s.at = new Date().toTimeString().slice(0, 5); s.pending = true; store.set('roster', st.roster);
-  enqueue('scan', { action: 'scan', op: 'board', studentId: c.id, method: st.method }, { optState: optState });
+  const s = rosterFind(c.id); if (!s || isDup(Object.assign({ mine: true }, s), stg)) return;
+  s.state = optState; s.stagesDone = (s.stagesDone || []).concat(stg ? [stg.id] : []); s.at = new Date().toTimeString().slice(0, 5); s.pending = true; store.set('roster', st.roster);
+  enqueue('scan', { action: 'scan', op: 'board', studentId: c.id, method: st.method, stageId: stg ? stg.id : undefined }, { optState: optState });
   if (!auto && (st.bagN > 0 || (s.bagsExpected || 0) > 0)) enqueue('bag', { action: 'bag', studentId: c.id, mode: st.bagMode, count: st.bagN }); // no bag record when the scan itself is the check-in
   st.last = { id: c.id, name: c.name, canUndo: true, at: Date.now() }; st.cur = null; st.q = ''; st.remote = [];
   render();
@@ -211,30 +211,40 @@ function toggleSound() { pref.set('sound', soundOn() ? '0' : '1'); feedback('ok'
 function cardRefused(c) {
   if (!c || c.notFound || c.offlineOther) return true;
   const chk = stageCheck(c), stg = chk.stage || null, anyBusOk = !c.mine && !!(stg && stg.anyBus);
-  const dup = c.mine && (stg && stg.dir === 'out' ? !!c.stageDone : c.state === 'boarded');
-  return (!c.mine && !anyBusOk) || c.state === 'withdrawn' || dup || !chk.ok;
+  return (!c.mine && !anyBusOk) || c.state === 'withdrawn' || isDup(c, stg) || !chk.ok;
 }
 /* ---------- camera light (torch): shown only when the phone's camera supports it ---------- */
 function torchOk() { try { return !!(scanner && scanner.getRunningTrackCameraCapabilities().torchFeature().isSupported()); } catch (e) { return false; } }
 async function toggleTorch() { try { const tf = scanner.getRunningTrackCameraCapabilities().torchFeature(); st.torch = !st.torch; await tf.apply(st.torch); } catch (e) { st.torch = false; } render(); }
-/* ---------- stages (by date + time): the screen shows which stage is open and who is accepted ---------- */
-const STAGE_GRACE_MS = 15 * 60 * 1000; // the same grace as the server
+/* ---------- stages: the supervisor CHOOSES the stage (the organisers tell him which); the clock only suggests one ---------- */
+const STAGE_GRACE_MS = 15 * 60 * 1000;
+// The stages open by the clock = the suggestion.
 function stagesNow() { const R = st.roster; if (!R || !R.stages) return null; const t = Date.now(), all = R.allStages || []; return { all: all, open: all.filter(x => x.startMs && t >= x.startMs && t <= x.endMs + STAGE_GRACE_MS) }; }
-function stageCheck(s) { // can this student be recorded now? uses the phone's clock, so it also works offline
-  const sn = stagesNow(); if (!sn) return { ok: true };
-  const ok = s.stagesOk || [];
-  if (!sn.open.length) { const t = Date.now(), nx = sn.all.filter(x => x.startMs > t && ok.indexOf(x.id) !== -1).sort((a, b) => a.startMs - b.startMs)[0]; return { ok: false, msg: L().noStageStudent + (nx ? '. ' + L().stNext + ': ' + nx.name + ' · ' + nx.day + ' ' + nx.from : '') }; }
-  const mine = sn.open.filter(x => ok.indexOf(x.id) !== -1);
-  if (!mine.length) return { ok: false, msg: L().notInStage(sn.open.map(x => x.name).join('، ')) };
-  return { ok: true, stage: mine[mine.length - 1] };
+// The stage in use: his own choice (kept on the phone); first time, the one the clock suggests.
+function chosenStage() {
+  const sn = stagesNow(); if (!sn || !sn.all.length) return null;
+  const pick = id => sn.all.find(x => x.id === id) || null;
+  return pick(st.stageId) || sn.open[0] || sn.all[0];
+}
+function pickStage(id) { st.stageId = id; store.set('stage', id); st.cur = null; st.banner = null; st.q = ''; st.remote = []; render(); }
+function isDup(c, stg) { // already recorded for this stage (or, in an "in" stage, already inside the camp)
+  if (!c.mine) return false;
+  if (!stg) return c.state === 'boarded';
+  return (c.stagesDone || []).indexOf(stg.id) !== -1 || (stg.dir === 'in' && c.state === 'boarded');
+}
+function stageCheck(s) { // does this student belong to the chosen stage? (the server checks again)
+  const x = chosenStage(); if (!x) return { ok: true };
+  if ((s.stagesOk || []).indexOf(x.id) === -1) return { ok: false, msg: L().notInStage(x.name) };
+  return { ok: true, stage: x };
 }
 function stageCard() {
-  const l = L(), sn = stagesNow(); if (!sn) return '';
-  if (!sn.open.length) { const t = Date.now(), nx = sn.all.filter(x => x.startMs > t).sort((a, b) => a.startMs - b.startMs)[0];
-    return `<section class="card" style="border-color:var(--warn)"><div class="kl">${l.stTitle}</div><div class="banner warn" style="margin-top:8px">${l.stNone}${nx ? `<div style="margin-top:4px">${l.stNext}: <b>${esc(nx.name)}</b> · ${esc(nx.day)} · ${esc(nx.time)}</div>` : ''}</div></section>`; }
-  const mineOf = id => ((st.roster.openStages || []).find(x => x.id === id) || {}).mine;
-  return `<section class="card" style="border-color:var(--brand)"><div class="kl">${l.stTitle}</div>` + sn.open.map(x => { const m = mineOf(x.id);
-    return `<div style="margin-top:8px"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b style="font-size:19px">${esc(x.name)}</b><span class="pill ${x.dir === 'out' ? 'bad' : 'ok'}">${x.dir === 'out' ? l.stOut : l.stIn}</span></div><div class="muted" style="font-size:13.5px;margin-top:2px">${esc(x.day)} · ${esc(x.time)} · ${esc(x.who)}</div>${m ? `<div style="margin-top:6px;font-size:13.5px">${esc(l.stShare(m.done, m.total))}</div>` : ''}${x.anyBus ? `<div class="muted" style="font-size:12.5px;margin-top:4px">${l.stAnyBus}</div>` : ''}</div>`; }).join('') + `</section>`;
+  const l = L(), sn = stagesNow(), cur = chosenStage(); if (!sn || !cur) return '';
+  const sug = sn.open, m = (st.roster.mineByStage || {})[cur.id];
+  return `<section class="card" style="border-color:var(--brand)"><div class="kl">${l.stTitle}</div>
+    <select id="stageSel" onchange="pickStage(this.value)" style="margin-top:8px;font-weight:700;font-size:16.5px">${sn.all.map(x => `<option value="${esc(x.id)}" ${x.id === cur.id ? 'selected' : ''}>${esc(x.order + ') ' + x.name + ' — ' + x.day)}</option>`).join('')}</select>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px"><span class="pill ${cur.dir === 'out' ? 'bad' : 'ok'}">${cur.dir === 'out' ? l.stOut : l.stIn}</span><span class="muted" style="font-size:13.5px">${esc(cur.time)} · ${esc(cur.who)}</span></div>
+    ${m ? `<div style="margin-top:6px;font-size:13.5px">${esc(l.stShare(m.done, m.total))}</div>` : ''}${cur.anyBus ? `<div class="muted" style="font-size:12.5px;margin-top:4px">${l.stAnyBus}</div>` : ''}
+    ${sug.length && !sug.some(x => x.id === cur.id) ? `<div class="banner warn" style="margin-top:8px">${esc(l.stDiff(sug.map(x => x.name).join('، ')))} <button class="chip" style="margin-top:6px" onclick="pickStage('${esc(sug[0].id)}')">${l.stUse}</button></div>` : ''}</section>`;
 }
 function undo() {
   const l = st.last; if (!l) return;
@@ -258,6 +268,7 @@ window.__onScanText = identify; // used by tests
 // A QR scan IS the check-in: the student is recorded at once (if the stage accepts him) and the camera stays on for the next one.
 // The same code is ignored for 4 seconds (the camera sees it many times per second); a refusal shows its reason and a low beep.
 let lastQr = { id: '', at: 0 }, qrBusy = false;
+st.stageId = store.get('stage', '');
 async function onQr(text) {
   const id = parseQr(text), now = Date.now();
   if (qrBusy || !id || (id === lastQr.id && now - lastQr.at < 4000)) return;
@@ -430,7 +441,7 @@ function curCard() {
   if (c.notFound) return `<div class="card"><div class="banner bad">${l.notFound} (${esc(c.id)})</div><button class="btn alt full" style="margin-top:10px" onclick="resetCur()">${l.next}</button></div>`;
   if (c.offlineOther) return `<div class="card"><div class="banner warn">${l.otherOffline}</div><button class="btn alt full" style="margin-top:10px" onclick="resetCur()">${l.next}</button></div>`;
   const chk = stageCheck(c), stg = chk.stage || null, anyBusOk = !c.mine && !!(stg && stg.anyBus);
-  const dup = c.mine && (stg && stg.dir === 'out' ? !!c.stageDone : c.state === 'boarded'), wd = c.state === 'withdrawn';
+  const dup = isDup(c, stg), wd = c.state === 'withdrawn';
   let act;
   if (!c.mine && !anyBusOk) act = `<div class="banner bad">${l.other(c.bus, c.supervisor)}</div><button class="btn full" style="margin-top:12px" disabled>${l.board}</button>`;
   else if (wd) act = `<div class="banner bad">${l.withdrawn}</div><button class="btn full" style="margin-top:12px" disabled>${l.board}</button>`;

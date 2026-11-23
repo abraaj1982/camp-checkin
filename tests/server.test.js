@@ -599,6 +599,13 @@ assert(r.enabled&&r.stages.length===6&&s1.status==='live'&&s1.expected===8&&s1.d
 assert(r.stages.find(x=>x.id==='S2').status==='next'&&!JSON.stringify(r).includes('9999'),'board: other stages "next"; no phone numbers');
 r=post({action:'stages',token:t1});assert(!r.success,'a supervisor cannot read the board');
 r=post({action:'stageStart',token:tsec,stageId:'S1'});assert(!r.success,'there is no start / end by hand any more');
+// ---- the supervisor CHOOSES the stage (stageId): the clock is not checked, only whether the student belongs to it
+r=post({action:'scan',token:t1,studentId:'7004',op:'board',stageId:'S1',clientId:'c1'});assert(!r.success&&r.code==='NOT_IN_STAGE'&&/وصول 7-11/.test(r.error),'chosen stage: a grade-5 student is refused by S1');
+r=post({action:'scan',token:t1,studentId:'7004',op:'board',stageId:'S9',clientId:'c2'});assert(!r.success&&r.code==='NO_STAGE','chosen stage: an unknown stage is refused');
+r=post({action:'scan',token:t1,studentId:'7004',op:'board',stageId:'S2',clientId:'c3'});assert(r.success&&r.stage.id==='S2'&&r.student.state==='boarded','chosen stage: S2 (4-6 arrival) is NOT open by the clock, yet a grade-5 student is recorded in it');
+{const row=book.Scans.rows[book.Scans.rows.length-1];assert(row[book.Scans.rows[0].indexOf('StageId')]==='S2','... the row carries the chosen stage');}
+r=post({action:'roster',token:t1});assert(r.mineByStage.S1.total===5&&r.mineByStage.S2.total===1&&r.mineByStage.S2.done===1&&r.students.find(x=>x.id==='7004').stagesDone.join()==='S2','roster: share per stage + the stages each student is already recorded in');
+r=post({action:'scan',token:t1,studentId:'7004',op:'undo'});assert(r.success&&r.student.state==='none','... undone');
 // ---- the window closes: refused; a short grace for scans made offline; the phone's own time is used if believable
 win('S1',-HR,-20*60e3);
 r=post({action:'scan',token:t1,studentId:'7002',op:'board',clientId:'s2'});assert(!r.success&&r.code==='NO_STAGE','window ended 20 min ago: refused');
