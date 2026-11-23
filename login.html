@@ -14,8 +14,8 @@
 .login h1{font-size:24px;text-align:center}
 .login .sub{text-align:center;color:var(--muted);margin:6px 0 18px}
 .field{margin-top:18px}
-.pw{position:relative}.pw input{padding-inline-end:60px}
-.pw button{position:absolute;inset-inline-end:8px;top:50%;transform:translateY(-50%);border:0;background:transparent;color:var(--brand);font:inherit;font-weight:600;font-size:13.5px;cursor:pointer;min-height:40px;padding:0 8px}
+.pw{position:relative}.pw input{padding-inline-end:52px}
+.pw button{position:absolute;inset-inline-end:8px;top:50%;transform:translateY(-50%);border:0;background:transparent;color:var(--muted);cursor:pointer;min-height:40px;min-width:40px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:10px}.pw button:hover,.pw button:focus-visible{color:var(--brand)}
 .foot{text-align:center;color:var(--muted);font-size:12.5px;margin-top:18px}
 </style>
 </head>
@@ -29,7 +29,6 @@
     <div class="ic" aria-hidden="true">م</div>
     <h1 id="title"></h1>
     <p class="sub" id="sub"></p>
-    <div class="note" id="note"></div>
     <form id="form" autocomplete="on">
       <div class="field"><label class="lbl" for="username"><span id="lblU"></span><span class="req">*</span></label><input id="username" type="text" autocomplete="username" autocapitalize="off" spellcheck="false" required></div>
       <div class="field"><label class="lbl" for="password"><span id="lblP"></span><span class="req">*</span></label><div class="pw"><input id="password" type="password" autocomplete="current-password" required><button type="button" id="showPw"></button></div></div>
@@ -48,11 +47,14 @@ const T = {
         bad: 'Wrong username or password.', locked: 'Account temporarily locked. Contact the secretariat.', disabled: 'Account disabled. Contact the secretariat.', net: 'Could not connect. Check the internet and try again.', ok: 'Signed in...' }
 };
 const pref = { get(k, d) { try { return localStorage.getItem('mk_pref_' + k) || d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('mk_pref_' + k, v); } catch (e) {} } };
+// Eye icons for the show / hide password button (a drawing instead of the word "إظهار").
+const EYE = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const EYE_OFF = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.9 17.9A10.4 10.4 0 0 1 12 19C5.6 19 2 12 2 12a18 18 0 0 1 4.1-5.1M9.9 5.2A9.7 9.7 0 0 1 12 5c6.4 0 10 7 10 7a18 18 0 0 1-2.2 3.2"/><path d="M14.1 14.1a3 3 0 1 1-4.2-4.2"/><path d="M2 2l20 20"/></svg>';
 const S = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light') };
 const $ = id => document.getElementById(id);
 function paint() {
   const t = T[S.lang]; document.documentElement.lang = S.lang; document.documentElement.dir = t.dir; document.documentElement.dataset.theme = S.theme;
-  $('title').textContent = t.title; $('sub').textContent = t.sub; $('note').textContent = t.note; $('foot').textContent = t.foot; $('showPw').textContent = $('password').type === 'password' ? t.show : t.hide; $('lblU').textContent = t.u; $('lblP').textContent = t.p; $('btn').textContent = t.go;
+  $('title').textContent = t.title; $('sub').textContent = t.sub; $('foot').textContent = t.foot; const shown = $('password').type !== 'password'; $('showPw').innerHTML = shown ? EYE_OFF : EYE; $('showPw').setAttribute('aria-label', shown ? t.hide : t.show); $('showPw').title = shown ? t.hide : t.show; $('lblU').textContent = t.u; $('lblP').textContent = t.p; $('btn').textContent = t.go;
   $('langBtn').textContent = t.lang; $('themeBtn').textContent = S.theme === 'light' ? t.dark : t.light; document.title = t.title + ' — MUKHAYYAM';
 }
 function msg(cls, text) { $('msg').innerHTML = text ? '<div class="banner ' + cls + '"></div>' : ''; if (text) $('msg').firstChild.textContent = text; }
