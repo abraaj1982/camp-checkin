@@ -23,7 +23,6 @@
 details.grp{border-top:1px solid var(--line);padding:8px 0}details.grp:first-of-type{border-top:0}details.grp summary{cursor:pointer;font-weight:600;display:flex;justify-content:space-between;gap:8px}details.grp .names{margin-top:8px}
 .dir{font-size:11.5px;font-weight:700;border-radius:8px;padding:1px 7px;margin-inline-start:4px;display:inline-block}.dir.in{background:var(--okbg);color:var(--ok)}.dir.out{background:var(--badbg);color:var(--bad)}
 .names{display:flex;flex-wrap:wrap;gap:6px}.names span{background:var(--soft);border-radius:10px;padding:4px 9px;font-size:13px}
-.btn.start{background:#1F7A45;min-height:56px;font-size:17px}.btn.end{background:#B3261E;min-height:56px;font-size:17px}
 </style>
 </head>
 <body>
@@ -47,63 +46,44 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const AUTH_ERR = /EXPIRED|IDLE_TIMEOUT|REVOKED|BAD_SIGNATURE|MALFORMED|USER_NOT_FOUND|ACCOUNT_DISABLED|BAD_PAYLOAD/;
 const T = {
- ar: { dir: 'rtl', title: 'المراحل', sub: 'بدء وإنهاء مراحل الوصول والرحلة والمغادرة', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
-  live: 'جارية الآن', idle: 'لا توجد مرحلة جارية', idleSub: 'المشرفون لا يستطيعون المسح الآن', since: t => 'بدأت ' + t, by: u => ' · ' + u,
+ ar: { dir: 'rtl', title: 'المراحل', sub: 'متابعة مراحل الوصول والرحلة والمغادرة (تبدأ وتنتهي تلقائياً بالتاريخ والوقت)', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
+  live: 'جارية الآن', idle: 'لا توجد مرحلة جارية الآن', idleSub: 'المشرفون لا يستطيعون المسح الآن', until: t => 'حتى ' + t,
   in: 'دخول', out: 'خروج', done: d => d === 'out' ? 'خرجوا' : 'وصلوا', left: 'لم يُمسحوا', withdrawn: 'استأذنوا', perBus: 'حسب الباص', bus: n => 'باص ' + n,
   remaining: 'لم يُمسحوا بعد', allDone: 'الجميع مُسجَّل ✓', anyBus: 'في هذه المرحلة يركب الطالب أي باص من باصات الرحلة، ويُسجَّل الباص الذي ركبه.',
-  next: 'المرحلة التالية', start: '▶ ابدأ المرحلة', end: '■ أنهِ المرحلة', reopen: 'إعادة فتح', program: 'برنامج المراحل',
-  sDone: 'انتهت', sLive: 'جارية', count: (a, b) => a + ' / ' + b, students: n => n + ' طالباً',
-  askStart: x => `بدء «${x.name}»؟\n\n${x.who} · ${x.expected} طالباً · ${x.dir === 'out' ? 'خروج' : 'دخول'}\nمن ليس ضمن هذه المرحلة يرفضه المسح.`,
-  askEnd: x => `إنهاء «${x.name}»؟\n\nلم يُمسح بعد: ${x.expected - x.done - (x.withdrawn || 0)} من ${x.expected}\nإنهاء المرحلة يوقف المسح فقط. لا يُلغى أي تسجيل، ولا تتغير حالة أي طالب.\nتسجيلات المشرفين بلا إنترنت تُقبل إذا كانت قبل الإنهاء.`,
-  askReopen: x => `إعادة فتح «${x.name}»؟ (للتصحيح فقط، إذا أُنهيت بالخطأ)`,
-  started: 'بدأت المرحلة ✓', ended: (d, e) => `انتهت المرحلة ✓ — سُجّل ${d} من ${e}`, viewOnly: 'عرض فقط: بدء المراحل وإنهاؤها للسكرتارية.',
+  next: 'المرحلة التالية', program: 'برنامج المراحل', sDone: 'انتهت', sLive: 'جارية', sNone: 'بلا وقت', count: (a, b) => a + ' / ' + b, students: n => n + ' طالباً',
+  note: 'لتعديل وقت مرحلة (إذا تأخر باص مثلاً): غيّر خانتي From / To في تبويب Stages بالشيت، ويسري خلال دقيقة.',
   off: 'المراحل غير مفعّلة بعد. يفعّلها المسؤول التقني مرة واحدة.', updated: t => 'آخر تحديث ' + t, refresh: 'تحديث',
-  error: 'تعذّر الاتصال. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.', codes: { OTHER_LIVE: 'توجد مرحلة جارية. أنهِها أولاً.', NOT_LIVE: 'المرحلة ليست جارية', NOT_FOUND: 'مرحلة غير معروفة' } },
- en: { dir: 'ltr', title: 'Stages', sub: 'Start and end the arrival, trip and departure stages', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
-  live: 'Running now', idle: 'No stage running', idleSub: 'Supervisors cannot scan now', since: t => 'started ' + t, by: u => ' · ' + u,
+  error: 'تعذّر الاتصال. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.' },
+ en: { dir: 'ltr', title: 'Stages', sub: 'Follow the arrival, trip and departure stages (they open and close by date and time)', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
+  live: 'Open now', idle: 'No stage is open now', idleSub: 'Supervisors cannot scan now', until: t => 'until ' + t,
   in: 'In', out: 'Out', done: d => d === 'out' ? 'Left' : 'Arrived', left: 'Not scanned', withdrawn: 'Withdrawn', perBus: 'Per bus', bus: n => 'Bus ' + n,
   remaining: 'Not scanned yet', allDone: 'Everyone recorded ✓', anyBus: 'In this stage a student may take any trip bus; the bus he took is recorded.',
-  next: 'Next stage', start: '▶ Start stage', end: '■ End stage', reopen: 'Re-open', program: 'Stage programme',
-  sDone: 'Done', sLive: 'Running', count: (a, b) => a + ' / ' + b, students: n => n + ' students',
-  askStart: x => `Start "${x.name}"?\n\n${x.who} · ${x.expected} students · ${x.dir === 'out' ? 'out' : 'in'}\nAnyone outside this stage is refused by the scan.`,
-  askEnd: x => `End "${x.name}"?\n\nNot scanned yet: ${x.expected - x.done - (x.withdrawn || 0)} of ${x.expected}\nEnding only stops scanning. No record is removed and no student's state changes.\nOffline scans made before the end are still accepted.`,
-  askReopen: x => `Re-open "${x.name}"? (only to correct a stage ended by mistake)`,
-  started: 'Stage started ✓', ended: (d, e) => `Stage ended ✓ — ${d} of ${e} recorded`, viewOnly: 'View only: the secretariat starts and ends stages.',
+  next: 'Next stage', program: 'Stage programme', sDone: 'Done', sLive: 'Open', sNone: 'No time', count: (a, b) => a + ' / ' + b, students: n => n + ' students',
+  note: 'To change a stage time (e.g. a late bus): edit its From / To cells in the Stages tab of the sheet; it applies within a minute.',
   off: 'Stages are not switched on yet. The technical admin turns them on once.', updated: t => 'Updated ' + t, refresh: 'Refresh',
-  error: 'Connection problem. Try again.', sessionEnd: 'Session expired. Please log in again.', codes: { OTHER_LIVE: 'Another stage is running. End it first.', NOT_LIVE: 'The stage is not running', NOT_FOUND: 'Unknown stage' } }
+  error: 'Connection problem. Try again.', sessionEnd: 'Session expired. Please log in again.' }
 };
-const st = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), data: null, msg: null, busy: false, at: '' };
+const st = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), data: null, msg: null, at: '' };
 const L = () => T[st.lang];
 async function api(action, extra) {
   const r = await (await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(Object.assign({ action: action, token: token }, extra || {})) })).json();
   if (r && r.code && AUTH_ERR.test(r.code)) { st.msg = { cls: 'bad', t: L().sessionEnd }; render(); setTimeout(() => { sessionStorage.clear(); location.href = 'login.html'; }, 1500); throw new Error('auth'); }
   return r;
 }
-const say = (cls, t) => { st.msg = { cls: cls, t: t }; };
-const errText = r => (r && L().codes[r.code]) || (r && r.error) || L().error;
 const nowHHMM = () => new Date().toLocaleTimeString('en-GB', { timeZone: 'Asia/Muscat', hour: '2-digit', minute: '2-digit' });
 async function load() {
-  try { const r = await api('stages'); if (r.success) { st.data = r; st.at = nowHHMM(); } else say('bad', errText(r)); } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
+  try { const r = await api('stages'); if (r.success) { st.data = r; st.msg = null; st.at = nowHHMM(); } else st.msg = { cls: 'bad', t: r.error || L().error }; } catch (e) { if (e.message !== 'auth') st.msg = { cls: 'bad', t: L().error }; }
   render();
 }
-async function act(kind, id) {
-  const l = L(), x = (st.data.stages || []).find(s => s.id === id); if (!x || st.busy) return;
-  if (!confirm(kind === 'start' ? (x.status === 'done' ? l.askReopen(x) : l.askStart(x)) : l.askEnd(x))) return;
-  st.busy = true; render();
-  try { const r = await api(kind === 'start' ? 'stageStart' : 'stageEnd', { stageId: id });
-    if (r.success) say('ok', kind === 'start' ? l.started : l.ended(r.done, r.expected)); else say('bad', errText(r));
-  } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
-  st.busy = false; await load();
-}
 const dirPill = d => `<span class="dir ${d}">${d === 'out' ? L().out : L().in}</span>`;
-function liveView(x, ctl) {
+const when = x => [x.day, x.time].filter(Boolean).join(' · ');
+function liveView(x) {
   const l = L(), left = x.expected - x.done - (x.withdrawn || 0);
-  return `<div class="now live"><span class="dot"></span><div>${l.live}: ${x.order}) ${esc(x.name)} ${dirPill(x.dir)}<small>${esc(l.since(x.startedAt))}${x.startedBy ? esc(l.by(x.startedBy)) : ''} · ${esc(x.who)}</small></div></div>
+  return `<div class="now live"><span class="dot"></span><div>${l.live}: ${x.order}) ${esc(x.name)} ${dirPill(x.dir)}<small>${esc(x.time)} · ${esc(x.who)}</small></div></div>
   <div class="kpi"><div><b>${x.done}</b><span>${l.done(x.dir)}</span></div><div><b>${left}</b><span>${l.left}</span></div><div><b>${x.withdrawn || 0}</b><span>${l.withdrawn}</span></div></div>
   <section class="card"><h2 class="h2" style="margin-bottom:4px">${l.perBus}</h2>${(x.perBus || []).map(b => `<div class="brow"><div class="meta"><b>${esc(l.bus(b.bus || '—'))}</b><span>${l.count(b.done, b.total)}</span></div><div class="bar"><i style="width:${b.total ? Math.round(b.done / b.total * 100) : 0}%"></i></div></div>`).join('')}
    ${x.anyBus ? `<div class="muted" style="font-size:12.5px;margin-top:8px">${l.anyBus}</div>` : ''}</section>
-  <section class="card"><h2 class="h2" style="margin-bottom:8px">${l.remaining} <span class="pill ${left ? 'warn' : 'ok'}">${left}</span></h2>${(x.remaining || []).length ? remainingByBus(x.remaining) : `<div class="muted">${l.allDone}</div>`}</section>
-  ${ctl ? `<button class="btn end full" data-end="${esc(x.id)}" ${st.busy ? 'disabled' : ''}>${l.end}</button>` : ''}`;
+  <section class="card"><h2 class="h2" style="margin-bottom:8px">${l.remaining} <span class="pill ${left ? 'warn' : 'ok'}">${left}</span></h2>${(x.remaining || []).length ? remainingByBus(x.remaining) : `<div class="muted">${l.allDone}</div>`}</section>`;
 }
 // Names still missing, grouped by bus; a short list opens by itself, a long one stays folded (tap a bus to see its names).
 function remainingByBus(list) {
@@ -111,18 +91,17 @@ function remainingByBus(list) {
   list.forEach(s => { (g[s.bus || '—'] = g[s.bus || '—'] || []).push(s); });
   return Object.keys(g).sort().map(b => `<details class="grp" ${list.length <= 25 ? 'open' : ''}><summary><span>${esc(l.bus(b))}</span><span class="pill warn">${g[b].length}</span></summary><div class="names">${g[b].map(s => `<span>${esc(s.name)}</span>`).join('')}</div></details>`).join('');
 }
-function idleView(n, ctl) {
+function idleView(n) {
   const l = L();
   return `<div class="now idle"><span class="dot"></span><div>${l.idle}<small>${l.idleSub}</small></div></div>
-  ${n ? `<section class="card"><h2 class="h2" style="margin-bottom:6px">${l.next}</h2><div><b>${n.order}) ${esc(n.name)}</b> ${dirPill(n.dir)}</div><div class="muted" style="font-size:13px;margin:4px 0 12px">${esc([n.day, n.time].filter(Boolean).join(' · '))} · ${esc(n.who)} · ${esc(l.students(n.expected))}</div>
-   ${ctl ? `<button class="btn start full" data-start="${esc(n.id)}" ${st.busy ? 'disabled' : ''}>${l.start}</button>` : ''}</section>` : ''}`;
+  ${n ? `<section class="card"><h2 class="h2" style="margin-bottom:6px">${l.next}</h2><div><b>${n.order}) ${esc(n.name)}</b> ${dirPill(n.dir)}</div><div class="muted" style="font-size:13px;margin-top:4px">${esc(when(n))} · ${esc(n.who)} · ${esc(l.students(n.expected))}</div></section>` : ''}`;
 }
-function programView(list, ctl) {
-  const l = L(), liveNow = list.some(s => s.status === 'live');
+function programView(list) {
+  const l = L();
   return `<section class="card"><h2 class="h2" style="margin-bottom:4px">${l.program}</h2>${list.map(s => `<div class="st ${s.status}"><div class="n">${s.status === 'done' ? '✓' : s.order}</div>
-   <div class="t"><b>${esc(s.name)} ${dirPill(s.dir)}</b><span class="sub">${esc([s.day, s.time].filter(Boolean).join(' · '))} · ${esc(s.who)}</span>
-   ${s.status !== 'next' ? `<span class="sub">${l.count(s.done, s.expected)}${s.startedAt ? ' · ' + esc(s.startedAt) : ''}${s.endedAt ? ' – ' + esc(s.endedAt) : ''}</span>` : ''}</div>
-   ${s.status === 'live' ? `<span class="pill ok">${l.sLive}</span>` : s.status === 'done' ? (ctl && !liveNow ? `<button class="chip" data-start="${esc(s.id)}">${l.reopen}</button>` : `<span class="pill">${l.sDone}</span>`) : (ctl && !liveNow ? `<button class="chip" data-start="${esc(s.id)}">▶</button>` : '')}</div>`).join('')}</section>`;
+   <div class="t"><b>${esc(s.name)} ${dirPill(s.dir)}</b><span class="sub">${esc(when(s))} · ${esc(s.who)}</span>
+   ${s.status === 'live' || s.status === 'done' ? `<span class="sub">${l.count(s.done, s.expected)}</span>` : ''}</div>
+   ${s.status === 'live' ? `<span class="pill ok">${l.sLive}</span>` : s.status === 'done' ? `<span class="pill">${l.sDone}</span>` : s.status === 'none' ? `<span class="pill bad">${l.sNone}</span>` : ''}</div>`).join('')}</section>`;
 }
 function render() {
   const l = L(); document.documentElement.lang = st.lang; document.documentElement.dir = l.dir; document.documentElement.dataset.theme = st.theme; document.title = l.title + ' — MUKHAYYAM';
@@ -130,17 +109,15 @@ function render() {
   const d = st.data, msg = st.msg ? `<div class="banner ${st.msg.cls}" role="alert">${esc(st.msg.t)}</div>` : '';
   if (!d) { $('app').innerHTML = msg; return; }
   if (!d.enabled) { $('app').innerHTML = msg + `<div class="banner warn">${l.off}</div>`; return; }
-  const ctl = !!d.canControl, list = d.stages || [], live = list.find(s => s.status === 'live'), next = list.find(s => s.status === 'next');
-  $('app').innerHTML = msg + (ctl ? '' : `<div class="banner">${l.viewOnly}</div>`) + (live ? liveView(live, ctl) : idleView(next, ctl)) + programView(list, ctl) +
-    `<div class="muted" style="text-align:center;font-size:12.5px">${esc(l.updated(st.at))} · <button class="chip" data-refresh="1">${l.refresh}</button></div>`;
+  const list = d.stages || [], live = list.filter(s => s.status === 'live'), next = list.filter(s => s.status === 'next')[0];
+  $('app').innerHTML = msg + (live.length ? live.map(liveView).join('') : idleView(next)) + programView(list) +
+    `<div class="muted" style="text-align:center;font-size:12.5px;margin-bottom:8px">${esc(l.note)}</div>
+     <div class="muted" style="text-align:center;font-size:12.5px">${esc(l.updated(st.at))} · <button class="chip" data-refresh="1">${l.refresh}</button></div>`;
 }
-document.addEventListener('click', e => {
-  const b = e.target.closest && e.target.closest('button'); if (!b) return; const d = b.dataset;
-  if (d.start) act('start', d.start); else if (d.end) act('end', d.end); else if (d.refresh) { st.msg = null; load(); }
-});
+document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('button'); if (b && b.dataset.refresh) { st.msg = null; load(); } });
 $('langBtn').onclick = () => { st.lang = st.lang === 'ar' ? 'en' : 'ar'; pref.set('lang', st.lang); render(); };
 $('themeBtn').onclick = () => { st.theme = st.theme === 'light' ? 'dark' : 'light'; pref.set('theme', st.theme); render(); };
 render(); load();
-setInterval(() => { if (document.visibilityState === 'visible' && !st.busy) load(); }, 20000); // the numbers follow the scans
+setInterval(() => { if (document.visibilityState === 'visible') load(); }, 20000); // the numbers follow the scans and the clock
 </script>
 </body></html>

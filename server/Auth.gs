@@ -305,7 +305,9 @@ function writeLoginSuccessRow_(sheet, headers, user, now) {
 }
 
 function handleLogin_(data) {
-  const { headers, sheet, rows } = readSheetAsObjects_(USERS_SHEET);
+  // Speed: the first look-up (is there such a user, his salt and hash) uses the 60-second Users cache instead of reading the whole tab
+  // (about 1-1.5 s saved when the cache is warm). Everything that decides the login is checked again on a FRESH row under the lock below.
+  const rows = readUsersCached_();
   const user = rows.find(r => sameUsername_(r.Username, data.username));
   if (!user) return { success: false, error: 'Invalid username or password' };
 
@@ -813,20 +815,25 @@ function SETUP_createTabs() {
 }
 
 
-// Turns the camp STAGES on (run once from the editor, when the stages screen is ready): creates the Stages tab with the
-// six stages. From then on a scan is accepted only while the secretariat has a stage running, and only for its students.
-// To turn stages off again, delete the Stages tab.
+// Turns the camp STAGES on (run once from the editor): creates the Stages tab with the six stages and their date + time windows.
+// From then on a scan is accepted only inside a stage's window and only for the students that stage includes.
+// Safe to run again: it only fills what is missing (a stage whose Date / From / To are empty gets the planned ones); it never overwrites.
+// To turn stages off, delete the Stages tab.
 function SETUP_createStages() {
   const ss = SpreadsheetApp.openById(SHEET_ID);
   Object.keys(SHEET_MEMO_).forEach(function(k) { delete SHEET_MEMO_[k]; });
   const log = [];
   ensureSheetWithHeaders_(ss, 'Scans', ['Time', 'StudentID', 'Action', 'Bus', 'Supervisor', 'Method', 'ClientId', 'Notes', 'StageId'], log);
-  const stg = ensureSheetWithHeaders_(ss, 'Stages', STAGES_HEADERS_, log);
-  if (stg.getLastRow() < 2) {
-    const rows = STAGES_SEED_.map(function(r) { return r.concat(['next', '', '', '', '']); });
-    stg.getRange(2, 1, rows.length, STAGES_HEADERS_.length).setValues(rows);
-    log.push('عُبِّئت ' + rows.length + ' مراحل');
-  }
+  const sh = ensureSheetWithHeaders_(ss, 'Stages', STAGES_HEADERS_, log);
+  const v = sh.getDataRange().getValues(), h = v[0].map(String), col = function(n) { return h.indexOf(n); };
+  STAGES_SEED_.forEach(function(seed) {
+    const want = {}; STAGES_HEADERS_.forEach(function(n, k) { want[n] = seed[k]; });
+    let r = -1; for (let i = 1; i < v.length; i++) if (String(v[i][col('StageId')]).trim() === seed[0]) { r = i; break; }
+    if (r === -1) { sh.appendRow(h.map(function(n) { return want[n] === undefined ? '' : want[n]; })); log.push('أُضيفت مرحلة ' + seed[0]); return; }
+    ['Date', 'From', 'To'].forEach(function(n) {
+      if (col(n) !== -1 && String(v[r][col(n)]).trim() === '') { sh.getRange(r + 1, col(n) + 1).setValue(want[n]); log.push(seed[0] + ': ' + n + ' = ' + String(want[n]).replace(/^'/, '')); }
+    });
+  });
   clearStagesCache_();
   const msg = log.join('\n');
   Logger.log(msg);
