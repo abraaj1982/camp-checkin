@@ -16,6 +16,7 @@
 .field{margin-top:18px}
 .pw{position:relative}.pw input{padding-inline-end:52px}
 .pw button{position:absolute;inset-inline-end:8px;top:50%;transform:translateY(-50%);border:0;background:transparent;color:var(--muted);cursor:pointer;min-height:40px;min-width:40px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:10px}.pw button:hover,.pw button:focus-visible{color:var(--brand)}
+.caps{margin-top:8px;color:var(--warn);background:var(--warnbg);border-radius:10px;padding:6px 10px;font-size:13px}
 .foot{text-align:center;color:var(--muted);font-size:12.5px;margin-top:18px}
 </style>
 </head>
@@ -31,7 +32,7 @@
     <p class="sub" id="sub"></p>
     <form id="form" autocomplete="on">
       <div class="field"><label class="lbl" for="username"><span id="lblU"></span><span class="req">*</span></label><input id="username" type="text" autocomplete="username" autocapitalize="off" spellcheck="false" required></div>
-      <div class="field"><label class="lbl" for="password"><span id="lblP"></span><span class="req">*</span></label><div class="pw"><input id="password" type="password" autocomplete="current-password" required><button type="button" id="showPw"></button></div></div>
+      <div class="field"><label class="lbl" for="password"><span id="lblP"></span><span class="req">*</span></label><div class="pw"><input id="password" type="password" autocomplete="current-password" required><button type="button" id="showPw"></button></div><div class="caps" id="caps" role="status" hidden></div></div>
       <div id="msg" role="alert"></div>
       <button type="submit" class="btn full" id="btn" style="margin-top:22px"></button>
     </form>
@@ -41,9 +42,9 @@
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4lEBGPNxghwq9UmK0iljI5QdS-8iCvC-K09dDtbZCXGvGZyA4repTE3rFVVRp5zS4yw/exec';
 const T = {
-  ar: { dir: 'rtl', title: 'تسجيل الدخول', sub: 'منصة إدارة المخيم', note: '🔒 أدخل اسم المستخدم وكلمة المرور التي استلمتها من السكرتارية', show: 'إظهار', hide: 'إخفاء', foot: 'نسيت كلمة المرور؟ تواصل مع السكرتارية.', u: 'اسم المستخدم', p: 'كلمة المرور', go: 'دخول', going: 'جارٍ الدخول...', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
+  ar: { dir: 'rtl', caps: 'مفتاح Caps Lock مفعّل', title: 'تسجيل الدخول', sub: 'منصة إدارة المخيم', note: '🔒 أدخل اسم المستخدم وكلمة المرور التي استلمتها من السكرتارية', show: 'إظهار', hide: 'إخفاء', foot: 'نسيت كلمة المرور؟ تواصل مع السكرتارية.', u: 'اسم المستخدم', p: 'كلمة المرور', go: 'دخول', going: 'جارٍ الدخول...', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
         bad: 'اسم المستخدم أو كلمة المرور غير صحيحة.', locked: 'الحساب مقفل مؤقتاً. تواصل مع السكرتارية.', disabled: 'الحساب معطَّل. تواصل مع السكرتارية.', net: 'تعذّر الاتصال. تحقق من الإنترنت وأعد المحاولة.', ok: 'تم الدخول...' },
-  en: { dir: 'ltr', title: 'Sign in', sub: 'Camp management platform', note: '🔒 Enter the username and password you received from the secretariat', show: 'Show', hide: 'Hide', foot: 'Forgot your password? Contact the secretariat.', u: 'Username', p: 'Password', go: 'Sign in', going: 'Signing in...', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
+  en: { dir: 'ltr', caps: 'Caps Lock is on', title: 'Sign in', sub: 'Camp management platform', note: '🔒 Enter the username and password you received from the secretariat', show: 'Show', hide: 'Hide', foot: 'Forgot your password? Contact the secretariat.', u: 'Username', p: 'Password', go: 'Sign in', going: 'Signing in...', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
         bad: 'Wrong username or password.', locked: 'Account temporarily locked. Contact the secretariat.', disabled: 'Account disabled. Contact the secretariat.', net: 'Could not connect. Check the internet and try again.', ok: 'Signed in...' }
 };
 const pref = { get(k, d) { try { return localStorage.getItem('mk_pref_' + k) || d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('mk_pref_' + k, v); } catch (e) {} } };
@@ -62,6 +63,9 @@ $('langBtn').onclick = () => { S.lang = S.lang === 'ar' ? 'en' : 'ar'; pref.set(
 $('themeBtn').onclick = () => { S.theme = S.theme === 'light' ? 'dark' : 'light'; pref.set('theme', S.theme); paint(); };
 $('showPw').onclick = () => { const p = $('password'); p.type = p.type === 'password' ? 'text' : 'password'; paint(); p.focus(); };
 paint();
+// Warn when Caps Lock is on while typing the password (a common reason for a refused password).
+function capsCheck(e) { const on = !!(e.getModifierState && e.getModifierState('CapsLock')); $('caps').hidden = !on; if (on) $('caps').textContent = '⚠ ' + T[S.lang].caps; }
+$('password').addEventListener('keydown', capsCheck); $('password').addEventListener('keyup', capsCheck); $('password').addEventListener('blur', () => { $('caps').hidden = true; });
 
 $('form').addEventListener('submit', async e => {
   e.preventDefault(); msg('', ''); const t = T[S.lang];
