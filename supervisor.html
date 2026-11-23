@@ -177,7 +177,7 @@ async function identify(idOrObj) {
 // No connection and the student is not on this bus: only a trip stage allows it (he may be any bus's); the server checks him when it is sent.
 function blindTrip(id) { const ids = stagesNow() ? stagesNow().open.filter(x => x.anyBus).map(x => x.id) : []; return ids.length ? { mine: false, id: id, name: id, team: '', cls: '', bus: '', stagesOk: ids, blind: true } : { offlineOther: true, id: id }; }
 async function pickRemote(s) { st.cur = Object.assign({ mine: false }, s); st.banner = null; feedback(cardRefused(st.cur) ? 'bad' : 'ok'); render(); }
-function board() {
+function board(auto) {
   const c = st.cur; if (!c) return;
   const chk = stageCheck(c);
   if (!chk.ok) { st.banner = { cls: 'bad', msg: chk.msg }; feedback('bad'); return render(); } // refused here already (the server decides again)
@@ -191,7 +191,7 @@ function board() {
   const s = rosterFind(c.id); if (!s || (out ? (s.stageDone || s.state === optState) : s.state === 'boarded')) return;
   s.state = optState; s.stageDone = true; s.at = new Date().toTimeString().slice(0, 5); s.pending = true; store.set('roster', st.roster);
   enqueue('scan', { action: 'scan', op: 'board', studentId: c.id, method: st.method }, { optState: optState });
-  if (st.bagN > 0 || (s.bagsExpected || 0) > 0) enqueue('bag', { action: 'bag', studentId: c.id, mode: st.bagMode, count: st.bagN });
+  if (!auto && (st.bagN > 0 || (s.bagsExpected || 0) > 0)) enqueue('bag', { action: 'bag', studentId: c.id, mode: st.bagMode, count: st.bagN }); // no bag record when the scan itself is the check-in
   st.last = { id: c.id, name: c.name, canUndo: true, at: Date.now() }; st.cur = null; st.q = ''; st.remote = [];
   render();
 }
@@ -254,7 +254,17 @@ document.addEventListener('click', e => {
   st.listTab = b.dataset.ltab; render();
 });
 function resetCur() { st.cur = null; st.banner = null; st.q = ''; st.remote = []; render(); }
-window.__onScanText = identify; // used by the camera decoder (and by tests)
+window.__onScanText = identify; // used by tests
+// A QR scan IS the check-in: the student is recorded at once (if the stage accepts him) and the camera stays on for the next one.
+// The same code is ignored for 4 seconds (the camera sees it many times per second); a refusal shows its reason and a low beep.
+let lastQr = { id: '', at: 0 }, qrBusy = false;
+async function onQr(text) {
+  const id = parseQr(text), now = Date.now();
+  if (qrBusy || !id || (id === lastQr.id && now - lastQr.at < 4000)) return;
+  qrBusy = true; lastQr = { id: id, at: now };
+  try { await identify(id); if (st.cur && !cardRefused(st.cur)) board(true); } finally { qrBusy = false; }
+}
+window.__onQr = onQr; // used by tests
 
 /* ---------- camera ---------- */
 let scanner = null;
@@ -270,7 +280,7 @@ async function startCam() {
   try { await loadScanner(); } catch (e) { st.cam = false; st.banner = { cls: 'warn', msg: L().noCam + ' (library)' }; return render(); }          // draw the #reader box FIRST, then attach the scanner to it
   try {
     scanner = new Html5Qrcode('reader');
-    await scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 220, height: 220 } }, text => { stopCam(); identify(text); }, () => {});
+    await scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 220, height: 220 } }, text => { onQr(text); }, () => {});
   } catch (e) {
     const m = String(e && (e.message || e)); scanner = null; st.cam = false;
     st.banner = { cls: 'warn', msg: /NotAllowed|Permission|denied/i.test(m) ? L().camDenied : L().noCam + ' (' + m.slice(0, 80) + ')' }; render();
