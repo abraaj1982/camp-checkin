@@ -461,7 +461,7 @@ function gradeOf_(cls) {
 // "7-11" -> [7..11]; "4,5,6" -> [4,5,6]; empty -> null (every grade). A cell Sheets turned into a date (7-11 -> 11 July) is read back.
 function parseGrades_(v) {
   if (v instanceof Date) v = (v.getMonth() + 1) + '-' + v.getDate();
-  const t = latinDigits_(v === undefined || v === null ? '' : v).trim();
+  const t = latinDigits_(v === undefined || v === null ? '' : v).trim().replace(/^'/, ''); // a text-marking apostrophe, if one shows up
   if (!t) return null;
   const r = /^(\d+)\s*[-–]\s*(\d+)$/.exec(t);
   if (r) { const out = []; for (let g = Number(r[1]); g <= Number(r[2]); g++) out.push(g); return out; }
@@ -488,7 +488,7 @@ function readStages_() {
       const st = String(g(r, 'Status')).trim().toLowerCase(), pt = g(r, 'PlannedTime');
       list.push({ id: id, order: Number(g(r, 'Order')) || r, name: String(g(r, 'Name')).trim() || id, dir: String(g(r, 'Direction')).trim().toLowerCase() === 'out' ? 'out' : 'in',
         grades: parseGrades_(g(r, 'Grades')), tripOnly: isYes_(g(r, 'TripOnly')), anyBus: isYes_(g(r, 'AnyBus')),
-        day: String(g(r, 'Day')).trim(), time: pt instanceof Date ? fmtTime_(pt) : String(pt).trim(),
+        day: String(g(r, 'Day')).trim(), time: pt instanceof Date ? fmtTime_(pt) : String(pt).trim().replace(/^'/, ''),
         status: st === 'live' || st === 'done' ? st : 'next', startedMs: ms(g(r, 'StartedAt')), startedBy: String(g(r, 'StartedBy')), endedMs: ms(g(r, 'EndedAt')), endedBy: String(g(r, 'EndedBy')), _row: r + 1 });
     }
     list.sort(function(a, b) { return a.order - b.order; });

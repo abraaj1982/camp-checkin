@@ -562,6 +562,7 @@ const tsec=post({action:'login',username:'stgsec',password:'sec-12345'}).token;
 const st=(id)=>post({action:'roster',token:T,bus:id==='7003'||id==='7005'?'2':'1'}).students.find(x=>x.id===id).state;
 // grades: digits, Arabic-Indic digits, words; a range that Sheets turned into a date is read back
 assert(run('gradeOf_("٨")')===8&&run('gradeOf_("الصف الحادي عشر")')===11&&run('gradeOf_("Grade 10")')===10&&run('gradeOf_("")')===null,'grade read from digits / Arabic digits / words');
+assert(JSON.stringify(run("parseGrades_(\"'7-11\")"))==='[7,8,9,10,11]','grades: a stray text apostrophe is ignored');
 assert(JSON.stringify(run('parseGrades_(new Date(2026,6,11))'))==='[7,8,9,10,11]'&&JSON.stringify(run('parseGrades_("4، 5، 6")'))==='[4,5,6]','grades: range, list, and a range Sheets turned into a date');
 // no stage running: nothing is recorded, the supervisor is told what comes next
 r=post({action:'scan',token:t1,studentId:'7001',op:'board',clientId:'s0'});assert(!r.success&&r.code==='NO_STAGE'&&/وصول 7-11/.test(r.error),'no running stage: scan refused, the next stage is named');
