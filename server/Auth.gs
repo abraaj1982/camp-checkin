@@ -804,7 +804,7 @@ function SETUP_createTabs() {
   ensureSheetWithHeaders_(ss, 'Custody', ['Time', 'StudentID', 'Item', 'Action', 'Count', 'Tag', 'By', 'ClientId', 'Notes'], log);
   ensureSheetWithHeaders_(ss, 'MedClearances', ['Id', 'StudentID', 'Time', 'DoctorUser', 'Note', 'Status', 'HandledBy', 'HandledAt', 'ReturnReason', 'WithdrawalId', 'ClientId'], log);
   ensureSheetWithHeaders_(ss, 'Withdrawals', ['Id', 'StudentID', 'Time', 'GuardianName', 'Reason', 'Status', 'CreatedBy', 'ClosedAt', 'ClosedBy', 'ClientId'], log);
-  ensureSheetWithHeaders_(ss, 'MedicalCases', ['Id', 'StudentID', 'OpenedAt', 'OpenedBy', 'Severity', 'Complaint', 'Treatment', 'Status', 'ClosedAt', 'ClosedBy', 'ClientId', 'Medication', 'FollowUp'], log);
+  ensureSheetWithHeaders_(ss, 'MedicalCases', ['Id', 'StudentID', 'OpenedAt', 'OpenedBy', 'Severity', 'Complaint', 'Treatment', 'Status', 'ClosedAt', 'ClosedBy', 'ClientId', 'Medication'], log);
   ensureSheetWithHeaders_(ss, 'Announcements', ['Id', 'CreatedAt', 'Title', 'Body', 'Kind', 'StartsAt', 'Audience', 'Pinned', 'Status', 'CreatedBy', 'PublishedAt', 'ClientId'], log);
   ensureSheetWithHeaders_(ss, 'Results', ['Id', 'CreatedAt', 'Competition', 'Team', 'Place', 'Points', 'Status', 'CreatedBy', 'PublishedAt', 'ClientId'], log);
   ensureSheetWithHeaders_(ss, 'Staff', ['Name', 'Size', 'Note'], log);

@@ -181,8 +181,8 @@ r=post({action:'leaderSummary',token:tl});assert(r.alerts.some(a=>a.type==='med_
 r=post({action:'medList',token:tl});assert(!r.success,'leader cannot list medical cases');
 r=post({action:'medClose',token:td,id:mid});assert(!r.success&&r.code==='TREATMENT_REQUIRED','cannot close without treatment');
 r=post({action:'medUpdate',token:td,id:mid,treatment:'خافض حرارة وراحة'});assert(r.success,'treatment saved');
-r=post({action:'medUpdate',token:td,id:mid,treatment:'خافض حرارة وراحة',medication:'باراسيتامول 500 ملغ مرة واحدة',followUp:'راحة وماء، مراجعة غدًا إن استمر'});assert(r.success,'diagnosis, medication and follow-up saved');
-r=post({action:'medList',token:td});{const x=r.cases.find(c=>c.id===mid);assert(x&&x.medication.includes('باراسيتامول')&&x.followUp.includes('مراجعة')&&x.treatment==='خافض حرارة وراحة'&&x.doctor,'the list carries medication, follow-up and the doctor name');}
+r=post({action:'medUpdate',token:td,id:mid,treatment:'خافض حرارة وراحة',medication:'باراسيتامول 500 ملغ مرة واحدة'});assert(r.success,'diagnosis and medication saved');
+r=post({action:'medList',token:td});{const x=r.cases.find(c=>c.id===mid);assert(x&&x.medication.includes('باراسيتامول')&&x.treatment==='خافض حرارة وراحة'&&x.doctor,'the list carries the medication and the doctor name');}
 {const hd=book.MedicalCases.rows[0],iM=hd.indexOf('Medication');hd[iM]='Medication_x';const w=post({action:'medUpdate',token:td,id:mid,medication:'دواء آخر'});hd[iM]='Medication';assert(!w.success&&w.code==='NEEDS_SETUP','a missing Medication column is reported, never silently ignored');}
 r=post({action:'medClose',token:td,id:mid});assert(r.success,'case closed');
 r=post({action:'medClose',token:td,id:mid});assert(!r.success&&r.code==='NOT_OPEN','closed case cannot close again');

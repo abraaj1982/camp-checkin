@@ -17,7 +17,7 @@ function readMedCases_() {
     const g = function(n) { return v[r][h.indexOf(n)]; };
     if (!g('Id')) continue;
     out.push({ id: String(g('Id')), studentId: String(g('StudentID')), openedAt: iso(g('OpenedAt')), openedBy: String(g('OpenedBy')), severity: String(g('Severity')),
-      complaint: String(g('Complaint')), treatment: String(g('Treatment')), medication: String(g('Medication') || ''), followUp: String(g('FollowUp') || ''), status: String(g('Status')), closedAt: iso(g('ClosedAt')), closedBy: String(g('ClosedBy')), clientId: String(g('ClientId') || ''), _row: r + 1 });
+      complaint: String(g('Complaint')), treatment: String(g('Treatment')), medication: String(g('Medication') || ''), status: String(g('Status')), closedAt: iso(g('ClosedAt')), closedBy: String(g('ClosedBy')), clientId: String(g('ClientId') || ''), _row: r + 1 });
   }
   return out;
 }
@@ -73,10 +73,10 @@ function handleMedOpen_(data) {
   });
 }
 
-// The doctor's three written parts: diagnosis (the Treatment column), the medication given with its dose, and the recommendations / follow-up.
-// The last two live in columns added by SETUP_createTabs; without them nothing is written silently, the doctor is told.
+// The doctor's written parts: symptoms (Complaint), diagnosis (the Treatment column) and the medication given with its dose.
+// The medication column is added by SETUP_createTabs; without it nothing is written silently, the doctor is told.
 function medSetFields_(sheet, h, row, data) {
-  const map = [['treatment', 'Treatment'], ['medication', 'Medication'], ['followUp', 'FollowUp']];
+  const map = [['treatment', 'Treatment'], ['medication', 'Medication']];
   for (let i = 0; i < map.length; i++) {
     const v = data[map[i][0]]; if (v === undefined) continue;
     const col = h.indexOf(map[i][1]); const txt = String(v).trim().slice(0, 2000);
@@ -115,7 +115,7 @@ function handleMedClose_(data) {
       const treatment = String(data.treatment !== undefined ? data.treatment : c.treatment).trim().slice(0, 2000);
       if (treatment.length < 2) return { success: false, code: 'TREATMENT_REQUIRED', error: 'اكتب التشخيص قبل الإغلاق' };
       const sheet = medSheet_(), h = sheet.getDataRange().getValues()[0];
-      const missing = medSetFields_(sheet, h, c._row, { treatment: treatment, medication: data.medication, followUp: data.followUp }); if (missing) return missing;
+      const missing = medSetFields_(sheet, h, c._row, { treatment: treatment, medication: data.medication }); if (missing) return missing;
       sheet.getRange(c._row, h.indexOf('Status') + 1).setValue('closed');
       sheet.getRange(c._row, h.indexOf('ClosedAt') + 1).setValue(new Date());
       sheet.getRange(c._row, h.indexOf('ClosedBy') + 1).setValue(user.Username);
@@ -136,7 +136,7 @@ function handleMedList_(data) {
     const list = readMedCases_().sort(function(a, b) { return (rank[a.status] - rank[b.status]) || (a.openedAt < b.openedAt ? 1 : -1); }).slice(0, 600).map(function(c) {
       const s = byId[c.studentId] || {};
       return { id: c.id, studentId: c.studentId, name: s.name || '', team: s.team || '', bus: s.bus || '', openedAt: c.openedAt, severity: c.severity, complaint: c.complaint,
-        treatment: c.treatment, medication: c.medication, followUp: c.followUp, status: c.status, closedAt: c.closedAt, openedBy: c.openedBy, closedBy: c.closedBy, cls: s.cls || '', age: s.age || '', doctor: repUserName_(c.openedBy), closedByName: c.closedBy ? repUserName_(c.closedBy) : '' };
+        treatment: c.treatment, medication: c.medication, status: c.status, closedAt: c.closedAt, openedBy: c.openedBy, closedBy: c.closedBy, cls: s.cls || '', age: s.age || '', doctor: repUserName_(c.openedBy), closedByName: c.closedBy ? repUserName_(c.closedBy) : '' };
     });
     try { const ck = 'medlist_' + user.Username, cc = CacheService.getScriptCache(); if (!cc.get(ck)) { writeAudit_(user.Username, 'MED_LIST', '', 'n=' + list.length); cc.put(ck, '1', 600); } } catch (e) { /* the audit is best effort here */ }
     return { success: true, cases: list };

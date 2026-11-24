@@ -54,11 +54,10 @@ const T = {
   openCase: 'فتح ملف جديد', hasOpen: 'يوجد ملف مفتوح لهذا الطالب', saveCase: 'حفظ وفتح الملف', cancel: 'تراجع', urgent: 'عاجلة', normal: 'عادية', open: 'مفتوحة', closed: 'مغلقة',
   sec1: '١. سبب المراجعة والأعراض', sec1ph: 'اكتب هنا بالتفصيل: سبب المراجعة، الأعراض، منذ متى، العلامات الحيوية…',
   sec2: '٢. التشخيص', sec2ph: 'التشخيص أو التقييم الطبي', med: 'الدواء المُعطى والجرعة', medPh: 'اسم الدواء، الجرعة، وقت الإعطاء (مثال: باراسيتامول 500 ملغ الساعة 4:10)',
-  sec3: '٣. التوصيات والمتابعة', sec3ph: 'التوصيات، موعد إعادة التقييم، تعليمات للمشرف أو الأهل…',
   saveTr: 'حفظ', closeCase: 'إغلاق الحالة', saveHelp: 'حفظ: يحفظ ما كتبت وتبقى الحالة مفتوحة لتكملها لاحقًا. إغلاق الحالة: ينهي الملف بعد كتابة التشخيص.', needTreatment: 'اكتب التشخيص أولًا قبل إغلاق الحالة.',
   savedOk: 'حُفظ ما كتبت. الحالة ما زالت مفتوحة.', closedOk: 'أُغلقت الحالة وحُفظت بياناتها.', openedOk: n => 'فُتح ملف الحالة للطالب ' + n + '.', confirmClose: 'إغلاق الحالة؟',
   openNow: 'الحالات المفتوحة الآن', noOpen: 'لا توجد حالات مفتوحة.', ago: m => m < 1 ? 'الآن' : m < 60 ? 'منذ ' + m + ' دقيقة' : 'منذ ' + Math.floor(m / 60) + ' ساعة' + (m % 60 ? ' و' + (m % 60) + ' دقيقة' : ''),
-  docBy: 'الطبيب', symptoms: 'الأعراض', diag: 'التشخيص', medG: 'الدواء المُعطى', recs: 'التوصيات', opened: 'فُتحت', closedAt: 'أُغلقت', more: 'التفاصيل', less: 'إخفاء',
+  docBy: 'الطبيب', symptoms: 'الأعراض', diag: 'التشخيص', medG: 'الدواء المُعطى', opened: 'فُتحت', closedAt: 'أُغلقت', more: 'التفاصيل', less: 'إخفاء',
   fDay: ['اليوم', 'أمس', 'الكل'], fDoc: 'كل الأطباء', fQ: 'ابحث بالاسم أو الرقم أو الدواء…', noVisits: 'لا توجد زيارات مطابقة.',
   allowExit: 'السماح بمغادرة المخيم', allowExitHint: 'يصل الطلب إلى السكرتارية وهي التي تقرر وتحوّله للكشافة. لا تفاصيل طبية تُرسل.', allowExitAsk: 'إرسال طلب السماح للطالب بمغادرة المخيم إلى السكرتارية؟', clrSent: 'أُرسل طلب السماح بالمغادرة إلى السكرتارية.',
   clrPending: 'بانتظار قرار السكرتارية', clrApproved: 'اعتمدته السكرتارية', clrReturned: 'أعادته السكرتارية', clrTitle: 'طلبات السماح بالمغادرة', clrNone: 'لا توجد طلبات.',
@@ -74,11 +73,10 @@ const T = {
   openCase: 'Open a new file', hasOpen: 'This student already has an open case', saveCase: 'Save and open the file', cancel: 'Back', urgent: 'Urgent', normal: 'Normal', open: 'Open', closed: 'Closed',
   sec1: '1. Reason for visit and symptoms', sec1ph: 'Write the details: reason for the visit, symptoms, duration, vital signs…',
   sec2: '2. Diagnosis', sec2ph: 'Diagnosis or medical assessment', med: 'Medication given and dose', medPh: 'Drug, dose, time given (e.g. Paracetamol 500 mg at 4:10)',
-  sec3: '3. Recommendations and follow-up', sec3ph: 'Recommendations, when to re-assess, instructions for the supervisor or family…',
   saveTr: 'Save', closeCase: 'Close case', saveHelp: 'Save: keeps what you wrote and the case stays open. Close case: ends the file once the diagnosis is written.', needTreatment: 'Write the diagnosis before closing the case.',
   savedOk: 'Saved. The case is still open.', closedOk: 'The case was closed and saved.', openedOk: n => 'Case file opened for ' + n + '.', confirmClose: 'Close this case?',
   openNow: 'Open cases now', noOpen: 'No open cases.', ago: m => m < 1 ? 'now' : m < 60 ? m + ' min ago' : Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + (m % 60) + ' min' : '') + ' ago',
-  docBy: 'Doctor', symptoms: 'Symptoms', diag: 'Diagnosis', medG: 'Medication given', recs: 'Recommendations', opened: 'Opened', closedAt: 'Closed', more: 'Details', less: 'Hide',
+  docBy: 'Doctor', symptoms: 'Symptoms', diag: 'Diagnosis', medG: 'Medication given', opened: 'Opened', closedAt: 'Closed', more: 'Details', less: 'Hide',
   fDay: ['Today', 'Yesterday', 'All'], fDoc: 'All doctors', fQ: 'Search name, number or medication…', noVisits: 'No matching visits.',
   allowExit: 'Allow leaving the camp', allowExitHint: 'The request goes to the secretariat, which decides and forwards it to the scouts. No medical details are sent.', allowExitAsk: 'Send the request to allow this student to leave the camp to the secretariat?', clrSent: 'The request to allow leaving was sent to the secretariat.',
   clrPending: 'Waiting for the secretariat', clrApproved: 'Approved by the secretariat', clrReturned: 'Returned by the secretariat', clrTitle: 'Leave-the-camp requests', clrNone: 'No requests.',
@@ -86,7 +84,7 @@ const T = {
   error: 'Connection problem. Try again.', sessionEnd: 'Session expired. Please log in again.', working: 'Working… please wait',
   codes: { ALREADY_OPEN: 'This student already has an open case', NOT_OPEN: 'Case is closed', TREATMENT_REQUIRED: 'Write the diagnosis before closing', NOT_FOUND: 'Student not found', ALREADY_PENDING: 'A request already exists for this student', NEEDS_SETUP: 'Run SETUP_createTabs once (medication and follow-up columns)' } }
 };
-const st = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), tab: 'clinic', q: '', results: [], cur: null, notes: null, caseOpen: false, f: { c: '', t: '', m: '', r: '' }, severity: 'normal',
+const st = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), tab: 'clinic', q: '', results: [], cur: null, notes: null, caseOpen: false, f: { c: '', t: '', m: '' }, severity: 'normal',
   cases: [], loaded: false, clr: [], clrPending: 0, msg: null, caseMsg: {}, drafts: {}, vf: { day: 'today', doc: '', q: '' }, openRows: {} };
 const L = () => T[st.lang];
 const say = (cls, t) => { st.msg = { cls: cls, t: t }; };
@@ -115,7 +113,7 @@ const mins = iso => Math.max(0, Math.round((Date.now() - new Date(iso).getTime()
 const ta = (id, v, rows, ph, extra) => `<textarea class="ta" id="${id}" rows="${rows}" maxlength="2000" placeholder="${esc(ph || '')}" ${extra || ''}>${esc(v)}</textarea>`;
 function visitDetail(c) {
   const l = L(), part = (lab, v) => v ? `<b>${lab}</b>${esc(v)}` : '';
-  return `<div class="vd">${part(l.symptoms, c.complaint)}${part(l.diag, c.treatment)}${part(l.medG, c.medication)}${part(l.recs, c.followUp)}</div>`;
+  return `<div class="vd">${part(l.symptoms, c.complaint)}${part(l.diag, c.treatment)}${part(l.medG, c.medication)}</div>`;
 }
 
 /* ---------- student search and card ---------- */
@@ -126,7 +124,7 @@ function onQ(v) {
   if (!v.trim()) { st.results = []; return renderResults(); }
   qTimer = setTimeout(async () => { try { const r = await api({ action: 'medFind', q: v.trim() }); if (r.success && st.q === v) { st.results = r.results; renderResults(); } } catch (e) {} }, 300);
 }
-function pick(id) { st.caseOpen = false; st.cur = st.results.find(x => x.id === id) || null; hideNotes(true); st.f = { c: '', t: '', m: '', r: '' }; st.severity = 'normal'; st.msg = null; st.results = []; render(); if (st.cur) showNotes(); }
+function pick(id) { st.caseOpen = false; st.cur = st.results.find(x => x.id === id) || null; hideNotes(true); st.f = { c: '', t: '', m: '' }; st.severity = 'normal'; st.msg = null; st.results = []; render(); if (st.cur) showNotes(); }
 async function showNotes() {
   try { const r = await api({ action: 'medInfo', studentId: st.cur.id }); if (r.success) { st.notes = r; clearTimeout(hideTimer); hideTimer = setTimeout(() => hideNotes(), 180000); } else say('bad', errText(r)); } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
   render();
@@ -151,7 +149,6 @@ function patientCard() {
     : !st.caseOpen ? `<button class="btn full" style="margin-top:12px" data-caseopen="1">🩺 ${l.openCase}</button>`
     : `<div class="item" style="margin-top:12px"><div class="sec" style="margin-top:0"><label class="lbl" for="f-c">${l.sec1}</label>${ta('f-c', st.f.c, 6, l.sec1ph)}</div>
         <div class="sec"><label class="lbl" for="f-t">${l.sec2}</label>${ta('f-t', st.f.t, 3, l.sec2ph)}<label class="lbl" for="f-m" style="margin-top:8px">${l.med}</label>${ta('f-m', st.f.m, 2, l.medPh)}</div>
-        <div class="sec"><label class="lbl" for="f-r">${l.sec3}</label>${ta('f-r', st.f.r, 3, l.sec3ph)}</div>
         <div class="two" style="margin-top:10px"><button class="chip ${st.severity === 'normal' ? 'on' : ''}" data-sev="normal">${l.normal}</button><button class="chip ${st.severity === 'urgent' ? 'on' : ''}" data-sev="urgent">${l.urgent}</button></div>
         <div class="two" style="margin-top:10px"><button class="btn" data-opencase="1" ${st.f.c.trim().length < 3 ? 'disabled style="opacity:.5"' : ''}>${l.saveCase}</button><button class="btn alt" data-casecancel="1">${l.cancel}</button></div></div>`;
   return `<section class="card"><div style="display:flex;justify-content:space-between;gap:8px"><div><div class="muted" style="font-size:13px">${esc(c.id)}</div><div class="big2">${esc(c.name)}</div>
@@ -164,8 +161,8 @@ async function openCase() {
   const f = st.f;
   try { const r = await api({ action: 'medOpen', studentId: st.cur.id, complaint: f.c, severity: st.severity, clientId: uid() });
     if (r.success) {
-      let extra = null; if (f.t.trim() || f.m.trim() || f.r.trim()) { const u = await api({ action: 'medUpdate', id: r.id, treatment: f.t, medication: f.m, followUp: f.r }); if (!u.success) say('bad', errText(u)); else extra = true; }
-      if (!r.repeated) st.cases.unshift({ id: r.id, studentId: st.cur.id, name: st.cur.name, cls: st.cur.cls || '', age: st.cur.age || '', openedAt: new Date().toISOString(), severity: st.severity, complaint: f.c, treatment: extra ? f.t : '', medication: extra ? f.m : '', followUp: extra ? f.r : '', status: 'open', closedAt: '', doctor: me() });
+      let extra = null; if (f.t.trim() || f.m.trim()) { const u = await api({ action: 'medUpdate', id: r.id, treatment: f.t, medication: f.m }); if (!u.success) say('bad', errText(u)); else extra = true; }
+      if (!r.repeated) st.cases.unshift({ id: r.id, studentId: st.cur.id, name: st.cur.name, cls: st.cur.cls || '', age: st.cur.age || '', openedAt: new Date().toISOString(), severity: st.severity, complaint: f.c, treatment: extra ? f.t : '', medication: extra ? f.m : '', status: 'open', closedAt: '', doctor: me() });
       if (!st.msg) say('ok', L().openedOk(st.cur.name));
       st.cur = null; st.q = ''; st.results = []; st.caseOpen = false; hideNotes(true); window.scrollTo({ top: 0, behavior: 'smooth' }); loadCases().then(render);
     } else say('bad', errText(r));
@@ -174,16 +171,16 @@ async function openCase() {
 }
 
 /* ---------- an open case: edit, save, close, allow leaving ---------- */
-const draft = c => st.drafts[c.id] || (st.drafts[c.id] = { t: c.treatment || '', m: c.medication || '', r: c.followUp || '' });
+const draft = c => st.drafts[c.id] || (st.drafts[c.id] = { t: c.treatment || '', m: c.medication || '' });
 async function saveCase(id, close) {
   const c = st.cases.find(x => x.id === id) || {}, d = draft(c);
   const msg = (cls, t) => { st.caseMsg[id] = { cls: cls, t: t }; };
   if (close && d.t.trim().length < 2) { msg('bad', L().needTreatment); return render(); }
   if (close && !confirm(L().confirmClose)) return;
   try {
-    const r = await api({ action: close ? 'medClose' : 'medUpdate', id: id, treatment: d.t, medication: d.m, followUp: d.r }); // one request only
+    const r = await api({ action: close ? 'medClose' : 'medUpdate', id: id, treatment: d.t, medication: d.m }); // one request only
     if (r.success) {
-      c.treatment = d.t; c.medication = d.m; c.followUp = d.r; delete st.drafts[id];
+      c.treatment = d.t; c.medication = d.m; delete st.drafts[id];
       if (close) { c.status = 'closed'; c.closedAt = new Date().toISOString(); c.closedByName = me(); delete st.caseMsg[id]; say('ok', L().closedOk); window.scrollTo({ top: 0, behavior: 'smooth' }); }
       else msg('ok', L().savedOk);
     } else msg('bad', errText(r));
@@ -209,7 +206,6 @@ function openCaseCard(c) {
     <div class="muted" style="font-size:13px">${esc(c.studentId)}${c.cls ? ' · ' + l.cls + ' ' + esc(c.cls) : ''}${c.age ? ' · ' + l.age + ': ' + esc(c.age) : ''} · ${l.docBy}: ${esc(c.doctor || '')} · ${l.ago(mins(c.openedAt))}</div>
     <div style="margin:8px 0;white-space:pre-wrap"><b>${l.symptoms}:</b> ${esc(c.complaint)}</div>
     <div class="sec" style="margin-top:6px"><label class="lbl" for="tr-${esc(c.id)}">${l.sec2}</label>${ta('tr-' + c.id, d.t, 3, l.sec2ph, `data-d="t" data-cid="${esc(c.id)}"`)}<label class="lbl" for="md-${esc(c.id)}" style="margin-top:8px">${l.med}</label>${ta('md-' + c.id, d.m, 2, l.medPh, `data-d="m" data-cid="${esc(c.id)}"`)}</div>
-    <div class="sec"><label class="lbl" for="fu-${esc(c.id)}">${l.sec3}</label>${ta('fu-' + c.id, d.r, 3, l.sec3ph, `data-d="r" data-cid="${esc(c.id)}"`)}</div>
     <div class="two" style="margin-top:10px"><button class="btn alt" data-save="${esc(c.id)}">💾 ${l.saveTr}</button><button class="btn" data-closecase="${esc(c.id)}">✔ ${l.closeCase}</button></div><div class="muted" style="font-size:12.5px;margin-top:6px">${l.saveHelp}</div>
     ${m ? `<div class="banner ${m.cls}" role="alert" style="margin:8px 0 0">${esc(m.t)}</div>` : ''}${exitBlock(c)}</div>`;
 }
@@ -263,7 +259,7 @@ document.addEventListener('input', e => {
   const t = e.target, i = t.id;
   if (i === 'q') onQ(t.value);
   else if (i === 'vq') { st.vf.q = t.value; render(); }
-  else if (i === 'f-c' || i === 'f-t' || i === 'f-m' || i === 'f-r') { st.f[i.slice(2)] = t.value; if (i === 'f-c') { const sb = document.querySelector('[data-opencase]'); if (sb) { sb.disabled = st.f.c.trim().length < 3; sb.style.opacity = sb.disabled ? '.5' : ''; } } }
+  else if (i === 'f-c' || i === 'f-t' || i === 'f-m') { st.f[i.slice(2)] = t.value; if (i === 'f-c') { const sb = document.querySelector('[data-opencase]'); if (sb) { sb.disabled = st.f.c.trim().length < 3; sb.style.opacity = sb.disabled ? '.5' : ''; } } }
   else if (t.dataset && t.dataset.cid) { const c = st.cases.find(x => x.id === t.dataset.cid); if (c) draft(c)[t.dataset.d] = t.value; }
 });
 document.addEventListener('change', e => { if (e.target.id === 'vdoc') { st.vf.doc = e.target.value; render(); } });
@@ -272,7 +268,7 @@ document.addEventListener('click', e => {
   if (d.tab) { st.tab = d.tab; st.msg = null; hideNotes(true); if (d.tab === 'leave') loadClr().then(render); render(); }
   else if (d.pick) pick(d.pick); else if (d.clear) { st.cur = null; st.caseOpen = false; hideNotes(true); render(); }
   else if (d.notes) showNotes(); else if (d.hide) hideNotes(); else if (d.sev) { st.severity = d.sev; render(); }
-  else if (d.caseopen) { st.caseOpen = true; render(); setTimeout(() => { const x = $('f-c'); if (x) x.focus(); }, 50); } else if (d.casecancel) { st.caseOpen = false; st.f = { c: '', t: '', m: '', r: '' }; render(); }
+  else if (d.caseopen) { st.caseOpen = true; render(); setTimeout(() => { const x = $('f-c'); if (x) x.focus(); }, 50); } else if (d.casecancel) { st.caseOpen = false; st.f = { c: '', t: '', m: '' }; render(); }
   else if (d.opencase) openCase(); else if (d.save) saveCase(d.save, false); else if (d.closecase) saveCase(d.closecase, true);
   else if (d.allowexit) allowExit(d.allowexit); else if (d.vday) { st.vf.day = d.vday; render(); } else if (d.row) { st.openRows[d.row] = !st.openRows[d.row]; render(); }
 });
