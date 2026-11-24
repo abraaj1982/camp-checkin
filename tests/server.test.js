@@ -533,6 +533,12 @@ assert(book.AuditLog.rows.some(x=>x[2]==='GATE_EXIT'&&x[1]==='scout1'),'audit: g
  q=post({action:'medClearList',token:td});assert(q.list.find(x=>x.id===mid2).status==='returned'&&q.list.find(x=>x.id===mid2).returnReason.includes('تقرير'),'the doctor sees the reason');
  q=post({action:'gateList',token:tsc});assert(!q.waiting.some(x=>x.id==='3004'),'a returned proposal never reaches the gate');
  assert(book.AuditLog.rows.some(x=>x[2]==='MED_CLEARANCE_APPROVED')&&book.AuditLog.rows.some(x=>x[2]==='MED_CLEARANCE_RETURNED'),'audit: approved and returned are logged');
+ // birth date column (any header that mentions it): the doctor gets the date and the age; nobody else gets the date
+ {const hd=book.Bus.rows[0];hd.push('Student Date of Birth');const row=book.Bus.rows.find(x=>x[3]==='3003');while(row.length<hd.length-1)row.push('');row.push('17/05/2012');for(const k of Object.keys(cache))delete cache[k];
+  const mi=post({action:'medInfo',token:td,studentId:'3003'});assert(mi.success&&mi.dob==='2012-05-17'&&/^\d+$/.test(mi.age),'doctor: birth date and age from a differently named column');
+  const mf=post({action:'medFind',token:td,q:'3003'});assert(mf.results[0].age===mi.age&&!JSON.stringify(mf).includes('2012-05-17'),'search shows the age, not the date');
+  const rs=post({action:'roster',token:post({action:'login',username:'sup1',password:'p1-12345'}).token});assert(!JSON.stringify(rs).includes('2012-05-17'),'supervisors never receive a birth date');
+  hd.pop();row.pop();for(const k of Object.keys(cache))delete cache[k];}
  book.Bus.rows.splice(book.Bus.rows.length-2,2);for(const k of Object.keys(cache))delete cache[k];}
 // items not returned: the gate is blocked
 post({action:'withdrawStart',token:ts,studentId:'3002',guardian:'والد',reason:'سبب'});

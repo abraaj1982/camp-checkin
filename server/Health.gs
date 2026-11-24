@@ -44,7 +44,7 @@ function handleMedInfo_(data) {
     const s = findStudent_(data.studentId);
     if (!s) return { success: false, code: 'NOT_FOUND', error: 'الطالب غير موجود' };
     writeAudit_(user.Username, 'MED_VIEW', s.id, '');
-    return { success: true, id: s.id, notes: s.medical, foodAllergy: s.foodAllergy };
+    return { success: true, id: s.id, notes: s.medical, foodAllergy: s.foodAllergy, dob: s.dob || '', age: s.age || '' };
   });
 }
 
@@ -124,9 +124,9 @@ function handleMedList_(data) {
     const list = readMedCases_().sort(function(a, b) { return (rank[a.status] - rank[b.status]) || (a.openedAt < b.openedAt ? 1 : -1); }).slice(0, 100).map(function(c) {
       const s = byId[c.studentId] || {};
       return { id: c.id, studentId: c.studentId, name: s.name || '', team: s.team || '', bus: s.bus || '', openedAt: c.openedAt, severity: c.severity, complaint: c.complaint,
-        treatment: c.treatment, status: c.status, closedAt: c.closedAt, openedBy: c.openedBy, closedBy: c.closedBy, cls: s.cls || '', age: s.age || '' };
+        treatment: c.treatment, status: c.status, closedAt: c.closedAt, openedBy: c.openedBy, closedBy: c.closedBy, cls: s.cls || '', age: s.age || '', doctor: repUserName_(c.openedBy), closedByName: c.closedBy ? repUserName_(c.closedBy) : '' };
     });
-    writeAudit_(user.Username, 'MED_LIST', '', 'n=' + list.length);
+    try { const ck = 'medlist_' + user.Username, cc = CacheService.getScriptCache(); if (!cc.get(ck)) { writeAudit_(user.Username, 'MED_LIST', '', 'n=' + list.length); cc.put(ck, '1', 600); } } catch (e) { /* the audit is best effort here */ }
     return { success: true, cases: list };
   });
 }

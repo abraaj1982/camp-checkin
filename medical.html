@@ -37,10 +37,14 @@ const can = k => perms.indexOf('*') !== -1 || perms.indexOf(k) !== -1;
 const pref = { get(k, d) { try { return localStorage.getItem('mk_pref_' + k) || d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('mk_pref_' + k, v); } catch (e) {} } };
 const $ = id => document.getElementById(id);
 const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const me = () => { try { return sessionStorage.getItem('mukhayyam_fullName') || ''; } catch (e) { return ''; } };
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2));
 const AUTH_ERR = /EXPIRED|IDLE_TIMEOUT|REVOKED|BAD_SIGNATURE|MALFORMED|USER_NOT_FOUND|ACCOUNT_DISABLED|BAD_PAYLOAD/;
+let busyN = 0;
+function busy(d) { busyN += d; let e = document.getElementById('busyBar'); if (!e) { e = document.createElement('div'); e.id = 'busyBar'; e.style.cssText = 'position:fixed;top:0;inset-inline:0;z-index:50;padding:8px;text-align:center;font-weight:700;font-size:14px;background:var(--warnbg);color:var(--warn);box-shadow:0 2px 8px rgba(0,0,0,.15);display:none'; document.body.appendChild(e); } e.textContent = '⏳ ' + (st.lang === 'en' ? 'Working… please wait' : 'جارٍ التنفيذ… يرجى الانتظار'); e.style.display = busyN > 0 ? 'block' : 'none'; }
 async function api(payload) {
-  const r = await (await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(Object.assign({ token: token }, payload)) })).json();
+  busy(1);
+  let r; try { r = await (await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(Object.assign({ token: token }, payload)) })).json(); } finally { busy(-1); }
   if (r && r.code && AUTH_ERR.test(r.code)) { st.msg = { cls: 'bad', t: L().sessionEnd }; render(); setTimeout(() => { sessionStorage.clear(); location.href = 'login.html'; }, 1500); throw new Error('auth'); }
   return r;
 }
@@ -53,17 +57,17 @@ const T = {
  ar: { dir: 'rtl', title: 'الطبيب', sub: 'الحالات الطبية (بيانات محمية)', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
   tCases: 'الحالات', tLeave: n => '🚪 مغادرة المخيم' + (n ? ' (' + n + ')' : ''), allowExit: 'السماح بمغادرة المخيم', allowExitHint: 'يصل الطلب إلى السكرتارية وهي التي تقرر وتحوّله للكشافة. لا تفاصيل طبية تُرسل.', allowExitAsk: 'إرسال طلب السماح للطالب بمغادرة المخيم إلى السكرتارية؟', saveHelp: 'حفظ: يحفظ ما كتبت وتبقى الحالة مفتوحة لتكملها لاحقًا. إغلاق الحالة: ينهي الملف بعد كتابة التشخيص والعلاج.', needTreatment: 'اكتب التشخيص والعلاج أولًا قبل إغلاق الحالة.', savedOk: 'حُفظ ما كتبت. الحالة ما زالت مفتوحة.', closedOk: 'أُغلقت الحالة وحُفظ التشخيص والعلاج.', openedOk: n => 'فُتح ملف الحالة للطالب ' + n + '.', clrSent: 'أُرسل طلب السماح بالمغادرة إلى السكرتارية.', clrPending: 'بانتظار قرار السكرتارية', clrApproved: 'اعتمدته السكرتارية', clrReturned: 'أعادته السكرتارية', clrTitle: 'طلبات عدم الممانعة', clrNone: 'لا توجد طلبات.', sToday: 'حالات اليوم', sOpen: 'مفتوحة', sClosed: 'أُغلقت اليوم', sUrgent: 'عاجلة', fOpen: 'مفتوحة', fClosed: 'مغلقة', moveStrip: 'نقل الشريط', opened: 'فُتحت', closedAt: 'أُغلقت', tStats: 'الإحصاءات', search: 'ابحث عن طالب بالاسم أو الرقم', bus: n => 'باص ' + n, none: 'لا نتائج',
   showNotes: 'عرض الملاحظات الطبية', hideNotes: 'إخفاء', notesWarn: 'يُسجَّل اطّلاعك على هذه البيانات. لا تشاركها خارج الفريق الطبي.', noNotes: 'لا توجد ملاحظات مسجّلة', foodAl: 'حساسية غذائية',
-  complaint: 'سبب المراجعة والأعراض', complaintPh: 'اكتب هنا بالتفصيل: سبب المراجعة، الأعراض، منذ متى، العلامات الحيوية، وما تراه مناسبًا للملف…', saveCase: 'حفظ وفتح الملف', cancel: 'تراجع', cls: 'الصف', age: 'العمر', noAllergy: 'لا توجد حساسية غذائية مسجّلة', healthNotes: 'ملاحظات صحية مسجّلة', urgent: 'عاجلة', normal: 'عادية', openCase: 'فتح ملف حالة', hasOpen: 'يوجد ملف مفتوح لهذا الطالب', open: 'مفتوحة', closed: 'مغلقة',
+  complaint: 'سبب المراجعة والأعراض', complaintPh: 'اكتب هنا بالتفصيل: سبب المراجعة، الأعراض، منذ متى، العلامات الحيوية، وما تراه مناسبًا للملف…', saveCase: 'حفظ وفتح الملف', docBy: 'الطبيب', dob: 'تاريخ الميلاد', cancel: 'تراجع', cls: 'الصف', age: 'العمر', noAllergy: 'لا توجد حساسية غذائية مسجّلة', healthNotes: 'ملاحظات صحية مسجّلة', urgent: 'عاجلة', normal: 'عادية', openCase: 'فتح ملف حالة', hasOpen: 'يوجد ملف مفتوح لهذا الطالب', open: 'مفتوحة', closed: 'مغلقة',
   treatment: 'التشخيص والعلاج / الإجراء', saveTr: 'حفظ', closeCase: 'إغلاق الحالة', confirmClose: 'إغلاق الحالة؟', noCases: 'لا توجد حالات.', openedAt: 'فُتحت', by: 'بواسطة',
-  total: 'إجمالي الحالات', openN: 'مفتوحة', closedN: 'مغلقة', urgentN: 'عاجلة', avg: 'متوسط وقت الإغلاق (د)', byDay: 'حسب اليوم', byTeam: 'حسب الفريق', byBus: 'حسب الباص',
+  total: 'إجمالي الحالات', openN: 'مفتوحة', closedN: 'مغلقة', urgentN: 'عاجلة', avg: 'متوسط وقت الإغلاق (د)', byDay: 'حسب اليوم', byDoctor: 'حسب الطبيب', byClass: 'حسب الصف',
   done: 'تم', error: 'تعذّر الاتصال. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.',
   codes: { ALREADY_OPEN: 'يوجد ملف مفتوح لهذا الطالب', NOT_OPEN: 'الملف مغلق', TREATMENT_REQUIRED: 'اكتب العلاج أو الإجراء قبل الإغلاق', NOT_FOUND: 'الطالب غير موجود' } },
  en: { dir: 'ltr', title: 'Doctor', sub: 'Medical cases (protected data)', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
   tCases: 'Cases', tLeave: n => '🚪 Leaving the camp' + (n ? ' (' + n + ')' : ''), allowExit: 'Allow leaving the camp', allowExitHint: 'The request goes to the secretariat, which decides and forwards it to the scouts. No medical details are sent.', allowExitAsk: 'Send the request to allow this student to leave the camp to the secretariat?', saveHelp: 'Save: keeps what you wrote and the case stays open to continue later. Close case: ends the file after the diagnosis and treatment are written.', needTreatment: 'Write the diagnosis and treatment before closing the case.', savedOk: 'Saved. The case is still open.', closedOk: 'The case was closed and the diagnosis and treatment saved.', openedOk: n => 'Case file opened for ' + n + '.', clrSent: 'The request to allow leaving was sent to the secretariat.', clrPending: 'Waiting for the secretariat', clrApproved: 'Approved by the secretariat', clrReturned: 'Returned by the secretariat', clrTitle: 'No-objection requests', clrNone: 'No requests.', sToday: 'Today', sOpen: 'Open', sClosed: 'Closed today', sUrgent: 'Urgent', fOpen: 'Open', fClosed: 'Closed', moveStrip: 'Move bar', opened: 'Opened', closedAt: 'Closed', tStats: 'Statistics', search: 'Search a student by name or number', bus: n => 'Bus ' + n, none: 'No results',
   showNotes: 'Show medical notes', hideNotes: 'Hide', notesWarn: 'Your access to this data is logged. Do not share it outside the medical team.', noNotes: 'No notes on record', foodAl: 'Food allergy',
-  complaint: 'Reason for visit and symptoms', complaintPh: 'Write the details here: reason for the visit, symptoms, duration, vital signs and anything relevant for the record…', saveCase: 'Save and open the file', cancel: 'Back', cls: 'Class', age: 'Age', noAllergy: 'No food allergy on record', healthNotes: 'Health notes on record', urgent: 'Urgent', normal: 'Normal', openCase: 'Open a case', hasOpen: 'This student already has an open case', open: 'Open', closed: 'Closed',
+  complaint: 'Reason for visit and symptoms', complaintPh: 'Write the details here: reason for the visit, symptoms, duration, vital signs and anything relevant for the record…', saveCase: 'Save and open the file', docBy: 'Doctor', dob: 'Date of birth', cancel: 'Back', cls: 'Class', age: 'Age', noAllergy: 'No food allergy on record', healthNotes: 'Health notes on record', urgent: 'Urgent', normal: 'Normal', openCase: 'Open a case', hasOpen: 'This student already has an open case', open: 'Open', closed: 'Closed',
   treatment: 'Diagnosis and treatment / action', saveTr: 'Save', closeCase: 'Close case', confirmClose: 'Close this case?', noCases: 'No cases.', openedAt: 'Opened', by: 'by',
-  total: 'Total cases', openN: 'Open', closedN: 'Closed', urgentN: 'Urgent', avg: 'Avg. time to close (min)', byDay: 'By day', byTeam: 'By team', byBus: 'By bus',
+  total: 'Total cases', openN: 'Open', closedN: 'Closed', urgentN: 'Urgent', avg: 'Avg. time to close (min)', byDay: 'By day', byDoctor: 'By doctor', byClass: 'By class',
   done: 'Done', error: 'Connection problem. Try again.', sessionEnd: 'Session expired. Please log in again.',
   codes: { ALREADY_OPEN: 'This student already has an open case', NOT_OPEN: 'Case is closed', TREATMENT_REQUIRED: 'Enter the treatment before closing', NOT_FOUND: 'Student not found' } }
 };
@@ -83,26 +87,28 @@ async function showNotes() {
 function hideNotes(silent) { clearTimeout(hideTimer); st.notes = null; if (!silent) render(); }
 async function openCase() {
   try { const r = await api({ action: 'medOpen', studentId: st.cur.id, complaint: st.complaint, severity: st.severity, clientId: uid() });
-    if (r.success) { say('ok', L().openedOk(st.cur.name)); st.cur = null; st.q = ''; st.results = []; st.caseOpen = false; hideNotes(true); await loadCases(); window.scrollTo({ top: 0, behavior: 'smooth' }); } else say('bad', errText(r));
+    if (r.success) { if (!r.repeated) st.cases.unshift({ id: r.id, studentId: st.cur.id, name: st.cur.name, cls: st.cur.cls || '', age: st.cur.age || '', openedAt: new Date().toISOString(), severity: st.severity, complaint: st.complaint, treatment: '', status: 'open', closedAt: '', doctor: me() }); say('ok', L().openedOk(st.cur.name)); st.cur = null; st.q = ''; st.results = []; st.caseOpen = false; hideNotes(true); window.scrollTo({ top: 0, behavior: 'smooth' }); loadCases().then(render); } else say('bad', errText(r));
   } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
   render();
 }
 async function saveTreatment(id, close) {
-  const text = (st.drafts[id] !== undefined ? st.drafts[id] : (st.cases.find(c => c.id === id) || {}).treatment) || '';
+  const c = st.cases.find(x => x.id === id) || {};
+  const text = (st.drafts[id] !== undefined ? st.drafts[id] : c.treatment) || '';
   const msg = (cls, t) => { st.caseMsg[id] = { cls: cls, t: t }; };
   if (close && text.trim().length < 2) { msg('bad', L().needTreatment); return render(); }
   if (close && !confirm(L().confirmClose)) return;
   try {
-    let r = await api({ action: 'medUpdate', id: id, treatment: text });
-    if (r.success && close) r = await api({ action: 'medClose', id: id, treatment: text });
-    if (r.success) { delete st.drafts[id]; if (close) { delete st.caseMsg[id]; say('ok', L().closedOk); window.scrollTo({ top: 0, behavior: 'smooth' }); } else msg('ok', L().savedOk); }
-    else msg('bad', errText(r));
+    const r = await api(close ? { action: 'medClose', id: id, treatment: text } : { action: 'medUpdate', id: id, treatment: text }); // one request only
+    if (r.success) {
+      c.treatment = text; delete st.drafts[id];
+      if (close) { c.status = 'closed'; c.closedAt = new Date().toISOString(); c.closedByName = me(); delete st.caseMsg[id]; say('ok', L().closedOk); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+      else msg('ok', L().savedOk);
+    } else msg('bad', errText(r));
   } catch (e) { if (e.message !== 'auth') msg('bad', L().error); }
-  await loadCases(); render();
+  render();
 }
-async function loadCases() { try { const r = await api({ action: 'medList' }); if (r.success) st.cases = r.cases; } catch (e) {} }
-async function loadStats() { try { const r = await api({ action: 'medStats' }); if (r.success) st.stats = r; } catch (e) {} }
-function setTab(t) { st.tab = t; st.msg = null; hideNotes(true); if (t === 'stats') loadStats().then(render); if (t === 'leave') loadClr().then(render); render(); }
+async function loadCases() { try { const r = await api({ action: 'medList' }); if (r.success) { st.cases = r.cases; st.loaded = true; } } catch (e) {} }
+function setTab(t) { st.tab = t; st.msg = null; hideNotes(true); if (t === 'leave') loadClr().then(render); render(); }
 
 function resultsHtml() {
   const l = L(); if (!st.q.trim() || st.cur) return '';
@@ -121,7 +127,7 @@ async function loadClr() { try { const r = await api({ action: 'medClearList' })
 async function allowExit(sid) {
   if (!confirm(L().allowExitAsk)) return;
   try { const r = await api({ action: 'medClearCreate', studentId: sid, note: '', clientId: uid() });
-    if (r.success) { say('ok', L().clrSent); await loadClr(); } else say('bad', errText(r));
+    if (r.success) { say('ok', L().clrSent); if (!r.repeated) { st.clr.unshift({ id: r.id, studentId: sid, name: (st.cases.find(c => c.studentId === sid) || {}).name || sid, status: 'pending', time: new Date().toISOString(), note: '' }); st.clrPending++; } loadClr().then(render); } else say('bad', errText(r));
   } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
   render(); window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -145,12 +151,13 @@ function studentCard() {
       <div class="two" style="margin-top:8px"><button class="chip ${st.severity === 'normal' ? 'on' : ''}" data-sev="normal">${l.normal}</button><button class="chip ${st.severity === 'urgent' ? 'on' : ''}" data-sev="urgent">${l.urgent}</button></div>
       <div class="two" style="margin-top:10px"><button class="btn" data-opencase="1" ${st.complaint.trim().length < 3 ? 'disabled style="opacity:.5"' : ''}>${l.saveCase}</button><button class="btn alt" data-casecancel="1">${l.cancel}</button></div></div>`;
   return `<section class="card"><div style="display:flex;justify-content:space-between;gap:8px"><div><div class="muted" style="font-size:13px">${esc(c.id)}</div><div class="big2">${esc(c.name)}</div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${c.cls ? `<span class="pill">${l.cls} ${esc(c.cls)}</span>` : ''}${c.age ? `<span class="pill">${l.age}: ${esc(c.age)}</span>` : ''}</div></div><button class="tool" data-clear="1" aria-label="x">✕</button></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${c.cls ? `<span class="pill">${l.cls} ${esc(c.cls)}</span>` : ''}${(n && n.age) || c.age ? `<span class="pill">${l.age}: ${esc((n && n.age) || c.age)}</span>` : ''}${n && n.dob ? `<span class="pill">${l.dob}: ${esc(n.dob)}</span>` : ''}</div></div><button class="tool" data-clear="1" aria-label="x">✕</button></div>
     <div class="item" style="margin-top:12px">${info}</div>
     ${form}</section>`;
 }
 const sameDay = iso => { if (!iso) return false; const d = new Date(iso); return !isNaN(d) && d.toDateString() === new Date().toDateString(); };
 const hm = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toTimeString().slice(0, 5); };
+const dt = iso => { const d = new Date(iso); if (isNaN(d)) return ''; try { return new Intl.DateTimeFormat(st.lang === 'en' ? 'en-GB' : 'ar-u-nu-latn', { timeZone: 'Asia/Muscat', weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', hour12: false }).format(d).replace(' في ', ' · ').replace(' at ', ' · ').replace(/[،,]/g, ''); } catch (e) { return hm(iso); } };
 function stripHtml() {
   const l = L(), cs = st.cases, op = cs.filter(c => c.status === 'open');
   const n = (v, lab, cls) => `<div><div class="sv ${cls || ''}">${v}</div><div class="sl">${lab}</div></div>`;
@@ -169,16 +176,19 @@ function casesView() {
   const seg = `<div class="seg"><button class="chip ${st.filter === 'open' ? 'on' : ''}" data-filter="open">${l.fOpen} (${nOpen})</button><button class="chip ${st.filter === 'closed' ? 'on' : ''}" data-filter="closed">${l.fClosed} (${nClosed})</button></div>`;
   const list = shown.length ? shown.map(c => { const tr = st.drafts[c.id] !== undefined ? st.drafts[c.id] : c.treatment;
     return `<div class="item"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>${esc(c.name)}</b><span><span class="pill ${c.severity === 'urgent' ? 'bad' : ''}">${l[c.severity]}</span> <span class="pill ${c.status === 'open' ? 'warn' : 'ok'}">${l[c.status]}</span></span></div>
-    <div class="muted" style="font-size:13px">${esc(c.studentId)}${c.cls ? ' · ' + l.cls + ' ' + esc(c.cls) : ''}${c.age ? ' · ' + l.age + ': ' + esc(c.age) : ''}</div><div style="margin:6px 0;white-space:pre-wrap"><b>${l.complaint}:</b> ${esc(c.complaint)}</div>
+    <div class="muted" style="font-size:13px">${esc(c.studentId)}${c.cls ? ' · ' + l.cls + ' ' + esc(c.cls) : ''}${c.age ? ' · ' + l.age + ': ' + esc(c.age) : ''}${c.doctor ? ' · ' + l.docBy + ': ' + esc(c.doctor) : ''}${c.status === 'open' ? ' · ' + dt(c.openedAt) : ''}</div><div style="margin:6px 0;white-space:pre-wrap"><b>${l.complaint}:</b> ${esc(c.complaint)}</div>
     ${c.status === 'open' ? `<label class="lbl" for="tr-${esc(c.id)}">${l.treatment}</label><textarea id="tr-${esc(c.id)}" data-tr="${esc(c.id)}" rows="6" maxlength="2000" style="width:100%;min-height:140px;font:inherit;padding:12px;border:1px solid var(--field);border-radius:14px;background:var(--card);color:var(--ink);resize:vertical">${esc(tr)}</textarea><div class="two" style="margin-top:8px"><button class="btn alt" data-save="${esc(c.id)}">💾 ${l.saveTr}</button><button class="btn" data-closecase="${esc(c.id)}">✔ ${l.closeCase}</button></div><div class="muted" style="font-size:12.5px;margin-top:6px">${l.saveHelp}</div>${st.caseMsg[c.id] ? `<div class="banner ${st.caseMsg[c.id].cls}" role="alert" style="margin:8px 0 0">${esc(st.caseMsg[c.id].t)}</div>` : ''}${exitBlock(c)}`
-      : `<div style="white-space:pre-wrap"><b>${l.treatment}:</b> ${esc(c.treatment)}</div><div class="muted" style="font-size:13px;margin-top:4px">${l.opened} ${hm(c.openedAt)} · ${l.closedAt} ${hm(c.closedAt)}</div>${sameDay(c.closedAt) ? exitBlock(c) : ''}`}</div>`; }).join('') : `<div class="card muted">${l.noCases}</div>`;
+      : `<div style="white-space:pre-wrap"><b>${l.treatment}:</b> ${esc(c.treatment)}</div><div class="muted" style="font-size:13px;margin-top:4px">${l.opened} ${dt(c.openedAt)} · ${l.closedAt} ${dt(c.closedAt)}${c.closedByName ? ' · ' + l.docBy + ': ' + esc(c.closedByName) : ''}</div>${sameDay(c.closedAt) ? exitBlock(c) : ''}`}</div>`; }).join('') : `<div class="card muted">${l.noCases}</div>`;
   return `<section class="card"><label class="lbl" for="q">${l.search}</label><input id="q" type="search" value="${esc(st.q)}" autocomplete="off"><div id="qres" style="margin-top:6px">${resultsHtml()}</div></section>${studentCard()}${seg}${list}`;
 }
 function statsView() {
-  const l = L(), s = st.stats; if (!s) return `<div class="card muted">...</div>`;
+  const l = L(), cs = st.cases; if (!cs.length && !st.loaded) return `<div class="card muted">...</div>`;
   const k = (lab, v) => `<div class="card"><div class="kl">${lab}</div><div class="kv">${v}</div></div>`;
-  const bars = (title, arr) => { const mx = Math.max(1, ...arr.map(a => a.count)); return `<section class="card"><h2 class="h2" style="margin-bottom:6px">${title}</h2>${arr.length ? arr.map(a => `<div class="brow2"><span>${esc(a.key)}</span><div class="bar" style="margin:0"><i style="width:${Math.round(a.count / mx * 100)}%"></i></div><b>${a.count}</b></div>`).join('') : '<div class="muted">—</div>'}</section>`; };
-  return `<div class="kpis">${k(l.total, s.total)}${k(l.openN, s.open)}${k(l.closedN, s.closed)}${k(l.urgentN, s.urgent)}${k(l.avg, s.avgCloseMinutes)}</div>${bars(l.byDay, s.byDay)}${bars(l.byTeam, s.byTeam)}${bars(l.byBus, s.byBus)}`;
+  const count = fn => { const m = {}; cs.forEach(c => { const key = fn(c) || '—'; m[key] = (m[key] || 0) + 1; }); return Object.keys(m).sort().map(x => ({ key: x, count: m[x] })); };
+  let mins = 0, n = 0; cs.forEach(c => { if (c.status === 'closed') { const d = (new Date(c.closedAt) - new Date(c.openedAt)) / 60000; if (isFinite(d) && d >= 0) { mins += d; n++; } } });
+  const bars = (title, arr) => { const mx = Math.max(1, ...arr.map(a => a.count)); return `<section class="card"><h2 class="h2" style="margin-bottom:6px">${title}</h2>${arr.length ? arr.map(a => `<div class="brow2"><span>${esc(a.key)}</span><div class="bar" style="margin:0"><i style="width:${Math.round(a.count / mx * 100)}%"></i></div><b>${a.count}</b></div>`).join('') : `<div class="muted">—</div>`}</section>`; };
+  const open = cs.filter(c => c.status === 'open').length;
+  return `<div class="kpis">${k(l.total, cs.length)}${k(l.openN, open)}${k(l.closedN, cs.length - open)}${k(l.urgentN, cs.filter(c => c.severity === 'urgent').length)}${k(l.avg, n ? Math.round(mins / n) : 0)}</div>${bars(l.byDay, count(c => c.openedAt.slice(0, 10)))}${bars(l.byDoctor, count(c => c.doctor))}${bars(l.byClass, count(c => c.cls ? l.cls + ' ' + c.cls : ''))}`;
 }
 function render() {
   const l = L(); document.documentElement.lang = st.lang; document.documentElement.dir = l.dir; document.documentElement.dataset.theme = st.theme; document.title = l.title + ' — MUKHAYYAM';

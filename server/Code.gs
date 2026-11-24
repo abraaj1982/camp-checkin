@@ -163,6 +163,7 @@ function findStudentColumns_(headerRow) {
       if (STUDENT_HEADERS_[key].indexOf(norm[i]) !== -1) { cols[key] = i; break; }
     }
   });
+  if (cols.dob === -1) { for (let i = 0; i < norm.length; i++) { if (/birth|ميلاد|ولادة/.test(norm[i])) { cols.dob = i; break; } } } // any header that mentions a birth date
   return cols;
 }
 
@@ -173,21 +174,26 @@ function realValue_(v) {
   return /^(|لا|لايوجد|لاتوجد|لاشيء|لاشي|ليس|ليسلديه|ليسلديهحساسية|لايعاني|سليم|none|no|non|na|nil|nothing|0)$/.test(k) ? '' : t;
 }
 
-// Age in whole years (Muscat today) from a birth date: a real date, or text like 2012-05-17 / 17/05/2012 / ١٧-٥-٢٠١٢. Unreadable or unlikely (< 3 or > 30) = ''.
-function ageFromDob_(v, nowMs) {
+// Birth date: a real date, or text like 2012-05-17 / 17/05/2012 / ١٧-٥-٢٠١٢ -> {y,m,d} or null. Unreadable = null.
+function parseDob_(v) {
   let y, m, d;
-  if (v instanceof Date) { if (isNaN(v.getTime())) return ''; y = v.getFullYear(); m = v.getMonth() + 1; d = v.getDate(); }
+  if (v instanceof Date) { if (isNaN(v.getTime())) return null; y = v.getFullYear(); m = v.getMonth() + 1; d = v.getDate(); }
   else {
     const s = latinDigits_(String(v === undefined || v === null ? '' : v)).trim(); let x;
     if ((x = /^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/.exec(s))) { y = +x[1]; m = +x[2]; d = +x[3]; }
     else if ((x = /^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})/.exec(s))) { y = +x[3]; d = +x[1]; m = +x[2]; if (m > 12 && d <= 12) { const k = d; d = m; m = k; } } // day first (month first only when the first part cannot be a month)
-    else return '';
+    else return null;
   }
-  if (!(m >= 1 && m <= 12 && d >= 1 && d <= 31 && y > 1900)) return '';
+  return m >= 1 && m <= 12 && d >= 1 && d <= 31 && y > 1900 ? { y: y, m: m, d: d } : null;
+}
+// Age in whole years (Muscat today). Unlikely ages (< 3 or > 30) = ''.
+function ageFromDob_(v, nowMs) {
+  const b = parseDob_(v); if (!b) return '';
   const n = new Date((nowMs || Date.now()) + 4 * 3600000), ny = n.getUTCFullYear(), nm = n.getUTCMonth() + 1, nd = n.getUTCDate();
-  let age = ny - y; if (nm < m || (nm === m && nd < d)) age--;
+  let age = ny - b.y; if (nm < b.m || (nm === b.m && nd < b.d)) age--;
   return age >= 3 && age <= 30 ? String(age) : '';
 }
+function dobText_(v) { const b = parseDob_(v); return b ? b.y + '-' + (b.m < 10 ? '0' : '') + b.m + '-' + (b.d < 10 ? '0' : '') + b.d : ''; }
 // fresh=true skips the cache (used inside the lock when a new student number is chosen).
 function readStudents_(fresh) {
   const cache = CacheService.getScriptCache();
@@ -214,6 +220,7 @@ function readStudents_(fresh) {
       bags: Number(cell(data[i], 'bags')) || 0,
       foodAllergy: realValue_(cell(data[i], 'foodAllergy')),
       medical: realValue_(cell(data[i], 'medical')),
+      dob: cols.dob !== -1 ? dobText_(cell(data[i], 'dob')) : '', // only the doctor's screen (medInfo) ever sends this
       age: cols.dob !== -1 && cell(data[i], 'dob') !== '' ? ageFromDob_(cell(data[i], 'dob')) : String(cell(data[i], 'age') === undefined || cell(data[i], 'age') === null ? '' : cell(data[i], 'age')).trim().slice(0, 4), // the birth date itself is never sent anywhere, only the age
       trip: isYes_(cell(data[i], 'trip')),
       _row: i + 1
