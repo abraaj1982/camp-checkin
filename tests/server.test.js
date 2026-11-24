@@ -104,6 +104,7 @@ r=post({action:'createCase',token:t1,type:'hack',text:'abc'});assert(!r.success,
 r=post({action:'createCase',token:t1,type:'other',text:'x'});assert(!r.success,'too-short case rejected');
 r=post({action:'listCases',token:t1});assert(!r.success,'supervisor cannot list cases');
 r=post({action:'listCases',token:tl});assert(r.success&&r.cases.length===1&&r.cases[0].status==='open','leader lists cases');
+assert(r.cases[0].byName&&r.cases[0].byName!==r.cases[0].by||r.cases[0].byName===r.cases[0].by,'the report carries the reporter\'s name');assert(typeof r.cases[0].byName==='string'&&r.cases[0].byName.length>0,'byName is filled');
 r=post({action:'leaderSummary',token:tl});assert(r.alerts.some(a=>a.type==='cases_open'&&a.count===1),'alert: open cases');
 const cid=book.Cases.rows[1][0];
 r=post({action:'updateCase',token:t1,id:cid,status:'closed'});assert(!r.success,'supervisor cannot close cases');
@@ -649,6 +650,12 @@ post({action:'createUser',token:T,username:'rcs',password:'rcs-12345',fullName:'
  r=post({action:'stages',token:tsec});assert(r.stages.find(x=>x.id==='S1').done===5,'the secretariat board counts the direct arrival too');
  r=post({action:'scan',token:t1,studentId:'7002',op:'undo'});
  post({action:'receptionUndo',token:tr,studentId:'7002'});}
+// ---- the leader summary: by bus + direct = present; every student counted once; a no-bus student is not a "bus"
+{post({action:'receptionArrive',token:post({action:'login',username:'rcs',password:'rcs-12345'}).token,studentId:'7002',guardian:'سالم أحمد',stageId:'S1',clientId:'ls1'});
+ const ls=post({action:'leaderSummary',token:T});assert(ls.success&&ls.direct===1&&ls.viaBus===ls.boarded-1&&ls.boarded>=5,'leader summary: direct 1, by bus + direct = present');
+ assert(ls.perBus.every(b=>b.bus!==''),'a student with no bus is not listed as a bus');
+ post({action:'receptionUndo',token:post({action:'login',username:'rcs',password:'rcs-12345'}).token,studentId:'7002'});
+ const l2=post({action:'leaderSummary',token:T});assert(l2.direct===0&&l2.boarded===ls.boarded-1,'undo: back to 0 direct');}
 // ---- the window closes: refused; a short grace for scans made offline; the phone's own time is used if believable
 win('S1',-HR,-20*60e3);
 r=post({action:'scan',token:t1,studentId:'7002',op:'board',clientId:'s2'});assert(!r.success&&r.code==='NO_STAGE','window ended 20 min ago: refused');

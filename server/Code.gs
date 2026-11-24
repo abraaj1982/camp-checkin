@@ -830,7 +830,7 @@ function computeLeaderSummary_() {
     const students = readStudents_().students;
     const sc = scanStates_();
     const buses = {};
-    students.forEach(function(s) { buses[s.bus] = true; });
+    students.forEach(function(s) { if (s.bus) buses[s.bus] = true; }); // a student with no bus (came with his guardian) is not a "bus"
     const perBus = Object.keys(buses).sort().map(function(b) {
       const c = busCounts_(b, students, sc.states);
       let withGuardian = 0; students.forEach(function(s) { const x = sc.states[s.id]; if (s.bus === b && x && x.state === 'boarded' && x.via === 'guardian') withGuardian++; }); // came with the guardian, not on the bus (already counted in boarded)
@@ -838,8 +838,10 @@ function computeLeaderSummary_() {
     });
     let withdrawn = 0;
     Object.keys(sc.states).forEach(function(k) { if (sc.states[k].state === 'withdrawn') withdrawn++; });
+    // Present = everybody currently "in": by bus + direct (with a guardian / late). Each student is counted once.
     const total = students.length;
-    const boarded = perBus.reduce(function(a, b) { return a + b.boarded; }, 0);
+    let boarded = 0, direct = 0;
+    students.forEach(function(s) { const x = sc.states[s.id]; if (x && x.state === 'boarded') { boarded++; if (x.via === 'guardian') direct++; } });
     // bags
     const bvals = bagsSheet_().getDataRange().getValues();
     const bh = bvals[0];
@@ -847,7 +849,7 @@ function computeLeaderSummary_() {
     const lastByKey = {};
     for (let r = 1; r < bvals.length; r++) lastByKey[bvals[r][bh.indexOf('StudentID')] + '|' + bvals[r][bh.indexOf('Mode')]] = Number(bvals[r][bh.indexOf('Count')]) || 0;
     Object.keys(lastByKey).forEach(function(k) { if (k.split('|')[1] === 'load') loaded += lastByKey[k]; else unloaded += lastByKey[k]; });
-    return { success: true, total: total, boarded: boarded, withdrawn: withdrawn, perBus: perBus, bags: { loaded: loaded, unloaded: unloaded },
+    return { success: true, total: total, boarded: boarded, direct: direct, viaBus: boarded - direct, withdrawn: withdrawn, perBus: perBus, bags: { loaded: loaded, unloaded: unloaded },
       alerts: buildAlerts_(perBus, students, lastByKey) };
   })();
 }
@@ -929,7 +931,8 @@ function handleCreateCase_(data) {
 }
 function casesForList_() {
   const rank = { open: 0, ack: 1, closed: 2 };
-  return readCases_().sort(function(a, b) { return (rank[a.status] - rank[b.status]) || (a.time < b.time ? 1 : -1); }).slice(0, 100);
+  return readCases_().sort(function(a, b) { return (rank[a.status] - rank[b.status]) || (a.time < b.time ? 1 : -1); }).slice(0, 100)
+    .map(function(c) { c.byName = repUserName_(c.by); return c; }); // the reporter's full name (the screen shows who reported)
 }
 function handleListCases_(data) {
   return withAuth_(data, requireAnyPerm_(['dashboard', 'stats', 'manage']), function() {
