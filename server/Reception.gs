@@ -5,7 +5,6 @@
 // Late students live in the "ExtraStudents" tab of the main sheet, so replacing the registration sheet never loses them.
 // =============================================================
 const EXTRA_SHEET_ = 'ExtraStudents';
-const GUARDIAN_RELATIONS_ = ['father', 'mother', 'brother', 'sister', 'relative', 'other'];
 
 function extraSheet_() { return getSheetByName_(EXTRA_SHEET_); }
 function readExtraStudents_() {
@@ -31,16 +30,17 @@ function handleReceptionFind_(data) {
   });
 }
 
-function guardianNote_(name, relation) { return 'ولي الأمر: ' + name + (relation ? ' (' + relation + ')' : ''); }
+function cleanNote_(s, n) { return String(s || '').replace(/[()\n\r|]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n); } // free text (father, uncle Salim...): no brackets, so the stored line stays parseable
+function guardianNote_(name, relation) { return 'ولي الأمر: ' + cleanNote_(name, 60) + (relation ? ' (' + relation + ')' : ''); }
 function parseGuardian_(note) { const m = String(note || '').match(/^ولي الأمر: ([^(]*?)(?: \(([^)]*)\))?$/); return m ? { name: m[1], relation: m[2] || '' } : { name: '', relation: '' }; }
 
 function handleReceptionArrive_(data) {
   return withAuth_(data, requirePerm_('reception'), function(user) {
     const student = findStudent_(data.studentId);
     if (!student) return { success: false, code: 'NOT_FOUND', error: 'الطالب غير موجود' };
-    const name = String(data.guardian || '').trim().slice(0, 60);
+    const name = cleanNote_(data.guardian, 60);
     if (name.length < 3) return { success: false, code: 'BAD_REQUEST', error: 'اكتب اسم ولي الأمر' };
-    const relation = GUARDIAN_RELATIONS_.indexOf(String(data.relation)) !== -1 ? String(data.relation) : '';
+    const relation = cleanNote_(data.relation, 40); // a free note: father, uncle, maternal uncle...
     const clientId = String(data.clientId || '').slice(0, 60);
     scansSheet_(); // C2: open the spreadsheet BEFORE taking the lock
     const lock = LockService.getScriptLock();
@@ -96,6 +96,24 @@ function handleReceptionList_(data) {
   });
 }
 
+
+// ---- Names: a student is NEVER added twice, for any reason (no override). Two names clash when, after removing diacritics,
+// tatweel and spelling variants (أإآ/ى/ة/ؤئ), they are equal, hold the same words in another order, or differ by one letter (typo).
+function normNameKey_(s) {
+  return String(s || '').toLowerCase().replace(/[\u0610-\u061A\u064B-\u065F\u0670\u0640]/g, '').replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/ؤ/g, 'و').replace(/ئ/g, 'ي')
+    .replace(/[^\u0621-\u064Aa-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+function oneEditApart_(a, b) {
+  if (a === b) return true; const la = a.length, lb = b.length; if (Math.abs(la - lb) > 1) return false;
+  let i = 0; while (i < la && i < lb && a[i] === b[i]) i++;
+  if (la === lb) return a.slice(i + 1) === b.slice(i + 1);
+  return la < lb ? a.slice(i) === b.slice(i + 1) : a.slice(i + 1) === b.slice(i);
+}
+function nameClash_(all, name) {
+  const k = normNameKey_(name); if (!k) return null; const tok = k.split(' ').sort().join(' ');
+  return all.filter(function(s) { const o = normNameKey_(s.name); return o === k || o.split(' ').sort().join(' ') === tok || (k.length >= 8 && oneEditApart_(o, k)); })[0] || null;
+}
+
 function handleReceptionAdd_(data) {
   return withAuth_(data, requirePerm_('reception'), function(user) {
     const name = String(data.name || '').trim().slice(0, 60);
@@ -116,8 +134,8 @@ function handleReceptionAdd_(data) {
       // The bus must be one of the buses of the registration sheet (the screen offers only those; the server now checks too).
       // An empty bus stays allowed: a student who comes with his guardian may have no bus.
       if (bus && !all.some(function(s) { return !s.manual && s.bus === bus; })) return { success: false, code: 'BAD_REQUEST', error: 'باص غير موجود' };
-      const same = all.filter(function(s) { return s.name === name; })[0];
-      if (same && !data.confirmDuplicate) return { success: false, code: 'POSSIBLE_DUPLICATE', error: 'يوجد طالب بنفس الاسم', existing: { id: same.id, name: same.name, team: same.team, bus: same.bus, cls: same.cls } };
+      const same = nameClash_(all, name); // no override: the student already exists, open him instead of adding him again
+      if (same) return { success: false, code: 'DUPLICATE_NAME', error: 'هذا الطالب مسجّل مسبقًا. لا يمكن إضافته مرة ثانية.', existing: { id: same.id, name: same.name, team: same.team, bus: same.bus, cls: same.cls, manual: !!same.manual } };
       const taken = {}; let n = 0;
       all.concat(extra).forEach(function(s) { taken[s.id] = true; const m = /^X(\d+)$/.exec(s.id); if (m) n = Math.max(n, Number(m[1])); });
       let id = 'X' + (n + 1); while (taken[id]) { n++; id = 'X' + (n + 1); }

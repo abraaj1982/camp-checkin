@@ -1020,6 +1020,9 @@ function checkStudentSheet_() {
     perBus[st.bus || '—'] = (perBus[st.bus || '—'] || 0) + 1;
   });
   if (dups.length) { report.ok = false; report.problems.push('أرقام طلاب مكررة: ' + dups.join(', ')); }
+  const nameSeen = {}, sameName = [];
+  result.students.forEach(function(st) { const k = normNameKey_(st.name).split(' ').sort().join(' '); if (!k) return; if (nameSeen[k]) sameName.push(st.name + ' (' + nameSeen[k] + ' / ' + st.id + ')'); else nameSeen[k] = st.id; });
+  if (sameName.length) { report.ok = false; report.problems.push('أسماء طلاب مكررة: ' + sameName.slice(0, 15).join(', ') + (sameName.length > 15 ? ' …' : '')); }
   if (noBus.length) { report.ok = false; report.problems.push('طلاب بلا باص: ' + noBus.join(', ')); }
   if (result.cols.cls === -1) report.notes.push('عمود Class غير موجود (اختياري)');
   if (result.cols.photo === -1) report.notes.push('عمود Photo URL غير موجود (لازم للتعرف على الوجه)');

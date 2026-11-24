@@ -517,8 +517,14 @@ r=post({action:'custodySummary',token:tsc});assert(!r.success,'scout has no acce
  q=post({action:'receptionAdd',token:tr1,name:'سالم متأخر',cls:'6',team:'أزرق',bus:'1',shirt:'xl',note:'سجّل قبل المخيم بيومين',clientId:'ad1'});assert(q.success&&q.id==='X1','late student added with an automatic id (X1)');const nid=q.id;
  q=post({action:'receptionAdd',token:tr1,name:'سالم متأخر',cls:'6',clientId:'ad1'});assert(q.success&&q.repeated&&q.id===nid,'same request twice adds him once');
  q=post({action:'receptionAdd',token:tr1,name:'أحمد الجديد',cls:'5',bus:'2',clientId:'ad4'});assert(q.success&&q.id==='X2','second late student gets X2');
- q=post({action:'receptionAdd',token:tr1,name:'سالم متأخر',cls:'6',clientId:'ad5'});assert(!q.success&&q.code==='POSSIBLE_DUPLICATE','same name warns about a possible duplicate');
- q=post({action:'receptionAdd',token:tr1,name:'سالم متأخر',cls:'6',clientId:'ad5',confirmDuplicate:true});assert(q.success&&q.id==='X3','duplicate allowed after confirmation');
+ // STRICT: a student is never added twice, whatever the reason (no override at all)
+ q=post({action:'receptionAdd',token:tr1,name:'سالم متأخر',cls:'6',clientId:'ad5'});assert(!q.success&&q.code==='DUPLICATE_NAME'&&q.existing.id==='X1','same name is refused and points to the existing student');
+ q=post({action:'receptionAdd',token:tr1,name:'سالم متأخر',cls:'6',clientId:'ad5b',confirmDuplicate:true});assert(!q.success&&q.code==='DUPLICATE_NAME','no override: confirmDuplicate does nothing');
+ for(const [nm,why] of [['سَالِم  متأخر','diacritics and extra spaces'],['متأخر سالم','same words, other order'],['سالم متاخر','spelling variant (hamza)'],['سالم متأخرر','one-letter typo']]){q=post({action:'receptionAdd',token:tr1,name:nm,cls:'6',clientId:'adx'+nm.length});assert(!q.success&&q.code==='DUPLICATE_NAME','refused: '+why);}
+ q=post({action:'receptionAdd',token:tr1,name:'احمد الجديد',cls:'5',clientId:'adx9'});assert(!q.success&&q.code==='DUPLICATE_NAME','a hand-added student also blocks his twin (alef spelling)');
+ {const stu=post({action:'receptionFind',token:tr1,q:'1002'}).results[0];q=post({action:'receptionAdd',token:tr1,name:stu.name,cls:'6',clientId:'adx10'});assert(!q.success&&q.code==='DUPLICATE_NAME'&&q.existing.id===stu.id,'a registration-sheet student cannot be added again');}
+ {const n0=book.ExtraStudents.rows.length;for(let i=0;i<3;i++)post({action:'receptionAdd',token:tr1,name:'سالم متأخر',cls:'6',clientId:'adr'+i});assert(book.ExtraStudents.rows.length===n0,'nothing was written by the refused attempts');}
+ q=post({action:'receptionAdd',token:tr1,name:'سالم متأخر الحارثي',cls:'6',clientId:'ad6'});assert(q.success&&q.id==='X3','a clearly different name (extra family name) is accepted');
  const rost=post({action:'roster',token:tb1});assert(rost.students.some(x=>x.id==='X1'&&x.state==='none'),'the late student appears in his bus roster');
  q=post({action:'receptionFind',token:tr1,q:'متأخر'});assert(q.results.some(x=>x.id==='X1'&&x.manual===true&&x.arrival===''),'reception search finds him');
  assert(post({action:'shirtFind',token:T,q:'X1'}).results.some(x=>x.id==='X1'&&x.size==='XL'),'his shirt size reaches the shirts screen');
