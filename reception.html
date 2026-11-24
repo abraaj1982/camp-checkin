@@ -39,13 +39,13 @@ const AUTH_ERR = /EXPIRED|IDLE_TIMEOUT|REVOKED|BAD_SIGNATURE|MALFORMED|USER_NOT_
 const REL = { father: ['الأب', 'Father'], mother: ['الأم', 'Mother'], brother: ['الأخ', 'Brother'], sister: ['الأخت', 'Sister'], relative: ['قريب', 'Relative'], other: ['آخر', 'Other'] };
 const T = {
  ar: { dir: 'rtl', title: 'الوصول المباشر', sub: 'مع ولي الأمر · متأخرون · بدون الباص', notice: 'لتسجيل الطلاب الذين وصلوا مع ولي أمرهم أو متأخرين (بدون الباص). طلاب الباص يُسجَّلون عند المشرف.', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
-  tArrive: 'وصل مع ولي أمره', tAdd: 'تسجيل طالب متأخر', search: 'اسم الطالب أو رقمه', none: 'لا نتائج', bus: n => 'باص ' + n, noBus: 'بلا باص', guardian: 'اسم ولي الأمر', relation: 'ملاحظة (الصلة: أب، أم، عم، خال…)', optional: 'اختياري', register: 'تسجيل الدخول مع ولي الأمر',
+  notFoundHint: 'إن كان طالبًا جديدًا غير مسجّل مسبقًا فتتم إضافته من شاشة «طالب جديد» (السكرتارية).', openNew: 'فتح «طالب جديد»', search: 'اسم الطالب أو رقمه', none: 'لا نتائج', bus: n => 'باص ' + n, noBus: 'بلا باص', guardian: 'اسم ولي الأمر', relation: 'ملاحظة (الصلة: أب، أم، عم، خال…)', optional: 'اختياري', register: 'تسجيل الدخول مع ولي الأمر',
   onBus: 'صعد الباص مسبقًا. لا حاجة لتسجيله هنا.', withG: n => 'دخل مسبقًا مع ولي أمره', undo: 'تراجع عن الدخول', confirmUndo: 'التراجع عن هذا الدخول؟', todayList: 'دخلوا مع أولياء أمورهم', noArrivals: 'لا يوجد بعد.',
   done: 'تم تسجيل الدخول ✓', undone: 'تم التراجع', name: 'اسم الطالب (كاملًا)', cls: 'الصف', team: 'الفريق', busLbl: 'الباص', shirt: 'مقاس القميص', note: 'ملاحظة', add: 'إضافة الطالب', added: (id, n) => `تمت إضافة ${n}. رقمه: ${id}`, addedList: 'أُضيفوا يدويًا', noAdded: 'لم يُضف أحد بعد.',
   printBand: 'اطبع سواره', dupTitle: 'هذا الطالب مسجّل مسبقًا. لا يمكن إضافته مرة ثانية.', dupOpen: 'افتح الطالب لتسجيل وصوله', dupHint: 'إذا كان طالبًا آخر بنفس الاسم، أضف اسم الجد أو العائلة ليختلف الاسم.', none2: 'بلا', pick: 'اختر', manual: 'مضاف يدويًا',
   error: 'تعذّر الاتصال. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.', codes: { DUPLICATE_NAME: 'هذا الطالب مسجّل مسبقًا. لا يمكن إضافته مرة ثانية.', DUPLICATE: 'سُجّل مسبقًا', WITHDRAWN: 'الطالب خرج بإذن', NOT_FOUND: 'الطالب غير موجود', BAD_REQUEST: 'تحقق من البيانات المكتوبة', NOTHING_TO_UNDO: 'لا يوجد ما يُتراجع عنه' } },
  en: { dir: 'ltr', title: 'Direct Arrival', sub: 'With guardian · late · not by bus', notice: 'For students who arrived with a guardian or late (not by bus). Bus students are recorded by the bus supervisor.', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
-  tArrive: 'Arrived with guardian', tAdd: 'Register late student', search: 'Student name or number', none: 'No results', bus: n => 'Bus ' + n, noBus: 'No bus', guardian: 'Guardian name', relation: 'Note (relation: father, mother, uncle…)', optional: 'optional', register: 'Register arrival with guardian',
+  notFoundHint: 'A new student who was not registered in advance is added from the “New student” screen (secretariat).', openNew: 'Open “New student”', search: 'Student name or number', none: 'No results', bus: n => 'Bus ' + n, noBus: 'No bus', guardian: 'Guardian name', relation: 'Note (relation: father, mother, uncle…)', optional: 'optional', register: 'Register arrival with guardian',
   onBus: 'Already boarded the bus. No need to register here.', withG: n => 'Already arrived with his guardian', undo: 'Undo arrival', confirmUndo: 'Undo this arrival?', todayList: 'Arrived with guardians', noArrivals: 'None yet.',
   done: 'Arrival registered ✓', undone: 'Undone', name: 'Student full name', cls: 'Class', team: 'Team', busLbl: 'Bus', shirt: 'Shirt size', note: 'Note', add: 'Add student', added: (id, n) => `${n} added. Number: ${id}`, addedList: 'Added by hand', noAdded: 'Nobody added yet.',
   printBand: 'Print wristband', dupTitle: 'This student is already registered. He cannot be added twice.', dupOpen: 'Open the student to record his arrival', dupHint: 'If this is another student with the same name, add the grandfather or family name so the names differ.', none2: 'None', pick: 'Choose', manual: 'Added by hand',
@@ -63,7 +63,7 @@ const errText = r => (r && L().codes[r.code]) || (r && r.error) || L().error;
 const hhmm = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleTimeString('en-GB', { timeZone: 'Asia/Muscat', hour: '2-digit', minute: '2-digit' }); };
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2));
 const rel = k => k && REL[k] ? REL[k][st.lang === 'en' ? 1 : 0] : (k || '');
-async function load() { try { const r = await api('receptionList'); if (r.success) { st.arrivals = r.arrivals; st.added = r.added; st.teams = r.teams; st.buses = r.buses; st.classes = r.classes; } } catch (e) {} render(); }
+async function load() { try { const r = await api('receptionList'); if (r.success) { st.arrivals = r.arrivals; } } catch (e) {} render(); }
 let qT = null;
 function onQ(v) { st.q = v; st.cur = null; clearTimeout(qT); if (!v.trim()) { st.results = []; return render(); }
   qT = setTimeout(async () => { try { const r = await api('receptionFind', { q: v.trim() }); if (r.success && st.q === v) { st.results = r.results; if (r.results.length === 1) st.cur = r.results[0]; render(); } } catch (e) {} }, 300); }
@@ -76,15 +76,6 @@ async function arrive() {
   render();
 }
 async function undo(id) { if (!confirm(L().confirmUndo)) return; try { const r = await api('receptionUndo', { studentId: id }); say(r.success ? 'ok' : 'bad', r.success ? L().undone : errText(r)); if (st.cur && st.cur.id === id) { st.cur = null; st.q = ''; st.results = []; } } catch (e) { if (e.message !== 'auth') say('bad', L().error); } await load(); }
-async function addStudent() {
-  const f = st.f;
-  try { const r = await api('receptionAdd', { name: f.name, cls: f.cls, team: f.team, bus: f.bus, shirt: f.shirt, note: f.note, clientId: st.addId || (st.addId = uid()) });
-    if (r.success) { st.last = { id: r.id, name: r.name }; say('ok', L().added(r.id, r.name)); st.f = { name: '', cls: '', team: '', bus: '', shirt: '', note: '' }; st.addId = null; await load(); return; }
-    if (r.code === 'DUPLICATE_NAME') { st.dup = r.existing; st.msg = null; render(); return; }
-    say('bad', errText(r));
-  } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
-  render();
-}
 function stuLine(c) { const l = L(); return `<div class="stu2"><div class="av">🎓</div><div style="flex:1;min-width:0"><div class="big2">${esc(c.name)}</div><div class="muted" style="font-size:13px">${esc(c.id)}</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${c.team ? `<span class="pill">${esc(c.team)}</span>` : ''}${c.cls ? `<span class="pill">${esc(c.cls)}</span>` : ''}<span class="pill">${c.bus ? l.bus(esc(c.bus)) : l.noBus}</span>${c.manual ? `<span class="pill warn">${l.manual}</span>` : ''}</div></div></div>`; }
 function curCard() {
   const l = L(), c = st.cur; if (!c) return '';
@@ -94,42 +85,30 @@ function curCard() {
     <div><label class="lbl" for="gr">${l.relation} (${l.optional})</label><input id="gr" type="text" maxlength="40" value="${esc(st.g.rel)}" autocomplete="off" placeholder="${st.lang === 'en' ? 'e.g. uncle' : 'مثال: عم'}"></div></div>
     <button class="btn go full" style="margin-top:12px" data-arrive="1" ${st.g.name.trim().length < 3 ? 'disabled' : ''}>${l.register}</button></section>`;
 }
-function resultsHtml() { const l = L(); if (!st.q.trim()) return ''; if (!st.results.length) return `<div class="muted" style="padding:8px">${l.none}</div>`; if (st.cur) return '';
+function resultsHtml() { const l = L(); if (!st.q.trim()) return ''; if (!st.results.length) return `<div class="muted" style="padding:8px">${l.none}<div style="margin-top:6px;font-size:13px">${l.notFoundHint}${can('addstudent') ? ` <a href="newstudent.html">${l.openNew}</a>` : ''}</div></div>`; if (st.cur) return '';
   return st.results.map(s => `<button class="res" data-pick="${esc(s.id)}"><span><b>${esc(s.name)}</b> <span class="muted">· ${esc(s.id)} · ${s.bus ? l.bus(esc(s.bus)) : l.noBus}</span></span><span class="pill ${s.arrival ? 'ok' : ''}">${s.arrival === 'guardian' ? '🚗' : s.arrival === 'bus' ? '🚌' : ''}</span></button>`).join(''); }
 function arriveView() {
   const l = L();
   return `<section class="card"><label class="lbl" for="q">${l.search}</label><input id="q" type="search" value="${esc(st.q)}" autocomplete="off"><div id="qres" style="margin-top:6px">${resultsHtml()}</div></section>${curCard()}
     <section class="card"><h2 class="h2" style="margin-bottom:6px">${l.todayList} (${st.arrivals.length})</h2>${st.arrivals.length ? st.arrivals.map(a => `<div class="arow"><div><b>${esc(a.name)}</b> <span class="muted">· ${esc(a.id)}</span><div class="g">🚗 ${esc(a.guardian)}${a.relation ? ' (' + esc(rel(a.relation)) + ')' : ''} · ${esc(hhmm(a.at))}</div></div><button class="chip" data-undo="${esc(a.id)}">${l.undo}</button></div>`).join('') : `<div class="muted">${l.noArrivals}</div>`}</section>`;
 }
-function opt(list, val, blank) { return `<option value="">${blank}</option>` + list.map(x => `<option value="${esc(x)}" ${val === x ? 'selected' : ''}>${esc(x)}</option>`).join(''); }
-function dupCard() { const l = L(), x = st.dup; if (!x) return ''; return `<div class="banner bad" role="alert"><b>${l.dupTitle}</b><div style="margin-top:6px">${esc(x.name)} · ${esc(x.id)}${x.cls ? ' · ' + esc(x.cls) : ''}${x.bus ? ' · ' + l.bus(esc(x.bus)) : ''}</div><div class="muted" style="margin-top:6px;font-size:13px">${l.dupHint}</div><button class="btn go full" style="margin-top:10px" data-opendup="1">${l.dupOpen}</button></div>`; }
-function addView() {
-  const l = L(), f = st.f;
-  return `${dupCard()}<section class="card"><div class="fgrid"><div><label class="lbl" for="fn">${l.name}</label><input id="fn" type="text" maxlength="60" value="${esc(f.name)}" autocomplete="off"></div>
-    <div class="fgrid two"><div><label class="lbl" for="fc">${l.cls}</label><select id="fc" data-f="cls">${opt(st.classes, f.cls, l.pick)}</select></div><div><label class="lbl" for="ft">${l.team}</label><select id="ft" data-f="team">${opt(st.teams, f.team, l.pick)}</select></div></div>
-    <div class="fgrid two"><div><label class="lbl" for="fb">${l.busLbl}</label><select id="fb" data-f="bus">${opt(st.buses, f.bus, l.noBus)}</select></div><div><label class="lbl" for="fs">${l.shirt} (${l.optional})</label><input id="fs" type="text" maxlength="8" value="${esc(f.shirt)}" placeholder="M / L / XL" autocomplete="off"></div></div>
-    <div><label class="lbl" for="fo">${l.note} (${l.optional})</label><input id="fo" type="text" maxlength="100" value="${esc(f.note)}" autocomplete="off"></div></div>
-    <button class="btn go full" style="margin-top:12px" data-add="1" ${f.name.trim().length < 3 ? 'disabled' : ''}>${l.add}</button>
-    ${st.last ? `<div class="banner go" style="margin-top:10px">${esc(l.added(st.last.id, st.last.name))} <a href="wristbands.html" style="margin-inline-start:8px">${l.printBand}</a></div>` : ''}</section>
-    <section class="card"><h2 class="h2" style="margin-bottom:6px">${l.addedList} (${st.added.length})</h2>${st.added.length ? st.added.map(a => `<div class="arow"><div><b>${esc(a.name)}</b> <span class="muted">· ${esc(a.id)}</span><div class="g">${esc([a.cls, a.team, a.bus ? l.bus(a.bus) : l.noBus, a.shirt].filter(Boolean).join(' · '))}</div></div></div>`).join('') : `<div class="muted">${l.noAdded}</div>`}</section>`;
-}
 function render() {
   const l = L(); document.documentElement.lang = st.lang; document.documentElement.dir = l.dir; document.documentElement.dataset.theme = st.theme; document.title = l.title + ' — MUKHAYYAM';
   $('hT').textContent = l.title; $('hS').textContent = l.sub; $('homeBtn').textContent = l.home; $('langBtn').textContent = l.lang; $('themeBtn').textContent = st.theme === 'light' ? l.dark : l.light;
   const ae = document.activeElement, keep = ae && ae.id ? { id: ae.id, pos: ae.selectionStart } : null;
-  $('app').innerHTML = `<div class="banner warn">${esc(l.notice)}</div>${st.msg ? `<div class="banner ${st.msg.cls}" role="alert">${esc(st.msg.t)}</div>` : ''}<div class="tabs">${[['arrive', l.tArrive], ['add', l.tAdd]].map(t => `<button class="${st.tab === t[0] ? 'on' : ''}" data-tab="${t[0]}">${t[1]}</button>`).join('')}</div>${st.tab === 'arrive' ? arriveView() : addView()}`;
+  $('app').innerHTML = `<div class="banner warn">${esc(l.notice)}</div>${st.msg ? `<div class="banner ${st.msg.cls}" role="alert">${esc(st.msg.t)}</div>` : ''}${arriveView()}`;
   if (keep && $(keep.id) && ['INPUT', 'TEXTAREA'].indexOf($(keep.id).tagName) !== -1) { const e = $(keep.id); e.focus(); try { e.setSelectionRange(keep.pos, keep.pos); } catch (x) {} }
 }
 document.addEventListener('input', e => { const i = e.target.id;
-  if (i === 'q') onQ(e.target.value); else if (i === 'gn') { st.g.name = e.target.value; render(); } else if (i === 'gr') { st.g.rel = e.target.value; } else if (i === 'fn') { st.f.name = e.target.value; st.dup = null; render(); } else if (i === 'fs') st.f.shirt = e.target.value; else if (i === 'fo') st.f.note = e.target.value; });
-document.addEventListener('change', e => { const i = e.target.id; if (e.target.dataset && e.target.dataset.f) st.f[e.target.dataset.f] = e.target.value; });
+  if (i === 'q') onQ(e.target.value); else if (i === 'gn') { st.g.name = e.target.value; render(); } else if (i === 'gr') { st.g.rel = e.target.value; } });
 document.addEventListener('click', e => {
   const b = e.target.closest && e.target.closest('button'); if (!b) return; const d = b.dataset;
-  if (d.tab) { st.tab = d.tab; st.msg = null; st.dup = null; render(); } else if (d.arrive) arrive(); else if (d.add) addStudent(); else if (d.opendup) { const x = st.dup; st.dup = null; st.tab = 'arrive'; st.q = x.id; st.results = [x]; st.cur = null; st.msg = null; render(); onQ(x.id); } else if (d.undo) undo(d.undo);
+  if (d.arrive) arrive(); else if (d.undo) undo(d.undo);
   else if (d.pick) { st.cur = st.results.find(x => x.id === d.pick) || null; st.msg = null; render(); }
 });
 $('langBtn').onclick = () => { st.lang = st.lang === 'ar' ? 'en' : 'ar'; pref.set('lang', st.lang); render(); };
 $('themeBtn').onclick = () => { st.theme = st.theme === 'light' ? 'dark' : 'light'; pref.set('theme', st.theme); render(); };
 render(); load();
+try { const q0 = new URLSearchParams(location.search).get('q'); if (q0) { st.q = q0; render(); onQ(q0); } } catch (e) {}
 </script>
 </body></html>

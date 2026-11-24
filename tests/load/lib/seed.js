@@ -30,7 +30,7 @@ function seed(opts) {
   for (let i = 1; i <= opts.supervisors; i++) mk('sup' + i, 'supervisor', String(1 + (i - 1) % opts.buses));
   mk('all1', 'supervisor', '', ['checkin', 'allbuses']); mk('all2', 'supervisor', '', ['checkin', 'allbuses']);
   mk('leader', 'camp_leader', '', ['dashboard', 'stats', 'allbuses']); mk('leader2', 'camp_leader', '', ['dashboard', 'stats']);
-  mk('secr', 'supervisor', '', ['reports', 'custody', 'print', 'reception']); mk('doctor', 'supervisor', '', ['medical']); mk('nutri', 'supervisor', '', ['nutrition']);
+  mk('secr', 'supervisor', '', ['reports', 'custody', 'print', 'reception', 'addstudent']); mk('doctor', 'supervisor', '', ['medical']); mk('nutri', 'supervisor', '', ['nutrition']);
   mk('scout', 'supervisor', '', ['gate']); mk('media', 'supervisor', '', ['announce', 'results', 'verify']); mk('shirt', 'supervisor', '', ['shirts']);
   for (let i = 1; i <= 6; i++) mk('viewer' + i, 'camp_leader', '', ['dashboard', 'stats']);
   const tokens = {}; users.concat(['admin']).forEach(u => { tokens[u] = post({ action: 'login', username: u, password: 'load-test-1' }).token; });

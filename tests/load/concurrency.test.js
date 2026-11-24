@@ -117,31 +117,34 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   s = seed({ supervisors: 9 }); emu = createEmu(s, { slots: 30, netOverheadMs: 0, lat: SMALL });
   const rcall = b => emu.call(b).then(x => x.out); const extra = () => s.book.ExtraStudents.rows.slice(1);
   const dupIds = () => { const all = extra().map(r => r[0]).concat(s.book.Bus.rows.slice(1).map(r => r[3])); return all.filter((x, i) => all.indexOf(x) !== i); };
-  const add = (name, k, bus) => rcall({ action: 'receptionAdd', token: s.tokens.secr, name, cls: '6', team: 'الأزرق', bus: bus === undefined ? '1' : bus, clientId: 'radd-' + k });
-  let ra = await Promise.all(Array.from({ length: 10 }, (_, i) => add('متأخر متزامن تجريبي ' + i, i)));
+  // names must differ clearly: the server refuses names that are equal, reordered or one letter apart (a student is never added twice)
+  const FIRST = ['سالم', 'خالد', 'ناصر', 'يوسف', 'حمد', 'إبراهيم', 'سعيد', 'عمر', 'بدر', 'طلال', 'راشد', 'فيصل', 'مالك', 'زياد', 'هلال', 'منذر', 'قيس', 'جابر', 'وليد', 'صالح', 'عادل', 'ماجد', 'نبيل', 'شهاب', 'غانم'], FAM = ['البلوشي', 'الحارثي', 'الكلباني', 'المعمري', 'الرواحي', 'السيابي', 'العبري', 'الشكيلي'];
+  const nm = i => FIRST[i % FIRST.length] + ' ' + FAM[Math.floor(i / FIRST.length) % FAM.length] + ' ' + FIRST[(i * 7 + 3) % FIRST.length];
+  const add = (name, k, bus) => rcall({ action: 'studentAdd', token: s.tokens.secr, name, cls: '6', team: 'الأزرق', bus: bus === undefined ? '1' : bus, clientId: 'radd-' + k });
+  let ra = await Promise.all(Array.from({ length: 10 }, (_, i) => add(nm(i), i)));
   chk(ra.every(x => x.success) && new Set(ra.map(x => x.id)).size === 10 && !dupIds().length, 'R1 [D1] 10 late students added at the same instant: 10 different numbers');
   // stale cache: a reader loads the student list BEFORE an add and stores it AFTER (deterministic pause)
   const pauseStudentsCachePut = () => { let rel; const g = { hit: false, wait: new Promise(r => { rel = r; }) }; g.release = () => rel();
     emu.cfg.gate = (op, a, act) => { if (!g.hit && act === 'roster' && op === 'cput' && a[0] === 'students_v2') { g.hit = true; return g.wait; } return null; }; return g; };
   flush(); let g7 = pauseStudentsCachePut(); const reader7 = rcall({ action: 'roster', token: s.tokens.sup1 }); let t7 = Date.now(); while (!g7.hit && Date.now() - t7 < 5000) await sleep(10);
-  const A = await add('متأخر أ تجريبي', 'a'); g7.release(); emu.cfg.gate = null; await reader7;
+  const A = await add('فهد الغافري المنذري', 'a'); g7.release(); emu.cfg.gate = null; await reader7;
   const vis = await Promise.all([rcall({ action: 'roster', token: s.tokens.sup1 }), rcall({ action: 'receptionFind', token: s.tokens.secr, q: A.id.toLowerCase() }), rcall({ action: 'reportData', token: s.tokens.admin, report: 'busAttendance', filters: { bus: '1' } })]);
   const seen = [vis[0].students && vis[0].students.some(x => x.id === A.id), vis[1].results && vis[1].results.some(x => x.id === A.id), vis[2].rows && vis[2].rows.some(x => x.id === A.id)];
   chk(g7.hit && seen.every(Boolean), `R2 [D1] a student list read before an add and cached after it does not hide the new student (roster/reception/report: ${seen.join('/')})`);
-  const B2 = await add('متأخر ب تجريبي', 'b');
+  const B2 = await add('تميم الهنائي الصبحي', 'b');
   chk(A.success && B2.success && A.id !== B2.id && !dupIds().length, `R3 [D1] RC4 the next add after that stale cache gets a NEW number (${A.id} / ${B2.id}; duplicates: ${dupIds().join(',') || 'none'})`);
   // a number already used in the REGISTRATION sheet is never reused
   const ix = s.book.Bus.rows[0].indexOf('Student ID'); const used = 'X' + (Math.max(...extra().map(r => Number(String(r[0]).slice(1)))) + 1); s.book.Bus.rows[5][ix] = used; flush();
-  const C3 = await add('متأخر ج تجريبي', 'c');
+  const C3 = await add('عبدالله الريامي الوهيبي', 'c');
   chk(C3.success && C3.id !== used && !dupIds().length, `R4 [D1] a number already used in the registration sheet (${used}) is not given again (got ${C3.id})`);
   // 20 additions while supervisors keep reading the roster (natural interleavings)
   let stop = false; const pollers = Array.from({ length: 6 }, (_, k) => (async () => { while (!stop) { flush(); await rcall({ action: 'roster', token: s.tokens['sup' + (k + 1)] }); } })());
-  ra = await Promise.all(Array.from({ length: 20 }, (_, i) => add('متأخر مع قراءات تجريبي ' + i, 'p' + i))); stop = true; await Promise.all(pollers);
+  ra = await Promise.all(Array.from({ length: 20 }, (_, i) => add(nm(100 + i), 'p' + i))); stop = true; await Promise.all(pollers);
   chk(ra.every(x => x.success) && new Set(ra.map(x => x.id)).size === 20 && !dupIds().length, `R5 [D1] 20 additions at once while 6 supervisors keep reloading their rosters: all numbers unique (${extra().length} hand-added, no duplicate)`);
   // existing records untouched
   chk(extra().every(r => r[9] === true) && s.book.Bus.rows.length === 301, 'R6 [D1] existing students and earlier hand-added records are untouched');
   // bus validation
-  const bad = await add('باص غير موجود تجريبي', 'bad', '99'), none = await add('بلا باص تجريبي', 'nob', ''), ok8 = await add('باص صحيح تجريبي', 'okb', '8');
+  const bad = await add('مهنا الجابري السعدي', 'bad', '99'), none = await add('ثامر الفارسي الشامسي', 'nob', ''), ok8 = await add('قاسم الراشدي الحجري', 'okb', '8');
   chk(bad.code === 'BAD_REQUEST' && !bad.success && none.success && ok8.success && !extra().some(r => r[1] === 'باص غير موجود تجريبي'), `R7 [D3] bus that does not exist is refused (${bad.code}: ${bad.error}); no bus (arrives with guardian) and an existing bus are accepted`);
   await emu.close();
 

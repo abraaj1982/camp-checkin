@@ -1,7 +1,8 @@
 // =============================================================
 // Reception (secretariat desk):
 //  1) A student who comes WITH his guardian (not by bus): record his arrival and the guardian's name.
-//  2) A student who registers late (e.g. two days before): add him by hand; he joins the normal lists, wristbands and reports.
+//  2) New Student (separate screen, permission "addstudent", secretariat/admin only, never a bus supervisor): a student who is NOT in the
+//     registration sheet is added by hand; he joins the normal lists, wristbands and reports.
 // Late students live in the "ExtraStudents" tab of the main sheet, so replacing the registration sheet never loses them.
 // =============================================================
 const EXTRA_SHEET_ = 'ExtraStudents';
@@ -14,7 +15,7 @@ function readExtraStudents_() {
     const g = function(n) { return v[r][h.indexOf(n)]; };
     if (!g('Id') || g('Active') === false) continue;
     out.push({ id: String(g('Id')).trim(), name: String(g('Name')).trim(), team: String(g('Team') || '').trim(), bus: String(g('Bus') || '').trim(), cls: String(g('Class') || '').trim(),
-      photo: '', shirt: String(g('Shirt') || '').trim(), bags: 0, foodAllergy: '', medical: '', manual: true, note: String(g('Note') || ''), addedAt: isoOf_(g('AddedAt')), addedBy: String(g('AddedBy') || ''), clientId: String(g('ClientId') || ''), _row: r + 1 });
+      photo: '', shirt: String(g('Shirt') || '').trim(), bags: Number(g('Bags')) || 0, foodAllergy: realValue_(g('FoodAllergy')), medical: realValue_(g('Medical')), trip: isYes_(g('Trip')), manual: true, note: String(g('Note') || ''), addedAt: isoOf_(g('AddedAt')), addedBy: String(g('AddedBy') || ''), clientId: String(g('ClientId') || ''), _row: r + 1 });
   }
   return out;
 }
@@ -90,9 +91,17 @@ function handleReceptionList_(data) {
       arrivals.push({ id: id, name: s.name, team: s.team, cls: s.cls, bus: s.bus, at: st.at.toISOString(), by: repUserName_(st.by), guardian: g.name, relation: g.relation });
     });
     arrivals.sort(function(a, b) { return a.at < b.at ? 1 : -1; });
-    const added = readExtraStudents_().map(function(s) { return { id: s.id, name: s.name, team: s.team, cls: s.cls, bus: s.bus, shirt: s.shirt, note: s.note, addedAt: s.addedAt, addedBy: repUserName_(s.addedBy) }; }).sort(function(a, b) { return a.addedAt < b.addedAt ? 1 : -1; });
+    return { success: true, arrivals: arrivals };
+  });
+}
+
+// ---- New Student screen (permission 'addstudent'; a bus supervisor is refused even if the permission was ticked by mistake)
+function requireAddStudent_(user) { return hasPerm_(user, 'addstudent') && !String(user.AssignedBus || '').trim(); }
+function handleStudentAddList_(data) {
+  return withAuth_(data, requireAddStudent_, function() {
+    const added = readExtraStudents_().map(function(s) { return { id: s.id, name: s.name, team: s.team, cls: s.cls, bus: s.bus, shirt: s.shirt, trip: s.trip, note: s.note, addedAt: s.addedAt, addedBy: repUserName_(s.addedBy) }; }).sort(function(a, b) { return a.addedAt < b.addedAt ? 1 : -1; });
     const all = readStudents_().students, uniq = function(k) { const m = {}; all.forEach(function(s) { if (s[k]) m[s[k]] = 1; }); return Object.keys(m).sort(repNum_); };
-    return { success: true, arrivals: arrivals, added: added, teams: uniq('team'), buses: uniq('bus'), classes: uniq('cls') };
+    return { success: true, added: added, teams: uniq('team'), buses: uniq('bus'), classes: uniq('cls') };
   });
 }
 
@@ -114,11 +123,14 @@ function nameClash_(all, name) {
   return all.filter(function(s) { const o = normNameKey_(s.name); return o === k || o.split(' ').sort().join(' ') === tok || (k.length >= 8 && oneEditApart_(o, k)); })[0] || null;
 }
 
-function handleReceptionAdd_(data) {
-  return withAuth_(data, requirePerm_('reception'), function(user) {
+function handleStudentAdd_(data) {
+  return withAuth_(data, requireAddStudent_, function(user) {
     const name = String(data.name || '').trim().slice(0, 60);
     if (name.length < 3) return { success: false, code: 'BAD_REQUEST', error: 'اكتب اسم الطالب كاملًا' };
-    const cls = String(data.cls || '').trim().slice(0, 10), bus = String(data.bus || '').trim().slice(0, 10), shirt = normSize_(data.shirt).slice(0, 8), note = String(data.note || '').trim().slice(0, 100);
+    const cls = String(data.cls || '').trim().slice(0, 10);
+    if (!cls || gradeOf_(cls) === null) return { success: false, code: 'BAD_REQUEST', error: 'اختر الصف (تعتمد عليه المراحل)' };
+    const trip = isYes_(data.trip), food = cleanNote_(data.foodAllergy, 100), medical = cleanNote_(data.medical, 100), bags = Math.max(0, Math.min(20, Math.floor(Number(data.bags) || 0)));
+    const bus = String(data.bus || '').trim().slice(0, 10), shirt = normSize_(data.shirt).slice(0, 8), note = String(data.note || '').trim().slice(0, 100);
     const team = String(data.team || '').trim().slice(0, 40);
     const teams = {}; readStudents_().students.forEach(function(s) { if (s.team) teams[s.team] = 1; });
     if (team && !teams[team]) return { success: false, code: 'BAD_REQUEST', error: 'فريق غير معروف' };
@@ -139,7 +151,7 @@ function handleReceptionAdd_(data) {
       const taken = {}; let n = 0;
       all.concat(extra).forEach(function(s) { taken[s.id] = true; const m = /^X(\d+)$/.exec(s.id); if (m) n = Math.max(n, Number(m[1])); });
       let id = 'X' + (n + 1); while (taken[id]) { n++; id = 'X' + (n + 1); }
-      appendSafe_(extraSheet_(), [id, name, cls, team, bus, shirt, note, new Date(), user.Username, true, clientId]);
+      appendSafe_(extraSheet_(), [id, name, cls, team, bus, shirt, note, new Date(), user.Username, true, clientId, trip ? 'نعم' : '', food, medical, bags || '']);
       clearStudentsCache_(); // every screen sees the new student at once
       writeAudit_(user.Username, 'STUDENT_ADDED', id, 'bus=' + bus);
       return { success: true, id: id, name: name };

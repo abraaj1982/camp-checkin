@@ -735,7 +735,7 @@ const PERMISSIONS_SEED_ = [
   ['users', 'المستخدمون', 'شاشة'], ['results', 'إدخال النتائج', 'شاشة'],
   ['medical', 'الصفحة الطبية', 'شاشة'],
   ['allbuses', 'تسجيل حضور كل الباصات', 'خاصة'], ['approve', 'اعتماد المصاريف', 'خاصة'],
-  ['addstudent', 'إضافة طلاب يدوياً', 'خاصة'], ['manage', 'إدارة المستخدمين', 'خاصة'],
+  ['addstudent', 'طالب جديد: إضافة طالب غير مسجّل مسبقًا (للسكرتارية والأدمن فقط)', 'شاشة'], ['manage', 'إدارة المستخدمين', 'خاصة'],
   ['verify', 'التحقق من النتائج', 'خاصة'], ['announce', 'نشر الإعلانات', 'خاصة'],
   ['budget', 'تحديد ميزانيات اللجان', 'خاصة'],
   ['support', 'الدعم الفني (كلمات المرور وفك القفل)', 'خاصة'],
@@ -745,7 +745,7 @@ const PERMISSIONS_SEED_ = [
   ['gate', 'البوابة (الكشافة): تأكيد خروج من وافقت السكرتارية على خروجه', 'شاشة'],
   ['nutrition', 'التغذية (أعداد الوجبات والحساسية الغذائية)', 'شاشة'],
   ['reports', 'التقارير (استخراج وطباعة) — للسكرتارية', 'شاشة'],
-  ['reception', 'الوصول المباشر: طلاب وصلوا مع ولي أمرهم أو متأخرين (بدون الباص) وتسجيل المتأخرين', 'شاشة'],
+  ['reception', 'الوصول المباشر: طلاب وصلوا مع ولي أمرهم أو متأخرين (بدون الباص)', 'شاشة'],
   ['stages', 'المراحل: بدء وإنهاء مراحل الوصول والرحلة والمغادرة — للسكرتارية', 'شاشة']
 ];
 
@@ -809,7 +809,7 @@ function SETUP_createTabs() {
   ensureSheetWithHeaders_(ss, 'Staff', ['Name', 'Size', 'Note'], log);
   ensureSheetWithHeaders_(ss, 'ShirtStock', ['Size', 'Total', 'LowAt'], log);
   ensureSheetWithHeaders_(ss, 'ShirtLog', ['Id', 'Time', 'Kind', 'PersonId', 'Name', 'Size', 'GivenBy', 'Status', 'Note', 'ClientId'], log);
-  ensureSheetWithHeaders_(ss, 'ExtraStudents', ['Id', 'Name', 'Class', 'Team', 'Bus', 'Shirt', 'Note', 'AddedAt', 'AddedBy', 'Active', 'ClientId'], log);
+  ensureSheetWithHeaders_(ss, 'ExtraStudents', ['Id', 'Name', 'Class', 'Team', 'Bus', 'Shirt', 'Note', 'AddedAt', 'AddedBy', 'Active', 'ClientId', 'Trip', 'FoodAllergy', 'Medical', 'Bags'], log);
   ensureSheetWithHeaders_(ss, 'Rounds', ['Time', 'Bus', 'Phase', 'Supervisor', 'Checked', 'Absent', 'Total', 'AbsentIds', 'ClientId'], log);
   ensureSheetWithHeaders_(ss, 'Cases', ['Id', 'Time', 'Type', 'Bus', 'StudentID', 'Text', 'Status', 'CreatedBy', 'UpdatedBy', 'ClientId'], log);
 

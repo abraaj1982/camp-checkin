@@ -508,23 +508,32 @@ r=post({action:'createCase',token:tsc,type:'student',text:'الاسم لا يط�
 r=post({action:'custodySummary',token:tsc});assert(!r.success,'scout has no access to custody data');
 // ---- reception: late registrations added by hand, and students who arrive WITH their guardian (not by bus)
 {post({action:'createUser',token:T,username:'recp',password:'prc-12345',fullName:'الاستقبال',role:'supervisor',permissions:['reception'],committees:[]});
+ post({action:'createUser',token:T,username:'newst',password:'pns-12345',fullName:'السكرتارية',role:'supervisor',permissions:['addstudent'],committees:[]});
+ post({action:'createUser',token:T,username:'busadd',password:'pba-12345',fullName:'مشرف باص',role:'supervisor',assignedBus:'1',permissions:['checkin','addstudent'],committees:[]});
+ const tn1=post({action:'login',username:'newst',password:'pns-12345'}).token,tbus=post({action:'login',username:'busadd',password:'pba-12345'}).token;
  const tr1=post({action:'login',username:'recp',password:'prc-12345'}).token,tb1=post({action:'login',username:'sup1',password:'p1-12345'}).token;
- for(const a of ['receptionFind','receptionList','receptionAdd','receptionArrive','receptionUndo'])assert(!post({action:a,token:tb1,q:'x',name:'طالب جديد',studentId:'1002',guardian:'ولي أمر'}).success,'supervisor cannot use '+a);
- let q=post({action:'receptionAdd',token:tr1,name:'سالم متأخر',cls:'6',team:'zzz',bus:'1'});assert(!q.success&&q.code==='BAD_REQUEST','unknown team rejected');
- q=post({action:'receptionAdd',token:tr1,name:'طالب باص وهمي',cls:'6',bus:'99',clientId:'adbus'});assert(!q.success&&q.code==='BAD_REQUEST'&&!book.ExtraStudents.rows.some(x=>x[1]==='طالب باص وهمي'),'a bus that does not exist is refused by the server');
- q=post({action:'receptionAdd',token:tr1,name:'طالب باص وهمي',cls:'6',bus:'99',clientId:'adbus'});assert(!q.success&&q.code==='BAD_REQUEST','retrying the refused request is still refused (nothing was added)');
- q=post({action:'receptionAdd',token:tr1,name:'ab'});assert(!q.success,'a full name is required');
- q=post({action:'receptionAdd',token:tr1,name:'سالم متأخر',cls:'6',team:'أزرق',bus:'1',shirt:'xl',note:'سجّل قبل المخيم بيومين',clientId:'ad1'});assert(q.success&&q.id==='X1','late student added with an automatic id (X1)');const nid=q.id;
- q=post({action:'receptionAdd',token:tr1,name:'سالم متأخر',cls:'6',clientId:'ad1'});assert(q.success&&q.repeated&&q.id===nid,'same request twice adds him once');
- q=post({action:'receptionAdd',token:tr1,name:'أحمد الجديد',cls:'5',bus:'2',clientId:'ad4'});assert(q.success&&q.id==='X2','second late student gets X2');
+ for(const a of ['receptionFind','receptionList','studentAdd','studentAddList','receptionArrive','receptionUndo'])assert(!post({action:a,token:tb1,q:'x',name:'طالب جديد',studentId:'1002',guardian:'ولي أمر'}).success,'supervisor cannot use '+a);
+ assert(!post({action:'studentAdd',token:tr1,name:'طالب جديد تماما',cls:'6'}).success,'the arrival desk (reception) cannot add students');
+ assert(!post({action:'studentAdd',token:tbus,name:'طالب جديد تماما',cls:'6'}).success&&!post({action:'studentAddList',token:tbus}).success,'a bus supervisor is refused even if the permission was ticked');
+ assert(post({action:'studentAddList',token:tn1}).success,'the new-student screen lists for its permission');
+ let q=post({action:'studentAdd',token:tn1,name:'سالم متأخر',cls:'6',team:'zzz',bus:'1'});assert(!q.success&&q.code==='BAD_REQUEST','unknown team rejected');
+ q=post({action:'studentAdd',token:tn1,name:'طالب باص وهمي',cls:'6',bus:'99',clientId:'adbus'});assert(!q.success&&q.code==='BAD_REQUEST'&&!book.ExtraStudents.rows.some(x=>x[1]==='طالب باص وهمي'),'a bus that does not exist is refused by the server');
+ q=post({action:'studentAdd',token:tn1,name:'طالب باص وهمي',cls:'6',bus:'99',clientId:'adbus'});assert(!q.success&&q.code==='BAD_REQUEST','retrying the refused request is still refused (nothing was added)');
+ q=post({action:'studentAdd',token:tn1,name:'ab'});assert(!q.success,'a full name is required');
+ q=post({action:'studentAdd',token:tn1,name:'طالب بلا صف'});assert(!q.success&&q.code==='BAD_REQUEST'&&!(book.ExtraStudents&&book.ExtraStudents.rows.some(x=>x[1]==='طالب بلا صف')),'the class is required');
+ q=post({action:'studentAdd',token:tn1,name:'سالم متأخر',cls:'6',team:'أزرق',bus:'1',shirt:'xl',note:'سجّل قبل المخيم بيومين',clientId:'ad1'});assert(q.success&&q.id==='X1','late student added with an automatic id (X1)');const nid=q.id;
+ q=post({action:'studentAdd',token:tn1,name:'سالم متأخر',cls:'6',clientId:'ad1'});assert(q.success&&q.repeated&&q.id===nid,'same request twice adds him once');
+ q=post({action:'studentAdd',token:tn1,name:'أحمد الجديد',cls:'5',bus:'2',trip:'1',foodAllergy:'فول سوداني',medical:'ربو',bags:2,clientId:'ad4'});assert(q.success&&q.id==='X2','second late student gets X2');
  // STRICT: a student is never added twice, whatever the reason (no override at all)
- q=post({action:'receptionAdd',token:tr1,name:'سالم متأخر',cls:'6',clientId:'ad5'});assert(!q.success&&q.code==='DUPLICATE_NAME'&&q.existing.id==='X1','same name is refused and points to the existing student');
- q=post({action:'receptionAdd',token:tr1,name:'سالم متأخر',cls:'6',clientId:'ad5b',confirmDuplicate:true});assert(!q.success&&q.code==='DUPLICATE_NAME','no override: confirmDuplicate does nothing');
- for(const [nm,why] of [['سَالِم  متأخر','diacritics and extra spaces'],['متأخر سالم','same words, other order'],['سالم متاخر','spelling variant (hamza)'],['سالم متأخرر','one-letter typo']]){q=post({action:'receptionAdd',token:tr1,name:nm,cls:'6',clientId:'adx'+nm.length});assert(!q.success&&q.code==='DUPLICATE_NAME','refused: '+why);}
- q=post({action:'receptionAdd',token:tr1,name:'احمد الجديد',cls:'5',clientId:'adx9'});assert(!q.success&&q.code==='DUPLICATE_NAME','a hand-added student also blocks his twin (alef spelling)');
- {const stu=post({action:'receptionFind',token:tr1,q:'1002'}).results[0];q=post({action:'receptionAdd',token:tr1,name:stu.name,cls:'6',clientId:'adx10'});assert(!q.success&&q.code==='DUPLICATE_NAME'&&q.existing.id===stu.id,'a registration-sheet student cannot be added again');}
- {const n0=book.ExtraStudents.rows.length;for(let i=0;i<3;i++)post({action:'receptionAdd',token:tr1,name:'سالم متأخر',cls:'6',clientId:'adr'+i});assert(book.ExtraStudents.rows.length===n0,'nothing was written by the refused attempts');}
- q=post({action:'receptionAdd',token:tr1,name:'سالم متأخر الحارثي',cls:'6',clientId:'ad6'});assert(q.success&&q.id==='X3','a clearly different name (extra family name) is accepted');
+ q=post({action:'studentAdd',token:tn1,name:'سالم متأخر',cls:'6',clientId:'ad5'});assert(!q.success&&q.code==='DUPLICATE_NAME'&&q.existing.id==='X1','same name is refused and points to the existing student');
+ q=post({action:'studentAdd',token:tn1,name:'سالم متأخر',cls:'6',clientId:'ad5b',confirmDuplicate:true});assert(!q.success&&q.code==='DUPLICATE_NAME','no override: confirmDuplicate does nothing');
+ for(const [nm,why] of [['سَالِم  متأخر','diacritics and extra spaces'],['متأخر سالم','same words, other order'],['سالم متاخر','spelling variant (hamza)'],['سالم متأخرر','one-letter typo']]){q=post({action:'studentAdd',token:tn1,name:nm,cls:'6',clientId:'adx'+nm.length});assert(!q.success&&q.code==='DUPLICATE_NAME','refused: '+why);}
+ q=post({action:'studentAdd',token:tn1,name:'احمد الجديد',cls:'5',clientId:'adx9'});assert(!q.success&&q.code==='DUPLICATE_NAME','a hand-added student also blocks his twin (alef spelling)');
+ {const stu=post({action:'receptionFind',token:tr1,q:'1002'}).results[0];q=post({action:'studentAdd',token:tn1,name:stu.name,cls:'6',clientId:'adx10'});assert(!q.success&&q.code==='DUPLICATE_NAME'&&q.existing.id===stu.id,'a registration-sheet student cannot be added again');}
+ {const n0=book.ExtraStudents.rows.length;for(let i=0;i<3;i++)post({action:'studentAdd',token:tn1,name:'سالم متأخر',cls:'6',clientId:'adr'+i});assert(book.ExtraStudents.rows.length===n0,'nothing was written by the refused attempts');}
+ q=post({action:'studentAdd',token:tn1,name:'سالم متأخر الحارثي',cls:'6',clientId:'ad6'});assert(q.success&&q.id==='X3','a clearly different name (extra family name) is accepted');
+ {const row=book.ExtraStudents.rows.find(x=>x[0]==='X2');assert(row&&row[11]==='نعم'&&row[12]==='فول سوداني'&&row[13]==='ربو'&&row[14]===2,'trip, food allergy, medical and bags are stored for the new student');
+  const nut=post({action:'nutritionSummary',token:T});assert(JSON.stringify(nut).indexOf('فول سوداني')!==-1||nut.success===false,'his allergy reaches the nutrition data');}
  const rost=post({action:'roster',token:tb1});assert(rost.students.some(x=>x.id==='X1'&&x.state==='none'),'the late student appears in his bus roster');
  q=post({action:'receptionFind',token:tr1,q:'متأخر'});assert(q.results.some(x=>x.id==='X1'&&x.manual===true&&x.arrival===''),'reception search finds him');
  assert(post({action:'shirtFind',token:T,q:'X1'}).results.some(x=>x.id==='X1'&&x.size==='XL'),'his shirt size reaches the shirts screen');
@@ -539,7 +548,8 @@ r=post({action:'custodySummary',token:tsc});assert(!r.success,'scout has no acce
  const bs=post({action:'busState',token:tb1});assert(!bs.missing.some(x=>x.id==='X1'),'not in the missing list of the bus');
  q=post({action:'roundSave',token:tb1,phase:'depart',absent:[],clientId:'rdg'});assert(q.success&&q.total===post({action:'roster',token:tb1}).students.filter(x=>x.state==='boarded'&&!x.via).length,'the verification round does not expect him on the bus');
  const rep=post({action:'reportData',token:T,report:'busAttendance',filters:{bus:'1'}}).rows.find(x=>x.id==='X1');assert(rep.state==='حضر مع ولي الأمر','report says: came with guardian');
- q=post({action:'receptionList',token:tr1});const ar=q.arrivals.find(x=>x.id==='X1');assert(ar&&ar.guardian==='محمد سالم'&&ar.relation==='father'&&q.added.some(x=>x.id==='X1')&&q.teams.length>0,'list shows the guardian and the added students');
+ q=post({action:'receptionList',token:tr1});const ar=q.arrivals.find(x=>x.id==='X1');assert(ar&&ar.guardian==='محمد سالم'&&ar.relation==='father'&&q.added===undefined,'arrival list shows the guardian (the add lists moved to the new-student screen)');
+ {const l2=post({action:'studentAddList',token:tn1});assert(l2.added.some(x=>x.id==='X1')&&l2.teams.length>0&&l2.classes.length>0,'new-student screen lists the added students and the choices');}
  assert(!JSON.stringify(q).includes('9999000'),'no phone numbers on the reception screen');
  {const la=post({action:'leaderAll',token:T});assert(la.summary.perBus.some(x=>x.bus==='1'&&x.guardian>=1),'leader: the bus row counts who came with the guardian');
   assert(la.extra.feed.some(f=>f.via==='guardian'&&f.action==='board'),'leader feed marks the guardian arrival');}
@@ -549,7 +559,7 @@ r=post({action:'custodySummary',token:tsc});assert(!r.success,'scout has no acce
   q=post({action:'receptionUndo',token:tr1,studentId:'X2'});assert(!q.success&&q.code==='NOTHING_TO_UNDO','a bus boarding cannot be undone from reception');
   q=post({action:'receptionArrive',token:tr1,studentId:'X2',guardian:'ولي أمر'});assert(!q.success&&q.code==='DUPLICATE'&&q.via==='bus','a student already on the bus is not re-registered');}
  q=post({action:'receptionArrive',token:tr1,studentId:'9999',guardian:'ولي أمر'});assert(!q.success&&q.code==='NOT_FOUND','unknown student');
- FORMULAS.length=0;post({action:'receptionAdd',token:tr1,name:'=HYPERLINK("x")',cls:'=1',clientId:'adf'});post({action:'receptionArrive',token:tr1,studentId:'X2',guardian:'=cmd',clientId:'arf'});assert(FORMULAS.length===0,'no formula can be injected through the reception forms');
+ FORMULAS.length=0;post({action:'studentAdd',token:tn1,name:'=HYPERLINK("x")',cls:'=1',clientId:'adf'});post({action:'receptionArrive',token:tr1,studentId:'X2',guardian:'=cmd',clientId:'arf'});assert(FORMULAS.length===0,'no formula can be injected through the reception forms');
  assert(book.AuditLog.rows.some(x=>x[2]==='STUDENT_ADDED')&&book.AuditLog.rows.some(x=>x[2]==='RECEPTION_ARRIVAL'),'audit: reception');}
 // ---- a supervisor sees only his own reports and their status
 {post({action:'createCase',token:t1,type:'other',text:'بلاغ المشرف الأول',clientId:'mc1'});post({action:'createCase',token:t2,type:'other',text:'بلاغ المشرف الثاني',clientId:'mc2'});
