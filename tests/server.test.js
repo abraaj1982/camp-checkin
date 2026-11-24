@@ -40,6 +40,9 @@ post({action:'createUser',token:T,username:'sup1',password:'p1-12345',fullName:'
 post({action:'createUser',token:T,username:'sup2',password:'p2-12345',fullName:'مشرف 2',role:'supervisor',assignedBus:'2'});
 post({action:'createUser',token:T,username:'lead',password:'p3-12345',fullName:'القائد',role:'camp_leader'});
 const t1=post({action:'login',username:'sup1',password:'p1-12345'}).token,t2=post({action:'login',username:'sup2',password:'p2-12345'}).token,tl=post({action:'login',username:'lead',password:'p3-12345'}).token;
+// ---- login also returns the supervisor's roster (saves the second request); other accounts get none
+{const lg=post({action:'login',username:'sup1',password:'p1-12345'});assert(lg.success&&lg.roster&&lg.roster.success&&lg.roster.bus==='1'&&lg.roster.students.length===2&&!JSON.stringify(lg.roster).includes('9999000'),'login returns the supervisor roster (own bus only, no phone numbers)');
+ const lg2=post({action:'login',username:'lead',password:'p3-12345'});assert(lg2.success&&!lg2.roster,'login of an account without a bus / check-in gets no roster');}
 // ---- security
 let r=JSON.parse(run('doGet')().t);assert(r.ok&&!r.students&&!r.records,'GET exposes no data');
 for(const a of ['getAllStudents','getDashboardData','lookup','roster','scan','busState','busLive','leaderSummary'])assert(!post({action:a}).success,'no token rejected: '+a);

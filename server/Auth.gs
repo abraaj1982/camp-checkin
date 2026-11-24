@@ -368,7 +368,7 @@ function handleLogin_(data) {
   });
 
   writeAudit_(user.Username, 'LOGIN_SUCCESS', user.Username, '');
-  return {
+  const out = {
     success: true,
     token: token,
     fullName: user.FullName,
@@ -377,6 +377,10 @@ function handleLogin_(data) {
     permissions: getUserPermissions_(user),
     committees: splitCsv_(user.Committees)
   };
+  // Speed: a bus supervisor's screen needs his roster right after login. Sending it here saves a whole second request (about 2 s).
+  // If anything fails, the login still succeeds and the screen asks for the roster itself, as before.
+  try { if (String(user.AssignedBus || '').trim() && hasPerm_(user, 'checkin')) { const r = buildRoster_(user, {}); if (r && r.success) out.roster = r; } } catch (e) { /* ignore */ }
+  return out;
 }
 
 // Lets the UI refresh a user's permissions without logging in again.

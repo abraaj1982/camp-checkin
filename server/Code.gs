@@ -306,7 +306,11 @@ function publicStudent_(s, st, withSup) {
 
 // All students of the caller's bus (or every bus with the allbuses permission).
 function handleRoster_(data) {
-  return withAuth_(data, requirePerm_('checkin'), function(user) {
+  return withAuth_(data, requirePerm_('checkin'), function(user) { return buildRoster_(user, data); });
+}
+// The roster of the caller's bus. Also used by the login (so a supervisor's screen needs no second request right after he signs in).
+function buildRoster_(user, data) {
+  {
     const students = readStudents_().students;
     const all = hasPerm_(user, 'allbuses');
     const bus = all && data.bus ? String(data.bus) : String(user.AssignedBus).trim();
@@ -330,7 +334,7 @@ function handleRoster_(data) {
       const n = nextStageAfter_(stages, nowMs); out.next = n ? stageBrief_(n) : null;
     }
     return out;
-  });
+  }
 }
 
 // View-only search across ALL buses (never records anything).

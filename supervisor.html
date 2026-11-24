@@ -479,6 +479,8 @@ setInterval(() => { if (navigator.onLine) refreshRoster(true).then(render); }, 6
 loadMyReports(); setInterval(loadMyReports, 180000); // my reports + their status, every 3 minutes
 render();
 if (!locOffByUser()) startLoc();
+// Right after login the roster arrives with the login answer: show the screen at once, then refresh quietly in the background.
+try { const seed = sessionStorage.getItem('mukhayyam_roster'); if (seed) { sessionStorage.removeItem('mukhayyam_roster'); const r0 = JSON.parse(seed); if (r0 && r0.success && r0.students) { st.roster = withQueue(r0); store.set('roster', st.roster); if (r0.bus) { me.bus = r0.bus; paintHero(); } render(); } } } catch (e) {}
 refreshRoster().then(() => { render(); flush(); });
 </script>
 </body></html>
