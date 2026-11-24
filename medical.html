@@ -62,7 +62,7 @@ const T = {
   allowExit: 'السماح بمغادرة المخيم', allowExitHint: 'يصل الطلب إلى السكرتارية وهي التي تقرر وتحوّله للكشافة. لا تفاصيل طبية تُرسل.', allowExitAsk: 'إرسال طلب السماح للطالب بمغادرة المخيم إلى السكرتارية؟', clrSent: 'أُرسل طلب السماح بالمغادرة إلى السكرتارية.',
   clrPending: 'بانتظار قرار السكرتارية', clrApproved: 'اعتمدته السكرتارية', clrReturned: 'أعادته السكرتارية', clrTitle: 'طلبات السماح بالمغادرة', clrNone: 'لا توجد طلبات.',
   total: 'إجمالي الزيارات', openN: 'مفتوحة', closedN: 'مغلقة', urgentN: 'عاجلة', avg: 'متوسط زمن الإغلاق (دقيقة)', byDay: 'حسب اليوم', byDoctor: 'حسب الطبيب', byClass: 'حسب الصف',
-  error: 'تعذّر الاتصال. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.', working: 'جارٍ التنفيذ… يرجى الانتظار',
+  error: 'تعذّر الاتصال. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.',
   codes: { ALREADY_OPEN: 'يوجد ملف مفتوح لهذا الطالب', NOT_OPEN: 'الملف مغلق', TREATMENT_REQUIRED: 'اكتب التشخيص قبل الإغلاق', NOT_FOUND: 'الطالب غير موجود', ALREADY_PENDING: 'يوجد طلب قائم لهذا الطالب', NEEDS_SETUP: 'يلزم تشغيل SETUP_createTabs مرة واحدة (أعمدة الدواء والتوصيات)' } },
  en: { dir: 'ltr', title: 'Medical clinic', sub: 'Students’ health files (protected data)', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
   tClinic: '🩺 Clinic', tLog: '📋 Visit log', tLeave: n => '🚪 Leaving the camp' + (n ? ' (' + n + ')' : ''), tStats: '📊 Statistics',
@@ -81,7 +81,7 @@ const T = {
   allowExit: 'Allow leaving the camp', allowExitHint: 'The request goes to the secretariat, which decides and forwards it to the scouts. No medical details are sent.', allowExitAsk: 'Send the request to allow this student to leave the camp to the secretariat?', clrSent: 'The request to allow leaving was sent to the secretariat.',
   clrPending: 'Waiting for the secretariat', clrApproved: 'Approved by the secretariat', clrReturned: 'Returned by the secretariat', clrTitle: 'Leave-the-camp requests', clrNone: 'No requests.',
   total: 'Total visits', openN: 'Open', closedN: 'Closed', urgentN: 'Urgent', avg: 'Avg. time to close (min)', byDay: 'By day', byDoctor: 'By doctor', byClass: 'By class',
-  error: 'Connection problem. Try again.', sessionEnd: 'Session expired. Please log in again.', working: 'Working… please wait',
+  error: 'Connection problem. Try again.', sessionEnd: 'Session expired. Please log in again.',
   codes: { ALREADY_OPEN: 'This student already has an open case', NOT_OPEN: 'Case is closed', TREATMENT_REQUIRED: 'Write the diagnosis before closing', NOT_FOUND: 'Student not found', ALREADY_PENDING: 'A request already exists for this student', NEEDS_SETUP: 'Run SETUP_createTabs once (medication and follow-up columns)' } }
 };
 const st = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), tab: 'clinic', q: '', results: [], cur: null, notes: null, caseOpen: false, f: { c: '', t: '', m: '' }, severity: 'normal',
@@ -91,11 +91,8 @@ const say = (cls, t) => { st.msg = { cls: cls, t: t }; };
 const errText = r => (r && L().codes && L().codes[r.code]) || (r && r.error) || L().error;
 
 /* ---------- requests ---------- */
-let busyN = 0;
-function busy(d) { busyN += d; let e = $('busyBar'); if (!e) { e = document.createElement('div'); e.id = 'busyBar'; e.style.cssText = 'position:fixed;top:0;inset-inline:0;z-index:50;padding:8px;text-align:center;font-weight:700;font-size:14px;background:var(--warnbg);color:var(--warn);box-shadow:0 2px 8px rgba(0,0,0,.15);display:none'; document.body.appendChild(e); } e.textContent = '⏳ ' + L().working; e.style.display = busyN > 0 ? 'block' : 'none'; }
 async function api(payload) {
-  busy(1);
-  let r; try { r = await (await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(Object.assign({ token: token }, payload)) })).json(); } finally { busy(-1); }
+  const r = await (await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(Object.assign({ token: token }, payload)) })).json();
   if (r && r.code && AUTH_ERR.test(r.code)) { st.msg = { cls: 'bad', t: L().sessionEnd }; render(); setTimeout(() => { sessionStorage.clear(); location.href = 'login.html'; }, 1500); throw new Error('auth'); }
   return r;
 }
