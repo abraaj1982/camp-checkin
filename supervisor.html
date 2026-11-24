@@ -518,12 +518,10 @@ $('logoutBtn').onclick = () => { if (queue.length && !confirm(L().pending(queue.
 window.addEventListener('online', () => { st.online = true; flush(); render(); });
 window.addEventListener('offline', () => { st.online = false; render(); });
 setInterval(() => { if (queue.length) flush(); }, 15000);
-setInterval(() => { if (navigator.onLine) refreshRoster(true).then(render); }, 60000);
-loadMyReports(); setInterval(loadMyReports, 180000); // my reports + their status, every 3 minutes
+setInterval(() => { if (navigator.onLine) refreshRoster(true).then(render); }, 120000); // every 2 min (each refresh costs the server several Sheets calls)
+if ((store.get('myrep', []) || []).length) loadMyReports(); setInterval(() => { if ((st.myRep || store.get('myrep', []) || []).length) loadMyReports(); }, 300000); // only for a supervisor who has sent a report; also right after he sends one
 render();
 if (!locOffByUser()) startLoc();
-// Right after login the roster arrives with the login answer: show the screen at once, then refresh quietly in the background.
-try { const seed = sessionStorage.getItem('mukhayyam_roster'); if (seed) { sessionStorage.removeItem('mukhayyam_roster'); const r0 = JSON.parse(seed); if (r0 && r0.success && r0.students) { st.roster = withQueue(r0); store.set('roster', st.roster); if (r0.bus) { me.bus = r0.bus; paintHero(); } render(); } } } catch (e) {}
 refreshRoster().then(() => { render(); flush(); });
 </script>
 </body></html>

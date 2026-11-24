@@ -40,9 +40,10 @@ post({action:'createUser',token:T,username:'sup1',password:'p1-12345',fullName:'
 post({action:'createUser',token:T,username:'sup2',password:'p2-12345',fullName:'مشرف 2',role:'supervisor',assignedBus:'2'});
 post({action:'createUser',token:T,username:'lead',password:'p3-12345',fullName:'القائد',role:'camp_leader'});
 const t1=post({action:'login',username:'sup1',password:'p1-12345'}).token,t2=post({action:'login',username:'sup2',password:'p2-12345'}).token,tl=post({action:'login',username:'lead',password:'p3-12345'}).token;
-// ---- login also returns the supervisor's roster (saves the second request); other accounts get none
-{const lg=post({action:'login',username:'sup1',password:'p1-12345'});assert(lg.success&&lg.roster&&lg.roster.success&&lg.roster.bus==='1'&&lg.roster.students.length===2&&!JSON.stringify(lg.roster).includes('9999000'),'login returns the supervisor roster (own bus only, no phone numbers)');
- const lg2=post({action:'login',username:'lead',password:'p3-12345'});assert(lg2.success&&!lg2.roster,'login of an account without a bus / check-in gets no roster');}
+// ---- login stays light: no roster inside it (that made the login itself slow), only the token and the account facts
+{const lg=post({action:'login',username:'sup1',password:'p1-12345'});assert(lg.success&&!lg.roster&&lg.assignedBus==='1','login answer carries no roster');
+ const row=book.Users.rows.find(x=>x[0]==='sup1'),H=book.Users.rows[0];assert(row[H.indexOf('FailedAttempts')]===0&&row[H.indexOf('LastLogin')]&&row[H.indexOf('LastActivityAt')]&&Number.isFinite(Number(row[H.indexOf('TokenEpoch')])),'one combined write stamped FailedAttempts / LastLogin / LastActivityAt and kept TokenEpoch');
+ const au=book.AuditLog.rows.filter(x=>x[2]==='LOGIN_SUCCESS'&&x[1]==='sup1').length;assert(au===0,'an ordinary supervisor login writes no audit row (LastLogin is stamped); sensitive accounts still do');}
 // ---- security
 let r=JSON.parse(run('doGet')().t);assert(r.ok&&!r.students&&!r.records,'GET exposes no data');
 for(const a of ['getAllStudents','getDashboardData','lookup','roster','scan','busState','busLive','leaderSummary'])assert(!post({action:a}).success,'no token rejected: '+a);
@@ -234,7 +235,7 @@ assert(post({action:'createCase',token:tk,type:'other',text:'x'}).code==='BAD_RE
  let la=post({action:'leaderAll',token:tl});assert(la.extra.rounds['2']&&la.extra.rounds['2'].absent===1&&la.extra.rounds['2'].phase==='depart','leader sees the latest round of the bus');
  assert(la.summary.alerts.some(a=>a.type==='round_gap'&&a.bus==='2'&&a.count===1&&a.level==='bad'),'leader gets a red alert when a round finds someone missing');
  post({action:'roundSave',token:tk,phase:'depart',absent:[],clientId:'rd5'});la=post({action:'leaderAll',token:tl});assert(!la.summary.alerts.some(a=>a.type==='round_gap'),'alert disappears after a clean round');
- assert(post({action:'roster',token:tk}).lastRound.total===rost.length,'supervisor sees the last round of his bus');
+ assert(post({action:'roster',token:tk}).lastRound===null,'the roster no longer reads the Rounds tab (the round check is switched off on the supervisor screen; the leader still sees rounds)');
  assert(!JSON.stringify(la).includes('9999000'),'no phone numbers in the round data');
  assert(book.AuditLog.rows.some(x=>x[2]==='ROUND_SAVED'),'audit: rounds');}
 // ---- password length: at least 8 (old shorter passwords keep working until changed)

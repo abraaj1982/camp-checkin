@@ -296,12 +296,15 @@ function findUserRow_(username) {
   return rows.find(r => sameUsername_(r.Username, username));
 }
 
-// Writes FailedAttempts, LockedUntil (H:I) and LastActivityAt, CreatedAt, LastLogin (K:M) in two range calls.
-// TokenEpoch (J) is deliberately NOT written: login read it earlier without the lock, and writing that old value
-// back could undo a password reset / session revocation that happened in between.
+// Writes FailedAttempts, LockedUntil, TokenEpoch, LastActivityAt, CreatedAt, LastLogin (H:M) in ONE call (every Sheets call costs ~1 s).
+// TokenEpoch is written back with the value of the FRESH row that login read under the lock; every other writer of TokenEpoch
+// (revoke, password reset) also holds that lock, so it cannot be undone. If the columns are not next to each other, two calls as before.
 function writeLoginSuccessRow_(sheet, headers, user, now) {
-  sheet.getRange(user._rowNumber, colIndexByName_(headers, 'FailedAttempts'), 1, 2).setValues([[0, '']]);
-  sheet.getRange(user._rowNumber, colIndexByName_(headers, 'LastActivityAt'), 1, 3).setValues([[now, user.CreatedAt, now]]);
+  const n = ['FailedAttempts', 'LockedUntil', 'TokenEpoch', 'LastActivityAt', 'CreatedAt', 'LastLogin'].map(function(k) { return colIndexByName_(headers, k); });
+  const together = n.every(function(c, i) { return i === 0 || c === n[i - 1] + 1; });
+  if (together) { sheet.getRange(user._rowNumber, n[0], 1, 6).setValues([[0, '', user.TokenEpoch === undefined ? '' : user.TokenEpoch, now, user.CreatedAt, now]]); return; }
+  sheet.getRange(user._rowNumber, n[0], 1, 2).setValues([[0, '']]);
+  sheet.getRange(user._rowNumber, n[3], 1, 3).setValues([[now, user.CreatedAt, now]]);
 }
 
 function handleLogin_(data) {
@@ -367,7 +370,7 @@ function handleLogin_(data) {
     epoch: epoch
   });
 
-  writeAudit_(user.Username, 'LOGIN_SUCCESS', user.Username, '');
+  if (idleLimitFor_(user) === IDLE_TIMEOUT_MS) writeAudit_(user.Username, 'LOGIN_SUCCESS', user.Username, ''); // sensitive accounts only: every other login is already stamped in Users (LastLogin), and each audit row costs ~1 s
   const out = {
     success: true,
     token: token,
@@ -377,9 +380,6 @@ function handleLogin_(data) {
     permissions: getUserPermissions_(user),
     committees: splitCsv_(user.Committees)
   };
-  // Speed: a bus supervisor's screen needs his roster right after login. Sending it here saves a whole second request (about 2 s).
-  // If anything fails, the login still succeeds and the screen asks for the roster itself, as before.
-  try { if (String(user.AssignedBus || '').trim() && hasPerm_(user, 'checkin')) { const r = buildRoster_(user, {}); if (r && r.success) out.roster = r; } } catch (e) { /* ignore */ }
   return out;
 }
 
@@ -856,6 +856,8 @@ function ADMIN_resetPassword() {
   const { headers, sheet, rows } = readSheetAsObjects_(USERS_SHEET);
   const target = rows.find(function(r) { return r.Username === USERNAME; });
   if (!target) throw new Error('المستخدم غير موجود: ' + USERNAME);
+  const lock = LockService.getScriptLock(); lock.waitLock(10000); // same lock as login / revoke (TokenEpoch is written by all of them)
+  try {
   const h = hashPassword_(NEW_PASSWORD);
   setCellByColumnName_(sheet, headers, target._rowNumber, 'PasswordHash', h.hashHex);
   setCellByColumnName_(sheet, headers, target._rowNumber, 'Salt', h.saltB64);
@@ -865,6 +867,7 @@ function ADMIN_resetPassword() {
   setCellByColumnName_(sheet, headers, target._rowNumber, 'TokenEpoch', (Number(target.TokenEpoch) || 0) + 1);
   writeAudit_('EDITOR_OWNER', 'RESET_PASSWORD', USERNAME, 'from the script editor');
   Logger.log('تم تغيير كلمة مرور ' + USERNAME + '. احذف كلمة المرور من الكود الآن.');
+  } finally { lock.releaseLock(); }
 }
 
 

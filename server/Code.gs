@@ -201,7 +201,7 @@ function readStudents_(fresh) {
   try {
     // A student added while we were reading must not be hidden by our older copy (see clearStudentsCache_):
     // cache it, THEN check, so whichever order the two run in, a stale copy is always removed.
-    cache.put('students_v2', JSON.stringify(result), 60);
+    cache.put('students_v2', JSON.stringify(result), 180); // the student list rarely changes; every app-made change clears it (see clearStudentsCache_), a manual edit in the sheet shows within 3 minutes
     if ((Number(cache.get('students_cleared_at')) || 0) >= startedAt) cache.remove('students_v2');
   } catch (e) { /* too large: skip cache */ }
   return result;
@@ -323,7 +323,7 @@ function buildRoster_(user, data) {
       return o;
     });
     const c = busCounts_(bus, students, states);
-    const out = { success: true, bus: bus, students: list, total: c.total, boarded: c.boarded, lastRound: latestRounds_()[bus] || null };
+    const out = { success: true, bus: bus, students: list, total: c.total, boarded: c.boarded, lastRound: null }; // (the round check is switched off: its tab is no longer read here, one Sheets call less)
     // What the supervisor is doing NOW, from the clock: the stages open at this moment (movement, who is accepted, his share) and the next one.
     if (stages) {
       out.stages = true;

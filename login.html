@@ -83,7 +83,6 @@ $('form').addEventListener('submit', async e => {
       sessionStorage.setItem('mukhayyam_assignedBus', data.assignedBus || '');
       sessionStorage.setItem('mukhayyam_permissions', JSON.stringify(data.permissions || []));
       sessionStorage.setItem('mukhayyam_committees', JSON.stringify(data.committees || []));
-      try { if (data.roster) sessionStorage.setItem('mukhayyam_roster', JSON.stringify(data.roster)); } catch (e) {} // a supervisor's roster comes with the login (no second request); it holds no token
       msg('ok', t.ok);
       const p = data.permissions || [];
       // One screen only (check-in) -> straight to it; otherwise the home menu of that person's screens.

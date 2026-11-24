@@ -157,7 +157,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   chk(ls.locked && (good.success || wrongMsgs.has(good.error)), `B2 [D2] 50 wrong + 1 correct at the same time: account locked; the correct one ${good.success ? 'got in before the lock' : 'got the SAME answer as wrong guesses ("' + good.error + '") — no hint that it was right'}`);
   // a correct login paused just before writing, while 6 wrong ones arrive: it must not erase the lock they cause
   { let rel; const g = { hit: false, wait: new Promise(r => { rel = r; }) };
-    emu.cfg.gate = (op, a, act) => { if (!g.hit && act === 'login' && op === 'setValues' && a[0] === 'Users' && Array.isArray(a[3]) && a[3][0] && a[3][0].length === 2) { g.hit = true; return g.wait; } return null; };
+    emu.cfg.gate = (op, a, act) => { if (!g.hit && act === 'login' && op === 'setValues' && a[0] === 'Users' && Array.isArray(a[3]) && a[3][0] && (a[3][0].length === 2 || a[3][0].length === 6))  /* the success write: 2 cells (old, two calls) or 6 cells (one combined call) */ { g.hit = true; return g.wait; } return null; };
     const lg = emu.call({ action: 'login', username: 'sup3', password: 'load-test-1' }); let t = Date.now(); while (!g.hit && Date.now() - t < 8000) await sleep(10);
     const wrongs = Promise.all(Array.from({ length: 6 }, (_, i) => emu.call({ action: 'login', username: 'sup3', password: 'w-' + i })));
     let wd = false; wrongs.then(() => { wd = true; }); t = Date.now(); while (!wd && Date.now() - t < 3000) await sleep(20); rel(); emu.cfg.gate = null; await lg; await wrongs;
