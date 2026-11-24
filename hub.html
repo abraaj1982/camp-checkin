@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="theme.css">
 <script src="ui.js" defer></script>
 <style>
-#adminArea{display:none!important}.adminView #adminArea{display:block!important}.adminView #tilesCard,.adminView #bulletinCard,.adminView .hero{display:none!important}
+#adminArea{display:none!important;direction:rtl;text-align:right}.adminView #adminArea{display:block!important}.adminView #tilesCard,.adminView #bulletinCard,.adminView .hero{display:none!important}
 /* aliases kept for older inline styles in this page's script */
 :root,[data-theme=dark]{--sap-gray:var(--muted);--sap-red:var(--bad);--sap-green:var(--ok);--sap-border:var(--line);--sap-bg:var(--soft)}
 .container{padding:16px;display:flex;flex-direction:column;gap:14px;flex:1}
@@ -67,15 +67,15 @@ html[dir=rtl] #usersListCard td:nth-child(2){text-align:right}
 <div class="wrap">
 <header class="hdr">
   <div class="brand"><div class="logo">م</div><div style="min-width:0"><div class="t" id="campT"></div><div class="s" id="campS"></div></div></div>
-  <div class="tools"><button class="tool" id="themeBtn"></button><button class="tool" id="logoutBtn">خروج</button></div>
+  <div class="tools"><button class="tool" id="langBtn"></button><button class="tool" id="themeBtn"></button><button class="tool" id="logoutBtn">خروج</button></div>
 </header>
-<section class="hero"><div class="ic" aria-hidden="true">م</div><h1>مرحباً، <span id="whoName">...</span></h1><span class="who-badge" id="whoRole"></span></section>
+<section class="hero"><div class="ic" aria-hidden="true">م</div><h1><span id="helloTxt">مرحباً،</span> <span id="whoName">...</span></h1><span class="who-badge" id="whoRole"></span></section>
 
 <div class="container">
 
-  <div class="card" id="bulletinCard" style="display:none;"><h2>📢 إعلانات</h2><div id="bulletinList"></div></div>
+  <div class="card" id="bulletinCard" style="display:none;"><h2 id="bulletinH">📢 إعلانات</h2><div id="bulletinList"></div></div>
   <div class="card" id="tilesCard">
-    <h2>شاشاتك</h2>
+    <h2 id="tilesH">شاشاتك</h2>
     <div class="tiles" id="tiles"></div>
     <div class="hint" id="noTiles" style="display:none;">لا توجد شاشات مفعّلة لحسابك بعد. تواصل مع السكرتارية.</div>
   </div>
@@ -227,11 +227,29 @@ const SCREEN_NAMES = {
 
 const SCREEN_ICONS = { stages: '📋', reception: '🚗', addstudent: '➕', reports: '📑', checkin: '🚌', dashboard: '📍', stats: '📊', shirts: '👕', print: '🖨️', custody: '🔐', gate: '🚪', medical: '⚕️', nutrition: '🍽️', announce: '📣', results: '🏆', verify: '✅', team: '👥' };
 
+// language (same preference as every other screen): the home page (tiles) has English; user management stays Arabic
+const HL = {
+  ar: { hello: 'مرحباً،', tiles: 'شاشاتك', none: 'لا توجد شاشات مفعّلة لحسابك بعد. تواصل مع السكرتارية.', bull: '📢 إعلانات', logout: 'خروج', open: 'فتح', soon: 'قريباً', tv: 'شاشة العرض', tvS: 'فتح على التلفاز', manage: 'إدارة المستخدمين', support: 'الدعم الفني', manageS: 'المستخدمون والصلاحيات', dark: '🌙 داكن', light: '☀ فاتح', lang: 'English', back: '→ رجوع إلى الشاشات' },
+  en: { hello: 'Welcome,', tiles: 'Your screens', none: 'No screens are enabled for your account yet. Contact the secretariat.', bull: '📢 Announcements', logout: 'Log out', open: 'Open', soon: 'Soon', tv: 'Display screen', tvS: 'Open on the TV', manage: 'User management', support: 'Technical support', manageS: 'Users and permissions', dark: '🌙 Dark', light: '☀ Light', lang: 'العربية', back: '← Back to screens' }
+};
+const SCREEN_NAMES_EN = { checkin: 'Bus check-in', dashboard: 'Dashboard', committee: 'Committee expenses', finance: 'Expense approval', shirts: 'Shirt distribution', results: 'Media and results', medical: 'Medical page', print: 'Print wristbands and lists', custody: 'Custody and early exit', gate: 'Gate (scouts)', nutrition: 'Nutrition', announce: 'Media and results', reports: 'Reports', reception: 'Direct Arrival', addstudent: 'New student', verify: 'Verify results', stages: 'Camp stages' };
+const ROLE_EN = { admin: 'Secretariat', supervisor: 'Bus supervisor', camp_leader: 'Camp leader', shirts_coordinator: 'Shirts officer', general_supervisor: 'General supervisor', doctor: 'Doctor', nutrition_officer: 'Nutrition committee', custody_officer: 'Custody', secretariat: 'Secretariat', scout: 'Scouts (gate)', printer: 'Printing', support: 'Technical support' };
+let hlang = 'ar'; try { hlang = localStorage.getItem('mk_pref_lang') === 'en' ? 'en' : 'ar'; } catch (e) {}
+const H = () => HL[hlang];
+function paintLang() {
+  const l = H(), d = document.documentElement; d.lang = hlang; d.dir = hlang === 'en' ? 'ltr' : 'rtl';
+  const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+  set('helloTxt', l.hello); set('tilesH', l.tiles); set('noTiles', l.none); set('bulletinH', l.bull); set('logoutBtn', l.logout); set('langBtn', l.lang); set('backBtn', l.back);
+  if (window.paintTheme) window.paintTheme();
+  if (typeof renderHeader === 'function' && window.__hubReady) { renderHeader(); renderTiles(); }
+}
+document.getElementById('langBtn').addEventListener('click', () => { hlang = hlang === 'ar' ? 'en' : 'ar'; try { localStorage.setItem('mk_pref_lang', hlang); } catch (e) {} paintLang(); });
+
 // dark / light (same preference as every other screen)
 (function themeInit() {
   let th = 'light'; try { th = localStorage.getItem('mk_pref_theme') || 'light'; } catch (e) {}
   const btn = document.getElementById('themeBtn');
-  const paint = () => { document.documentElement.dataset.theme = th; btn.textContent = th === 'light' ? '🌙 داكن' : '☀ فاتح'; };
+  const paint = () => { document.documentElement.dataset.theme = th; btn.textContent = th === 'light' ? H().dark : H().light; }; window.paintTheme = paint;
   btn.addEventListener('click', () => { th = th === 'light' ? 'dark' : 'light'; try { localStorage.setItem('mk_pref_theme', th); } catch (e) {} paint(); });
   paint();
 })();
@@ -254,7 +272,7 @@ function setMsg(el, text, cls) { el.textContent = text; el.className = 'msg' + (
 
 function renderHeader() {
   document.getElementById('whoName').textContent = fullName;
-  document.getElementById('whoRole').textContent = roleLabels[role] || role;
+  document.getElementById('whoRole').textContent = hlang === 'en' ? (ROLE_EN[role] || role) : (roleLabels[role] || role);
 }
 
 function renderTiles() {
@@ -268,22 +286,22 @@ function renderTiles() {
     a.className = 'tile' + (SCREEN_LINKS[k] ? '' : ' soon');
     if (SCREEN_LINKS[k]) a.href = SCREEN_LINKS[k];
     const ic = document.createElement('div'); ic.className = 'i'; ic.textContent = SCREEN_ICONS[k] || '▣'; a.appendChild(ic);
-    const t = document.createElement('div'); t.className = 't'; t.textContent = SCREEN_NAMES[k];
-    const s = document.createElement('div'); s.className = 's'; s.textContent = SCREEN_LINKS[k] ? 'فتح' : 'قريباً';
+    const t = document.createElement('div'); t.className = 't'; t.textContent = hlang === 'en' ? (SCREEN_NAMES_EN[k] || SCREEN_NAMES[k]) : SCREEN_NAMES[k];
+    const s = document.createElement('div'); s.className = 's'; s.textContent = SCREEN_LINKS[k] ? H().open : H().soon;
     a.appendChild(t); a.appendChild(s);
     box.appendChild(a);
   });
   if (can('announce') || can('results') || can('verify')) {
     const a = document.createElement('a');
     a.className = 'tile'; a.href = 'display.html'; a.target = '_blank'; a.rel = 'noopener';
-    a.innerHTML = '<div class="i">📺</div><div class="t">شاشة العرض</div><div class="s">فتح على التلفاز</div>';
+    a.innerHTML = '<div class="i">📺</div><div class="t">' + H().tv + '</div><div class="s">' + H().tvS + '</div>';
     box.appendChild(a);
   }
   if (can('manage') || can('support')) {
     const a = document.createElement('a');
     a.className = 'tile'; a.href = '#users';
-    a.innerHTML = '<div class="i">👥</div><div class="t"></div><div class="s">المستخدمون والصلاحيات</div>';
-    a.querySelector('.t').textContent = can('manage') ? 'إدارة المستخدمين' : 'الدعم الفني';
+    a.innerHTML = '<div class="i">👥</div><div class="t"></div><div class="s">' + H().manageS + '</div>';
+    a.querySelector('.t').textContent = can('manage') ? H().manage : H().support;
     box.appendChild(a);
   }
   document.getElementById('noTiles').style.display = box.children.length ? 'none' : 'block';
@@ -701,6 +719,7 @@ async function loadBulletin() {
 
 renderHeader();
 renderTiles();
+window.__hubReady = true; paintLang();
 loadBulletin();
 
 // The server is the source of truth: refresh permissions once, then draw the admin parts if allowed.
