@@ -501,6 +501,12 @@ r=post({action:'gateCheck',token:tsc,q:'3001'});assert(r.results[0].exit==='exit
 r=post({action:'roster',token:tgen,bus:'1'});assert(r.students.find(x=>x.id==='3001').state==='withdrawn','the student is now WITHDRAWN in the lists');
 r=post({action:'gateList',token:tsc});assert(r.exited.some(x=>x.wid===gw&&x.exitedBy==='scout1'),'exit recorded with the scout name');
 assert(book.AuditLog.rows.some(x=>x[2]==='GATE_EXIT'&&x[1]==='scout1'),'audit: gate exit by the scout');
+// ---- age from a birth date (only the age leaves the server)
+{const N=Date.UTC(2026,11,30,8,0),ag=v=>run('ageFromDob_')(v,N);
+ assert(ag('2012-05-17')==='14'&&ag('17/05/2012')==='14'&&ag('05/17/2012')==='14'&&ag('١٧-٥-٢٠١٢')==='14','birth dates in several written forms give 14');
+ assert(ag('2012-12-30')==='14'&&ag('2012-12-31')==='13','the birthday itself counts; the day before it does not');
+ assert(ag('2026-12-31')===''&&ag('')===''&&ag('xx')===''&&ag('1980-01-01')==='','future, empty, unreadable and unlikely dates give nothing');
+ assert(run('ageFromDob_')(new Date(2012,4,17),N)==='14','a real date cell works too');}
 // ---- doctor's "no objection" -> secretariat -> gate (the doctor never sends to the gate directly)
 {book.Bus.rows.push(['6','طالب طبي1','1','3003','أزرق','99990011','','','']);book.Bus.rows.push(['6','طالب طبي2','1','3004','أحمر','99990012','','','']);for(const k of Object.keys(cache))delete cache[k];
  let q=post({action:'medClearCreate',token:ts,studentId:'3003',note:'x'});assert(!q.success,'custody (secretariat) cannot create a doctor clearance');
