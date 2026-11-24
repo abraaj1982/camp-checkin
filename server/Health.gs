@@ -24,7 +24,7 @@ function readMedCases_() {
 
 function medStudentView_(s, cases) {
   const open = cases.filter(function(c) { return c.studentId === s.id && c.status === 'open'; })[0];
-  return { id: s.id, name: s.name, team: s.team, bus: s.bus, cls: s.cls, hasNotes: !!(s.medical || s.foodAllergy), openCase: open ? open.id : null };
+  return { id: s.id, name: s.name, team: s.team, bus: s.bus, cls: s.cls, age: s.age || '', hasNotes: !!(s.medical || s.foodAllergy), openCase: open ? open.id : null };
 }
 
 function handleMedFind_(data) {
@@ -54,7 +54,7 @@ function handleMedOpen_(data) {
     if (!s) return { success: false, code: 'NOT_FOUND', error: 'الطالب غير موجود' };
     const severity = String(data.severity || 'normal');
     if (MED_SEVERITY_.indexOf(severity) === -1) return { success: false, error: 'Invalid severity' };
-    const complaint = String(data.complaint || '').trim().slice(0, 500);
+    const complaint = String(data.complaint || '').trim().slice(0, 2000);
     if (complaint.length < 3) return { success: false, error: 'اكتب الشكوى' };
     const clientId = String(data.clientId || '').slice(0, 60);
     const lock = LockService.getScriptLock();
@@ -82,7 +82,7 @@ function handleMedUpdate_(data) {
       if (!c) return { success: false, error: 'غير موجود' };
       if (c.status !== 'open') return { success: false, code: 'NOT_OPEN', error: 'الملف مغلق' };
       const sheet = medSheet_(), h = sheet.getDataRange().getValues()[0];
-      if (data.treatment !== undefined) sheet.getRange(c._row, h.indexOf('Treatment') + 1).setValue(cellSafe_(String(data.treatment).trim().slice(0, 800)));
+      if (data.treatment !== undefined) sheet.getRange(c._row, h.indexOf('Treatment') + 1).setValue(cellSafe_(String(data.treatment).trim().slice(0, 2000)));
       if (data.severity !== undefined && MED_SEVERITY_.indexOf(String(data.severity)) !== -1) sheet.getRange(c._row, h.indexOf('Severity') + 1).setValue(String(data.severity));
       writeAudit_(user.Username, 'MED_UPDATED', c.studentId, c.id);
       return { success: true };
@@ -100,7 +100,7 @@ function handleMedClose_(data) {
       const c = readMedCases_().filter(function(x) { return x.id === String(data.id); })[0];
       if (!c) return { success: false, error: 'غير موجود' };
       if (c.status !== 'open') return { success: false, code: 'NOT_OPEN', error: 'الملف مغلق' };
-      const treatment = String(data.treatment !== undefined ? data.treatment : c.treatment).trim().slice(0, 800);
+      const treatment = String(data.treatment !== undefined ? data.treatment : c.treatment).trim().slice(0, 2000);
       if (treatment.length < 2) return { success: false, code: 'TREATMENT_REQUIRED', error: 'اكتب العلاج أو الإجراء قبل الإغلاق' };
       const sheet = medSheet_(), h = sheet.getDataRange().getValues()[0];
       sheet.getRange(c._row, h.indexOf('Treatment') + 1).setValue(cellSafe_(treatment));
@@ -124,7 +124,7 @@ function handleMedList_(data) {
     const list = readMedCases_().sort(function(a, b) { return (rank[a.status] - rank[b.status]) || (a.openedAt < b.openedAt ? 1 : -1); }).slice(0, 100).map(function(c) {
       const s = byId[c.studentId] || {};
       return { id: c.id, studentId: c.studentId, name: s.name || '', team: s.team || '', bus: s.bus || '', openedAt: c.openedAt, severity: c.severity, complaint: c.complaint,
-        treatment: c.treatment, status: c.status, closedAt: c.closedAt, openedBy: c.openedBy, closedBy: c.closedBy };
+        treatment: c.treatment, status: c.status, closedAt: c.closedAt, openedBy: c.openedBy, closedBy: c.closedBy, cls: s.cls || '', age: s.age || '' };
     });
     writeAudit_(user.Username, 'MED_LIST', '', 'n=' + list.length);
     return { success: true, cases: list };

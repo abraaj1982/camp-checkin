@@ -148,6 +148,7 @@ const STUDENT_HEADERS_ = {
   bags: ['bags', 'bag count', 'عدد الحقائب'],
   foodAllergy: ['food allergy', 'food allergies', 'allergy', 'الحساسية الغذائية', 'حساسية الطعام'],
   medical: ['medical notes', 'medical', 'health', 'chronic', 'ملاحظات طبية', 'الحالة الصحية'],
+  age: ['age', 'العمر', 'age (years)'],
   trip: ['trip', 'external trip', 'رحلة', 'الرحلة', 'رحلة خارجية', 'الرحلة الخارجية']
 };
 const STUDENT_REQUIRED_ = ['id', 'name', 'bus'];
@@ -197,6 +198,7 @@ function readStudents_(fresh) {
       bags: Number(cell(data[i], 'bags')) || 0,
       foodAllergy: realValue_(cell(data[i], 'foodAllergy')),
       medical: realValue_(cell(data[i], 'medical')),
+      age: String(cell(data[i], 'age') === undefined || cell(data[i], 'age') === null ? '' : cell(data[i], 'age')).trim().slice(0, 4),
       trip: isYes_(cell(data[i], 'trip')),
       _row: i + 1
     });

@@ -53,37 +53,37 @@ const T = {
  ar: { dir: 'rtl', title: 'الطبيب', sub: 'الحالات الطبية (بيانات محمية)', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
   tCases: 'الحالات', tLeave: n => '🚪 مغادرة المخيم' + (n ? ' (' + n + ')' : ''), clrBtn: 'عدم ممانعة مغادرة المخيم', clrHint: 'يصل الطلب إلى السكرتارية وهي التي تقرر وتحوّله للكشافة. اكتب ما يلزم السكرتارية فقط (لا تفاصيل طبية).', clrNote: 'ملاحظة للسكرتارية', clrSend: 'إرسال للسكرتارية', clrCancel: 'تراجع', clrSent: 'أُرسل الطلب إلى السكرتارية', clrPending: 'بانتظار قرار السكرتارية', clrApproved: 'اعتمدته السكرتارية', clrReturned: 'أعادته السكرتارية', clrTitle: 'طلبات عدم الممانعة', clrNone: 'لا توجد طلبات.', sToday: 'حالات اليوم', sOpen: 'مفتوحة', sClosed: 'أُغلقت اليوم', sUrgent: 'عاجلة', fOpen: 'مفتوحة', fClosed: 'مغلقة', moveStrip: 'نقل الشريط', opened: 'فُتحت', closedAt: 'أُغلقت', tStats: 'الإحصاءات', search: 'ابحث عن طالب بالاسم أو الرقم', bus: n => 'باص ' + n, none: 'لا نتائج',
   showNotes: 'عرض الملاحظات الطبية', hideNotes: 'إخفاء', notesWarn: 'يُسجَّل اطّلاعك على هذه البيانات. لا تشاركها خارج الفريق الطبي.', noNotes: 'لا توجد ملاحظات مسجّلة', foodAl: 'حساسية غذائية',
-  complaint: 'الشكوى', urgent: 'عاجلة', normal: 'عادية', openCase: 'فتح ملف حالة', hasOpen: 'يوجد ملف مفتوح لهذا الطالب', open: 'مفتوحة', closed: 'مغلقة',
-  treatment: 'العلاج / الإجراء', saveTr: 'حفظ', closeCase: 'إغلاق الحالة', confirmClose: 'إغلاق الحالة؟', noCases: 'لا توجد حالات.', openedAt: 'فُتحت', by: 'بواسطة',
+  complaint: 'سبب المراجعة والأعراض', complaintPh: 'اكتب هنا بالتفصيل: سبب المراجعة، الأعراض، منذ متى، العلامات الحيوية، وما تراه مناسبًا للملف…', saveCase: 'حفظ وفتح الملف', cancel: 'تراجع', cls: 'الصف', age: 'العمر', noAllergy: 'لا توجد حساسية غذائية مسجّلة', healthNotes: 'ملاحظات صحية مسجّلة', urgent: 'عاجلة', normal: 'عادية', openCase: 'فتح ملف حالة', hasOpen: 'يوجد ملف مفتوح لهذا الطالب', open: 'مفتوحة', closed: 'مغلقة',
+  treatment: 'التشخيص والعلاج / الإجراء', saveTr: 'حفظ', closeCase: 'إغلاق الحالة', confirmClose: 'إغلاق الحالة؟', noCases: 'لا توجد حالات.', openedAt: 'فُتحت', by: 'بواسطة',
   total: 'إجمالي الحالات', openN: 'مفتوحة', closedN: 'مغلقة', urgentN: 'عاجلة', avg: 'متوسط وقت الإغلاق (د)', byDay: 'حسب اليوم', byTeam: 'حسب الفريق', byBus: 'حسب الباص',
   done: 'تم', error: 'تعذّر الاتصال. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.',
   codes: { ALREADY_OPEN: 'يوجد ملف مفتوح لهذا الطالب', NOT_OPEN: 'الملف مغلق', TREATMENT_REQUIRED: 'اكتب العلاج أو الإجراء قبل الإغلاق', NOT_FOUND: 'الطالب غير موجود' } },
  en: { dir: 'ltr', title: 'Doctor', sub: 'Medical cases (protected data)', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
   tCases: 'Cases', tLeave: n => '🚪 Leaving the camp' + (n ? ' (' + n + ')' : ''), clrBtn: 'No objection to leaving the camp', clrHint: 'The request goes to the secretariat, which decides and forwards it to the scouts. Write only what the secretariat needs (no medical details).', clrNote: 'Note for the secretariat', clrSend: 'Send to the secretariat', clrCancel: 'Back', clrSent: 'Request sent to the secretariat', clrPending: 'Waiting for the secretariat', clrApproved: 'Approved by the secretariat', clrReturned: 'Returned by the secretariat', clrTitle: 'No-objection requests', clrNone: 'No requests.', sToday: 'Today', sOpen: 'Open', sClosed: 'Closed today', sUrgent: 'Urgent', fOpen: 'Open', fClosed: 'Closed', moveStrip: 'Move bar', opened: 'Opened', closedAt: 'Closed', tStats: 'Statistics', search: 'Search a student by name or number', bus: n => 'Bus ' + n, none: 'No results',
   showNotes: 'Show medical notes', hideNotes: 'Hide', notesWarn: 'Your access to this data is logged. Do not share it outside the medical team.', noNotes: 'No notes on record', foodAl: 'Food allergy',
-  complaint: 'Complaint', urgent: 'Urgent', normal: 'Normal', openCase: 'Open a case', hasOpen: 'This student already has an open case', open: 'Open', closed: 'Closed',
-  treatment: 'Treatment / action', saveTr: 'Save', closeCase: 'Close case', confirmClose: 'Close this case?', noCases: 'No cases.', openedAt: 'Opened', by: 'by',
+  complaint: 'Reason for visit and symptoms', complaintPh: 'Write the details here: reason for the visit, symptoms, duration, vital signs and anything relevant for the record…', saveCase: 'Save and open the file', cancel: 'Back', cls: 'Class', age: 'Age', noAllergy: 'No food allergy on record', healthNotes: 'Health notes on record', urgent: 'Urgent', normal: 'Normal', openCase: 'Open a case', hasOpen: 'This student already has an open case', open: 'Open', closed: 'Closed',
+  treatment: 'Diagnosis and treatment / action', saveTr: 'Save', closeCase: 'Close case', confirmClose: 'Close this case?', noCases: 'No cases.', openedAt: 'Opened', by: 'by',
   total: 'Total cases', openN: 'Open', closedN: 'Closed', urgentN: 'Urgent', avg: 'Avg. time to close (min)', byDay: 'By day', byTeam: 'By team', byBus: 'By bus',
   done: 'Done', error: 'Connection problem. Try again.', sessionEnd: 'Session expired. Please log in again.',
   codes: { ALREADY_OPEN: 'This student already has an open case', NOT_OPEN: 'Case is closed', TREATMENT_REQUIRED: 'Enter the treatment before closing', NOT_FOUND: 'Student not found' } }
 };
-const st = { clr: [], clrPending: 0, clrOpen: false, clrNote: '', lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), tab: 'cases', q: '', results: [], cur: null, notes: null, complaint: '', severity: 'normal', cases: [], stats: null, msg: null, drafts: {}, filter: 'open', strip: pref.get('strip', 'bot') };
+const st = { caseOpen: false, clr: [], clrPending: 0, clrOpen: false, clrNote: '', lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), tab: 'cases', q: '', results: [], cur: null, notes: null, complaint: '', severity: 'normal', cases: [], stats: null, msg: null, drafts: {}, filter: 'open', strip: pref.get('strip', 'bot') };
 
 let qTimer = null, hideTimer = null;
 function onQ(v) {
-  st.q = v; clearTimeout(qTimer);
+  st.q = v; if (st.cur) { st.cur = null; hideNotes(true); st.caseOpen = false; } clearTimeout(qTimer);
   if (!v.trim()) { st.results = []; return renderResults(); }
   qTimer = setTimeout(async () => { try { const r = await api({ action: 'medFind', q: v.trim() }); if (r.success && st.q === v) { st.results = r.results; renderResults(); } } catch (e) {} }, 300);
 }
-function pick(id) { st.clrOpen = false; st.clrNote = ''; st.cur = st.results.find(x => x.id === id) || null; hideNotes(true); st.complaint = ''; st.severity = 'normal'; st.msg = null; render(); }
+function pick(id) { st.clrOpen = false; st.clrNote = ''; st.caseOpen = false; st.cur = st.results.find(x => x.id === id) || null; hideNotes(true); st.complaint = ''; st.severity = 'normal'; st.msg = null; st.results = []; render(); if (st.cur) showNotes(); }
 async function showNotes() {
-  try { const r = await api({ action: 'medInfo', studentId: st.cur.id }); if (r.success) { st.notes = r; clearTimeout(hideTimer); hideTimer = setTimeout(() => hideNotes(), 30000); } else say('bad', errText(r)); } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
+  try { const r = await api({ action: 'medInfo', studentId: st.cur.id }); if (r.success) { st.notes = r; clearTimeout(hideTimer); hideTimer = setTimeout(() => hideNotes(), 180000); } else say('bad', errText(r)); } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
   render();
 }
 function hideNotes(silent) { clearTimeout(hideTimer); st.notes = null; if (!silent) render(); }
 async function openCase() {
   try { const r = await api({ action: 'medOpen', studentId: st.cur.id, complaint: st.complaint, severity: st.severity, clientId: uid() });
-    if (r.success) { say('ok', L().done); st.cur = null; st.q = ''; st.results = []; hideNotes(true); await loadCases(); } else say('bad', errText(r));
+    if (r.success) { say('ok', L().done); st.cur = null; st.q = ''; st.results = []; st.caseOpen = false; hideNotes(true); await loadCases(); } else say('bad', errText(r));
   } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
   render();
 }
@@ -102,9 +102,9 @@ async function loadStats() { try { const r = await api({ action: 'medStats' }); 
 function setTab(t) { st.tab = t; st.msg = null; hideNotes(true); if (t === 'stats') loadStats().then(render); if (t === 'leave') loadClr().then(render); render(); }
 
 function resultsHtml() {
-  const l = L(); if (!st.q.trim()) return '';
+  const l = L(); if (!st.q.trim() || st.cur) return '';
   if (!st.results.length) return `<div class="muted" style="padding:8px">${l.none}</div>`;
-  return st.results.map(s => `<button class="res" data-pick="${esc(s.id)}"><b>${esc(s.name)}</b><span class="muted"> · ${esc(s.id)} · ${esc(s.team)} · ${l.bus(esc(s.bus))}</span></button>`).join('');
+  return st.results.map(s => `<button class="res" data-pick="${esc(s.id)}"><b>${esc(s.name)}</b><span class="muted"> · ${esc(s.id)}${s.cls ? ' · ' + l.cls + ' ' + esc(s.cls) : ''}</span></button>`).join('');
 }
 function renderResults() { const e = $('qres'); if (e) e.innerHTML = resultsHtml(); }
 function leaveBlock(c) {
@@ -130,13 +130,20 @@ function leaveView() {
 function studentCard() {
   const l = L(), c = st.cur; if (!c) return '';
   const n = st.notes;
-  return `<section class="card"><div style="display:flex;justify-content:space-between;gap:8px"><div><div class="muted" style="font-size:13px">${esc(c.id)}</div><div class="big2">${esc(c.name)}</div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><span class="pill">${esc(c.team)}</span><span class="pill">${l.bus(esc(c.bus))}</span></div></div><button class="tool" data-clear="1" aria-label="x">✕</button></div>
-    <div class="item" style="margin-top:12px">${n ? `<div class="banner warn" style="margin:0 0 8px">${l.notesWarn}</div><div><b>${l.showNotes}</b><div style="margin:6px 0">${n.notes ? esc(n.notes) : `<span class="muted">${l.noNotes}</span>`}</div>${n.foodAl || n.foodAllergy ? `<div><b>${l.foodAl}:</b> ${esc(n.foodAllergy)}</div>` : ''}</div><button class="btn alt full" style="margin-top:8px" data-hide="1">${l.hideNotes}</button>`
-      : c.hasNotes ? `<button class="btn alt full" data-notes="1">🔒 ${l.showNotes}</button>` : `<span class="muted">${l.noNotes}</span>`}</div>
-    ${c.openCase ? `<div class="banner warn" style="margin-top:10px">${l.hasOpen}</div>` : `<div class="item" style="margin-top:10px"><label class="lbl" for="cm">${l.complaint}</label><input id="cm" type="text" maxlength="500" value="${esc(st.complaint)}" autocomplete="off">
+  const info = n
+    ? `${n.foodAllergy ? `<div class="banner bad" style="margin:0 0 8px"><b>⚠ ${l.foodAl}:</b> ${esc(n.foodAllergy)}</div>` : `<div class="muted" style="margin-bottom:8px">${l.noAllergy}</div>`}
+       ${n.notes ? `<div class="banner warn" style="margin:0 0 8px"><b>${l.healthNotes}:</b> ${esc(n.notes)}</div>` : `<div class="muted" style="margin-bottom:8px">${l.noNotes}</div>`}
+       <div class="muted" style="font-size:12px">${l.notesWarn}</div><button class="chip" style="margin-top:8px" data-hide="1">${l.hideNotes}</button>`
+    : (c.hasNotes ? `<button class="btn alt full" data-notes="1">🔒 ${l.showNotes}</button>` : `<span class="muted">${l.noNotes}</span>`);
+  const form = c.openCase ? `<div class="banner warn" style="margin-top:10px">${l.hasOpen}</div>`
+    : !st.caseOpen ? `<button class="btn full" style="margin-top:12px" data-caseopen="1">🩺 ${l.openCase}</button>`
+    : `<div class="item" style="margin-top:12px"><label class="lbl" for="cm"><b>${l.complaint}</b></label><textarea id="cm" rows="9" maxlength="2000" placeholder="${esc(l.complaintPh)}" style="width:100%;min-height:200px;font:inherit;padding:12px;border:1px solid var(--field);border-radius:14px;background:var(--card);color:var(--ink);resize:vertical">${esc(st.complaint)}</textarea>
       <div class="two" style="margin-top:8px"><button class="chip ${st.severity === 'normal' ? 'on' : ''}" data-sev="normal">${l.normal}</button><button class="chip ${st.severity === 'urgent' ? 'on' : ''}" data-sev="urgent">${l.urgent}</button></div>
-      <button class="btn full" style="margin-top:10px" data-opencase="1">${l.openCase}</button></div>`}
+      <div class="two" style="margin-top:10px"><button class="btn" data-opencase="1" ${st.complaint.trim().length < 3 ? 'disabled style="opacity:.5"' : ''}>${l.saveCase}</button><button class="btn alt" data-casecancel="1">${l.cancel}</button></div></div>`;
+  return `<section class="card"><div style="display:flex;justify-content:space-between;gap:8px"><div><div class="muted" style="font-size:13px">${esc(c.id)}</div><div class="big2">${esc(c.name)}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${c.cls ? `<span class="pill">${l.cls} ${esc(c.cls)}</span>` : ''}${c.age ? `<span class="pill">${l.age}: ${esc(c.age)}</span>` : ''}</div></div><button class="tool" data-clear="1" aria-label="x">✕</button></div>
+    <div class="item" style="margin-top:12px">${info}</div>
+    ${form}
     ${leaveBlock(c)}</section>`;
 }
 const sameDay = iso => { if (!iso) return false; const d = new Date(iso); return !isNaN(d) && d.toDateString() === new Date().toDateString(); };
@@ -159,9 +166,9 @@ function casesView() {
   const seg = `<div class="seg"><button class="chip ${st.filter === 'open' ? 'on' : ''}" data-filter="open">${l.fOpen} (${nOpen})</button><button class="chip ${st.filter === 'closed' ? 'on' : ''}" data-filter="closed">${l.fClosed} (${nClosed})</button></div>`;
   const list = shown.length ? shown.map(c => { const tr = st.drafts[c.id] !== undefined ? st.drafts[c.id] : c.treatment;
     return `<div class="item"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>${esc(c.name)}</b><span><span class="pill ${c.severity === 'urgent' ? 'bad' : ''}">${l[c.severity]}</span> <span class="pill ${c.status === 'open' ? 'warn' : 'ok'}">${l[c.status]}</span></span></div>
-    <div class="muted" style="font-size:13px">${esc(c.studentId)} · ${esc(c.team)} · ${l.bus(esc(c.bus))}</div><div style="margin:6px 0"><b>${l.complaint}:</b> ${esc(c.complaint)}</div>
-    ${c.status === 'open' ? `<label class="lbl" for="tr-${esc(c.id)}">${l.treatment}</label><input id="tr-${esc(c.id)}" data-tr="${esc(c.id)}" type="text" maxlength="800" value="${esc(tr)}" autocomplete="off"><div class="two" style="margin-top:8px"><button class="btn alt" data-save="${esc(c.id)}">${l.saveTr}</button><button class="btn" data-closecase="${esc(c.id)}">${l.closeCase}</button></div>`
-      : `<div><b>${l.treatment}:</b> ${esc(c.treatment)}</div><div class="muted" style="font-size:13px;margin-top:4px">${l.opened} ${hm(c.openedAt)} · ${l.closedAt} ${hm(c.closedAt)}</div>`}</div>`; }).join('') : `<div class="card muted">${l.noCases}</div>`;
+    <div class="muted" style="font-size:13px">${esc(c.studentId)}${c.cls ? ' · ' + l.cls + ' ' + esc(c.cls) : ''}${c.age ? ' · ' + l.age + ': ' + esc(c.age) : ''}</div><div style="margin:6px 0;white-space:pre-wrap"><b>${l.complaint}:</b> ${esc(c.complaint)}</div>
+    ${c.status === 'open' ? `<label class="lbl" for="tr-${esc(c.id)}">${l.treatment}</label><textarea id="tr-${esc(c.id)}" data-tr="${esc(c.id)}" rows="6" maxlength="2000" style="width:100%;min-height:140px;font:inherit;padding:12px;border:1px solid var(--field);border-radius:14px;background:var(--card);color:var(--ink);resize:vertical">${esc(tr)}</textarea><div class="two" style="margin-top:8px"><button class="btn alt" data-save="${esc(c.id)}">${l.saveTr}</button><button class="btn" data-closecase="${esc(c.id)}">${l.closeCase}</button></div>`
+      : `<div style="white-space:pre-wrap"><b>${l.treatment}:</b> ${esc(c.treatment)}</div><div class="muted" style="font-size:13px;margin-top:4px">${l.opened} ${hm(c.openedAt)} · ${l.closedAt} ${hm(c.closedAt)}</div>`}</div>`; }).join('') : `<div class="card muted">${l.noCases}</div>`;
   return `<section class="card"><label class="lbl" for="q">${l.search}</label><input id="q" type="search" value="${esc(st.q)}" autocomplete="off"><div id="qres" style="margin-top:6px">${resultsHtml()}</div></section>${studentCard()}${seg}${list}`;
 }
 function statsView() {
@@ -180,7 +187,7 @@ function render() {
   if (keep && $(keep.id)) { const e = $(keep.id); e.focus(); try { e.setSelectionRange(keep.pos, keep.pos); } catch (x) {} }
 }
 document.addEventListener('input', e => {
-  if (e.target.id === 'q') onQ(e.target.value); else if (e.target.id === 'cn') st.clrNote = e.target.value; else if (e.target.id === 'cm') st.complaint = e.target.value; else if (e.target.dataset.tr) st.drafts[e.target.dataset.tr] = e.target.value;
+  if (e.target.id === 'q') onQ(e.target.value); else if (e.target.id === 'cn') st.clrNote = e.target.value; else if (e.target.id === 'cm') { st.complaint = e.target.value; const sb = document.querySelector('[data-opencase]'); if (sb) { sb.disabled = st.complaint.trim().length < 3; sb.style.opacity = sb.disabled ? '.5' : ''; } } else if (e.target.dataset.tr) st.drafts[e.target.dataset.tr] = e.target.value;
 });
 document.addEventListener('click', e => {
   const b = e.target.closest && e.target.closest('button'); if (!b) return; const d = b.dataset;
@@ -188,6 +195,7 @@ document.addEventListener('click', e => {
   else if (d.notes) showNotes(); else if (d.hide) hideNotes(); else if (d.sev) { st.severity = d.sev; render(); }
   else if (d.filter) { st.filter = d.filter; render(); } else if (d.movestrip) { st.strip = st.strip === 'top' ? 'bot' : 'top'; pref.set('strip', st.strip); render(); }
   else if (d.clropen) { st.clrOpen = true; render(); } else if (d.clrcancel) { st.clrOpen = false; st.clrNote = ''; render(); } else if (d.clrsend) sendClr();
+  else if (d.caseopen) { st.caseOpen = true; render(); setTimeout(() => { const e = $('cm'); if (e) e.focus(); }, 50); } else if (d.casecancel) { st.caseOpen = false; st.complaint = ''; render(); }
   else if (d.opencase) openCase(); else if (d.save) saveTreatment(d.save, false); else if (d.closecase) saveTreatment(d.closecase, true);
 });
 document.addEventListener('visibilitychange', () => { if (document.hidden && st.notes) hideNotes(); });
