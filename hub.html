@@ -241,7 +241,7 @@ function paintLang() {
   const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
   set('helloTxt', l.hello); set('tilesH', l.tiles); set('noTiles', l.none); set('bulletinH', l.bull); set('logoutBtn', l.logout); set('langBtn', l.lang); set('backBtn', l.back);
   if (window.paintTheme) window.paintTheme();
-  if (typeof renderHeader === 'function' && window.__hubReady) { renderHeader(); renderTiles(); }
+  if (typeof renderHeader === 'function' && window.__hubReady) { renderHeader(); renderTiles(); if (typeof loadDocBadge === 'function') loadDocBadge(); }
 }
 document.getElementById('langBtn').addEventListener('click', () => { hlang = hlang === 'ar' ? 'en' : 'ar'; try { localStorage.setItem('mk_pref_lang', hlang); } catch (e) {} paintLang(); });
 
@@ -717,10 +717,24 @@ async function loadBulletin() {
   } catch (e) { /* no bulletin: ignore */ }
 }
 
+// A red badge on the exit-permission tile when the medical committee has asked for a student to be allowed to leave.
+async function loadDocBadge() {
+  if (!can('custody')) return;
+  try {
+    const r = await api({ action: 'medClearList' });
+    const tile = document.querySelector('#tiles a[href="custody.html"]');
+    if (!r.success || !tile) return;
+    let b = tile.querySelector('.docbadge');
+    if (!r.pending) { if (b) b.remove(); return; }
+    if (!b) { b = document.createElement('span'); b.className = 'docbadge'; b.style.cssText = 'display:inline-block;margin-top:6px;padding:3px 10px;border-radius:999px;background:var(--badbg);color:var(--bad);font-size:12.5px;font-weight:700'; tile.appendChild(b); }
+    b.textContent = '🩺 ' + (hlang === 'en' ? r.pending + ' request from the medical committee' : r.pending + ' طلب من اللجنة الطبية');
+  } catch (e) { /* ignore */ }
+}
 renderHeader();
 renderTiles();
 window.__hubReady = true; paintLang();
 loadBulletin();
+loadDocBadge(); setInterval(() => { if (!document.hidden) loadDocBadge(); }, 30000);
 
 // The server is the source of truth: refresh permissions once, then draw the admin parts if allowed.
 (async function init() {

@@ -36,10 +36,10 @@ const AUTH_ERR = /EXPIRED|IDLE_TIMEOUT|REVOKED|BAD_SIGNATURE|MALFORMED|USER_NOT_
 const T = {
  ar: { dir: 'rtl', title: 'استئذان الخروج من المخيم', sub: 'حالات خاصة لأسباب قهرية · تعتمدها السكرتارية وتصل للكشافة', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
   notice: 'للحالات الخاصة جدًا فقط (قبل حفل الختام). عند الاعتماد يظهر الاسم عند الكشافة في البوابة. انصراف الطلاب بعد الحفل يسجّله المشرفون.',
-  tNew: 'استئذان جديد', tDoc: n => '🩺 الطبيب' + (n ? ' (' + n + ')' : ''), tList: 'الطلبات', tSummary: 'الملخص',
+  tNew: n => 'استئذان الخروج' + (n ? ' 🩺' + n : ''), tDoc: 'سجل اللجنة الطبية', tList: 'الطلبات', tSummary: 'الملخص', docAlert: n => '🩺 وصل ' + (n === 1 ? 'طلب' : n + ' طلبات') + ' من اللجنة الطبية: لا مانع طبي من مغادرة ' + (n === 1 ? 'الطالب' : 'الطلاب') + '. راجعه أدناه ثم اعتمده أو أعده.', docPendTitle: '🩺 طلبات اللجنة الطبية بانتظار قرارك',
   search: 'ابحث بالاسم أو الرقم', none: 'لا نتائج', team: 'الفريق', bus: n => 'باص ' + n,
   guardian: 'اسم المستلِم وصلته (ولي الأمر أو من ينوب)', guardianPh: 'مثال: سالم أحمد — العم', reason: 'سبب الاستئذان', approve: 'اعتماد وإرسال للكشافة', openNow: 'استئذان خروج قائم', cancelWd: 'إلغاء الطلب',
-  done: 'تم', error: 'تعذّر الاتصال. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.',
+  sentOk: n => 'اعتُمد خروج ' + n + ' وأُرسل إلى الكشافة.', docOk: 'اعتُمد الطلب وأُرسل إلى الكشافة.', returnedOk: 'أُعيد الطلب إلى الطبيب.', cancelledOk: 'أُلغي الطلب.', readmittedOk: 'أُعيد الطالب إلى المخيم.', error: 'تعذّر الاتصال. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.',
   open: 'بانتظار الكشافة', closed: 'خرج', cancelled: 'ملغى', reversed: 'أُعيد الطالب', readmit: 'إعادة الطالب (سُجّل خروجه بالخطأ)', confirmReadmit: 'إعادة هذا الطالب إلى المخيم وإلغاء خروجه؟', noWd: 'لا توجد طلبات.', recvBy: 'المستلِم', medTag: '🩺 بتوصية طبية',
   sOpen: 'بانتظار الكشافة', sClosed: 'خرجوا', sDoc: 'طلبات الطبيب القائمة', confirmCancel: 'إلغاء استئذان الخروج؟',
   docTitle: 'طلبات عدم الممانعة من الطبيب', docNone: 'لا توجد طلبات من الطبيب.', docBy: 'الطبيب', docNote: 'ملاحظة الطبيب', docApprove: 'اعتماد وتحويل للكشافة', docReturn: 'إعادة للطبيب', docReturnWhy: 'سبب الإعادة للطبيب', docSend: 'إرسال الإعادة', docCancel: 'تراجع',
@@ -47,10 +47,10 @@ const T = {
   codes: { ALREADY_OPEN: 'يوجد استئذان خروج مفتوح لهذا الطالب', ALREADY_WITHDRAWN: 'هذا الطالب خرج مسبقاً', NOT_FOUND: 'الطالب غير موجود', NOT_OPEN: 'الطلب ليس مفتوحاً', NOT_WITHDRAWN: 'الطالب ليس خارجاً الآن', NOT_PENDING: 'الطلب ليس قائمًا', NOT_CLOSED: 'لا يمكن إعادة طالب لم يخرج بعد' } },
  en: { dir: 'ltr', title: 'Exit permission', sub: 'Special cases for compelling reasons · approved by the secretariat, handled by the scouts', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
   notice: 'For very special cases only (before the closing ceremony). Once approved the name shows at the gate. Departure after the ceremony is recorded by the supervisors.',
-  tNew: 'New request', tDoc: n => '🩺 Doctor' + (n ? ' (' + n + ')' : ''), tList: 'Requests', tSummary: 'Summary',
+  tNew: n => 'Exit permission' + (n ? ' 🩺' + n : ''), tDoc: 'Medical committee log', tList: 'Requests', tSummary: 'Summary', docAlert: n => '🩺 ' + (n === 1 ? 'A request' : n + ' requests') + ' from the medical committee: no medical objection to the student leaving. Review below, then approve or return.', docPendTitle: '🩺 Medical committee requests waiting for your decision',
   search: 'Search by name or number', none: 'No results', team: 'Team', bus: n => 'Bus ' + n,
   guardian: 'Receiver name and relation (guardian or delegate)', guardianPh: 'e.g. Salem Ahmed — uncle', reason: 'Reason', approve: 'Approve and send to the scouts', openNow: 'Exit request open', cancelWd: 'Cancel request',
-  done: 'Done', error: 'Connection problem. Try again.', sessionEnd: 'Session expired. Please log in again.',
+  sentOk: n => 'Exit approved for ' + n + ' and sent to the scouts.', docOk: 'Approved and sent to the scouts.', returnedOk: 'Returned to the doctor.', cancelledOk: 'Request cancelled.', readmittedOk: 'The student was re-admitted to the camp.', error: 'Connection problem. Try again.', sessionEnd: 'Session expired. Please log in again.',
   open: 'Waiting for the scouts', closed: 'Left', cancelled: 'Cancelled', reversed: 'Re-admitted', readmit: 'Re-admit the student (recorded by mistake)', confirmReadmit: 'Bring this student back and cancel his exit?', noWd: 'No requests.', recvBy: 'Receiver', medTag: '🩺 medical recommendation',
   sOpen: 'Waiting for the scouts', sClosed: 'Left', sDoc: 'Doctor requests pending', confirmCancel: 'Cancel the exit request?',
   docTitle: 'No-objection requests from the doctor', docNone: 'No requests from the doctor.', docBy: 'Doctor', docNote: 'Doctor’s note', docApprove: 'Approve and send to the scouts', docReturn: 'Return to the doctor', docReturnWhy: 'Reason for returning', docSend: 'Send', docCancel: 'Back',
@@ -80,7 +80,7 @@ function onQ(v) {
 function pick(id) { const s = st.results.find(x => x.id === id) || (st.cur && st.cur.id === id ? st.cur : null); if (!s) return; st.cur = s; st.guardian = ''; st.reason = ''; st.msg = null; render(); }
 async function approve() {
   try { const r = await api({ action: 'withdrawStart', studentId: st.cur.id, guardian: st.guardian, reason: st.reason, clientId: uid() });
-    if (r.success) { say('ok', L().done + ' — ' + st.cur.name); st.cur = null; st.q = ''; st.results = []; st.guardian = ''; st.reason = ''; await loadAll(); }
+    if (r.success) { say('ok', L().sentOk(st.cur.name)); st.cur = null; st.q = ''; st.results = []; st.guardian = ''; st.reason = ''; await loadAll(); }
     else say('bad', errText(r));
   } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
   render();
@@ -88,26 +88,26 @@ async function approve() {
 async function refreshCur() { if (!st.cur) return; try { const r = await api({ action: 'custodyFind', q: st.cur.id }); const h = r.success && r.results.find(x => x.id === st.cur.id); if (h) st.cur = h; } catch (e) {} render(); }
 async function readmit(id) {
   if (!confirm(L().confirmReadmit)) return;
-  try { const r = await api({ action: 'withdrawReopen', id: id }); say(r.success ? 'ok' : 'bad', r.success ? L().done : errText(r)); } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
+  try { const r = await api({ action: 'withdrawReopen', id: id }); say(r.success ? 'ok' : 'bad', r.success ? L().readmittedOk : errText(r)); } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
   await loadAll(); render();
 }
 async function cancelWd(id) {
   if (!confirm(L().confirmCancel)) return;
-  try { const r = await api({ action: 'withdrawCancel', id: id }); say(r.success ? 'ok' : 'bad', r.success ? L().done : errText(r)); } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
+  try { const r = await api({ action: 'withdrawCancel', id: id }); say(r.success ? 'ok' : 'bad', r.success ? L().cancelledOk : errText(r)); } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
   await loadAll(); await refreshCur();
 }
 async function docApprove(id) {
   const g = (st.docG[id] || '').trim();
-  try { const r = await api({ action: 'medClearApprove', id: id, guardian: g }); if (r.success) { say('ok', L().done); delete st.docG[id]; } else say('bad', errText(r)); } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
-  await loadAll(); render();
+  try { const r = await api({ action: 'medClearApprove', id: id, guardian: g }); if (r.success) { say('ok', L().docOk); delete st.docG[id]; } else say('bad', errText(r)); } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
+  await loadAll(); render(); window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 async function docReturn(id) {
-  try { const r = await api({ action: 'medClearReturn', id: id, reason: st.retWhy }); if (r.success) { say('ok', L().done); st.retId = ''; st.retWhy = ''; } else say('bad', errText(r)); } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
+  try { const r = await api({ action: 'medClearReturn', id: id, reason: st.retWhy }); if (r.success) { say('ok', L().returnedOk); st.retId = ''; st.retWhy = ''; } else say('bad', errText(r)); } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
   await loadAll(); render();
 }
 async function loadSummary() { try { const r = await api({ action: 'custodySummary' }); if (r.success) st.sum = r; } catch (e) {} }
 async function loadWds() { try { const r = await api({ action: 'withdrawList' }); if (r.success) st.wds = r.withdrawals; } catch (e) {} }
-async function loadDocs() { try { const r = await api({ action: 'medClearList' }); if (r.success) { st.docs = r.list; st.docPending = r.pending; } } catch (e) {} }
+async function loadDocs() { try { const r = await api({ action: 'medClearList' }); if (r.success) { st.docs = r.list; st.docPending = r.pending; notifyDocs(); } } catch (e) {} }
 async function loadAll() { await Promise.all([loadSummary(), loadWds(), loadDocs()]); }
 function setTab(t) { st.tab = t; st.msg = null; render(); loadAll().then(render); }
 
@@ -127,21 +127,34 @@ function newView() {
        <label class="lbl" for="g" style="margin-top:12px">${l.guardian}</label><input id="g" type="text" value="${esc(st.guardian)}" maxlength="60" autocomplete="off" placeholder="${esc(l.guardianPh)}">
        <label class="lbl" for="rs" style="margin-top:8px">${l.reason}</label><input id="rs" type="text" value="${esc(st.reason)}" maxlength="200" autocomplete="off">
        <button class="btn go full" style="margin-top:12px" data-approve="1" ${st.guardian.trim().length < 2 || st.reason.trim().length < 3 ? 'disabled' : ''}>${l.approve}</button></section>`);
-  return `<section class="card"><label class="lbl" for="q">${l.search}</label><input id="q" type="search" value="${esc(st.q)}" autocomplete="off"><div id="qres" style="margin-top:6px">${resultsHtml()}</div></section>${card}`;
+  return `${docPendingBlock()}<section class="card"><label class="lbl" for="q">${l.search}</label><input id="q" type="search" value="${esc(st.q)}" autocomplete="off"><div id="qres" style="margin-top:6px">${resultsHtml()}</div></section>${card}`;
 }
-function docView() {
-  const l = L();
-  if (!st.docs.length) return `<div class="card muted">${l.docNone}</div>`;
-  return `<section class="card"><h2 class="h2" style="margin-bottom:8px">${l.docTitle}</h2>` + st.docs.map(x => {
-    const pend = x.status === 'pending', ret = st.retId === x.id;
-    return `<div class="item"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>${esc(x.name)}</b><span class="pill ${pend ? 'warn' : x.status === 'approved' ? 'ok' : ''}">${pend ? l.stPending : x.status === 'approved' ? l.stApproved : l.stReturned}</span></div>
+function docCard(x) {
+  const l = L(), pend = x.status === 'pending', ret = st.retId === x.id;
+  return `<div class="item"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>${esc(x.name)}</b><span class="pill ${pend ? 'warn' : x.status === 'approved' ? 'ok' : ''}">${pend ? l.stPending : x.status === 'approved' ? l.stApproved : l.stReturned}</span></div>
       <div class="muted" style="font-size:13px">${esc(x.studentId)} · ${esc(x.team)} · ${l.bus(esc(x.bus))} · ${l.docBy}: ${esc(x.doctor)} · ${esc(hhmm(x.time))}</div>
       ${x.note ? `<div style="margin:6px 0"><span class="muted">${l.docNote}:</span> ${esc(x.note)}</div>` : ''}
       ${x.status === 'returned' && x.returnReason ? `<div class="muted" style="margin:6px 0">↩ ${esc(x.returnReason)}</div>` : ''}
       ${pend ? (ret ? `<label class="lbl" for="rw" style="margin-top:8px">${l.docReturnWhy}</label><input id="rw" type="text" value="${esc(st.retWhy)}" maxlength="200" autocomplete="off"><div class="two" style="margin-top:8px"><button class="btn" data-docret="${esc(x.id)}" ${st.retWhy.trim().length < 3 ? 'disabled' : ''}>${l.docSend}</button><button class="btn alt" data-retcancel="1">${l.docCancel}</button></div>`
         : `<label class="lbl" for="dg-${esc(x.id)}" style="margin-top:8px">${l.guardian}</label><input id="dg-${esc(x.id)}" data-dg="${esc(x.id)}" type="text" value="${esc(st.docG[x.id] || '')}" maxlength="60" autocomplete="off" placeholder="${esc(l.guardianPh)}">
            <div class="two" style="margin-top:8px"><button class="btn go" data-docok="${esc(x.id)}" ${(st.docG[x.id] || '').trim().length < 2 ? 'disabled' : ''}>${l.docApprove}</button><button class="btn alt" data-docretopen="${esc(x.id)}">${l.docReturn}</button></div>`) : ''}</div>`;
-  }).join('') + '</section>';
+}
+function docPendingBlock() {
+  const l = L(), p = st.docs.filter(x => x.status === 'pending'); if (!p.length) return '';
+  return `<section class="card" style="border:2px solid var(--warn)"><h2 class="h2" style="margin-bottom:8px">${l.docPendTitle}</h2>${p.map(docCard).join('')}</section>`;
+}
+function docView() {
+  const l = L();
+  if (!st.docs.length) return `<div class="card muted">${l.docNone}</div>`;
+  return `<section class="card"><h2 class="h2" style="margin-bottom:8px">${l.docTitle}</h2>${st.docs.map(docCard).join('')}</section>`;
+}
+// A new request from the medical committee: a short beep + vibration, once per request.
+let seenDoc = null;
+function beep() { try { const C = window.AudioContext || window.webkitAudioContext; const a = new C(), o = a.createOscillator(), g = a.createGain(); o.connect(g); g.connect(a.destination); o.frequency.value = 880; g.gain.value = 0.15; o.start(); o.stop(a.currentTime + 0.35); } catch (e) {} }
+function notifyDocs() {
+  const ids = st.docs.filter(x => x.status === 'pending').map(x => x.id);
+  if (seenDoc && ids.some(i => !seenDoc.has(i))) { beep(); try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) {} }
+  seenDoc = new Set(ids);
 }
 function listView() {
   const l = L();
@@ -159,8 +172,8 @@ function render() {
   const l = L(); document.documentElement.lang = st.lang; document.documentElement.dir = l.dir; document.documentElement.dataset.theme = st.theme; document.title = l.title + ' — MUKHAYYAM';
   $('hT').textContent = l.title; $('hS').textContent = l.sub; $('homeBtn').textContent = l.home; $('langBtn').textContent = l.lang; $('themeBtn').textContent = st.theme === 'light' ? l.dark : l.light;
   const ae = document.activeElement, keep = ae && ae.id ? { id: ae.id, pos: ae.selectionStart } : null;
-  $('app').innerHTML = `<div class="banner warn">${esc(l.notice)}</div>${st.msg ? `<div class="banner ${st.msg.cls}" role="alert">${esc(st.msg.t)}</div>` : ''}
-   <div class="tabs">${[['new', l.tNew], ['doc', l.tDoc(st.docPending)], ['list', l.tList], ['summary', l.tSummary]].map(t => `<button class="${st.tab === t[0] ? 'on' : ''}" data-tab="${t[0]}">${t[1]}</button>`).join('')}</div>
+  $('app').innerHTML = `${st.docPending ? `<div class="banner bad" role="alert" style="font-weight:700">${esc(l.docAlert(st.docPending))}</div>` : ''}<div class="banner warn">${esc(l.notice)}</div>${st.msg ? `<div class="banner ${st.msg.cls}" role="alert">${esc(st.msg.t)}</div>` : ''}
+   <div class="tabs">${[['new', l.tNew(st.docPending)], ['list', l.tList], ['doc', l.tDoc], ['summary', l.tSummary]].map(t => `<button class="${st.tab === t[0] ? 'on' : ''}" data-tab="${t[0]}">${t[1]}</button>`).join('')}</div>
    ${st.tab === 'new' ? newView() : st.tab === 'doc' ? docView() : st.tab === 'list' ? listView() : summaryView()}`;
   if (keep && $(keep.id) && ['INPUT', 'TEXTAREA'].indexOf($(keep.id).tagName) !== -1) { const e = $(keep.id); e.focus(); try { e.setSelectionRange(keep.pos, keep.pos); } catch (x) {} }
 }
