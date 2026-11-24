@@ -15,7 +15,7 @@ function readExtraStudents_() {
     const g = function(n) { return v[r][h.indexOf(n)]; };
     if (!g('Id') || g('Active') === false) continue;
     out.push({ id: String(g('Id')).trim(), name: String(g('Name')).trim(), team: String(g('Team') || '').trim(), bus: String(g('Bus') || '').trim(), cls: String(g('Class') || '').trim(),
-      photo: '', shirt: String(g('Shirt') || '').trim(), bags: Number(g('Bags')) || 0, foodAllergy: realValue_(g('FoodAllergy')), medical: realValue_(g('Medical')), trip: isYes_(g('Trip')), manual: true, note: String(g('Note') || ''), addedAt: isoOf_(g('AddedAt')), addedBy: String(g('AddedBy') || ''), clientId: String(g('ClientId') || ''), _row: r + 1 });
+      photo: '', shirt: String(g('Shirt') || '').trim(), bags: Number(g('Bags')) || 0, foodAllergy: realValue_(g('FoodAllergy')), medical: realValue_(g('Medical')), trip: isYes_(g('Trip')), dob: dobText_(g('DOB')), age: ageFromDob_(g('DOB')), manual: true, note: String(g('Note') || ''), addedAt: isoOf_(g('AddedAt')), addedBy: String(g('AddedBy') || ''), clientId: String(g('ClientId') || ''), _row: r + 1 });
   }
   return out;
 }
@@ -163,6 +163,7 @@ function handleStudentAdd_(data) {
     if (name.length < 3) return { success: false, code: 'BAD_REQUEST', error: 'اكتب اسم الطالب كاملًا' };
     const cls = String(data.cls || '').trim().slice(0, 10);
     if (!cls || gradeOf_(cls) === null) return { success: false, code: 'BAD_REQUEST', error: 'اختر الصف (تعتمد عليه المراحل)' };
+    let dob = ''; if (String(data.dob || '').trim()) { dob = dobText_(String(data.dob).trim()); if (!dob || ageFromDob_(dob) === '') return { success: false, code: 'BAD_DOB', error: 'تاريخ الميلاد غير صحيح' }; }
     const trip = isYes_(data.trip), food = cleanNote_(data.foodAllergy, 100), medical = cleanNote_(data.medical, 100), bags = Math.max(0, Math.min(20, Math.floor(Number(data.bags) || 0)));
     const bus = String(data.bus || '').trim().slice(0, 10), shirt = normSize_(data.shirt).slice(0, 8), note = String(data.note || '').trim().slice(0, 100);
     const team = String(data.team || '').trim().slice(0, 40);
@@ -185,7 +186,7 @@ function handleStudentAdd_(data) {
       const taken = {}; let n = 0;
       all.concat(extra).forEach(function(s) { taken[s.id] = true; const m = /^X(\d+)$/.exec(s.id); if (m) n = Math.max(n, Number(m[1])); });
       let id = 'X' + (n + 1); while (taken[id]) { n++; id = 'X' + (n + 1); }
-      appendSafe_(extraSheet_(), [id, name, cls, team, bus, shirt, note, new Date(), user.Username, true, clientId, trip ? 'نعم' : '', food, medical, bags || '']);
+      appendSafe_(extraSheet_(), [id, name, cls, team, bus, shirt, note, new Date(), user.Username, true, clientId, trip ? 'نعم' : '', food, medical, bags || '', dob]);
       clearStudentsCache_(); // every screen sees the new student at once
       writeAudit_(user.Username, 'STUDENT_ADDED', id, 'bus=' + bus);
       return { success: true, id: id, name: name };

@@ -542,6 +542,11 @@ assert(book.AuditLog.rows.some(x=>x[2]==='GATE_EXIT'&&x[1]==='scout1'),'audit: g
   const mf=post({action:'medFind',token:td,q:'3003'});assert(mf.results[0].age===mi.age&&!JSON.stringify(mf).includes('2012-05-17'),'search shows the age, not the date');
   const rs=post({action:'roster',token:post({action:'login',username:'sup1',password:'p1-12345'}).token});assert(!JSON.stringify(rs).includes('2012-05-17'),'supervisors never receive a birth date');
   hd.pop();row.pop();for(const k of Object.keys(cache))delete cache[k];}
+ // a late student with a birth date: the doctor sees it; a wrong date is refused
+ {let w=post({action:'studentAdd',token:T,name:'طالب جديد بتاريخ ميلاد',cls:'6',dob:'2012-13-45',clientId:'dobx1'});assert(!w.success&&w.code==='BAD_DOB','an unreadable birth date is refused');
+  w=post({action:'studentAdd',token:T,name:'طالب جديد بتاريخ ميلاد',cls:'6',dob:'2012-05-17',clientId:'dobx2'});assert(w.success,'a late student with a birth date is added');
+  const mi=post({action:'medInfo',token:td,studentId:w.id});assert(mi.success&&mi.dob==='2012-05-17'&&/^\d+$/.test(mi.age),'the doctor sees his birth date and age');
+  book.ExtraStudents.rows.length=1;for(const k of Object.keys(cache))delete cache[k];}
  book.Bus.rows.splice(book.Bus.rows.length-2,2);for(const k of Object.keys(cache))delete cache[k];}
 // items not returned: the gate is blocked
 post({action:'withdrawStart',token:ts,studentId:'3002',guardian:'والد',reason:'سبب'});

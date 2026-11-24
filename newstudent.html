@@ -40,19 +40,19 @@ const T = {
  ar: { dir: 'rtl', title: 'طالب جديد', sub: 'للطلبة غير المسجّلين مسبقًا في الكشف', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
   notice: 'هذه الخانة مخصصة للطلبة غير المسجّلين مسبقًا. إذا كان الطالب مسجّلًا فابحث عنه في «الوصول المباشر» ولا تُضِفه هنا. لا يُقبل أي اسم مكرر.',
   name: 'اسم الطالب (كاملًا)', cls: 'الصف', team: 'الفريق', busLbl: 'الباص', noBus: 'بلا باص', shirt: 'مقاس القميص', note: 'ملاحظة', trip: 'مسجّل في الرحلة', yes: 'نعم', no: 'لا',
-  food: 'الحساسية الغذائية', medical: 'الحالة الصحية', bags: 'عدد الحقائب', optional: 'اختياري', pick: 'اختر', bus: n => 'باص ' + n,
+  dob: 'تاريخ الميلاد', food: 'الحساسية الغذائية', medical: 'الحالة الصحية', bags: 'عدد الحقائب', optional: 'اختياري', pick: 'اختر', bus: n => 'باص ' + n,
   add: 'إضافة الطالب', added: (id, n) => `تمت إضافة ${n}. رقمه: ${id}`, addedList: 'أُضيفوا يدويًا', noAdded: 'لم يُضف أحد بعد.',
   printBand: 'اطبع سواره', goArrive: 'سجّل وصوله', manual: 'مضاف يدويًا', dupTitle: 'هذا الطالب مسجّل مسبقًا. لا يمكن إضافته مرة ثانية.', dupOpen: 'افتح الطالب في «الوصول المباشر»', dupHint: 'إذا كان طالبًا آخر بنفس الاسم، أضف اسم الجد أو العائلة ليختلف الاسم.',
-  error: 'تعذّر الاتصال. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.', codes: { DUPLICATE_NAME: 'هذا الطالب مسجّل مسبقًا. لا يمكن إضافته مرة ثانية.', BAD_REQUEST: 'تحقق من البيانات المكتوبة (الاسم والصف مطلوبان)' } },
+  error: 'تعذّر الاتصال. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.', codes: { DUPLICATE_NAME: 'هذا الطالب مسجّل مسبقًا. لا يمكن إضافته مرة ثانية.', BAD_REQUEST: 'تحقق من البيانات المكتوبة (الاسم والصف مطلوبان)', BAD_DOB: 'تاريخ الميلاد غير صحيح' } },
  en: { dir: 'ltr', title: 'New student', sub: 'For students not registered in advance', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
   notice: 'This screen is for students NOT registered in advance. If the student is registered, find him in “Direct Arrival” and do not add him here. No duplicate name is accepted.',
   name: 'Student full name', cls: 'Class', team: 'Team', busLbl: 'Bus', noBus: 'No bus', shirt: 'Shirt size', note: 'Note', trip: 'Registered for the trip', yes: 'Yes', no: 'No',
-  food: 'Food allergy', medical: 'Medical condition', bags: 'Number of bags', optional: 'optional', pick: 'Choose', bus: n => 'Bus ' + n,
+  dob: 'Date of birth', food: 'Food allergy', medical: 'Medical condition', bags: 'Number of bags', optional: 'optional', pick: 'Choose', bus: n => 'Bus ' + n,
   add: 'Add student', added: (id, n) => `${n} added. Number: ${id}`, addedList: 'Added by hand', noAdded: 'Nobody added yet.',
   printBand: 'Print wristband', goArrive: 'Record arrival', manual: 'Added by hand', dupTitle: 'This student is already registered. He cannot be added twice.', dupOpen: 'Open him in “Direct Arrival”', dupHint: 'If this is another student with the same name, add the grandfather or family name so the names differ.',
-  error: 'Connection problem. Try again.', sessionEnd: 'Session expired. Please log in again.', codes: { DUPLICATE_NAME: 'This student is already registered. He cannot be added twice.', BAD_REQUEST: 'Check the data (name and class are required)' } }
+  error: 'Connection problem. Try again.', sessionEnd: 'Session expired. Please log in again.', codes: { DUPLICATE_NAME: 'This student is already registered. He cannot be added twice.', BAD_REQUEST: 'Check the data (name and class are required)', BAD_DOB: 'The date of birth is not valid' } }
 };
-const EMPTY = { name: '', cls: '', team: '', bus: '', shirt: '', note: '', trip: '', food: '', medical: '', bags: '' };
+const EMPTY = { name: '', cls: '', team: '', bus: '', shirt: '', note: '', trip: '', food: '', medical: '', bags: '', dob: '' };
 const st = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), added: [], teams: [], buses: [], classes: [], msg: null, f: Object.assign({}, EMPTY), last: null, dup: null };
 const L = () => T[st.lang];
 async function api(action, extra) {
@@ -66,7 +66,7 @@ const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + 
 async function load() { try { const r = await api('studentAddList'); if (r.success) { st.added = r.added; st.teams = r.teams; st.buses = r.buses; st.classes = r.classes; } else if (r.code === 'FORBIDDEN' || r.error) { location.href = 'hub.html'; return; } } catch (e) {} render(); }
 async function addStudent() {
   const f = st.f; let busy = st.busy; if (busy) return; st.busy = true;
-  try { const r = await api('studentAdd', { name: f.name, cls: f.cls, team: f.team, bus: f.bus, shirt: f.shirt, note: f.note, trip: f.trip, foodAllergy: f.food, medical: f.medical, bags: f.bags, clientId: st.addId || (st.addId = uid()) });
+  try { const r = await api('studentAdd', { name: f.name, cls: f.cls, team: f.team, bus: f.bus, shirt: f.shirt, note: f.note, trip: f.trip, dob: f.dob, foodAllergy: f.food, medical: f.medical, bags: f.bags, clientId: st.addId || (st.addId = uid()) });
     if (r.success) { st.last = { id: r.id, name: r.name }; st.dup = null; say('ok', L().added(r.id, r.name)); st.f = Object.assign({}, EMPTY); st.addId = null; st.busy = false; await load(); return; }
     if (r.code === 'DUPLICATE_NAME') { st.dup = r.existing; st.msg = null; } else say('bad', errText(r));
   } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
@@ -82,6 +82,7 @@ function view() {
     <div class="fgrid two"><div><label class="lbl" for="fc">${l.cls}</label><select id="fc" data-f="cls">${opt(st.classes, f.cls, l.pick)}</select></div><div><label class="lbl" for="ft">${l.team} (${l.optional})</label><select id="ft" data-f="team">${opt(st.teams, f.team, l.pick)}</select></div></div>
     <div class="fgrid two"><div><label class="lbl" for="fb">${l.busLbl} (${l.optional})</label><select id="fb" data-f="bus">${opt(st.buses, f.bus, l.noBus, x => l.bus(x))}</select></div><div><label class="lbl" for="ftr">${l.trip}</label><select id="ftr" data-f="trip"><option value="">${l.no}</option><option value="1" ${f.trip === '1' ? 'selected' : ''}>${l.yes}</option></select></div></div>
     <div class="fgrid two">${txt('fs', l.shirt + ' (' + l.optional + ')', f.shirt, 8, 'placeholder="M / L / XL"')}<div><label class="lbl" for="fg">${l.bags} (${l.optional})</label><input id="fg" type="number" min="0" max="20" inputmode="numeric" value="${esc(f.bags)}"></div></div>
+    <div><label class="lbl" for="fdob">${l.dob} (${l.optional})</label><input id="fdob" type="date" value="${esc(f.dob)}" max="${new Date().toISOString().slice(0, 10)}"></div>
     ${txt('ffd', l.food + ' (' + l.optional + ')', f.food, 100)}${txt('fm', l.medical + ' (' + l.optional + ')', f.medical, 100)}${txt('fo', l.note + ' (' + l.optional + ')', f.note, 100)}</div>
     <button class="btn go full" style="margin-top:12px" data-add="1" ${ok ? '' : 'disabled'}>${l.add}</button>
     ${st.last ? `<div class="banner go" style="margin-top:10px">${esc(l.added(st.last.id, st.last.name))} <a href="wristbands.html" style="margin-inline-start:8px">${l.printBand}</a> · <a href="reception.html?q=${encodeURIComponent(st.last.id)}">${l.goArrive}</a></div>` : ''}</section>
@@ -95,7 +96,7 @@ function render() {
   if (keep && $(keep.id) && ['INPUT', 'TEXTAREA'].indexOf($(keep.id).tagName) !== -1) { const e = $(keep.id); e.focus(); try { e.setSelectionRange(keep.pos, keep.pos); } catch (x) {} }
 }
 document.addEventListener('input', e => { const i = e.target.id;
-  if (i === 'fn') { st.f.name = e.target.value; st.dup = null; render(); } else if (i === 'fs') st.f.shirt = e.target.value; else if (i === 'fo') st.f.note = e.target.value; else if (i === 'ffd') st.f.food = e.target.value; else if (i === 'fm') st.f.medical = e.target.value; else if (i === 'fg') st.f.bags = e.target.value; });
+  if (i === 'fn') { st.f.name = e.target.value; st.dup = null; render(); } else if (i === 'fs') st.f.shirt = e.target.value; else if (i === 'fo') st.f.note = e.target.value; else if (i === 'ffd') st.f.food = e.target.value; else if (i === 'fm') st.f.medical = e.target.value; else if (i === 'fg') st.f.bags = e.target.value; else if (i === 'fdob') st.f.dob = e.target.value; });
 document.addEventListener('change', e => { if (e.target.dataset && e.target.dataset.f) { st.f[e.target.dataset.f] = e.target.value; render(); } });
 document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('button'); if (b && b.dataset.add) addStudent(); });
 $('langBtn').onclick = () => { st.lang = st.lang === 'ar' ? 'en' : 'ar'; pref.set('lang', st.lang); render(); };
