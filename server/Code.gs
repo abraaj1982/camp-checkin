@@ -173,7 +173,7 @@ function readStudents_(fresh) {
   if (!fresh) { const hit = cache.get('students_v2'); if (hit) { try { return JSON.parse(hit); } catch (e) { /* fall through */ } } }
   const startedAt = Date.now();
   const sheet = SpreadsheetApp.openById(getStudentSpreadsheetId_()).getSheetByName(SHEET_NAME);
-  if (!sheet) throw new Error('تبويب Bus غير موجود في شيت الطلاب');
+  if (!sheet) throw new Error('تبويب Bus غير موجود في كشف الطلاب');
   const data = sheet.getDataRange().getValues();
   const cols = findStudentColumns_(data[0] || []);
   const missing = STUDENT_REQUIRED_.filter(function(k) { return cols[k] === -1; });

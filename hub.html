@@ -150,8 +150,8 @@ html[dir=rtl] #usersListCard td:nth-child(2){text-align:right}
     </div>
 
     <div class="card">
-      <h2>🔎 فحص شيت الطلاب</h2>
-      <div class="hint">يتأكد أن الأعمدة موجودة، ولا توجد أرقام طلاب مكررة أو طلاب بلا باص. استخدمه بعد أي تحديث لشيت الطلاب.</div>
+      <h2>🔎 فحص كشف الطلاب</h2>
+      <div class="hint">يتأكد أن الأعمدة موجودة، ولا توجد أرقام طلاب مكررة أو طلاب بلا باص. استخدمه بعد أي تحديث لكشف الطلاب.</div>
       <button type="button" class="btn secondary" id="checkSheetBtn">فحص الآن</button>
       <div class="report" id="sheetReport"></div>
     </div>
@@ -687,7 +687,7 @@ document.getElementById('checkSheetBtn').addEventListener('click', async () => {
     if (!data.success) { out.textContent = '❌ ' + (data.error || 'فشل الفحص'); return; }
     const r = data.report;
     const line = (text, cls) => { const d = document.createElement('div'); if (cls) d.className = cls; d.textContent = text; out.appendChild(d); };
-    line(r.ok ? '✅ الشيت سليم' : '⚠️ توجد مشاكل تحتاج إصلاحاً', r.ok ? 'good' : 'bad');
+    line(r.ok ? '✅ الكشف سليم' : '⚠️ توجد مشاكل تحتاج إصلاحاً', r.ok ? 'good' : 'bad');
     r.problems.forEach(p => line('• ' + p, 'bad'));
     (r.notes || []).forEach(n => line('• ' + n));
     if (r.total !== undefined) {
