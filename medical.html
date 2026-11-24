@@ -51,7 +51,7 @@ const errText = r => (r && L().codes && L().codes[r.code]) || (r && r.error) || 
 if (!token) location.href = 'login.html'; else if (!can('medical')) location.href = 'hub.html';
 const T = {
  ar: { dir: 'rtl', title: 'الطبيب', sub: 'الحالات الطبية (بيانات محمية)', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
-  tCases: 'الحالات', sToday: 'حالات اليوم', sOpen: 'مفتوحة', sClosed: 'أُغلقت اليوم', sUrgent: 'عاجلة', fOpen: 'مفتوحة', fClosed: 'مغلقة', moveStrip: 'نقل الشريط', opened: 'فُتحت', closedAt: 'أُغلقت', tStats: 'الإحصاءات', search: 'ابحث عن طالب بالاسم أو الرقم', bus: n => 'باص ' + n, none: 'لا نتائج',
+  tCases: 'الحالات', tLeave: n => '🚪 مغادرة المخيم' + (n ? ' (' + n + ')' : ''), clrBtn: 'عدم ممانعة مغادرة المخيم', clrHint: 'يصل الطلب إلى السكرتارية وهي التي تقرر وتحوّله للكشافة. اكتب ما يلزم السكرتارية فقط (لا تفاصيل طبية).', clrNote: 'ملاحظة للسكرتارية', clrSend: 'إرسال للسكرتارية', clrCancel: 'تراجع', clrSent: 'أُرسل الطلب إلى السكرتارية', clrPending: 'بانتظار قرار السكرتارية', clrApproved: 'اعتمدته السكرتارية', clrReturned: 'أعادته السكرتارية', clrTitle: 'طلبات عدم الممانعة', clrNone: 'لا توجد طلبات.', sToday: 'حالات اليوم', sOpen: 'مفتوحة', sClosed: 'أُغلقت اليوم', sUrgent: 'عاجلة', fOpen: 'مفتوحة', fClosed: 'مغلقة', moveStrip: 'نقل الشريط', opened: 'فُتحت', closedAt: 'أُغلقت', tStats: 'الإحصاءات', search: 'ابحث عن طالب بالاسم أو الرقم', bus: n => 'باص ' + n, none: 'لا نتائج',
   showNotes: 'عرض الملاحظات الطبية', hideNotes: 'إخفاء', notesWarn: 'يُسجَّل اطّلاعك على هذه البيانات. لا تشاركها خارج الفريق الطبي.', noNotes: 'لا توجد ملاحظات مسجّلة', foodAl: 'حساسية غذائية',
   complaint: 'الشكوى', urgent: 'عاجلة', normal: 'عادية', openCase: 'فتح ملف حالة', hasOpen: 'يوجد ملف مفتوح لهذا الطالب', open: 'مفتوحة', closed: 'مغلقة',
   treatment: 'العلاج / الإجراء', saveTr: 'حفظ', closeCase: 'إغلاق الحالة', confirmClose: 'إغلاق الحالة؟', noCases: 'لا توجد حالات.', openedAt: 'فُتحت', by: 'بواسطة',
@@ -59,7 +59,7 @@ const T = {
   done: 'تم', error: 'تعذّر الاتصال. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.',
   codes: { ALREADY_OPEN: 'يوجد ملف مفتوح لهذا الطالب', NOT_OPEN: 'الملف مغلق', TREATMENT_REQUIRED: 'اكتب العلاج أو الإجراء قبل الإغلاق', NOT_FOUND: 'الطالب غير موجود' } },
  en: { dir: 'ltr', title: 'Doctor', sub: 'Medical cases (protected data)', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
-  tCases: 'Cases', sToday: 'Today', sOpen: 'Open', sClosed: 'Closed today', sUrgent: 'Urgent', fOpen: 'Open', fClosed: 'Closed', moveStrip: 'Move bar', opened: 'Opened', closedAt: 'Closed', tStats: 'Statistics', search: 'Search a student by name or number', bus: n => 'Bus ' + n, none: 'No results',
+  tCases: 'Cases', tLeave: n => '🚪 Leaving the camp' + (n ? ' (' + n + ')' : ''), clrBtn: 'No objection to leaving the camp', clrHint: 'The request goes to the secretariat, which decides and forwards it to the scouts. Write only what the secretariat needs (no medical details).', clrNote: 'Note for the secretariat', clrSend: 'Send to the secretariat', clrCancel: 'Back', clrSent: 'Request sent to the secretariat', clrPending: 'Waiting for the secretariat', clrApproved: 'Approved by the secretariat', clrReturned: 'Returned by the secretariat', clrTitle: 'No-objection requests', clrNone: 'No requests.', sToday: 'Today', sOpen: 'Open', sClosed: 'Closed today', sUrgent: 'Urgent', fOpen: 'Open', fClosed: 'Closed', moveStrip: 'Move bar', opened: 'Opened', closedAt: 'Closed', tStats: 'Statistics', search: 'Search a student by name or number', bus: n => 'Bus ' + n, none: 'No results',
   showNotes: 'Show medical notes', hideNotes: 'Hide', notesWarn: 'Your access to this data is logged. Do not share it outside the medical team.', noNotes: 'No notes on record', foodAl: 'Food allergy',
   complaint: 'Complaint', urgent: 'Urgent', normal: 'Normal', openCase: 'Open a case', hasOpen: 'This student already has an open case', open: 'Open', closed: 'Closed',
   treatment: 'Treatment / action', saveTr: 'Save', closeCase: 'Close case', confirmClose: 'Close this case?', noCases: 'No cases.', openedAt: 'Opened', by: 'by',
@@ -67,7 +67,7 @@ const T = {
   done: 'Done', error: 'Connection problem. Try again.', sessionEnd: 'Session expired. Please log in again.',
   codes: { ALREADY_OPEN: 'This student already has an open case', NOT_OPEN: 'Case is closed', TREATMENT_REQUIRED: 'Enter the treatment before closing', NOT_FOUND: 'Student not found' } }
 };
-const st = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), tab: 'cases', q: '', results: [], cur: null, notes: null, complaint: '', severity: 'normal', cases: [], stats: null, msg: null, drafts: {}, filter: 'open', strip: pref.get('strip', 'bot') };
+const st = { clr: [], clrPending: 0, clrOpen: false, clrNote: '', lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), tab: 'cases', q: '', results: [], cur: null, notes: null, complaint: '', severity: 'normal', cases: [], stats: null, msg: null, drafts: {}, filter: 'open', strip: pref.get('strip', 'bot') };
 
 let qTimer = null, hideTimer = null;
 function onQ(v) {
@@ -75,7 +75,7 @@ function onQ(v) {
   if (!v.trim()) { st.results = []; return renderResults(); }
   qTimer = setTimeout(async () => { try { const r = await api({ action: 'medFind', q: v.trim() }); if (r.success && st.q === v) { st.results = r.results; renderResults(); } } catch (e) {} }, 300);
 }
-function pick(id) { st.cur = st.results.find(x => x.id === id) || null; hideNotes(true); st.complaint = ''; st.severity = 'normal'; st.msg = null; render(); }
+function pick(id) { st.clrOpen = false; st.clrNote = ''; st.cur = st.results.find(x => x.id === id) || null; hideNotes(true); st.complaint = ''; st.severity = 'normal'; st.msg = null; render(); }
 async function showNotes() {
   try { const r = await api({ action: 'medInfo', studentId: st.cur.id }); if (r.success) { st.notes = r; clearTimeout(hideTimer); hideTimer = setTimeout(() => hideNotes(), 30000); } else say('bad', errText(r)); } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
   render();
@@ -99,7 +99,7 @@ async function saveTreatment(id, close) {
 }
 async function loadCases() { try { const r = await api({ action: 'medList' }); if (r.success) st.cases = r.cases; } catch (e) {} }
 async function loadStats() { try { const r = await api({ action: 'medStats' }); if (r.success) st.stats = r; } catch (e) {} }
-function setTab(t) { st.tab = t; st.msg = null; hideNotes(true); if (t === 'stats') loadStats().then(render); render(); }
+function setTab(t) { st.tab = t; st.msg = null; hideNotes(true); if (t === 'stats') loadStats().then(render); if (t === 'leave') loadClr().then(render); render(); }
 
 function resultsHtml() {
   const l = L(); if (!st.q.trim()) return '';
@@ -107,6 +107,26 @@ function resultsHtml() {
   return st.results.map(s => `<button class="res" data-pick="${esc(s.id)}"><b>${esc(s.name)}</b><span class="muted"> · ${esc(s.id)} · ${esc(s.team)} · ${l.bus(esc(s.bus))}</span></button>`).join('');
 }
 function renderResults() { const e = $('qres'); if (e) e.innerHTML = resultsHtml(); }
+function leaveBlock(c) {
+  const l = L(), pend = st.clr.find(x => x.studentId === c.id && x.status === 'pending');
+  if (pend) return `<div class="banner warn" style="margin-top:10px">${l.clrPending}</div>`;
+  if (!st.clrOpen) return `<button class="btn alt full" style="margin-top:10px" data-clropen="1">🚪 ${l.clrBtn}</button>`;
+  return `<div class="item" style="margin-top:10px"><b>${l.clrBtn}</b><div class="muted" style="font-size:12.5px;margin:4px 0">${l.clrHint}</div><label class="lbl" for="cn">${l.clrNote}</label><input id="cn" type="text" maxlength="200" value="${esc(st.clrNote)}" autocomplete="off">
+    <div class="two" style="margin-top:8px"><button class="btn go" data-clrsend="1">${l.clrSend}</button><button class="btn alt" data-clrcancel="1">${l.clrCancel}</button></div></div>`;
+}
+async function loadClr() { try { const r = await api({ action: 'medClearList' }); if (r.success) { st.clr = r.list; st.clrPending = r.pending; } } catch (e) {} }
+async function sendClr() {
+  try { const r = await api({ action: 'medClearCreate', studentId: st.cur.id, note: st.clrNote, clientId: uid() });
+    if (r.success) { say('ok', L().clrSent); st.clrOpen = false; st.clrNote = ''; await loadClr(); } else say('bad', errText(r));
+  } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
+  render();
+}
+function leaveView() {
+  const l = L();
+  if (!st.clr.length) return `<div class="card muted">${l.clrNone}</div>`;
+  return `<section class="card"><h2 class="h2" style="margin-bottom:8px">${l.clrTitle}</h2>` + st.clr.map(x => `<div class="item"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>${esc(x.name)}</b><span class="pill ${x.status === 'pending' ? 'warn' : x.status === 'approved' ? 'ok' : ''}">${x.status === 'pending' ? l.clrPending : x.status === 'approved' ? l.clrApproved : l.clrReturned}</span></div>
+    <div class="muted" style="font-size:13px">${esc(x.studentId)} · ${esc(x.team)} · ${l.bus(esc(x.bus))} · ${hm(x.time)}</div>${x.note ? `<div style="margin:6px 0">${esc(x.note)}</div>` : ''}${x.status === 'returned' && x.returnReason ? `<div class="banner warn" style="margin:6px 0 0">↩ ${esc(x.returnReason)}</div>` : ''}</div>`).join('') + '</section>';
+}
 function studentCard() {
   const l = L(), c = st.cur; if (!c) return '';
   const n = st.notes;
@@ -116,7 +136,8 @@ function studentCard() {
       : c.hasNotes ? `<button class="btn alt full" data-notes="1">🔒 ${l.showNotes}</button>` : `<span class="muted">${l.noNotes}</span>`}</div>
     ${c.openCase ? `<div class="banner warn" style="margin-top:10px">${l.hasOpen}</div>` : `<div class="item" style="margin-top:10px"><label class="lbl" for="cm">${l.complaint}</label><input id="cm" type="text" maxlength="500" value="${esc(st.complaint)}" autocomplete="off">
       <div class="two" style="margin-top:8px"><button class="chip ${st.severity === 'normal' ? 'on' : ''}" data-sev="normal">${l.normal}</button><button class="chip ${st.severity === 'urgent' ? 'on' : ''}" data-sev="urgent">${l.urgent}</button></div>
-      <button class="btn full" style="margin-top:10px" data-opencase="1">${l.openCase}</button></div>`}</section>`;
+      <button class="btn full" style="margin-top:10px" data-opencase="1">${l.openCase}</button></div>`}
+    ${leaveBlock(c)}</section>`;
 }
 const sameDay = iso => { if (!iso) return false; const d = new Date(iso); return !isNaN(d) && d.toDateString() === new Date().toDateString(); };
 const hm = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toTimeString().slice(0, 5); };
@@ -154,24 +175,25 @@ function render() {
   $('hT').textContent = l.title; $('hS').textContent = l.sub; $('homeBtn').textContent = l.home; $('langBtn').textContent = l.lang; $('themeBtn').textContent = st.theme === 'light' ? l.dark : l.light;
   const ae = document.activeElement, keep = ae && ae.id ? { id: ae.id, pos: ae.selectionStart } : null;
   $('app').innerHTML = `${st.msg ? `<div class="banner ${st.msg.cls}" role="alert">${esc(st.msg.t)}</div>` : ''}
-   <div class="tabs">${[['cases', l.tCases], ['stats', l.tStats]].map(t => `<button class="${st.tab === t[0] ? 'on' : ''}" data-tab="${t[0]}">${t[1]}</button>`).join('')}</div>${st.tab === 'cases' ? casesView() : statsView()}`;
+   <div class="tabs">${[['cases', l.tCases], ['leave', l.tLeave(st.clrPending)], ['stats', l.tStats]].map(t => `<button class="${st.tab === t[0] ? 'on' : ''}" data-tab="${t[0]}">${t[1]}</button>`).join('')}</div>${st.tab === 'cases' ? casesView() : st.tab === 'leave' ? leaveView() : statsView()}`;
   renderStrip();
   if (keep && $(keep.id)) { const e = $(keep.id); e.focus(); try { e.setSelectionRange(keep.pos, keep.pos); } catch (x) {} }
 }
 document.addEventListener('input', e => {
-  if (e.target.id === 'q') onQ(e.target.value); else if (e.target.id === 'cm') st.complaint = e.target.value; else if (e.target.dataset.tr) st.drafts[e.target.dataset.tr] = e.target.value;
+  if (e.target.id === 'q') onQ(e.target.value); else if (e.target.id === 'cn') st.clrNote = e.target.value; else if (e.target.id === 'cm') st.complaint = e.target.value; else if (e.target.dataset.tr) st.drafts[e.target.dataset.tr] = e.target.value;
 });
 document.addEventListener('click', e => {
   const b = e.target.closest && e.target.closest('button'); if (!b) return; const d = b.dataset;
   if (d.tab) setTab(d.tab); else if (d.pick) pick(d.pick); else if (d.clear) { st.cur = null; hideNotes(true); render(); }
   else if (d.notes) showNotes(); else if (d.hide) hideNotes(); else if (d.sev) { st.severity = d.sev; render(); }
   else if (d.filter) { st.filter = d.filter; render(); } else if (d.movestrip) { st.strip = st.strip === 'top' ? 'bot' : 'top'; pref.set('strip', st.strip); render(); }
+  else if (d.clropen) { st.clrOpen = true; render(); } else if (d.clrcancel) { st.clrOpen = false; st.clrNote = ''; render(); } else if (d.clrsend) sendClr();
   else if (d.opencase) openCase(); else if (d.save) saveTreatment(d.save, false); else if (d.closecase) saveTreatment(d.closecase, true);
 });
 document.addEventListener('visibilitychange', () => { if (document.hidden && st.notes) hideNotes(); });
 
 $('langBtn').onclick = () => { st.lang = st.lang === 'ar' ? 'en' : 'ar'; pref.set('lang', st.lang); render(); };
 $('themeBtn').onclick = () => { st.theme = st.theme === 'light' ? 'dark' : 'light'; pref.set('theme', st.theme); render(); };
-render(); loadCases().then(render);
+render(); loadCases().then(render); loadClr().then(render); setInterval(() => { if (!document.hidden && !document.activeElement.id) loadClr().then(render); }, 30000);
 </script>
 </body></html>

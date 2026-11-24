@@ -741,7 +741,7 @@ const PERMISSIONS_SEED_ = [
   ['support', 'الدعم الفني (كلمات المرور وفك القفل)', 'خاصة'],
   ['print', 'طباعة الأساور والكشوف', 'خاصة'],
   ['undo', 'التراجع عن تسجيل صعود أي طالب في أي وقت (المشرف العام)', 'خاصة'],
-  ['custody', 'الأمانات (هواتف وحقائب) واستئذان الخروج', 'شاشة'],
+  ['custody', 'استئذان الخروج من المخيم: اعتماد خروج الطالب وتحويل طلبات الطبيب إلى الكشافة', 'شاشة'],
   ['gate', 'البوابة (الكشافة): تأكيد خروج من وافقت السكرتارية على خروجه', 'شاشة'],
   ['nutrition', 'التغذية (أعداد الوجبات والحساسية الغذائية)', 'شاشة'],
   ['reports', 'التقارير (استخراج وطباعة) — للسكرتارية', 'شاشة'],
@@ -802,6 +802,7 @@ function SETUP_createTabs() {
   ensureSheetWithHeaders_(ss, 'BusLive', ['Bus', 'Status', 'Lat', 'Lng', 'Accuracy', 'UpdatedAt', 'Supervisor', 'Boarded', 'Total', 'Speed'], log);
 
   ensureSheetWithHeaders_(ss, 'Custody', ['Time', 'StudentID', 'Item', 'Action', 'Count', 'Tag', 'By', 'ClientId', 'Notes'], log);
+  ensureSheetWithHeaders_(ss, 'MedClearances', ['Id', 'StudentID', 'Time', 'DoctorUser', 'Note', 'Status', 'HandledBy', 'HandledAt', 'ReturnReason', 'WithdrawalId', 'ClientId'], log);
   ensureSheetWithHeaders_(ss, 'Withdrawals', ['Id', 'StudentID', 'Time', 'GuardianName', 'Reason', 'Status', 'CreatedBy', 'ClosedAt', 'ClosedBy', 'ClientId'], log);
   ensureSheetWithHeaders_(ss, 'MedicalCases', ['Id', 'StudentID', 'OpenedAt', 'OpenedBy', 'Severity', 'Complaint', 'Treatment', 'Status', 'ClosedAt', 'ClosedBy', 'ClientId'], log);
   ensureSheetWithHeaders_(ss, 'Announcements', ['Id', 'CreatedAt', 'Title', 'Body', 'Kind', 'StartsAt', 'Audience', 'Pinned', 'Status', 'CreatedBy', 'PublishedAt', 'ClientId'], log);

@@ -149,6 +149,19 @@ function handleWithdrawReopen_(data) {
   });
 }
 
+// Approves an exit (the gate then sees it). Caller holds the script lock.
+function openWithdrawalLocked_(student, guardian, reason, user, clientId) {
+  const all = readWithdrawals_();
+  if (clientId) { const dup = all.filter(function(w) { return w.clientId === clientId; })[0]; if (dup) return { success: true, repeated: true, id: dup.id }; }
+  if (all.some(function(w) { return w.studentId === student.id && w.status === 'open'; })) return { success: false, code: 'ALREADY_OPEN', error: 'يوجد استئذان خروج مفتوح لهذا الطالب' };
+  const cur = scanStates_().states[student.id];
+  if (cur && cur.state === 'withdrawn') return { success: false, code: 'ALREADY_WITHDRAWN', error: 'خرج مسبقاً' };
+  const id = newId_('W');
+  appendSafe_(withdrawalsSheet_(), [id, student.id, new Date(), guardian, reason, 'open', user.Username, '', '', clientId]);
+  writeAudit_(user.Username, 'WITHDRAW_OPENED', student.id, id);
+  return { success: true, id: id };
+}
+
 function handleWithdrawStart_(data) {
   return withAuth_(data, requirePerm_('custody'), function(user) {
     const student = findStudent_(data.studentId);
@@ -161,14 +174,9 @@ function handleWithdrawStart_(data) {
     const lock = LockService.getScriptLock();
     lock.waitLock(10000);
     try {
-      const all = readWithdrawals_();
-      if (clientId) { const dup = all.filter(function(w) { return w.clientId === clientId; })[0]; if (dup) return { success: true, repeated: true, id: dup.id }; }
-      if (all.some(function(w) { return w.studentId === student.id && w.status === 'open'; })) return { success: false, code: 'ALREADY_OPEN', error: 'يوجد استئذان خروج مفتوح لهذا الطالب' };
-      if (scanStates_().states[student.id] && scanStates_().states[student.id].state === 'withdrawn') return { success: false, code: 'ALREADY_WITHDRAWN', error: 'خرج مسبقاً' };
-      const id = newId_('W');
-      appendSafe_(withdrawalsSheet_(), [id, student.id, new Date(), guardian, reason, 'open', user.Username, '', '', clientId]);
-      writeAudit_(user.Username, 'WITHDRAW_OPENED', student.id, id);
-      return { success: true, id: id, custody: custodyView_(student, custodyStates_().states, readWithdrawals_()) };
+      const o = openWithdrawalLocked_(student, guardian, reason, user, clientId);
+      if (!o.success) return o;
+      return { success: true, id: o.id, repeated: o.repeated, custody: custodyView_(student, custodyStates_().states, readWithdrawals_()) };
     } finally {
       lock.releaseLock();
     }
@@ -224,7 +232,7 @@ function handleGateList_(data) {
     const all = readWithdrawals_();
     const today = new Date().toISOString().slice(0, 10);
     const mk = function(w) { const s = byId[w.studentId]; return Object.assign(s ? gateStudent_(s) : { id: w.studentId, name: w.studentId, cls: '', team: '', bus: '', photo: '' },
-      { wid: w.id, guardian: w.guardian, approvedAt: w.time, approvedBy: w.by, exitedAt: w.closedAt, exitedBy: w.closedBy }); };
+      { wid: w.id, guardian: w.guardian, approvedAt: w.time, approvedBy: w.by, exitedAt: w.closedAt, exitedBy: w.closedBy, medical: w.reason === MED_REASON_ }); };
     return { success: true,
       waiting: all.filter(function(w) { return w.status === 'open'; }).sort(function(a, b) { return a.time < b.time ? -1 : 1; }).map(mk),
       exited: all.filter(function(w) { return w.status === 'closed' && String(w.closedAt).slice(0, 10) === today; }).sort(function(a, b) { return a.closedAt < b.closedAt ? 1 : -1; }).slice(0, 30).map(mk) };
@@ -291,5 +299,102 @@ function handleWithdrawList_(data) {
         status: w.status, closedAt: w.closedAt, by: w.by, outstanding: { phone: c.phone, bags: c.bags } };
     });
     return { success: true, withdrawals: list };
+  });
+}
+
+// ---------------- Medical "no objection" to leaving the camp (doctor -> secretariat -> gate) ----------------
+// The doctor only PROPOSES. The secretariat is the single decision point: it approves (which opens the exit, so the gate sees it,
+// tagged "medical") or returns it to the doctor with a reason. The gate never sees the doctor's note or any diagnosis.
+const MED_REASON_ = 'بتوصية طبية';
+function medClearSheet_() { return getSheetByName_('MedClearances'); }
+function readMedClear_() {
+  const v = medClearSheet_().getDataRange().getValues();
+  const h = v[0] || [], out = [];
+  const iso = function(t) { return t instanceof Date ? t.toISOString() : String(t || ''); };
+  for (let r = 1; r < v.length; r++) {
+    const g = function(n) { return v[r][h.indexOf(n)]; };
+    if (!g('Id')) continue;
+    out.push({ id: String(g('Id')), studentId: String(g('StudentID')), time: iso(g('Time')), doctor: String(g('DoctorUser')), note: String(g('Note')), status: String(g('Status')),
+      handledBy: String(g('HandledBy')), handledAt: iso(g('HandledAt')), returnReason: String(g('ReturnReason')), withdrawalId: String(g('WithdrawalId')), clientId: String(g('ClientId') || ''), _row: r + 1 });
+  }
+  return out;
+}
+function setMedClear_(rowNum, fields) {
+  const sheet = medClearSheet_(), h = sheet.getDataRange().getValues()[0];
+  Object.keys(fields).forEach(function(k) { const i = h.indexOf(k); if (i !== -1) sheet.getRange(rowNum, i + 1).setValue(fields[k]); });
+}
+function handleMedClearCreate_(data) {
+  return withAuth_(data, requirePerm_('medical'), function(user) {
+    const student = findStudent_(data.studentId);
+    if (!student) return { success: false, code: 'NOT_FOUND', error: 'الطالب غير موجود' };
+    const note = String(data.note || '').trim().slice(0, 200), clientId = String(data.clientId || '').slice(0, 60);
+    const lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    try {
+      const all = readMedClear_();
+      if (clientId) { const dup = all.filter(function(x) { return x.clientId === clientId; })[0]; if (dup) return { success: true, repeated: true, id: dup.id }; }
+      if (all.some(function(x) { return x.studentId === student.id && x.status === 'pending'; })) return { success: false, code: 'ALREADY_PENDING', error: 'يوجد طلب عدم ممانعة قائم لهذا الطالب' };
+      if (readWithdrawals_().some(function(w) { return w.studentId === student.id && w.status === 'open'; })) return { success: false, code: 'ALREADY_OPEN', error: 'يوجد استئذان خروج مفتوح لهذا الطالب' };
+      const cur = scanStates_().states[student.id];
+      if (cur && cur.state === 'withdrawn') return { success: false, code: 'ALREADY_WITHDRAWN', error: 'خرج مسبقاً' };
+      const id = newId_('M');
+      appendSafe_(medClearSheet_(), [id, student.id, new Date(), user.Username, note, 'pending', '', '', '', '', clientId]);
+      writeAudit_(user.Username, 'MED_CLEARANCE_PROPOSED', student.id, id);
+      return { success: true, id: id };
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+function handleMedClearList_(data) {
+  return withAuth_(data, requireAnyPerm_(['medical', 'custody', 'manage']), function() {
+    const byId = {}; readStudents_().students.forEach(function(s) { byId[s.id] = s; });
+    const rank = { pending: 0, approved: 1, returned: 2 };
+    const list = readMedClear_().sort(function(a, b) { return (rank[a.status] - rank[b.status]) || (a.time < b.time ? 1 : -1); }).slice(0, 60).map(function(x) {
+      const s = byId[x.studentId] || {};
+      return { id: x.id, studentId: x.studentId, name: s.name || x.studentId, team: s.team || '', bus: s.bus || '', time: x.time, doctor: repUserName_(x.doctor), note: x.note, status: x.status,
+        handledBy: x.handledBy ? repUserName_(x.handledBy) : '', handledAt: x.handledAt, returnReason: x.returnReason };
+    });
+    return { success: true, list: list, pending: list.filter(function(x) { return x.status === 'pending'; }).length };
+  });
+}
+function handleMedClearApprove_(data) {
+  return withAuth_(data, requirePerm_('custody'), function(user) {
+    const guardian = String(data.guardian || '').trim().slice(0, 60);
+    if (guardian.length < 2) return { success: false, error: 'اكتب اسم المستلِم' };
+    const lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    try {
+      const x = readMedClear_().filter(function(y) { return y.id === String(data.id); })[0];
+      if (!x) return { success: false, error: 'غير موجود' };
+      if (x.status !== 'pending') return { success: false, code: 'NOT_PENDING', error: 'الطلب ليس قائمًا' };
+      const student = findStudent_(x.studentId);
+      if (!student) return { success: false, code: 'NOT_FOUND', error: 'الطالب غير موجود' };
+      const o = openWithdrawalLocked_(student, guardian, MED_REASON_, user, '');
+      if (!o.success) return o;
+      setMedClear_(x._row, { Status: 'approved', HandledBy: user.Username, HandledAt: new Date(), WithdrawalId: o.id });
+      writeAudit_(user.Username, 'MED_CLEARANCE_APPROVED', student.id, x.id + '>' + o.id);
+      return { success: true, withdrawalId: o.id };
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+function handleMedClearReturn_(data) {
+  return withAuth_(data, requirePerm_('custody'), function(user) {
+    const reason = String(data.reason || '').trim().slice(0, 200);
+    if (reason.length < 3) return { success: false, error: 'اكتب سبب الإعادة للطبيب' };
+    const lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    try {
+      const x = readMedClear_().filter(function(y) { return y.id === String(data.id); })[0];
+      if (!x) return { success: false, error: 'غير موجود' };
+      if (x.status !== 'pending') return { success: false, code: 'NOT_PENDING', error: 'الطلب ليس قائمًا' };
+      setMedClear_(x._row, { Status: 'returned', HandledBy: user.Username, HandledAt: new Date(), ReturnReason: reason });
+      writeAudit_(user.Username, 'MED_CLEARANCE_RETURNED', x.studentId, x.id);
+      return { success: true };
+    } finally {
+      lock.releaseLock();
+    }
   });
 }

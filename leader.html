@@ -222,7 +222,7 @@ function printReport() {
   $('printArea').innerHTML = `<h1>${l.reportTitle}</h1><div>${esc(when)}</div>
    <h2>${l.byBus}</h2><table><tr><th></th><th>${l.present}</th><th>${l.remaining}</th></tr>${allBuses().map(b => `<tr><td>${TONE_DOT[busTone(b)]} ${l.bus(esc(b.bus))} · ${esc(b.started ? l.tone[busTone(b)] : l.notStarted)}</td><td>${b.boarded} / ${b.total}</td><td>${b.missing}</td></tr>`).join('')}<tr><th>Σ</th><th>${s.boarded} / ${s.total}</th><th>${s.total - s.boarded - s.withdrawn}</th></tr></table>
    ${x.byTeam ? `<h2>${l.byTeam}</h2><table>${x.byTeam.map(t => `<tr><td>${esc(t.team)}</td><td>${t.present} / ${t.total}</td></tr>`).join('')}</table>` : ''}
-   <h2>${l.committees}</h2><table><tr><td>${l.medOpen}</td><td>${c.medOpen || 0}</td></tr><tr><td>${l.phones}</td><td>${c.phones || 0}</td></tr><tr><td>${l.bags}</td><td>${c.bags || 0}</td></tr><tr><td>${l.withdrawOpen}</td><td>${c.withdrawOpen || 0}</td></tr><tr><td>${l.meals}</td><td>${c.meals || 0}</td></tr></table>`;
+   <h2>${l.committees}</h2><table><tr><td>${l.medOpen}</td><td>${c.medOpen || 0}</td></tr><tr><td>${l.withdrawOpen}</td><td>${c.withdrawOpen || 0}</td></tr><tr><td>${l.meals}</td><td>${c.meals || 0}</td></tr></table>`;
   window.print();
 }
 
@@ -261,8 +261,6 @@ function render() {
   const byTeam = teamsReal.map(t => `<div class="brow"><span>${esc(t.team)}</span><div class="bar team" style="margin:0"><i style="width:${t.total ? Math.round(t.present / t.total * 100) : 0}%"></i></div><span class="muted" style="text-align:end"><b style="color:var(--ink)">${t.present}</b> / ${t.total}</span></div>`).join('');
   const comm = st.extra ? `<section class="card"><h2 class="h2" style="margin-bottom:10px">${l.committees}</h2><div class="grid4">
     <div class="card com"><div class="kl">⚕️ ${l.medOpen}</div><div class="kv" style="color:var(--${com.medUrgent ? 'bad' : 'ink'})">${com.medOpen || 0}</div><div class="kl">${com.medUrgent ? l.medUrgent(com.medUrgent) : ''}</div></div>
-    <div class="card com"><div class="kl">📱 ${l.phones}</div><div class="kv">${com.phones || 0}</div></div>
-    <div class="card com"><div class="kl">🧳 ${l.bags}</div><div class="kv">${com.bags || 0}</div></div>
     <div class="card com"><div class="kl">🚪 ${l.withdrawOpen}</div><div class="kv" style="color:var(--${com.withdrawOpen ? 'warn' : 'ink'})">${com.withdrawOpen || 0}</div></div>
     <div class="card com"><div class="kl">🍽️ ${l.meals}</div><div class="kv">${com.meals || 0}</div><div class="kl">${l.mealsNote}</div></div></div></section>` : '';
   const wds = st.extra ? `<section class="card feed"><h2 class="h2" style="margin-bottom:6px">${l.withdrawals}</h2>${(ex.withdrawals || []).length ? ex.withdrawals.map(w => `<div><span>${esc(w.name)}${w.bus ? ' · ' + l.bus(esc(w.bus)) : ''} <span class="muted">· ${l.receiver}: ${esc(w.guardian)}</span></span><span style="display:flex;gap:6px;align-items:center"><span class="pill ${w.status === 'open' ? 'warn' : 'bad'}">${w.status === 'open' ? l.wdOpen : l.wdClosed}</span><span class="muted">${esc(new Date(w.time).toTimeString().slice(0, 5))}</span></span></div>`).join('') : `<div class="muted">${l.noWd}</div>`}</section>` : '';

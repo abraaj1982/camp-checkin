@@ -501,6 +501,33 @@ r=post({action:'gateCheck',token:tsc,q:'3001'});assert(r.results[0].exit==='exit
 r=post({action:'roster',token:tgen,bus:'1'});assert(r.students.find(x=>x.id==='3001').state==='withdrawn','the student is now WITHDRAWN in the lists');
 r=post({action:'gateList',token:tsc});assert(r.exited.some(x=>x.wid===gw&&x.exitedBy==='scout1'),'exit recorded with the scout name');
 assert(book.AuditLog.rows.some(x=>x[2]==='GATE_EXIT'&&x[1]==='scout1'),'audit: gate exit by the scout');
+// ---- doctor's "no objection" -> secretariat -> gate (the doctor never sends to the gate directly)
+{book.Bus.rows.push(['6','طالب طبي1','1','3003','أزرق','99990011','','','']);book.Bus.rows.push(['6','طالب طبي2','1','3004','أحمر','99990012','','','']);for(const k of Object.keys(cache))delete cache[k];
+ let q=post({action:'medClearCreate',token:ts,studentId:'3003',note:'x'});assert(!q.success,'custody (secretariat) cannot create a doctor clearance');
+ q=post({action:'medClearCreate',token:tsc,studentId:'3003',note:'x'});assert(!q.success,'the gate cannot create one');
+ q=post({action:'medClearCreate',token:td,studentId:'3003',note:'حالة تحتاج متابعة خارج المخيم',clientId:'mc1'});assert(q.success&&q.id,'the doctor proposes a no-objection');
+ const mid=q.id;
+ q=post({action:'medClearCreate',token:td,studentId:'3003',note:'x',clientId:'mc1'});assert(q.success&&q.repeated,'retry is idempotent');
+ q=post({action:'medClearCreate',token:td,studentId:'3003',note:'x',clientId:'mc2'});assert(!q.success&&q.code==='ALREADY_PENDING','one pending proposal per student');
+ q=post({action:'gateList',token:tsc});assert(!q.waiting.some(x=>x.id==='3003'),'NOT visible to the gate until the secretariat approves');
+ q=post({action:'medClearList',token:ts});assert(q.success&&q.pending>=1&&q.list[0].status==='pending'&&q.list[0].note.includes('متابعة'),'the secretariat sees it with the doctor\'s note');
+ q=post({action:'medClearList',token:tsc});assert(!q.success,'the gate cannot read the clearances');
+ q=post({action:'medClearApprove',token:td,id:mid,guardian:'والد 3003'});assert(!q.success,'the doctor cannot approve it himself');
+ q=post({action:'medClearApprove',token:ts,id:mid,guardian:''});assert(!q.success,'the receiver name is required');
+ q=post({action:'medClearApprove',token:ts,id:mid,guardian:'والد 3003'});assert(q.success&&q.withdrawalId,'the secretariat approves in one step');
+ q=post({action:'gateList',token:tsc});const gx=q.waiting.find(x=>x.id==='3003');assert(gx&&gx.medical===true&&gx.guardian==='والد 3003','now the gate sees him, tagged medical');
+ assert(!JSON.stringify(q).includes('متابعة')&&!JSON.stringify(q).includes('حالة تحتاج'),'the gate never sees the doctor\'s note');
+ q=post({action:'medClearApprove',token:ts,id:mid,guardian:'آخر'});assert(!q.success&&q.code==='NOT_PENDING','cannot approve twice');
+ q=post({action:'medClearList',token:td});assert(q.list.find(x=>x.id===mid).status==='approved','the doctor sees that it was approved');
+ q=post({action:'gateConfirm',token:tsc,id:gx.wid});assert(q.success,'the scout confirms the exit');
+ // returned to the doctor
+ q=post({action:'medClearCreate',token:td,studentId:'3004',note:'محتمل',clientId:'mc3'});const mid2=q.id;
+ q=post({action:'medClearReturn',token:ts,id:mid2,reason:''});assert(!q.success,'a reason is required to return it');
+ q=post({action:'medClearReturn',token:ts,id:mid2,reason:'نحتاج تقريرًا مكتوبًا'});assert(q.success,'returned to the doctor with a reason');
+ q=post({action:'medClearList',token:td});assert(q.list.find(x=>x.id===mid2).status==='returned'&&q.list.find(x=>x.id===mid2).returnReason.includes('تقرير'),'the doctor sees the reason');
+ q=post({action:'gateList',token:tsc});assert(!q.waiting.some(x=>x.id==='3004'),'a returned proposal never reaches the gate');
+ assert(book.AuditLog.rows.some(x=>x[2]==='MED_CLEARANCE_APPROVED')&&book.AuditLog.rows.some(x=>x[2]==='MED_CLEARANCE_RETURNED'),'audit: approved and returned are logged');
+ book.Bus.rows.splice(book.Bus.rows.length-2,2);for(const k of Object.keys(cache))delete cache[k];}
 // items not returned: the gate is blocked
 post({action:'withdrawStart',token:ts,studentId:'3002',guardian:'والد',reason:'سبب'});
 post({action:'custodyRecord',token:ts,studentId:'3002',item:'phone',op:'receive',tag:'G-1'});

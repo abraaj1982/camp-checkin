@@ -43,21 +43,21 @@ const safeUrl = u => (/^https?:\/\//i.test(String(u || '')) ? u : '');
 const AUTH_ERR = /EXPIRED|IDLE_TIMEOUT|REVOKED|BAD_SIGNATURE|MALFORMED|USER_NOT_FOUND|ACCOUNT_DISABLED|BAD_PAYLOAD/;
 const T = {
  ar: { dir: 'rtl', title: 'البوابة', sub: 'خروج الطلاب المأذون لهم من السكرتارية', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
-  tCheck: 'تحقق', newExit: n => '🔔 وصل إذن خروج جديد: ' + n, tWaiting: 'بانتظار الخروج', tDone: 'خرجوا اليوم', search: 'اسم الطالب أو رقمه', scan: '▣ مسح سوار الطالب', stopScan: 'إيقاف الكاميرا', none: 'لا نتائج', bus: n => 'باص ' + n, team: 'الفريق', cls: 'الصف',
+  tCheck: 'تحقق', newExit: n => '🔔 وصل إذن خروج جديد: ' + n, tWaiting: 'بانتظار الخروج', tDone: 'خرجوا اليوم', search: 'اسم الطالب أو رقمه', medTag: '🩺 بتوصية طبية', cWaiting: 'ينتظرون الخروج', cDone: 'خرجوا اليوم', how: 'تأكد من هوية المستلِم ثم اضغط «تأكيد خروج الطالب».', none: 'لا نتائج', bus: n => 'باص ' + n, team: 'الفريق', cls: 'الصف',
   goTitle: 'مأذون له بالخروج', goHow: 'تأكد أن المستلِم هو:', stopTitle: 'غير مأذون له. لا تُخرجه', stopHow: 'لا يوجد إذن خروج من السكرتارية. أرسله إلى السكرتارية.', doneTitle: 'خرج سابقاً', at: 'الساعة',
   confirm: '✔ تأكيد خروج الطالب', confirmAsk: 'تأكيد أن الطالب خرج من البوابة؟', problem: '⚠ مشكلة (لا يطابق / تردّد)', problemAsk: 'اكتب المشكلة باختصار (تصل للإدارة)', problemSent: 'أُرسلت المشكلة للإدارة',
   noWaiting: 'لا أحد بانتظار الخروج الآن.', noDone: 'لم يخرج أحد اليوم.', receiver: 'المستلِم', approved: 'اعتُمد', exited: 'خرج', by: 'بواسطة', refresh: '↻ تحديث', updated: 'آخر تحديث',
-  done: 'تم تسجيل الخروج ✓', error: 'تعذّر الاتصال. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.', noCam: 'تعذّر تشغيل الكاميرا. ابحث بالاسم أو الرقم.', camDenied: 'لم يُسمح بالكاميرا. اسمح بها من إعدادات المتصفح ثم أعد تحميل الصفحة.',
-  codes: { ITEMS_NOT_RETURNED: 'لم تُسلَّم أغراض الطالب (هاتف/حقائب). أرسله إلى السكرتارية ولا تُخرجه.', NOT_OPEN: 'لا يوجد إذن خروج مفتوح لهذا الطالب.' } },
+  done: 'تم تسجيل الخروج ✓', error: 'تعذّر الاتصال. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.',
+  codes: { NOT_OPEN: 'لا يوجد إذن خروج مفتوح لهذا الطالب.' } },
  en: { dir: 'ltr', title: 'Gate', sub: 'Exit of students approved by the secretariat', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
-  tCheck: 'Check', newExit: n => '🔔 New exit approval: ' + n, tWaiting: 'Waiting to leave', tDone: 'Left today', search: 'Student name or number', scan: '▣ Scan student wristband', stopScan: 'Stop camera', none: 'No results', bus: n => 'Bus ' + n, team: 'Team', cls: 'Class',
+  tCheck: 'Check', newExit: n => '🔔 New exit approval: ' + n, tWaiting: 'Waiting to leave', tDone: 'Left today', search: 'Student name or number', medTag: '🩺 medical recommendation', cWaiting: 'Waiting to leave', cDone: 'Left today', how: 'Check the receiver’s identity, then press “Confirm the student left”.', none: 'No results', bus: n => 'Bus ' + n, team: 'Team', cls: 'Class',
   goTitle: 'Allowed to leave', goHow: 'Make sure the person taking him is:', stopTitle: 'NOT allowed. Do not let him out', stopHow: 'No exit approval from the secretariat. Send him to the secretariat.', doneTitle: 'Already left', at: 'at',
   confirm: '✔ Confirm the student left', confirmAsk: 'Confirm the student has left through the gate?', problem: '⚠ Problem (does not match / doubt)', problemAsk: 'Describe the problem briefly (goes to the administration)', problemSent: 'Problem sent to the administration',
   noWaiting: 'Nobody is waiting to leave.', noDone: 'Nobody has left today.', receiver: 'Receiver', approved: 'Approved', exited: 'Left', by: 'by', refresh: '↻ Refresh', updated: 'Updated',
-  done: 'Exit recorded ✓', error: 'Connection problem. Try again.', sessionEnd: 'Session expired. Please log in again.', noCam: 'Could not start the camera. Search by name or number.', camDenied: 'Camera blocked. Allow it in the browser settings and reload.',
-  codes: { ITEMS_NOT_RETURNED: 'The student’s items (phone/bags) are not returned. Send him to the secretariat; do not let him out.', NOT_OPEN: 'There is no open exit approval for this student.' } }
+  done: 'Exit recorded ✓', error: 'Connection problem. Try again.', sessionEnd: 'Session expired. Please log in again.',
+  codes: { NOT_OPEN: 'There is no open exit approval for this student.' } }
 };
-const st = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), tab: 'check', q: '', results: [], waiting: [], exited: [], msg: null, cam: false, at: '' };
+const st = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), tab: 'waiting', q: '', results: [], waiting: [], exited: [], msg: null, at: '' };
 const L = () => T[st.lang];
 async function api(action, extra) {
   const r = await (await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(Object.assign({ action: action, token: token }, extra || {})) })).json();
@@ -100,25 +100,10 @@ async function problem(sid) {
   render();
 }
 
-/* ---------- camera (the library is downloaded only when the camera is first used) ---------- */
-let scanner = null, h5Promise = null;
-function loadScanner() {
-  if (typeof Html5Qrcode !== 'undefined') return Promise.resolve();
-  if (!h5Promise) h5Promise = new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.4/html5-qrcode.min.js'; s.onload = res; s.onerror = () => { h5Promise = null; rej(new Error('library')); }; document.head.appendChild(s); });
-  return h5Promise;
-}
-async function startCam() {
-  st.cam = true; st.msg = null; render();
-  try { await loadScanner(); } catch (e) { st.cam = false; say('warn', L().noCam); return render(); }
-  try { scanner = new Html5Qrcode('reader'); await scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 220, height: 220 } }, text => { stopCam(); identify(text); }, () => {}); }
-  catch (e) { const m = String(e && (e.message || e)); scanner = null; st.cam = false; say('warn', /NotAllowed|Permission|denied/i.test(m) ? L().camDenied : L().noCam + ' (' + m.slice(0, 80) + ')'); render(); }
-}
-async function stopCam() { try { if (scanner) { await scanner.stop(); scanner.clear(); } } catch (e) {} scanner = null; st.cam = false; render(); }
-
 /* ---------- views ---------- */
 function stuCard(s, extra) {
   const l = L();
-  return `<div class="stu"><div class="photo">${safeUrl(s.photo) ? `<img src="${esc(safeUrl(s.photo))}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}</div>
+  return `<div class="stu">${safeUrl(s.photo) ? `<div class="photo"><img src="${esc(safeUrl(s.photo))}" alt="" referrerpolicy="no-referrer" onerror="this.parentNode.remove()"></div>` : ''}
     <div style="flex:1;min-width:0"><div class="big2">${esc(s.name)}</div><div class="muted" style="font-size:13px">${esc(s.id)}</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${s.team ? `<span class="pill">${esc(s.team)}</span>` : ''}${s.cls ? `<span class="pill">${l.cls} ${esc(s.cls)}</span>` : ''}${s.bus ? `<span class="pill">${l.bus(esc(s.bus))}</span>` : ''}</div>${extra || ''}</div></div>`;
 }
@@ -142,13 +127,17 @@ function renderResults() { const e = $('qres'); if (e) e.innerHTML = resultsHtml
 function checkView() {
   const l = L();
   return `<section class="card"><label class="lbl" for="q">${l.search}</label><input id="q" type="search" value="${esc(st.q)}" autocomplete="off">
-    <button class="btn alt full" style="margin-top:8px" data-cam="1">${st.cam ? l.stopScan : l.scan}</button>${st.cam ? '<div id="reader" style="width:100%;margin-top:8px"></div>' : ''}</section>
+</section>
     <div id="qres" style="display:flex;flex-direction:column;gap:12px">${resultsHtml()}</div>`;
+}
+function counters() {
+  const l = L(), c = (n, v) => `<div style="flex:1;text-align:center"><div style="font-size:24px;font-weight:700">${v}</div><div class="muted" style="font-size:12.5px">${n}</div></div>`;
+  return `<section class="card" style="display:flex;gap:6px">${c(l.cWaiting, st.waiting.length)}${c(l.cDone, st.exited.length)}</section>`;
 }
 function waitingView() {
   const l = L();
-  if (!st.waiting.length) return `<div class="card muted">${l.noWaiting}</div>`;
-  return st.waiting.map(s => `<section class="card">${stuCard(s, `<div style="margin-top:6px;font-size:13.5px">${l.receiver}: <b>${esc(s.guardian)}</b> <span class="muted">· ${l.approved} ${esc(hhmm(s.approvedAt))}</span></div>`)}<button class="btn go full" style="margin-top:12px" data-confirm="${esc(s.wid)}">${l.confirm}</button></section>`).join('');
+  if (!st.waiting.length) return `${counters()}<div class="card muted">${l.noWaiting}</div>`;
+  return counters() + `<div class="banner warn" style="margin-top:0">${l.how}</div>` + st.waiting.map(s => `<section class="card">${stuCard(s, `${s.medical ? `<div style="margin-top:6px"><span class="pill warn">${l.medTag}</span></div>` : ''}<div style="margin-top:8px;font-size:13px" class="muted">${l.receiver}</div><div class="big2" style="margin-top:2px">${esc(s.guardian)}</div><div class="muted" style="font-size:12.5px;margin-top:2px">${l.approved} ${esc(hhmm(s.approvedAt))}</div>`)}<button class="btn go full" style="margin-top:12px" data-confirm="${esc(s.wid)}">${l.confirm}</button></section>`).join('');
 }
 function doneView() {
   const l = L();
@@ -158,21 +147,18 @@ function doneView() {
 function render() {
   const l = L(); document.documentElement.lang = st.lang; document.documentElement.dir = l.dir; document.documentElement.dataset.theme = st.theme; document.title = l.title + ' — MUKHAYYAM';
   $('hT').textContent = l.title; $('hS').textContent = l.sub; $('homeBtn').textContent = l.home; $('langBtn').textContent = l.lang; $('themeBtn').textContent = st.theme === 'light' ? l.dark : l.light;
-  const keepReader = st.cam ? $('reader') : null; if (keepReader) keepReader.remove();
   const ae = document.activeElement, keep = ae && ae.id === 'q' ? ae.selectionStart : null;
-  const tabs = [['check', l.tCheck], ['waiting', l.tWaiting + ' (' + st.waiting.length + ')' + (newCount ? ' 🔔' : '')], ['done', l.tDone + ' (' + st.exited.length + ')']];
+  const tabs = [['waiting', l.tWaiting + ' (' + st.waiting.length + ')' + (newCount ? ' 🔔' : '')], ['done', l.tDone + ' (' + st.exited.length + ')'], ['check', l.tCheck]];
   $('app').innerHTML = `${st.msg ? `<div class="banner ${st.msg.cls}" role="alert">${esc(st.msg.t)}</div>` : ''}
     <div class="tabs">${tabs.map(t => `<button class="${st.tab === t[0] ? 'on' : ''}" data-tab="${t[0]}">${t[1]}</button>`).join('')}</div>
     ${st.tab === 'check' ? checkView() : st.tab === 'waiting' ? waitingView() : doneView()}
     <div class="muted" style="text-align:center;font-size:12.5px"><button class="chip" data-refresh="1">${l.refresh}</button> ${st.at ? l.updated + ' ' + esc(st.at) : ''}</div>`;
-  if (keepReader) { const ph = $('reader'); if (ph) ph.replaceWith(keepReader); }
   if (keep !== null && $('q')) { const q = $('q'); q.focus(); try { q.setSelectionRange(keep, keep); } catch (e) {} }
 }
 document.addEventListener('input', e => { if (e.target.id === 'q') onQ(e.target.value); });
 document.addEventListener('click', e => {
   const b = e.target.closest && e.target.closest('button'); if (!b) return; const d = b.dataset;
-  if (d.tab) { st.tab = d.tab; st.msg = null; if (d.tab === 'waiting') newCount = 0; if (st.cam) stopCam(); else render(); }
-  else if (d.cam) { st.cam ? stopCam() : startCam(); }
+  if (d.tab) { st.tab = d.tab; st.msg = null; if (d.tab === 'waiting') newCount = 0; render(); }
   else if (d.confirm) confirmExit(d.confirm);
   else if (d.problem) problem(d.problem);
   else if (d.refresh) load();
@@ -181,7 +167,7 @@ document.addEventListener('click', e => {
 $('langBtn').onclick = () => { st.lang = st.lang === 'ar' ? 'en' : 'ar'; pref.set('lang', st.lang); render(); };
 $('themeBtn').onclick = () => { st.theme = st.theme === 'light' ? 'dark' : 'light'; pref.set('theme', st.theme); render(); };
 document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
-setInterval(() => { if (!document.hidden && navigator.onLine && !st.cam) load(); }, 10000);
+setInterval(() => { if (!document.hidden && navigator.onLine) load(); }, 10000);
 render(); load();
 </script>
 </body></html>
