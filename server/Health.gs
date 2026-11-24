@@ -17,7 +17,7 @@ function readMedCases_() {
     const g = function(n) { return v[r][h.indexOf(n)]; };
     if (!g('Id')) continue;
     out.push({ id: String(g('Id')), studentId: String(g('StudentID')), openedAt: iso(g('OpenedAt')), openedBy: String(g('OpenedBy')), severity: String(g('Severity')),
-      complaint: String(g('Complaint')), treatment: String(g('Treatment')), status: String(g('Status')), closedAt: iso(g('ClosedAt')), closedBy: String(g('ClosedBy')), clientId: String(g('ClientId') || ''), _row: r + 1 });
+      complaint: String(g('Complaint')), treatment: String(g('Treatment')), medication: String(g('Medication') || ''), followUp: String(g('FollowUp') || ''), status: String(g('Status')), closedAt: iso(g('ClosedAt')), closedBy: String(g('ClosedBy')), clientId: String(g('ClientId') || ''), _row: r + 1 });
   }
   return out;
 }
@@ -73,6 +73,18 @@ function handleMedOpen_(data) {
   });
 }
 
+// The doctor's three written parts: diagnosis (the Treatment column), the medication given with its dose, and the recommendations / follow-up.
+// The last two live in columns added by SETUP_createTabs; without them nothing is written silently, the doctor is told.
+function medSetFields_(sheet, h, row, data) {
+  const map = [['treatment', 'Treatment'], ['medication', 'Medication'], ['followUp', 'FollowUp']];
+  for (let i = 0; i < map.length; i++) {
+    const v = data[map[i][0]]; if (v === undefined) continue;
+    const col = h.indexOf(map[i][1]); const txt = String(v).trim().slice(0, 2000);
+    if (col === -1) { if (txt) return { success: false, code: 'NEEDS_SETUP', error: 'يلزم تشغيل SETUP_createTabs مرة واحدة لإضافة أعمدة الدواء والتوصيات' }; continue; }
+    sheet.getRange(row, col + 1).setValue(cellSafe_(txt));
+  }
+  return null;
+}
 function handleMedUpdate_(data) {
   return withAuth_(data, requirePerm_('medical'), function(user) {
     const lock = LockService.getScriptLock();
@@ -82,7 +94,7 @@ function handleMedUpdate_(data) {
       if (!c) return { success: false, error: 'غير موجود' };
       if (c.status !== 'open') return { success: false, code: 'NOT_OPEN', error: 'الملف مغلق' };
       const sheet = medSheet_(), h = sheet.getDataRange().getValues()[0];
-      if (data.treatment !== undefined) sheet.getRange(c._row, h.indexOf('Treatment') + 1).setValue(cellSafe_(String(data.treatment).trim().slice(0, 2000)));
+      const missing = medSetFields_(sheet, h, c._row, data); if (missing) return missing;
       if (data.severity !== undefined && MED_SEVERITY_.indexOf(String(data.severity)) !== -1) sheet.getRange(c._row, h.indexOf('Severity') + 1).setValue(String(data.severity));
       writeAudit_(user.Username, 'MED_UPDATED', c.studentId, c.id);
       return { success: true };
@@ -101,9 +113,9 @@ function handleMedClose_(data) {
       if (!c) return { success: false, error: 'غير موجود' };
       if (c.status !== 'open') return { success: false, code: 'NOT_OPEN', error: 'الملف مغلق' };
       const treatment = String(data.treatment !== undefined ? data.treatment : c.treatment).trim().slice(0, 2000);
-      if (treatment.length < 2) return { success: false, code: 'TREATMENT_REQUIRED', error: 'اكتب العلاج أو الإجراء قبل الإغلاق' };
+      if (treatment.length < 2) return { success: false, code: 'TREATMENT_REQUIRED', error: 'اكتب التشخيص قبل الإغلاق' };
       const sheet = medSheet_(), h = sheet.getDataRange().getValues()[0];
-      sheet.getRange(c._row, h.indexOf('Treatment') + 1).setValue(cellSafe_(treatment));
+      const missing = medSetFields_(sheet, h, c._row, { treatment: treatment, medication: data.medication, followUp: data.followUp }); if (missing) return missing;
       sheet.getRange(c._row, h.indexOf('Status') + 1).setValue('closed');
       sheet.getRange(c._row, h.indexOf('ClosedAt') + 1).setValue(new Date());
       sheet.getRange(c._row, h.indexOf('ClosedBy') + 1).setValue(user.Username);
@@ -121,10 +133,10 @@ function handleMedList_(data) {
     const byId = {};
     readStudents_().students.forEach(function(s) { byId[s.id] = s; });
     const rank = { open: 0, closed: 1 };
-    const list = readMedCases_().sort(function(a, b) { return (rank[a.status] - rank[b.status]) || (a.openedAt < b.openedAt ? 1 : -1); }).slice(0, 100).map(function(c) {
+    const list = readMedCases_().sort(function(a, b) { return (rank[a.status] - rank[b.status]) || (a.openedAt < b.openedAt ? 1 : -1); }).slice(0, 600).map(function(c) {
       const s = byId[c.studentId] || {};
       return { id: c.id, studentId: c.studentId, name: s.name || '', team: s.team || '', bus: s.bus || '', openedAt: c.openedAt, severity: c.severity, complaint: c.complaint,
-        treatment: c.treatment, status: c.status, closedAt: c.closedAt, openedBy: c.openedBy, closedBy: c.closedBy, cls: s.cls || '', age: s.age || '', doctor: repUserName_(c.openedBy), closedByName: c.closedBy ? repUserName_(c.closedBy) : '' };
+        treatment: c.treatment, medication: c.medication, followUp: c.followUp, status: c.status, closedAt: c.closedAt, openedBy: c.openedBy, closedBy: c.closedBy, cls: s.cls || '', age: s.age || '', doctor: repUserName_(c.openedBy), closedByName: c.closedBy ? repUserName_(c.closedBy) : '' };
     });
     try { const ck = 'medlist_' + user.Username, cc = CacheService.getScriptCache(); if (!cc.get(ck)) { writeAudit_(user.Username, 'MED_LIST', '', 'n=' + list.length); cc.put(ck, '1', 600); } } catch (e) { /* the audit is best effort here */ }
     return { success: true, cases: list };

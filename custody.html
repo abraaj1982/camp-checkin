@@ -172,7 +172,7 @@ function render() {
   const l = L(); document.documentElement.lang = st.lang; document.documentElement.dir = l.dir; document.documentElement.dataset.theme = st.theme; document.title = l.title + ' — MUKHAYYAM';
   $('hT').textContent = l.title; $('hS').textContent = l.sub; $('homeBtn').textContent = l.home; $('langBtn').textContent = l.lang; $('themeBtn').textContent = st.theme === 'light' ? l.dark : l.light;
   const ae = document.activeElement, keep = ae && ae.id ? { id: ae.id, pos: ae.selectionStart } : null;
-  $('app').innerHTML = `${st.docPending ? `<div class="banner bad" role="alert" style="font-weight:700">${esc(l.docAlert(st.docPending))}</div>` : ''}<div class="banner warn">${esc(l.notice)}</div>${st.msg ? `<div class="banner ${st.msg.cls}" role="alert">${esc(st.msg.t)}</div>` : ''}
+  $('app').innerHTML = `${st.docPending ? `<div class="banner bad" role="alert" style="font-weight:700">${esc(l.docAlert(st.docPending))}</div>` : ''}${st.msg ? `<div class="banner ${st.msg.cls}" role="alert">${esc(st.msg.t)}</div>` : ''}
    <div class="tabs">${[['new', l.tNew(st.docPending)], ['list', l.tList], ['doc', l.tDoc], ['summary', l.tSummary]].map(t => `<button class="${st.tab === t[0] ? 'on' : ''}" data-tab="${t[0]}">${t[1]}</button>`).join('')}</div>
    ${st.tab === 'new' ? newView() : st.tab === 'doc' ? docView() : st.tab === 'list' ? listView() : summaryView()}`;
   if (keep && $(keep.id) && ['INPUT', 'TEXTAREA'].indexOf($(keep.id).tagName) !== -1) { const e = $(keep.id); e.focus(); try { e.setSelectionRange(keep.pos, keep.pos); } catch (x) {} }
