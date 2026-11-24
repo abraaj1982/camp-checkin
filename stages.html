@@ -46,7 +46,7 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const AUTH_ERR = /EXPIRED|IDLE_TIMEOUT|REVOKED|BAD_SIGNATURE|MALFORMED|USER_NOT_FOUND|ACCOUNT_DISABLED|BAD_PAYLOAD/;
 const T = {
- ar: { dir: 'rtl', title: 'المراحل', sub: 'متابعة مراحل الوصول والرحلة والمغادرة (تبدأ وتنتهي تلقائياً بالتاريخ والوقت)', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
+ ar: { dir: 'rtl', title: 'جدول الوصول والمغادرة', sub: 'متابعة مراحل الوصول والرحلة والمغادرة (تبدأ وتنتهي تلقائياً بالتاريخ والوقت)', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
   live: 'جارية الآن', idle: 'لا توجد مرحلة جارية الآن', idleSub: 'المشرفون لا يستطيعون المسح الآن', until: t => 'حتى ' + t,
   in: 'دخول', out: 'خروج', done: d => d === 'out' ? 'خرجوا' : 'وصلوا', left: 'لم يُمسحوا', withdrawn: 'استأذنوا', perBus: 'حسب الباص', bus: n => 'باص ' + n,
   remaining: 'لم يُمسحوا بعد', allDone: 'الجميع مُسجَّل ✓', anyBus: 'في هذه المرحلة يركب الطالب أي باص من باصات الرحلة، ويُسجَّل الباص الذي ركبه.',
@@ -54,7 +54,7 @@ const T = {
   note: 'لتعديل وقت مرحلة (إذا تأخر باص مثلاً): غيّر خانتي From / To في تبويب Stages من ملف المنصة، ويسري خلال دقيقة.',
   off: 'المراحل غير مفعّلة بعد. يفعّلها المسؤول التقني مرة واحدة.', updated: t => 'آخر تحديث ' + t, refresh: 'تحديث',
   error: 'تعذّر الاتصال. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.' },
- en: { dir: 'ltr', title: 'Stages', sub: 'Follow the arrival, trip and departure stages (they open and close by date and time)', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
+ en: { dir: 'ltr', title: 'Arrival and departure schedule', sub: 'Follow the arrival, trip and departure stages (they open and close by date and time)', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
   live: 'Open now', idle: 'No stage is open now', idleSub: 'Supervisors cannot scan now', until: t => 'until ' + t,
   in: 'In', out: 'Out', done: d => d === 'out' ? 'Left' : 'Arrived', left: 'Not scanned', withdrawn: 'Withdrawn', perBus: 'Per bus', bus: n => 'Bus ' + n,
   remaining: 'Not scanned yet', allDone: 'Everyone recorded ✓', anyBus: 'In this stage a student may take any trip bus; the bus he took is recorded.',
