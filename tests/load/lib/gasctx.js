@@ -16,6 +16,8 @@ const Utilities = {
 function makeCtx(svc) {
   const ctx = Object.assign({ console, Logger: { log: () => {} }, Date, Utilities,
     ContentService: { createTextOutput: t => ({ t, setMimeType() { return this; } }), MimeType: { JSON: 1 } },
+    UrlFetchApp: { fetch: () => { const days = []; for (let i = 0; i < 16; i++) days.push(new Date(Date.now() + i * 86400000).toISOString().slice(0, 10)); // a fixed fake forecast: nothing here reaches the internet
+      return { getResponseCode: () => 200, getContentText: () => JSON.stringify({ daily: { time: days, weather_code: days.map((d, i) => (i === 2 ? 61 : i % 3)), temperature_2m_max: days.map(() => 27.4), temperature_2m_min: days.map(() => 15.6), precipitation_probability_max: days.map((d, i) => (i === 2 ? 60 : 8)), precipitation_sum: days.map((d, i) => (i === 2 ? 6 : 0)), wind_speed_10m_max: days.map(() => 16) } }) }; } },
     ScriptApp: { getProjectTriggers: () => [], newTrigger: () => ({ timeBased: () => ({ everyMinutes: () => ({ create() {} }) }) }) } }, svc);
   vm.createContext(ctx); SCRIPT.runInContext(ctx); return ctx;
 }

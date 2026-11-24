@@ -47,6 +47,7 @@ const ACTIONS_ = {
   busLive: function(d) { return handleBusLive_(d); },
   leaderSummary: function(d) { return handleLeaderSummary_(d); },
   leaderAll: function(d) { return handleLeaderAll_(d); },
+  weather: function(d) { return handleWeather_(d); },
   setCampLocation: function(d) { return handleSetCampLocation_(d); },
   printList: function(d) { return handlePrintList_(d); },
   createCase: function(d) { return handleCreateCase_(d); },
@@ -115,7 +116,7 @@ function doPost(e) {
     const fn = Object.prototype.hasOwnProperty.call(ACTIONS_, data.action) ? ACTIONS_[data.action] : null;
     if (!fn) return json_({ success: false, error: 'Invalid action' });
     const out = fn(data);
-    if (data.action !== 'leaderSummary' && data.action !== 'leaderAll') { try { CacheService.getScriptCache().removeAll(['leader_v1', 'leader_x1']); } catch (e) { /* ignore */ } }
+    if (data.action !== 'leaderSummary' && data.action !== 'leaderAll' && data.action !== 'weather') { try { CacheService.getScriptCache().removeAll(['leader_v1', 'leader_x1']); } catch (e) { /* ignore */ } }
     return json_(out);
   } catch (error) {
     Logger.log('doPost error: ' + error + '\n' + (error && error.stack));
@@ -767,6 +768,11 @@ function leaderExtra_() {
   try { const med = readMedCases_(); committees.medOpen = med.filter(function(m) { return m.status === 'open'; }).length; committees.medUrgent = med.filter(function(m) { return m.status === 'open' && m.severity === 'urgent'; }).length; committees.medToday = med.filter(function(m) { return String(m.openedAt).slice(0, 10) === new Date().toISOString().slice(0, 10); }).length; } catch (e) { /* tab missing */ }
   try { const cs = custodyStates_().states; let ph = 0, bg = 0; Object.keys(cs).forEach(function(k) { if (cs[k].phone) ph++; bg += cs[k].bags; }); committees.phones = ph; committees.bags = bg; } catch (e) { /* tab missing */ }
   try { committees.withdrawOpen = readWithdrawals_().filter(function(w) { return w.status === 'open'; }).length; } catch (e) { /* tab missing */ }
+  // Numbers only for the leader's charts: clinic visits per day (Muscat date, no names, no details) and the progress of each stage.
+  let medByDay = [];
+  try { const m = {}; readMedCases_().forEach(function(c) { const d = new Date(c.openedAt); if (isNaN(d)) return; const k = new Date(d.getTime() + 4 * 3600000).toISOString().slice(0, 10); m[k] = (m[k] || 0) + 1; }); medByDay = Object.keys(m).sort().map(function(k) { return { day: k, count: m[k] }; }); } catch (e) { /* tab missing */ }
+  let stageBars = [];
+  try { const stg = readStages_(); if (stg) stageBars = stg.map(function(x) { const b = stageBrief_(x), s2 = stageStats_(x, students, sc, false); return { id: b.id, name: b.name, status: b.status, expected: s2.expected, done: s2.done }; }); } catch (e) { /* no stages */ }
   let present = 0; Object.keys(sc.states).forEach(function(k) { if (sc.states[k].state === 'boarded') present++; });
   committees.meals = present + users.length;
   let nextEvent = null;
@@ -790,8 +796,41 @@ function leaderExtra_() {
     feed.push({ time: t instanceof Date ? t.toISOString() : String(t), action: String(sv[r][sh.indexOf('Action')]), bus: String(sv[r][sh.indexOf('Bus')]), name: byId[id] ? byId[id].name : id, by: String(sv[r][sh.indexOf('Supervisor')]), via: sh.indexOf('Method') !== -1 && String(sv[r][sh.indexOf('Method')]) === 'guardian' ? 'guardian' : '' });
   }
   let rounds = {}; try { rounds = latestRounds_(); } catch (e) { /* tab missing */ }
-  return { rounds: rounds, missingByBus: missingByBus, supervisors: supervisors, byTeam: Object.keys(byTeam).sort().map(function(k) { return byTeam[k]; }), committees: committees, nextEvent: nextEvent, feed: feed, present: present, withdrawals: withdrawals };
+  return { rounds: rounds, medByDay: medByDay, stageBars: stageBars, missingByBus: missingByBus, supervisors: supervisors, byTeam: Object.keys(byTeam).sort().map(function(k) { return byTeam[k]; }), committees: committees, nextEvent: nextEvent, feed: feed, present: present, withdrawals: withdrawals };
 }
+
+// ---------------- Weather (the leader's card) ----------------
+// Daily forecast from the free Open-Meteo service for the camp location (Barka unless the camp point was set). Cached 3 h; if the service is down
+// the last good copy is served (marked old); the card never blocks the screen. The OFFICIAL Oman Met bulletin is a link on the card.
+const WEATHER_TTL_ = 10800;
+function fetchWeather_() {
+  const c = campLocation_(), lat = c ? c.lat : 23.68, lng = c ? c.lng : 57.89;
+  const res = UrlFetchApp.fetch('https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lng + '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,wind_speed_10m_max&timezone=Asia%2FMuscat&forecast_days=16', { muteHttpExceptions: true });
+  if (res.getResponseCode() !== 200) throw new Error('weather ' + res.getResponseCode());
+  const d = JSON.parse(res.getContentText()).daily;
+  if (!d || !d.time) throw new Error('weather: unexpected answer');
+  const n = function(v) { return v === null || v === undefined ? 0 : Math.round(Number(v) * 10) / 10; };
+  return { at: new Date().toISOString(), days: d.time.map(function(day, i) { return { date: day, code: d.weather_code[i], tmax: Math.round(n(d.temperature_2m_max[i])), tmin: Math.round(n(d.temperature_2m_min[i])), rain: Math.round(n(d.precipitation_probability_max[i])), mm: n(d.precipitation_sum[i]), wind: Math.round(n(d.wind_speed_10m_max[i])) }; }) };
+}
+function weatherCached_() {
+  const cache = CacheService.getScriptCache();
+  try { const hit = cache.get('weather_v1'); if (hit) return JSON.parse(hit); } catch (e) { /* refetch */ }
+  const props = PropertiesService.getScriptProperties();
+  try {
+    const w = fetchWeather_(); const txt = JSON.stringify(w);
+    try { cache.put('weather_v1', txt, WEATHER_TTL_); } catch (e) { /* ignore */ }
+    try { props.setProperty('WeatherLast', txt); } catch (e) { /* ignore */ }
+    return w;
+  } catch (err) {
+    try { const old = JSON.parse(props.getProperty('WeatherLast') || 'null'); if (old) { old.old = true; try { cache.put('weather_v1', JSON.stringify(old), 600); } catch (e) { /* ignore */ } return old; } } catch (e) { /* none */ }
+    return null;
+  }
+}
+function handleWeather_(data) {
+  return withAuth_(data, requireAnyPerm_(['dashboard', 'stats']), function() { const w = weatherCached_(); return { success: true, weather: w }; });
+}
+// Run ONCE from the editor: it asks Google to allow the script to contact the weather service (needed once), and shows the answer in the log.
+function ADMIN_testWeather() { const w = fetchWeather_(); Logger.log('الطقس يعمل: ' + w.days.length + ' يومًا. أول يوم: ' + JSON.stringify(w.days[0])); }
 
 // ONE round trip for the whole leader screen (summary + buses + cases): authorises once instead of three times.
 function handleLeaderAll_(data) {

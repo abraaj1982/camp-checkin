@@ -7,12 +7,14 @@ function cellIn(v){if(typeof v!=='string')return v;if(v[0]==="'")return v.slice(
 function mkSheet(rows){return{rows,getDataRange:()=>({getValues:()=>rows.map(r=>r.slice())}),getLastRow:()=>rows.length,getLastColumn:()=>Math.max(...rows.map(r=>r.length),1),appendRow:(r)=>rows.push(r.map(cellIn)),
  getRange:(r,c,nr=1,nc=1)=>({setValue:(v)=>{rows[r-1]=rows[r-1]||[];rows[r-1][c-1]=cellIn(v);},setValues:(vs)=>vs.forEach((row,i)=>{rows[r-1+i]=rows[r-1+i]||[];row.forEach((v,j)=>rows[r-1+i][c-1+j]=cellIn(v));}),getValues:()=>{const o=[];for(let i=0;i<nr;i++){const row=[];for(let j=0;j<nc;j++)row.push((rows[r-1+i]||[])[c-1+j]??'');o.push(row);}return o;}})};}
 const ss={getSheetByName:n=>book[n]||null,insertSheet:n=>(book[n]=mkSheet([[]]))};
+let fetchFail=false;const fetchLog=[];
 const props={},cache={};
 const ctx={console,Logger:{log:()=>{}},Date,
  SpreadsheetApp:{openById:()=>ss},
  CacheService:{getScriptCache:()=>({get:k=>cache[k]||null,put:(k,v)=>{cache[k]=v},remove:k=>{delete cache[k]},removeAll:ks=>ks.forEach(k=>{delete cache[k]})})},
  PropertiesService:{getScriptProperties:()=>({getProperty:k=>props[k]||null,setProperty:(k,v)=>props[k]=v})},
  LockService:{getScriptLock:()=>({waitLock(){},releaseLock(){}})},
+ UrlFetchApp:{fetch:(u)=>{fetchLog.push(u);if(fetchFail)return{getResponseCode:()=>500,getContentText:()=>''};const days=[];for(let i=0;i<16;i++){days.push(new Date(Date.UTC(2026,11,25+i)).toISOString().slice(0,10));}return{getResponseCode:()=>200,getContentText:()=>JSON.stringify({daily:{time:days,weather_code:days.map(()=>2),temperature_2m_max:days.map(()=>27.4),temperature_2m_min:days.map(()=>15.6),precipitation_probability_max:days.map((d,i)=>i===7?60:5),precipitation_sum:days.map(()=>0),wind_speed_10m_max:days.map(()=>14.2)}})};}},
  ContentService:{createTextOutput:t=>({t,setMimeType(){return this;}}),MimeType:{JSON:1}},
  Utilities:{computeHmacSha256Signature:(a,b)=>[...crypto.createHmac('sha256',Buffer.from(typeof b==='string'?b:b.map(x=>x&255))).update(typeof a==='string'?Buffer.from(a):Buffer.from(a.map(x=>x&255))).digest()].map(x=>x>127?x-256:x),
   newBlob:s=>({getBytes:()=>[...Buffer.from(s)].map(x=>x>127?x-256:x),getDataAsString:()=>Array.isArray(s)?Buffer.from(s.map(x=>x&255)).toString():s}),
@@ -510,6 +512,14 @@ assert(book.AuditLog.rows.some(x=>x[2]==='GATE_EXIT'&&x[1]==='scout1'),'audit: g
  assert(ag('2012-12-30')==='14'&&ag('2012-12-31')==='13','the birthday itself counts; the day before it does not');
  assert(ag('2026-12-31')===''&&ag('')===''&&ag('xx')===''&&ag('1980-01-01')==='','future, empty, unreadable and unlikely dates give nothing');
  assert(run('ageFromDob_')(new Date(2012,4,17),N)==='14','a real date cell works too');}
+// ---- weather card: fetched once, cached, never blocks; the last good copy is kept if the service fails
+{fetchLog.length=0;delete cache.weather_v1;let w=post({action:'weather',token:T});assert(w.success&&w.weather.days.length===16&&w.weather.days[0].tmax===27&&w.weather.days[7].rain===60,'weather: 16 days with rounded numbers');
+ w=post({action:'weather',token:T});assert(fetchLog.length===1,'weather: the second call comes from the cache (one fetch only)');
+ delete cache.weather_v1;fetchFail=true;w=post({action:'weather',token:T});assert(w.success&&w.weather&&w.weather.old===true,'weather: service down -> the last good copy, marked old');
+ delete cache.weather_v1;delete props.WeatherLast;w=post({action:'weather',token:T});assert(w.success&&w.weather===null,'weather: no copy at all -> null, the screen still works');fetchFail=false;delete cache.weather_v1;
+ assert(!post({action:'weather',token:post({action:'login',username:'sup1',password:'p1-12345'}).token}).success,'a bus supervisor cannot read the leader weather');
+ const lx=post({action:'leaderAll',token:T});assert(Array.isArray(lx.extra.stageBars)&&Array.isArray(lx.extra.medByDay),'leader: stage bars and clinic visits per day (numbers only)');
+ assert(lx.extra.medByDay.every(x=>/^\d{4}-\d\d-\d\d$/.test(x.day)&&typeof x.count==='number'&&Object.keys(x).length===2),'clinic per day carries only a date and a count');}
 // ---- doctor's "no objection" -> secretariat -> gate (the doctor never sends to the gate directly)
 {book.Bus.rows.push(['6','طالب طبي1','1','3003','أزرق','99990011','','','']);book.Bus.rows.push(['6','طالب طبي2','1','3004','أحمر','99990012','','','']);for(const k of Object.keys(cache))delete cache[k];
  let q=post({action:'medClearCreate',token:ts,studentId:'3003',note:'x'});assert(!q.success,'custody (secretariat) cannot create a doctor clearance');
