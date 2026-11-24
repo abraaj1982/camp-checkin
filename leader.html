@@ -17,6 +17,7 @@
 .brow{display:grid;grid-template-columns:90px 1fr 80px;gap:10px;align-items:center;padding:7px 0;font-size:14px}
 .pin{width:30px;height:30px;border-radius:50%;color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;border:3px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.4);font-size:14px}
 .pin.f{background:#2E7D4F}.pin.s{background:#D4912A}.pin.o{background:#C2455A}
+.pin.tr{background:#C2455A}.pin.to{background:#E08A1E}.pin.tg{background:#2E7D4F}.pin.td{background:#7B8580}.pin.stale{opacity:.5}
 @keyframes pulse{50%{opacity:.55}}.sk{animation:pulse 1.2s infinite;background:var(--soft)}
 .kpi .kv{font-size:38px}.kpi.hero{background:linear-gradient(135deg,var(--brand),#1F4A2B);color:#fff;border:0}.kpi.hero .kl{color:rgba(255,255,255,.85)}
 .ring{--p:0;width:74px;height:74px;border-radius:50%;background:conic-gradient(#fff calc(var(--p)*1%),rgba(255,255,255,.25) 0);display:flex;align-items:center;justify-content:center;flex:none}
@@ -62,8 +63,8 @@ const T = {
  ar: { dir: 'rtl', title: 'القائد', sub: 'متابعة المخيم مباشرة', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح', of: 'من', bus: n => 'باص ' + n,
   present: 'صعدوا / في المخيم', remaining: 'لم يصعدوا بعد', arrivedBuses: 'باصات وصلت', withdrawn: 'غادروا', meals: 'وجبات اليوم', mealsNote: 'طلاب + مشرفون',
   map: 'تتبع الباصات مباشرة', live: 'مباشر', byBus: 'الحضور حسب الباص', byTeam: 'الحضور حسب الفريق (كم صعد من كل فريق)', committees: 'اللجان الآن', withdrawals: 'الاستئذانات', noWd: 'لا استئذانات.', wdOpen: 'قيد التنفيذ', wdClosed: 'خرج', receiver: 'المستلِم', feed: 'آخر الأحداث', noFeed: 'لا أحداث بعد.',
-  st: { boarding: 'يصعدون', departed: 'انطلق', onway: 'في الطريق', arrived: 'وصل' }, notStarted: 'لم يبدأ', noLoc: 'لا يوجد موقع بعد', lastSeen: s => 'آخر موقع منذ ' + durText(s, false),
-  eta: (m, km) => 'يصل خلال ~' + m + ' د (' + km + ' كم)', arrivedOk: 'وصل المخيم ✓', speed: k => k + ' كم/س', call: '📞 اتصال', missingBtn: n => '👥 الناقصون (' + n + ')', allIn: 'اكتمل الباص ✓', noPhone: 'لا رقم للمشرف',
+  st: { boarding: 'يصعدون', departed: 'انطلق', onway: 'في الطريق', arrived: 'وصل' }, tone: { r: 'واقف', o: 'على وشك الانطلاق', g: 'يسير', d: 'وصل ✓' }, notStarted: 'لم يبدأ', noLoc: 'لا يوجد موقع بعد', lastSeen: s => 'آخر موقع منذ ' + durText(s, false),
+  eta: (m, km) => 'يصل خلال ~' + m + ' د (' + km + ' كم)', arrivedOk: 'وصل المخيم ✓', speed: k => k + ' كم/س', call: '📞 اتصال', missingBtn: n => '👥 لم يصعدوا بعد (' + n + ')', allIn: 'اكتمل الباص ✓', noPhone: 'لا رقم للمشرف',
   medOpen: 'حالات طبية مفتوحة', medUrgent: n => n + ' عاجلة', phones: 'هواتف بالأمانات', bags: 'حقائب بالأمانات', withdrawOpen: 'استئذان خروج مفتوح',
   nextEvent: 'الفعالية القادمة', d: 'ي', h: 'س', m: 'د', setCamp: '📍 تحديد موقع المخيم', setCampHint: 'اضغط على الخريطة في مكان المخيم', campSaved: 'حُفظ موقع المخيم', campNone: 'لم يُحدَّد موقع المخيم بعد (لحساب وقت الوصول والوصول التلقائي).',
   sound: '🔔 صوت التنبيهات', soundOff: '🔕 الصوت متوقف', printReport: '🖨 طباعة التقرير', printAbsent: '🖨 كشف الغائبين', absentTitle: 'كشف من لم يصعد', reportTitle: 'تقرير حالة المخيم', at: 'في',
@@ -72,8 +73,8 @@ const T = {
  en: { dir: 'ltr', title: 'Camp leader', sub: 'Live camp overview', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light', of: 'of', bus: n => 'Bus ' + n,
   present: 'Boarded / at camp', remaining: 'Not boarded yet', arrivedBuses: 'Buses arrived', withdrawn: 'Withdrawn', meals: 'Meals today', mealsNote: 'students + supervisors',
   map: 'Live bus tracking', live: 'Live', byBus: 'Attendance by bus', byTeam: 'Attendance by team (how many of each team boarded)', committees: 'Committees now', withdrawals: 'Withdrawals', noWd: 'No withdrawals.', wdOpen: 'In progress', wdClosed: 'Left', receiver: 'Receiver', feed: 'Latest activity', noFeed: 'No activity yet.',
-  st: { boarding: 'Boarding', departed: 'Departed', onway: 'On the way', arrived: 'Arrived' }, notStarted: 'Not started', noLoc: 'No location yet', lastSeen: s => 'Last seen ' + durText(s, true) + ' ago',
-  eta: (m, km) => 'Arrives in ~' + m + ' min (' + km + ' km)', arrivedOk: 'At camp ✓', speed: k => k + ' km/h', call: '📞 Call', missingBtn: n => '👥 Missing (' + n + ')', allIn: 'Bus complete ✓', noPhone: 'No supervisor phone',
+  st: { boarding: 'Boarding', departed: 'Departed', onway: 'On the way', arrived: 'Arrived' }, tone: { r: 'Standing', o: 'About to leave', g: 'Moving', d: 'Arrived ✓' }, notStarted: 'Not started', noLoc: 'No location yet', lastSeen: s => 'Last seen ' + durText(s, true) + ' ago',
+  eta: (m, km) => 'Arrives in ~' + m + ' min (' + km + ' km)', arrivedOk: 'At camp ✓', speed: k => k + ' km/h', call: '📞 Call', missingBtn: n => '👥 Not boarded yet (' + n + ')', allIn: 'Bus complete ✓', noPhone: 'No supervisor phone',
   medOpen: 'Open medical cases', medUrgent: n => n + ' urgent', phones: 'Phones in custody', bags: 'Bags in custody', withdrawOpen: 'Open withdrawals',
   nextEvent: 'Next event', d: 'd', h: 'h', m: 'm', setCamp: '📍 Set camp location', setCampHint: 'Click the camp location on the map', campSaved: 'Camp location saved', campNone: 'Camp location not set yet (needed for arrival time and automatic arrival).',
   sound: '🔔 Alert sound', soundOff: '🔕 Sound off', printReport: '🖨 Print report', printAbsent: '🖨 Absent list', absentTitle: 'Students not boarded', reportTitle: 'Camp status report', at: 'at',
@@ -81,8 +82,8 @@ const T = {
   withGuardian: '🚗 arrived with guardian (not by bus)', actions: { board: 'boarded', undo: 'undone', withdraw: 'asked to leave', readmit: 're-admitted' }, num: '#', student: 'Student', team: 'Team', cls: 'Class' }
 };
 const X = {
- ar: { roundGap: (b, n) => `باص ${b}: جولة التحقق وجدت ${n} مسجَّلين غير موجودين في الباص`, roundOk: (t, c, tot) => `جولة التحقق ${t}: ${c} / ${tot} ✓`, roundBad: (t, c, tot, ab) => `جولة التحقق ${t}: ${ab} غير موجود`, alerts: 'تنبيهات', none: 'لا توجد تنبيهات. كل شيء طبيعي ✓', stale: (b, a) => `باص ${b}: انقطع إرسال موقعه منذ ${durText(a, false)} (ربما أُغلقت شاشة المشرف أو ضعفت الشبكة). اتصل بالمشرف.`, missing: (b, n, tot) => `باص ${b}: لم يصعد بعد ${n === 1 ? 'طالب واحد' : n === 2 ? 'طالبان' : n + ' ' + (n <= 10 ? 'طلاب' : 'طالبًا')}${tot ? ' من أصل ' + tot : ''}.`, no_report: bs => `باصات لم تبدأ بعد: ${bs.join('، ')}`, bags: (b, n) => `باص ${b}: ${n} طالب حقائبهم المحمّلة أقل من المتوقع.`, cases_open: n => `${n} بلاغ مفتوح يحتاج متابعة.`, med_urgent: n => `${n} حالة طبية عاجلة مفتوحة.`, withdraw_open: n => `${n} استئذان خروج مفتوح.`, cases: 'البلاغات', noCases: 'لا توجد بلاغات.', ack: 'استلمت', close: 'إغلاق', ty: { student: 'طالب', bus: 'باص', lost: 'مفقود', other: 'أخرى' }, stt: { open: 'مفتوح', ack: 'قيد المتابعة', closed: 'مغلق' } },
- en: { roundGap: (b, n) => `Bus ${b}: the round check found ${n} recorded students not on the bus`, roundOk: (t, c, tot) => `Round check ${t}: ${c} / ${tot} ✓`, roundBad: (t, c, tot, ab) => `Round check ${t}: ${ab} missing`, alerts: 'Alerts', none: 'No alerts. Everything looks normal ✓', stale: (b, a) => `Bus ${b}: location updates stopped ${durText(a, true)} ago (supervisor screen closed or weak signal). Call the supervisor.`, missing: (b, n, tot) => `Bus ${b}: ${n} student${n === 1 ? '' : 's'} not boarded yet${tot ? ' out of ' + tot : ''}.`, no_report: bs => `Buses not started yet: ${bs.join(', ')}`, bags: (b, n) => `Bus ${b}: ${n} student(s) with fewer loaded bags than expected.`, cases_open: n => `${n} open case(s) need follow-up.`, med_urgent: n => `${n} urgent medical case(s) open.`, withdraw_open: n => `${n} open withdrawal request(s).`, cases: 'Cases', noCases: 'No cases.', ack: 'Acknowledge', close: 'Close', ty: { student: 'Student', bus: 'Bus', lost: 'Lost item', other: 'Other' }, stt: { open: 'Open', ack: 'In progress', closed: 'Closed' } }
+ ar: { roundGap: (b, n) => `باص ${b}: جولة التحقق وجدت ${n} مسجَّلين غير موجودين في الباص`, roundOk: (t, c, tot) => `جولة التحقق ${t}: ${c} / ${tot} ✓`, roundBad: (t, c, tot, ab) => `جولة التحقق ${t}: ${ab} غير موجود`, alerts: 'تنبيهات', none: 'لا توجد تنبيهات. كل شيء طبيعي ✓', stale: (b, a) => `باص ${b}: انقطع إرسال موقعه منذ ${durText(a, false)} (ربما أُغلقت شاشة المشرف أو ضعفت الشبكة). اتصل بالمشرف.`, missing: (b, n, tot, arr) => `⚠ باص ${b}: ${arr ? 'وصل' : 'تحرّك'} ولم يصعد ${n === 1 ? 'طالب واحد' : n === 2 ? 'طالبان' : n + ' ' + (n <= 10 ? 'طلاب' : 'طالبًا')}${tot ? ' من أصل ' + tot : ''}.`, no_report: bs => `باصات لم تبدأ بعد: ${bs.join('، ')}`, bags: (b, n) => `باص ${b}: ${n} طالب حقائبهم المحمّلة أقل من المتوقع.`, cases_open: n => `${n} بلاغ مفتوح يحتاج متابعة.`, med_urgent: n => `${n} حالة طبية عاجلة مفتوحة.`, withdraw_open: n => `${n} استئذان خروج مفتوح.`, cases: 'البلاغات', noCases: 'لا توجد بلاغات.', ack: 'استلمت', close: 'إغلاق', ty: { student: 'طالب', bus: 'باص', lost: 'مفقود', other: 'أخرى' }, stt: { open: 'مفتوح', ack: 'قيد المتابعة', closed: 'مغلق' } },
+ en: { roundGap: (b, n) => `Bus ${b}: the round check found ${n} recorded students not on the bus`, roundOk: (t, c, tot) => `Round check ${t}: ${c} / ${tot} ✓`, roundBad: (t, c, tot, ab) => `Round check ${t}: ${ab} missing`, alerts: 'Alerts', none: 'No alerts. Everything looks normal ✓', stale: (b, a) => `Bus ${b}: location updates stopped ${durText(a, true)} ago (supervisor screen closed or weak signal). Call the supervisor.`, missing: (b, n, tot, arr) => `⚠ Bus ${b}: ${arr ? 'arrived' : 'left'} and ${n} student${n === 1 ? '' : 's'} did not board${tot ? ' out of ' + tot : ''}.`, no_report: bs => `Buses not started yet: ${bs.join(', ')}`, bags: (b, n) => `Bus ${b}: ${n} student(s) with fewer loaded bags than expected.`, cases_open: n => `${n} open case(s) need follow-up.`, med_urgent: n => `${n} urgent medical case(s) open.`, withdraw_open: n => `${n} open withdrawal request(s).`, cases: 'Cases', noCases: 'No cases.', ack: 'Acknowledge', close: 'Close', ty: { student: 'Student', bus: 'Bus', lost: 'Lost item', other: 'Other' }, stt: { open: 'Open', ack: 'In progress', closed: 'Closed' } }
 };
 const st = { cases: [], lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), sum: null, live: [], extra: null, camp: null, canSetCamp: false, err: '', open: {}, picking: false, msg: '' };
 const L_ = () => T[st.lang], X_ = () => X[st.lang];
@@ -127,6 +128,14 @@ function caseTime(iso) {
   const ago = Math.max(0, Math.round((Date.now() - d.getTime()) / 1000));
   return f.format(d).replace(' في ', ' · ').replace(' at ', ' · ').replace(/[،,]/g, '') + ' (' + (en ? durText(ago, true) + ' ago' : 'منذ ' + durText(ago, false)) + ')';
 }
+// Traffic-light status of a bus: red = standing (boarding), orange = about to leave (everybody boarded), green = moving, grey = arrived.
+function busTone(b) {
+  if (b.status === 'arrived') return 'd';
+  if (b.status === 'departed' || b.status === 'onway') return 'g';
+  return b.total > 0 && b.boarded >= b.total ? 'o' : 'r';
+}
+const TONE_DOT = { r: '🔴', o: '🟠', g: '🟢', d: '⚪' };
+const TONE_CLS = { r: 'bad', o: 'warn', g: 'ok', d: '' };
 const ageClass = a => a < 90 ? 'f' : a < 600 ? 's' : 'o';
 function distM(a, b, c, d) { const R = 6371000, r = Math.PI / 180, x = Math.sin((c - a) * r / 2) ** 2 + Math.cos(a * r) * Math.cos(c * r) * Math.sin((d - b) * r / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(x)); }
 function etaText(b) {
@@ -187,7 +196,7 @@ function drawMap() {
   el.style.cursor = st.picking ? 'crosshair' : '';
   const pts = [];
   st.live.filter(b => b.lat !== null && b.lng !== null).forEach(b => {
-    const icon = L.divIcon({ className: '', html: '<div class="pin ' + (b.status === 'arrived' ? 'f' : ageClass(b.ageSec)) + '">' + esc(b.bus) + '</div>', iconSize: [30, 30], iconAnchor: [15, 15] });
+    const icon = L.divIcon({ className: '', html: '<div class="pin t' + busTone(b) + (b.status !== 'arrived' && b.ageSec >= 600 ? ' stale' : '') + '">' + esc(b.bus) + '</div>', iconSize: [30, 30], iconAnchor: [15, 15] });
     if (markers[b.bus]) markers[b.bus].setLatLng([b.lat, b.lng]).setIcon(icon); else markers[b.bus] = L.marker([b.lat, b.lng], { icon: icon }).addTo(map);
     markers[b.bus].bindTooltip(L_().bus(b.bus) + ' · ' + L_().lastSeen(b.ageSec)); pts.push([b.lat, b.lng]);
   });
@@ -211,7 +220,7 @@ function printReport() {
   const l = L_(), s = st.sum, x = st.extra || {}, c = x.committees || {};
   const when = new Date().toLocaleString(st.lang === 'ar' ? 'ar' : 'en');
   $('printArea').innerHTML = `<h1>${l.reportTitle}</h1><div>${esc(when)}</div>
-   <h2>${l.byBus}</h2><table><tr><th></th><th>${l.present}</th><th>${l.remaining}</th></tr>${allBuses().map(b => `<tr><td>${l.bus(esc(b.bus))} · ${esc(l.st[b.status] || l.notStarted)}</td><td>${b.boarded} / ${b.total}</td><td>${b.missing}</td></tr>`).join('')}<tr><th>Σ</th><th>${s.boarded} / ${s.total}</th><th>${s.total - s.boarded - s.withdrawn}</th></tr></table>
+   <h2>${l.byBus}</h2><table><tr><th></th><th>${l.present}</th><th>${l.remaining}</th></tr>${allBuses().map(b => `<tr><td>${TONE_DOT[busTone(b)]} ${l.bus(esc(b.bus))} · ${esc(b.started ? l.tone[busTone(b)] : l.notStarted)}</td><td>${b.boarded} / ${b.total}</td><td>${b.missing}</td></tr>`).join('')}<tr><th>Σ</th><th>${s.boarded} / ${s.total}</th><th>${s.total - s.boarded - s.withdrawn}</th></tr></table>
    ${x.byTeam ? `<h2>${l.byTeam}</h2><table>${x.byTeam.map(t => `<tr><td>${esc(t.team)}</td><td>${t.present} / ${t.total}</td></tr>`).join('')}</table>` : ''}
    <h2>${l.committees}</h2><table><tr><td>${l.medOpen}</td><td>${c.medOpen || 0}</td></tr><tr><td>${l.phones}</td><td>${c.phones || 0}</td></tr><tr><td>${l.bags}</td><td>${c.bags || 0}</td></tr><tr><td>${l.withdrawOpen}</td><td>${c.withdrawOpen || 0}</td></tr><tr><td>${l.meals}</td><td>${c.meals || 0}</td></tr></table>`;
   window.print();
@@ -230,7 +239,7 @@ function render() {
   const arrived = buses.filter(b => b.status === 'arrived').length;
   // alerts: "not started" buses grouped into ONE line
   const al = s.alerts || [], nr = al.filter(a => a.type === 'no_report').map(a => a.bus), rest = al.filter(a => a.type !== 'no_report');
-  const amsg = a => a.type === 'round_gap' ? x.roundGap(esc(a.bus), a.count) : a.type === 'stale' ? x.stale(esc(a.bus), a.ageSec) : a.type === 'missing' ? x.missing(esc(a.bus), a.missing, ((((st.sum && st.sum.perBus) || []).filter(p => String(p.bus) === String(a.bus))[0]) || {}).total) : a.type === 'bags' ? x.bags(esc(a.bus), a.count) : a.type === 'med_urgent' ? x.med_urgent(a.count) : a.type === 'withdraw_open' ? x.withdraw_open(a.count) : x.cases_open(a.count);
+  const amsg = a => a.type === 'round_gap' ? x.roundGap(esc(a.bus), a.count) : a.type === 'stale' ? x.stale(esc(a.bus), a.ageSec) : a.type === 'missing' ? x.missing(esc(a.bus), a.missing, ((((st.sum && st.sum.perBus) || []).filter(p => String(p.bus) === String(a.bus))[0]) || {}).total, (allBuses().filter(q => String(q.bus) === String(a.bus))[0] || {}).status === 'arrived') : a.type === 'bags' ? x.bags(esc(a.bus), a.count) : a.type === 'med_urgent' ? x.med_urgent(a.count) : a.type === 'withdraw_open' ? x.withdraw_open(a.count) : x.cases_open(a.count);
   const alertsHtml = (rest.length || nr.length) ? rest.map(a => `<div class="banner ${a.level === 'bad' ? 'bad' : 'warn'}" style="margin:0 0 6px">${amsg(a)}</div>`).join('') + (nr.length ? `<div class="banner" style="margin:0;background:var(--soft)">${x.no_report(nr.map(esc))}</div>` : '') : `<div class="banner ok" style="margin:0">${x.none}</div>`;
   const kpi = (lab, v, n, c) => `<div class="card kpi"><div class="kl">${lab}</div><div class="kv" ${c ? `style="color:var(--${c})"` : ''}>${v}</div><div class="kl">${n || ''}</div></div>`;
   const hero = `<div class="card kpi hero" style="display:flex;align-items:center;gap:14px"><div class="ring" style="--p:${pct}"><b>${pct}%</b></div><div><div class="kl">${l.present}</div><div class="kv">${s.boarded}</div><div class="kl">${l.of} ${s.total}</div></div></div>`;
@@ -238,7 +247,7 @@ function render() {
   const sup = (ex.supervisors || {});
   const cards = buses.map(b => {
     const sp = (sup[b.bus] || [])[0], miss = (ex.missingByBus || {})[b.bus] || [], open = st.open[b.bus];
-    const pill = !b.started ? `<span class="pill">${l.notStarted}</span>` : `<span class="pill ${b.status === 'arrived' ? 'ok' : b.status === 'onway' ? 'warn' : ''}">${esc(l.st[b.status] || b.status)}</span>`;
+    const tn = busTone(b), pill = `<span class="pill ${TONE_CLS[tn]}">${TONE_DOT[tn]} ${esc(!b.started ? l.notStarted : l.tone[tn])}</span>`;
     const seen = b.lat === null || b.lat === undefined ? `<span>${l.noLoc}</span>` : `<span style="color:var(--${b.ageSec >= 300 ? 'bad' : 'ok'})">${b.ageSec >= 300 ? '⚠ ' : ''}${l.lastSeen(b.ageSec)}</span>`;
     return `<div class="bus"><div class="top"><b>${l.bus(esc(b.bus))}</b>${pill}</div>
       <div class="bar" style="margin-top:8px"><i style="width:${b.total ? Math.round(b.boarded / b.total * 100) : 0}%"></i></div>
