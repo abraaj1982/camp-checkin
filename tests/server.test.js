@@ -631,6 +631,24 @@ r=post({action:'scan',token:t1,studentId:'7004',op:'board',stageId:'S2',clientId
 {const row=book.Scans.rows[book.Scans.rows.length-1];assert(row[book.Scans.rows[0].indexOf('StageId')]==='S2','... the row carries the chosen stage');}
 r=post({action:'roster',token:t1});assert(r.mineByStage.S1.total===5&&r.mineByStage.S2.total===1&&r.mineByStage.S2.done===1&&r.students.find(x=>x.id==='7004').stagesDone.join()==='S2','roster: share per stage + the stages each student is already recorded in');
 r=post({action:'scan',token:t1,studentId:'7004',op:'undo'});assert(r.success&&r.student.state==='none','... undone');
+// ---- Direct Arrival (reception) follows the chosen stage: counts, the pending list, the stage on the row
+post({action:'createUser',token:T,username:'rcs',password:'rcs-12345',fullName:'الوصول المباشر',role:'supervisor',permissions:['reception'],committees:[]});
+{const tr=post({action:'login',username:'rcs',password:'rcs-12345'}).token;
+ r=post({action:'receptionList',token:tr,stageId:'S1'});assert(r.success&&r.stages.length>0&&r.stages.every(x=>x.dir==='in')&&r.stage.id==='S1','reception lists only arrival-type stages and the chosen one');
+ assert(r.count.expected===8&&r.count.present===4&&r.count.direct===0&&r.count.bus===4&&r.count.pending===4&&r.pending.length===4&&r.pending.some(x=>x.id==='7002')&&!JSON.stringify(r).includes('9999'),'counts: 4 by bus + 0 direct = 4 present of 8; the 4 missing are named; no phones');
+ r=post({action:'receptionArrive',token:tr,studentId:'7002',guardian:'سالم أحمد',relation:'عم',stageId:'S1',clientId:'rd1'});assert(r.success,'direct arrival in S1');
+ {const row=book.Scans.rows[book.Scans.rows.length-1];assert(row[book.Scans.rows[0].indexOf('StageId')]==='S1'&&row[5]==='guardian','the row carries the stage and "guardian"');}
+ r=post({action:'receptionList',token:tr,stageId:'S1'});assert(r.count.direct===1&&r.count.bus===4&&r.count.present===5&&r.count.pending===3&&!r.pending.some(x=>x.id==='7002')&&r.arrivals.length===1&&r.arrivals[0].relation==='عم','bus 4 + direct 1 = 5 present; he leaves the pending list');
+ r=post({action:'receptionArrive',token:tr,studentId:'7002',guardian:'سالم أحمد',stageId:'S1',clientId:'rd2'});assert(!r.success&&r.code==='DUPLICATE'&&r.via==='guardian','the same stage twice is refused');
+ r=post({action:'receptionArrive',token:tr,studentId:'7001',guardian:'سالم أحمد',stageId:'S1',clientId:'rd3'});assert(!r.success&&r.code==='DUPLICATE'&&r.via==='bus','a student who already boarded the bus is refused (says "bus")');
+ r=post({action:'receptionArrive',token:tr,studentId:'7004',guardian:'سالم أحمد',stageId:'S1',clientId:'rd4'});assert(!r.success&&r.code==='NOT_IN_STAGE','a student outside the stage grades is refused');
+ r=post({action:'receptionArrive',token:tr,studentId:'7003',guardian:'سالم أحمد',stageId:'S3',clientId:'rd5'});assert(!r.success&&r.code==='NO_STAGE','an exit/trip stage cannot be chosen here');
+ r=post({action:'receptionUndo',token:tr,studentId:'7002'});assert(r.success,'undo the direct arrival');
+ r=post({action:'receptionList',token:tr,stageId:'S1'});assert(r.count.direct===0&&r.count.present===4&&r.pending.some(x=>x.id==='7002')&&r.arrivals.length===0,'after undo he is pending again and the counts are back');
+ r=post({action:'receptionArrive',token:tr,studentId:'7002',guardian:'سالم أحمد',stageId:'S1',clientId:'rd6'});assert(r.success,'and he can be registered again');
+ r=post({action:'stages',token:tsec});assert(r.stages.find(x=>x.id==='S1').done===5,'the secretariat board counts the direct arrival too');
+ r=post({action:'scan',token:t1,studentId:'7002',op:'undo'});
+ post({action:'receptionUndo',token:tr,studentId:'7002'});}
 // ---- the window closes: refused; a short grace for scans made offline; the phone's own time is used if believable
 win('S1',-HR,-20*60e3);
 r=post({action:'scan',token:t1,studentId:'7002',op:'board',clientId:'s2'});assert(!r.success&&r.code==='NO_STAGE','window ended 20 min ago: refused');

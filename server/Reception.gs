@@ -43,17 +43,32 @@ function handleReceptionArrive_(data) {
     if (name.length < 3) return { success: false, code: 'BAD_REQUEST', error: 'اكتب اسم ولي الأمر' };
     const relation = cleanNote_(data.relation, 40); // a free note: father, uncle, maternal uncle...
     const clientId = String(data.clientId || '').slice(0, 60);
-    scansSheet_(); // C2: open the spreadsheet BEFORE taking the lock
+    // The stage is CHOSEN on the screen (arrival or trip-return stages only; the student must belong to it). No stage sent = the old behaviour.
+    const stages = readStages_(), want = String(data.stageId || '').trim();
+    let stage = null;
+    if (stages && want) {
+      stage = stages.filter(function(y) { return y.id === want; })[0] || null;
+      if (!stage || stage.dir !== 'in') return { success: false, code: 'NO_STAGE', error: 'اختر مرحلة وصول صحيحة' };
+      if (!stageIncludes_(stage, student)) return { success: false, code: 'NOT_IN_STAGE', error: 'ليس ضمن مرحلة «' + stage.name + '»' };
+    }
+    const sheet0 = scansSheet_(); // C2: open the spreadsheet BEFORE taking the lock
+    const iStage = stage ? scanHeaders_(sheet0).indexOf('StageId') : -1;
     const lock = LockService.getScriptLock();
     lock.waitLock(10000);
     try {
       const sc = scanStates_();
       if (clientId && sc.clients[clientId]) return { success: true, repeated: true };
       const cur = sc.states[student.id];
-      if (cur && cur.state === 'boarded') return { success: false, code: 'DUPLICATE', error: cur.via === 'guardian' ? 'سُجّل دخوله مسبقاً مع ولي أمره' : 'سُجّل صعوده الباص مسبقاً', at: fmtTime_(cur.at), via: cur.via || 'bus', student: publicStudent_(student, cur, false) };
+      if (stage && cur && cur.state !== 'withdrawn') {
+        const rec = stageRec_(sc, student.id, stage);
+        if (rec || (cur.state === 'boarded' && cur.ord >= stage.order)) { const v = rec || cur; return { success: false, code: 'DUPLICATE', error: v.via === 'guardian' ? 'سُجّل دخوله مسبقاً مع ولي أمره' : 'سُجّل صعوده الباص مسبقاً', at: fmtTime_(v.at), via: v.via || 'bus', student: publicStudent_(student, cur, false) }; }
+      }
+      if (!stage && cur && cur.state === 'boarded') return { success: false, code: 'DUPLICATE', error: cur.via === 'guardian' ? 'سُجّل دخوله مسبقاً مع ولي أمره' : 'سُجّل صعوده الباص مسبقاً', at: fmtTime_(cur.at), via: cur.via || 'bus', student: publicStudent_(student, cur, false) };
       if (cur && cur.state === 'withdrawn') return { success: false, code: 'WITHDRAWN', error: 'الطالب خرج بإذن' };
-      appendSafe_(scansSheet_(), [new Date(), student.id, 'board', student.bus, user.Username, 'guardian', clientId, guardianNote_(name, relation)]);
-      writeAudit_(user.Username, 'RECEPTION_ARRIVAL', student.id, 'guardian');
+      const row = [new Date(), student.id, 'board', student.bus, user.Username, 'guardian', clientId, guardianNote_(name, relation)];
+      if (stage && iStage !== -1) { while (row.length < iStage) row.push(''); row[iStage] = stage.id; }
+      appendSafe_(sheet0, row);
+      writeAudit_(user.Username, 'RECEPTION_ARRIVAL', student.id, 'guardian' + (stage ? ' stage=' + stage.id : ''));
       return { success: true, student: publicStudent_(student, scanStates_().states[student.id], false) };
     } finally {
       lock.releaseLock();
@@ -71,7 +86,9 @@ function handleReceptionUndo_(data) {
     try {
       const cur = scanStates_().states[student.id];
       if (!cur || cur.state !== 'boarded' || cur.via !== 'guardian') return { success: false, code: 'NOTHING_TO_UNDO', error: 'لا يوجد دخول مع ولي أمر للتراجع عنه' };
-      appendSafe_(scansSheet_(), [new Date(), student.id, 'undo', student.bus, user.Username, 'guardian', '', '']);
+      const sh = scansSheet_(), urow = [new Date(), student.id, 'undo', student.bus, user.Username, 'guardian', '', ''];
+      if (cur.stage) { const iS = scanHeaders_(sh).indexOf('StageId'); if (iS !== -1) { while (urow.length < iS) urow.push(''); urow[iS] = cur.stage; } }
+      appendSafe_(sh, urow);
       writeAudit_(user.Username, 'RECEPTION_UNDO', student.id, '');
       return { success: true };
     } finally {
@@ -82,16 +99,33 @@ function handleReceptionUndo_(data) {
 
 function handleReceptionList_(data) {
   return withAuth_(data, requirePerm_('reception'), function() {
-    const states = scanStates_().states, byId = {};
-    readStudents_().students.forEach(function(s) { byId[s.id] = s; });
+    const sc = scanStates_(), states = sc.states, byId = {}, students = readStudents_().students;
+    students.forEach(function(s) { byId[s.id] = s; });
+    const stages = readStages_(), out = { success: true };
+    let sel = null;
+    if (stages) {
+      const inn = stages.filter(function(x) { return x.dir === 'in'; });
+      out.stages = inn.map(stageBrief_);
+      const want = String(data.stageId || '').trim(), open = openStages_(inn, Date.now());
+      sel = inn.filter(function(x) { return x.id === want; })[0] || open[0] || inn[0] || null;
+    }
     const arrivals = [];
     Object.keys(states).forEach(function(id) {
-      const st = states[id]; if (st.state !== 'boarded' || st.via !== 'guardian' || !byId[id]) return;
-      const g = parseGuardian_(st.note), s = byId[id];
+      const s = byId[id]; if (!s) return;
+      const st = sel ? stageRec_(sc, id, sel) : (states[id].state === 'boarded' ? states[id] : null);
+      if (!st || st.via !== 'guardian') return;
+      const g = parseGuardian_(st.note);
       arrivals.push({ id: id, name: s.name, team: s.team, cls: s.cls, bus: s.bus, at: st.at.toISOString(), by: repUserName_(st.by), guardian: g.name, relation: g.relation });
     });
     arrivals.sort(function(a, b) { return a.at < b.at ? 1 : -1; });
-    return { success: true, arrivals: arrivals };
+    out.arrivals = arrivals;
+    if (sel) { // the numbers of the chosen stage: by bus + direct = present; the rest are still missing (names only, never phones)
+      const stt = stageStats_(sel, students, sc, true);
+      out.stage = stageBrief_(sel);
+      out.count = { expected: stt.expected, direct: arrivals.length, bus: Math.max(0, stt.done - arrivals.length), present: stt.done, pending: stt.remaining.length, withdrawn: stt.withdrawn };
+      out.pending = stt.remaining.slice(0, 400);
+    }
+    return out;
   });
 }
 

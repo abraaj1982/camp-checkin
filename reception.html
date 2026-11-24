@@ -39,19 +39,19 @@ const AUTH_ERR = /EXPIRED|IDLE_TIMEOUT|REVOKED|BAD_SIGNATURE|MALFORMED|USER_NOT_
 const REL = { father: ['الأب', 'Father'], mother: ['الأم', 'Mother'], brother: ['الأخ', 'Brother'], sister: ['الأخت', 'Sister'], relative: ['قريب', 'Relative'], other: ['آخر', 'Other'] };
 const T = {
  ar: { dir: 'rtl', title: 'الوصول المباشر', sub: 'مع ولي الأمر · متأخرون · بدون الباص', notice: 'لتسجيل الطلاب الذين وصلوا مع ولي أمرهم أو متأخرين (بدون الباص). طلاب الباص يُسجَّلون عند المشرف.', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
-  notFoundHint: 'إن كان طالبًا جديدًا غير مسجّل مسبقًا فتتم إضافته من شاشة «طالب جديد» (السكرتارية).', openNew: 'فتح «طالب جديد»', search: 'اسم الطالب أو رقمه', none: 'لا نتائج', bus: n => 'باص ' + n, noBus: 'بلا باص', guardian: 'اسم ولي الأمر', relation: 'ملاحظة (الصلة: أب، أم، عم، خال…)', optional: 'اختياري', register: 'تسجيل الدخول مع ولي الأمر',
+  stageLbl: 'المرحلة', cExpected: 'المتوقعون', cBus: 'بالباص', cDirect: 'مباشر', cPending: 'لم يصلوا', pendTitle: 'لم يصلوا بعد', pendHint: 'اضغط الاسم لتسجيل وصوله مع ولي أمره.', pendNone: 'وصل الجميع 🎉', pendMore: 'أول 400 اسم فقط', notFoundHint: 'إن كان طالبًا جديدًا غير مسجّل مسبقًا فتتم إضافته من شاشة «طالب جديد» (السكرتارية).', openNew: 'فتح «طالب جديد»', search: 'اسم الطالب أو رقمه', none: 'لا نتائج', bus: n => 'باص ' + n, noBus: 'بلا باص', guardian: 'اسم ولي الأمر', relation: 'ملاحظة (الصلة: أب، أم، عم، خال…)', optional: 'اختياري', register: 'تسجيل الدخول مع ولي الأمر',
   onBus: 'صعد الباص مسبقًا. لا حاجة لتسجيله هنا.', withG: n => 'دخل مسبقًا مع ولي أمره', undo: 'تراجع عن الدخول', confirmUndo: 'التراجع عن هذا الدخول؟', todayList: 'دخلوا مع أولياء أمورهم', noArrivals: 'لا يوجد بعد.',
   done: 'تم تسجيل الدخول ✓', undone: 'تم التراجع', name: 'اسم الطالب (كاملًا)', cls: 'الصف', team: 'الفريق', busLbl: 'الباص', shirt: 'مقاس القميص', note: 'ملاحظة', add: 'إضافة الطالب', added: (id, n) => `تمت إضافة ${n}. رقمه: ${id}`, addedList: 'أُضيفوا يدويًا', noAdded: 'لم يُضف أحد بعد.',
   printBand: 'اطبع سواره', dupTitle: 'هذا الطالب مسجّل مسبقًا. لا يمكن إضافته مرة ثانية.', dupOpen: 'افتح الطالب لتسجيل وصوله', dupHint: 'إذا كان طالبًا آخر بنفس الاسم، أضف اسم الجد أو العائلة ليختلف الاسم.', none2: 'بلا', pick: 'اختر', manual: 'مضاف يدويًا',
   error: 'تعذّر الاتصال. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.', codes: { DUPLICATE_NAME: 'هذا الطالب مسجّل مسبقًا. لا يمكن إضافته مرة ثانية.', DUPLICATE: 'سُجّل مسبقًا', WITHDRAWN: 'الطالب خرج بإذن', NOT_FOUND: 'الطالب غير موجود', BAD_REQUEST: 'تحقق من البيانات المكتوبة', NOTHING_TO_UNDO: 'لا يوجد ما يُتراجع عنه' } },
  en: { dir: 'ltr', title: 'Direct Arrival', sub: 'With guardian · late · not by bus', notice: 'For students who arrived with a guardian or late (not by bus). Bus students are recorded by the bus supervisor.', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
-  notFoundHint: 'A new student who was not registered in advance is added from the “New student” screen (secretariat).', openNew: 'Open “New student”', search: 'Student name or number', none: 'No results', bus: n => 'Bus ' + n, noBus: 'No bus', guardian: 'Guardian name', relation: 'Note (relation: father, mother, uncle…)', optional: 'optional', register: 'Register arrival with guardian',
+  stageLbl: 'Stage', cExpected: 'Expected', cBus: 'By bus', cDirect: 'Direct', cPending: 'Not arrived', pendTitle: 'Not arrived yet', pendHint: 'Tap a name to record his arrival with a guardian.', pendNone: 'Everyone has arrived 🎉', pendMore: 'First 400 names only', notFoundHint: 'A new student who was not registered in advance is added from the “New student” screen (secretariat).', openNew: 'Open “New student”', search: 'Student name or number', none: 'No results', bus: n => 'Bus ' + n, noBus: 'No bus', guardian: 'Guardian name', relation: 'Note (relation: father, mother, uncle…)', optional: 'optional', register: 'Register arrival with guardian',
   onBus: 'Already boarded the bus. No need to register here.', withG: n => 'Already arrived with his guardian', undo: 'Undo arrival', confirmUndo: 'Undo this arrival?', todayList: 'Arrived with guardians', noArrivals: 'None yet.',
   done: 'Arrival registered ✓', undone: 'Undone', name: 'Student full name', cls: 'Class', team: 'Team', busLbl: 'Bus', shirt: 'Shirt size', note: 'Note', add: 'Add student', added: (id, n) => `${n} added. Number: ${id}`, addedList: 'Added by hand', noAdded: 'Nobody added yet.',
   printBand: 'Print wristband', dupTitle: 'This student is already registered. He cannot be added twice.', dupOpen: 'Open the student to record his arrival', dupHint: 'If this is another student with the same name, add the grandfather or family name so the names differ.', none2: 'None', pick: 'Choose', manual: 'Added by hand',
   error: 'Connection problem. Try again.', sessionEnd: 'Session expired. Please log in again.', codes: { DUPLICATE_NAME: 'This student is already registered. He cannot be added twice.', DUPLICATE: 'Already registered', WITHDRAWN: 'The student left with permission', NOT_FOUND: 'Student not found', BAD_REQUEST: 'Check the entered data', NOTHING_TO_UNDO: 'Nothing to undo' } }
 };
-const st = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), tab: 'arrive', q: '', results: [], cur: null, arrivals: [], added: [], teams: [], buses: [], classes: [], msg: null, f: { name: '', cls: '', team: '', bus: '', shirt: '', note: '' }, g: { name: '', rel: '' }, last: null };
+const st = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), tab: 'arrive', q: '', results: [], cur: null, arrivals: [], stages: [], stageId: pref.get('rstage', ''), stage: null, count: null, pending: [], showPend: false, added: [], teams: [], buses: [], classes: [], msg: null, f: { name: '', cls: '', team: '', bus: '', shirt: '', note: '' }, g: { name: '', rel: '' }, last: null };
 const L = () => T[st.lang];
 async function api(action, extra) {
   const r = await (await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(Object.assign({ action: action, token: token }, extra || {})) })).json();
@@ -63,13 +63,13 @@ const errText = r => (r && L().codes[r.code]) || (r && r.error) || L().error;
 const hhmm = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleTimeString('en-GB', { timeZone: 'Asia/Muscat', hour: '2-digit', minute: '2-digit' }); };
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2));
 const rel = k => k && REL[k] ? REL[k][st.lang === 'en' ? 1 : 0] : (k || '');
-async function load() { try { const r = await api('receptionList'); if (r.success) { st.arrivals = r.arrivals; } } catch (e) {} render(); }
+async function load() { try { const r = await api('receptionList', { stageId: st.stageId }); if (r.success) { st.arrivals = r.arrivals; st.stages = r.stages || []; st.stage = r.stage || null; st.count = r.count || null; st.pending = r.pending || []; if (r.stage) st.stageId = r.stage.id; } } catch (e) {} render(); }
 let qT = null;
 function onQ(v) { st.q = v; st.cur = null; clearTimeout(qT); if (!v.trim()) { st.results = []; return render(); }
   qT = setTimeout(async () => { try { const r = await api('receptionFind', { q: v.trim() }); if (r.success && st.q === v) { st.results = r.results; if (r.results.length === 1) st.cur = r.results[0]; render(); } } catch (e) {} }, 300); }
 async function arrive() {
   const c = st.cur; if (!c) return;
-  try { const r = await api('receptionArrive', { studentId: c.id, guardian: st.g.name, relation: st.g.rel, clientId: uid() });
+  try { const r = await api('receptionArrive', { studentId: c.id, guardian: st.g.name, relation: st.g.rel, stageId: st.stage ? st.stage.id : '', clientId: uid() });
     if (r.success) { say('ok', L().done + ' — ' + c.name); st.cur = null; st.q = ''; st.results = []; st.g = { name: '', rel: '' }; await load(); return; }
     say('bad', errText(r)); if (r.code === 'DUPLICATE') { c.arrival = r.via === 'guardian' ? 'guardian' : 'bus'; }
   } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
@@ -87,9 +87,19 @@ function curCard() {
 }
 function resultsHtml() { const l = L(); if (!st.q.trim()) return ''; if (!st.results.length) return `<div class="muted" style="padding:8px">${l.none}<div style="margin-top:6px;font-size:13px">${l.notFoundHint}${can('addstudent') ? ` <a href="newstudent.html">${l.openNew}</a>` : ''}</div></div>`; if (st.cur) return '';
   return st.results.map(s => `<button class="res" data-pick="${esc(s.id)}"><span><b>${esc(s.name)}</b> <span class="muted">· ${esc(s.id)} · ${s.bus ? l.bus(esc(s.bus)) : l.noBus}</span></span><span class="pill ${s.arrival ? 'ok' : ''}">${s.arrival === 'guardian' ? '🚗' : s.arrival === 'bus' ? '🚌' : ''}</span></button>`).join(''); }
+function stageBox() {
+  const l = L(); if (!st.stages.length) return '';
+  const c = st.count, cell = (n, v) => `<div style="flex:1;text-align:center"><div style="font-size:22px;font-weight:700">${v}</div><div class="muted" style="font-size:12px">${n}</div></div>`;
+  return `<section class="card"><label class="lbl" for="stg">${l.stageLbl}</label><select id="stg">${st.stages.map(x => `<option value="${esc(x.id)}" ${st.stage && st.stage.id === x.id ? 'selected' : ''}>${esc(x.name)}${x.day ? ' · ' + esc(x.day) : ''}</option>`).join('')}</select>
+    ${c ? `<div style="display:flex;gap:6px;margin-top:12px">${cell(l.cExpected, c.expected)}${cell(l.cBus, c.bus)}${cell(l.cDirect, c.direct)}${cell(l.cPending, c.pending)}</div>` : ''}</section>`;
+}
+function pendingView() {
+  const l = L(); if (!st.count) return '';
+  return `<section class="card"><button class="chip" data-pend-toggle="1" style="width:100%;justify-content:space-between;display:flex"><b>${l.pendTitle} (${st.count.pending})</b><span>${st.showPend ? '▲' : '▼'}</span></button>${st.showPend ? `<div class="muted" style="font-size:13px;margin:8px 0">${l.pendHint}</div>${st.pending.length ? st.pending.map(p => `<button class="res" data-pend="${esc(p.id)}"><span><b>${esc(p.name)}</b> <span class="muted">· ${esc(p.id)} · ${p.bus ? l.bus(esc(p.bus)) : l.noBus}</span></span></button>`).join('') : `<div class="muted">${l.pendNone}</div>`}${st.count.pending > st.pending.length ? `<div class="muted" style="font-size:12px">${l.pendMore}</div>` : ''}` : ''}</section>`;
+}
 function arriveView() {
   const l = L();
-  return `<section class="card"><label class="lbl" for="q">${l.search}</label><input id="q" type="search" value="${esc(st.q)}" autocomplete="off"><div id="qres" style="margin-top:6px">${resultsHtml()}</div></section>${curCard()}
+  return `${stageBox()}<section class="card"><label class="lbl" for="q">${l.search}</label><input id="q" type="search" value="${esc(st.q)}" autocomplete="off"><div id="qres" style="margin-top:6px">${resultsHtml()}</div></section>${curCard()}${pendingView()}
     <section class="card"><h2 class="h2" style="margin-bottom:6px">${l.todayList} (${st.arrivals.length})</h2>${st.arrivals.length ? st.arrivals.map(a => `<div class="arow"><div><b>${esc(a.name)}</b> <span class="muted">· ${esc(a.id)}</span><div class="g">🚗 ${esc(a.guardian)}${a.relation ? ' (' + esc(rel(a.relation)) + ')' : ''} · ${esc(hhmm(a.at))}</div></div><button class="chip" data-undo="${esc(a.id)}">${l.undo}</button></div>`).join('') : `<div class="muted">${l.noArrivals}</div>`}</section>`;
 }
 function render() {
@@ -101,14 +111,15 @@ function render() {
 }
 document.addEventListener('input', e => { const i = e.target.id;
   if (i === 'q') onQ(e.target.value); else if (i === 'gn') { st.g.name = e.target.value; render(); } else if (i === 'gr') { st.g.rel = e.target.value; } });
+document.addEventListener('change', e => { if (e.target.id === 'stg') { st.stageId = e.target.value; pref.set('rstage', st.stageId); st.cur = null; st.q = ''; st.results = []; load(); } });
 document.addEventListener('click', e => {
   const b = e.target.closest && e.target.closest('button'); if (!b) return; const d = b.dataset;
-  if (d.arrive) arrive(); else if (d.undo) undo(d.undo);
+  if (d.pendToggle) { st.showPend = !st.showPend; render(); } else if (d.pend) { st.q = d.pend; st.cur = null; st.results = []; render(); onQ(d.pend); window.scrollTo(0, 0); } else if (d.arrive) arrive(); else if (d.undo) undo(d.undo);
   else if (d.pick) { st.cur = st.results.find(x => x.id === d.pick) || null; st.msg = null; render(); }
 });
 $('langBtn').onclick = () => { st.lang = st.lang === 'ar' ? 'en' : 'ar'; pref.set('lang', st.lang); render(); };
 $('themeBtn').onclick = () => { st.theme = st.theme === 'light' ? 'dark' : 'light'; pref.set('theme', st.theme); render(); };
-render(); load();
+render(); load(); setInterval(() => { if (!document.hidden) load(); }, 60000);
 try { const q0 = new URLSearchParams(location.search).get('q'); if (q0) { st.q = q0; render(); onQ(q0); } } catch (e) {}
 </script>
 </body></html>
