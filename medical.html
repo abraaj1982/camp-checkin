@@ -67,7 +67,7 @@ const T = {
   done: 'Done', error: 'Connection problem. Try again.', sessionEnd: 'Session expired. Please log in again.',
   codes: { ALREADY_OPEN: 'This student already has an open case', NOT_OPEN: 'Case is closed', TREATMENT_REQUIRED: 'Enter the treatment before closing', NOT_FOUND: 'Student not found' } }
 };
-const st = { caseMsg: {}, caseOpen: false, clr: [], clrPending: 0, clrOpen: false, clrNote: '', lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), tab: 'cases', q: '', results: [], cur: null, notes: null, complaint: '', severity: 'normal', cases: [], stats: null, msg: null, drafts: {}, filter: 'open', strip: pref.get('strip', 'bot') };
+const st = { caseMsg: {}, caseOpen: false, clr: [], clrPending: 0, lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), tab: 'cases', q: '', results: [], cur: null, notes: null, complaint: '', severity: 'normal', cases: [], stats: null, msg: null, drafts: {}, filter: 'open', strip: pref.get('strip', 'bot') };
 
 let qTimer = null, hideTimer = null;
 function onQ(v) {
@@ -75,7 +75,7 @@ function onQ(v) {
   if (!v.trim()) { st.results = []; return renderResults(); }
   qTimer = setTimeout(async () => { try { const r = await api({ action: 'medFind', q: v.trim() }); if (r.success && st.q === v) { st.results = r.results; renderResults(); } } catch (e) {} }, 300);
 }
-function pick(id) { st.clrOpen = false; st.clrNote = ''; st.caseOpen = false; st.cur = st.results.find(x => x.id === id) || null; hideNotes(true); st.complaint = ''; st.severity = 'normal'; st.msg = null; st.results = []; render(); if (st.cur) showNotes(); }
+function pick(id) { st.caseOpen = false; st.cur = st.results.find(x => x.id === id) || null; hideNotes(true); st.complaint = ''; st.severity = 'normal'; st.msg = null; st.results = []; render(); if (st.cur) showNotes(); }
 async function showNotes() {
   try { const r = await api({ action: 'medInfo', studentId: st.cur.id }); if (r.success) { st.notes = r; clearTimeout(hideTimer); hideTimer = setTimeout(() => hideNotes(), 180000); } else say('bad', errText(r)); } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
   render();
