@@ -17,6 +17,7 @@
   <section class="hero compact"><div class="ic" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#17301C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="15" rx="3"/><path d="M4 11h16"/><circle cx="8.5" cy="14.5" r=".7"/><circle cx="15.5" cy="14.5" r=".7"/><path d="M6.5 18v2.5M17.5 18v2.5"/></svg></div><div><h1 id="busTitle">—</h1><p id="supName"></p></div></section>
   <div id="netbar" class="netbar" hidden></div>
   <main id="app"></main>
+  <div id="cfm" aria-live="polite"></div>
   <div id="tmline" class="muted" style="font-size:11.5px;text-align:center;padding:6px 0" hidden></div>
 </div>
 <script>
@@ -50,7 +51,7 @@ const pref = { get(k, d) { try { return localStorage.getItem('mk_pref_' + k) || 
 
 /* ---------- i18n ---------- */
 const I = {
- ar: { dir: 'rtl', myRep: 'بلاغاتي', repOpen: 'مفتوح', repAck: 'تم الاطلاع', repClosed: 'مغلق', locIos: 'لم يُسمح بالموقع. على الآيفون: اضغط «aA» بجانب عنوان الصفحة ← «إعدادات الموقع» ← «الموقع» ← «السماح». ثم اضغط «إعادة المحاولة».', locAndroid: 'لم يُسمح بالموقع. اضغط أيقونة القفل بجانب عنوان الصفحة ← «الأذونات» ← «الموقع» ← «السماح». ثم اضغط «إعادة المحاولة».', retry: 'إعادة المحاولة', snd: 'صوت واهتزاز عند المسح', torchOn: 'تشغيل إضاءة الكاميرا', torchOff: 'إيقاف إضاءة الكاميرا', stTitle: 'اختر المرحلة', stNone: 'لا توجد مرحلة الآن. المسح متوقف حتى تبدأ المرحلة التالية.', stNext: 'القادمة', stIn: 'دخول', stOut: 'خروج', stShare: (d, t) => 'سُجّل ' + d + ' من ' + t + ' في باصك', stAnyBus: 'في هذه المرحلة تمسح أي طالب رحلة من أي باص.', noStageStudent: 'لا توجد مرحلة لهذا الطالب الآن', notInStage: n => 'ليس ضمن المرحلة المختارة «' + n + '»', stDiff: n => 'تنبيه: المرحلة المقترحة حسب الوقت الآن: ' + n, stUse: 'استخدم المقترحة', stTrip: 'في الرحلة', stLeft: 'غادر', warnNoArrival: 'تنبيه: لا يوجد تسجيل وصول لهذا الطالب. سُجّل خروجه وسيراه السكرتارية.', warnAlreadyIn: 'تنبيه: الطالب مسجّل داخل المخيم مسبقاً.', bus: n => 'باص ' + n, sup: n => 'مشرف: ' + n, boarded: 'صعدوا', remaining: n => n > 0 ? 'ناقص ' + n : 'اكتمل الباص', how: 'اختر طريقة التسجيل',
+ ar: { dir: 'rtl', cfmIn: 'تم تسجيل الصعود', cfmOut: 'تم تسجيل الخروج', cfmPend: 'محفوظ على الجوال وسيُرسل عند عودة الإنترنت', cfmRefused: 'لم يُسجَّل', myRep: 'بلاغاتي', repOpen: 'مفتوح', repAck: 'تم الاطلاع', repClosed: 'مغلق', locIos: 'لم يُسمح بالموقع. على الآيفون: اضغط «aA» بجانب عنوان الصفحة ← «إعدادات الموقع» ← «الموقع» ← «السماح». ثم اضغط «إعادة المحاولة».', locAndroid: 'لم يُسمح بالموقع. اضغط أيقونة القفل بجانب عنوان الصفحة ← «الأذونات» ← «الموقع» ← «السماح». ثم اضغط «إعادة المحاولة».', retry: 'إعادة المحاولة', snd: 'صوت واهتزاز عند المسح', torchOn: 'تشغيل إضاءة الكاميرا', torchOff: 'إيقاف إضاءة الكاميرا', stTitle: 'اختر المرحلة', stNone: 'لا توجد مرحلة الآن. المسح متوقف حتى تبدأ المرحلة التالية.', stNext: 'القادمة', stIn: 'دخول', stOut: 'خروج', stShare: (d, t) => 'سُجّل ' + d + ' من ' + t + ' في باصك', stAnyBus: 'في هذه المرحلة تمسح أي طالب رحلة من أي باص.', noStageStudent: 'لا توجد مرحلة لهذا الطالب الآن', notInStage: n => 'ليس ضمن المرحلة المختارة «' + n + '»', stDiff: n => 'تنبيه: المرحلة المقترحة حسب الوقت الآن: ' + n, stUse: 'استخدم المقترحة', stTrip: 'في الرحلة', stLeft: 'غادر', warnNoArrival: 'تنبيه: لا يوجد تسجيل وصول لهذا الطالب. سُجّل خروجه وسيراه السكرتارية.', warnAlreadyIn: 'تنبيه: الطالب مسجّل داخل المخيم مسبقاً.', bus: n => 'باص ' + n, sup: n => 'مشرف: ' + n, boarded: 'صعدوا', remaining: n => n > 0 ? 'ناقص ' + n : 'اكتمل الباص', how: 'اختر طريقة التسجيل',
   m_qr: 'QR Code', m_name: 'بحث بالاسم', m_num: 'بحث برقم الطالب', soon: 'قريباً', scanQr: 'وجّه الكاميرا إلى رمز QR الخاص بالطالب', startCam: 'تشغيل الكاميرا', stopCam: 'إيقاف الكاميرا', noCam: 'تعذّر تشغيل الكاميرا. استخدم الاسم أو الرقم.', camDenied: 'لم يُسمح بالكاميرا. من إعدادات المتصفح للموقع اسمح بالكاميرا ثم أعد تحميل الصفحة.',
   nameLbl: 'اكتب اسم الطالب', numLbl: 'اكتب رقم الطالب', none: 'لا توجد نتيجة', student: 'طالب', team: 'الفريق', cls: 'الصف',
   rc: 'جولة التحقق', rcStart: 'بدء جولة التحقق', rcSub: 'نادِ على الأسماء وتأكد أن كل مسجَّل موجود فعلًا في الباص.', rcDepart: 'عند الانطلاق', rcArrive: 'عند الوصول', rcLast: (ph, t, c, tot, ab) => 'آخر جولة (' + (ph === 'arrive' ? 'وصول' : 'انطلاق') + ') ' + t + ': ' + c + ' / ' + tot + (ab ? ' — ' + ab + ' غير موجود' : ' ✓'), rcNever: 'لم تُجرَ جولة بعد', rcHere: 'موجود ✓', rcGone: 'غير موجود ✗', rcBack: 'رجوع', rcOf: (a, b) => 'تم التحقق ' + a + ' من ' + b, rcExit: 'خروج', rcDone: 'انتهت الجولة', rcOk: n => 'كل الطلاب (' + n + ') موجودون ✓', rcGap: n => n + ' مسجَّلون غير موجودين في الباص', rcSend: 'اعتماد وإرسال', rcFix: 'بعد الإرسال سجّل الطالب غير المسجَّل بالاسم، أو تراجع عن تسجيل من ليس موجودًا.', rcSent: 'أُرسلت نتيجة الجولة للقائد', rcNone: 'لا يوجد من سُجّل صعوده بعد.', rcPending: 'تغيير', retrying: names => 'لم يُرسَل بعد، ويُعاد إرساله تلقائياً (لا تُعِد تسجيله): ' + names, board: 'تسجيل الصعود', undo: 'تراجع عن آخر تسجيل', next: 'الطالب التالي', done: 'سُجّل الصعود', undone: 'تم التراجع', undoLocked: 'لا يمكنك التراجع الآن (آخر تسجيل لك وخلال دقيقتين فقط). اطلب من المشرف العام.', undoRow: 'تراجع', confirmUndo: 'التراجع عن صعود هذا الطالب؟',
@@ -59,7 +60,7 @@ const I = {
   missing: 'لم يصعدوا بعد', boardedList: 'صعدوا (الأحدث أولاً)', allList: 'الكل', remainShort: 'المتبقي', boardedShort: 'صعدوا', notYet: 'لم يصعد', withdrawnShort: 'خرج', noneBoarded: 'لم يصعد أحد بعد', allIn: 'اكتمل الباص', trip: 'حالة الرحلة', st_boarding: 'الصعود', st_departed: 'انطلق', st_onway: 'في الطريق', st_arrived: 'وصل', shareLoc: 'مشاركة الموقع مع القائد', locOn: 'الموقع يُرسَل', locOff: 'الموقع متوقف', lastSent: t => 'آخر إرسال ' + t,
   tracking: 'تتبع الباص', trackNote: 'يُرسَل موقع باصك تلقائياً للقائد ما دامت هذه الصفحة مفتوحة. أبقِ الشاشة مضاءة والجوال على الشاحن.', locDenied: 'لم يُسمح بالموقع. افتح إعدادات المتصفح للموقع واسمح بالوصول للموقع ثم أعد تحميل الصفحة.', confirmDepart: n => n > 0 ? 'ينقص ' + n + ' طالباً. هل تؤكد الانطلاق؟' : 'اكتمل الباص. تأكيد الانطلاق؟', yes: 'نعم', cancel: 'إلغاء',
   offline: 'غير متصل. ما تسجّله يُحفظ ويُرسَل تلقائياً.', pending: n => n + ' بانتظار الإرسال', synced: 'تم الإرسال', loading: 'جارٍ التحميل...', report: 'إبلاغ الإدارة', reportAsk: 'اكتب المشكلة باختصار (طالب، باص، مفقود...)', reportSent: 'أُرسل البلاغ إلى الإدارة', logout: 'خروج', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح', err: 'حدث خطأ. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.', paper: 'عند انقطاع الإنترنت يُستخدم الكشف الورقي.' },
- en: { dir: 'ltr', myRep: 'My reports', repOpen: 'Open', repAck: 'Seen', repClosed: 'Closed', locIos: 'Location was blocked. On iPhone: tap "aA" next to the page address → "Website Settings" → "Location" → "Allow". Then tap "Try again".', locAndroid: 'Location was blocked. Tap the lock icon next to the address → "Permissions" → "Location" → "Allow". Then tap "Try again".', retry: 'Try again', snd: 'Sound & vibration on scan', torchOn: 'Camera light on', torchOff: 'Camera light off', stTitle: 'Choose the stage', stNone: 'No stage now. Scanning is stopped until the next stage starts.', stNext: 'Next', stIn: 'In', stOut: 'Out', stShare: (d, t) => d + ' of ' + t + ' recorded on your bus', stAnyBus: 'In this stage you scan any trip student from any bus.', noStageStudent: 'No stage for this student now', notInStage: n => 'Not part of the chosen stage: ' + n, stDiff: n => 'Note: the stage suggested by the time now is: ' + n, stUse: 'Use the suggested one', stTrip: 'On the trip', stLeft: 'Left', warnNoArrival: 'Note: no arrival was recorded for this student. His exit is recorded; the secretariat will see it.', warnAlreadyIn: 'Note: the student is already recorded inside the camp.', bus: n => 'Bus ' + n, sup: n => 'Supervisor: ' + n, boarded: 'Boarded', remaining: n => n > 0 ? n + ' remaining' : 'Bus full', how: 'Choose how to record',
+ en: { dir: 'ltr', cfmIn: 'Boarding recorded', cfmOut: 'Exit recorded', cfmPend: 'Saved on the phone, will be sent when the internet is back', cfmRefused: 'Not recorded', myRep: 'My reports', repOpen: 'Open', repAck: 'Seen', repClosed: 'Closed', locIos: 'Location was blocked. On iPhone: tap "aA" next to the page address → "Website Settings" → "Location" → "Allow". Then tap "Try again".', locAndroid: 'Location was blocked. Tap the lock icon next to the address → "Permissions" → "Location" → "Allow". Then tap "Try again".', retry: 'Try again', snd: 'Sound & vibration on scan', torchOn: 'Camera light on', torchOff: 'Camera light off', stTitle: 'Choose the stage', stNone: 'No stage now. Scanning is stopped until the next stage starts.', stNext: 'Next', stIn: 'In', stOut: 'Out', stShare: (d, t) => d + ' of ' + t + ' recorded on your bus', stAnyBus: 'In this stage you scan any trip student from any bus.', noStageStudent: 'No stage for this student now', notInStage: n => 'Not part of the chosen stage: ' + n, stDiff: n => 'Note: the stage suggested by the time now is: ' + n, stUse: 'Use the suggested one', stTrip: 'On the trip', stLeft: 'Left', warnNoArrival: 'Note: no arrival was recorded for this student. His exit is recorded; the secretariat will see it.', warnAlreadyIn: 'Note: the student is already recorded inside the camp.', bus: n => 'Bus ' + n, sup: n => 'Supervisor: ' + n, boarded: 'Boarded', remaining: n => n > 0 ? n + ' remaining' : 'Bus full', how: 'Choose how to record',
   m_qr: 'QR Code', m_name: 'Search by name', m_num: 'Search by student number', soon: 'Soon', scanQr: 'Point the camera at the student\'s QR code', startCam: 'Start camera', stopCam: 'Stop camera', noCam: 'Camera unavailable. Use name or number.', camDenied: 'Camera access was blocked. Allow the camera for this site in the browser settings, then reload.',
   nameLbl: "Type the student's name", numLbl: "Type the student's number", none: 'No result', student: 'Student', team: 'Team', cls: 'Grade',
   rc: 'Round check', rcStart: 'Start round check', rcSub: 'Call the names and confirm everyone recorded is really on the bus.', rcDepart: 'At departure', rcArrive: 'At arrival', rcLast: (ph, t, c, tot, ab) => 'Last round (' + (ph === 'arrive' ? 'arrival' : 'departure') + ') ' + t + ': ' + c + ' / ' + tot + (ab ? ' — ' + ab + ' missing' : ' ✓'), rcNever: 'No round yet', rcHere: 'Here ✓', rcGone: 'Not here ✗', rcBack: 'Back', rcOf: (a, b) => 'Checked ' + a + ' of ' + b, rcExit: 'Exit', rcDone: 'Round finished', rcOk: n => 'All students (' + n + ') are here ✓', rcGap: n => n + ' recorded but not on the bus', rcSend: 'Confirm and send', rcFix: 'After sending, record the unregistered student by name, or undo the one who is not here.', rcSent: 'The round result was sent to the leader', rcNone: 'Nobody has boarded yet.', rcPending: 'Change', retrying: names => 'Not sent yet, retrying automatically (do not record again): ' + names, board: 'Mark as boarded', undo: 'Undo last record', next: 'Next student', done: 'Boarding recorded', undone: 'Undone', undoLocked: 'You can no longer undo (only your last record, within 2 minutes). Ask the general supervisor.', undoRow: 'Undo', confirmUndo: 'Undo this student’s boarding?',
@@ -128,7 +129,7 @@ function applyServerResult(op, r) {
     const who = rosterFind(op.body.studentId), nm = who ? who.name : op.body.studentId;
     if (!r.success && ['NOT_IN_STAGE', 'NO_STAGE', 'STAGE_ENDED'].indexOf(r.code) !== -1) { // refused by the stage rules: undo what the screen showed, and say why
       if (who) { who.state = 'none'; who.at = ''; who.pending = false; }
-      st.banner = { cls: 'bad', msg: nm + ': ' + (r.error || '') }; feedback('bad'); return;
+      st.banner = { cls: 'bad', msg: nm + ': ' + (r.error || '') }; feedback('bad'); showConfirm({ ok: false, name: nm, reason: r.error || '', mode: 'banner' }); return;
     }
     if (r.success && r.warn) st.banner = { cls: 'warn', msg: nm + ': ' + (r.warn === 'NO_ARRIVAL' ? L().warnNoArrival : L().warnAlreadyIn) };
   }
@@ -194,14 +195,47 @@ function board(auto) {
   if (!c.mine) { // a student of another bus: only a trip stage lets any supervisor record him
     if (!(stg && stg.anyBus)) return;
     enqueue('scan', { action: 'scan', op: 'board', studentId: c.id, method: st.method, stageId: stg ? stg.id : undefined }, { optState: optState });
+    showConfirm({ ok: true, pending: !navigator.onLine, out: out, name: c.name || c.id, sub: [c.id, c.cls, c.bus ? L().bus(c.bus) : ''].filter(Boolean).join(' · '), photo: c.photo, mode: auto ? 'banner' : 'popup' });
     st.last = { id: c.id, name: c.name || c.id, canUndo: true, at: Date.now() }; st.cur = null; st.q = ''; st.remote = [];
     return render();
   }
   const s = rosterFind(c.id); if (!s || isDup(Object.assign({ mine: true }, s), stg)) return;
   s.state = optState; s.stagesDone = (s.stagesDone || []).concat(stg ? [stg.id] : []); s.at = new Date().toTimeString().slice(0, 5); s.pending = true; store.set('roster', st.roster);
   enqueue('scan', { action: 'scan', op: 'board', studentId: c.id, method: st.method, stageId: stg ? stg.id : undefined }, { optState: optState });
+  showConfirm({ ok: true, pending: !navigator.onLine, out: out, name: c.name || c.id, sub: [c.id, c.cls, c.bus ? L().bus(c.bus) : ''].filter(Boolean).join(' · '), photo: c.photo, mode: auto ? 'banner' : 'popup' });
   st.last = { id: c.id, name: c.name, canUndo: true, at: Date.now() }; st.cur = null; st.q = ''; st.remote = [];
   render();
+}
+/* ---------- confirmation: a big banner after a CAMERA scan, a pop-up after a NAME / NUMBER search ---------- */
+let cfmTimer = null;
+function hideConfirm() { clearTimeout(cfmTimer); const e = document.getElementById('cfm'); if (e) e.innerHTML = ''; }
+function refusalText(c) { // why the card would refuse this student (same rules as curCard)
+  const l = L(); if (!c) return ''; if (c.notFound) return l.notFound; if (c.offlineOther) return l.otherOffline;
+  const chk = stageCheck(c), stg = chk.stage || null, anyBusOk = !c.mine && !!(stg && stg.anyBus);
+  if (!c.mine && !anyBusOk) return l.other(c.bus, c.supervisor); if (c.state === 'withdrawn') return l.withdrawn; if (isDup(c, stg)) return l.dup(c.at); if (!chk.ok) return chk.msg; return '';
+}
+// o: { ok, pending, out, name, sub, photo, reason, mode: 'banner' | 'popup' }
+function showConfirm(o) {
+  const l = L(), e = document.getElementById('cfm'); if (!e) return; clearTimeout(cfmTimer);
+  const ok = !!o.ok, pend = ok && !!o.pending, tone = ok ? (pend ? 'warn' : 'ok') : 'bad';
+  const head = ok ? (pend ? l.cfmPend : (o.out ? l.cfmOut : l.cfmIn)) : l.cfmRefused;
+  const pic = safeUrl(o.photo) ? `<img src="${esc(safeUrl(o.photo))}" alt="" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:cover;border-radius:inherit" onerror="this.remove()">` : (ok ? '✓' : '✕');
+  const undoBtn = ok ? `<button class="btn alt" style="min-height:40px;width:100%;margin-top:8px;font-size:14px;background:var(--card)" onclick="event.stopPropagation(); undo(); hideConfirm()">${l.undo}</button>` : '';
+  const colors = `background:var(--${tone}bg);color:var(--${tone});border:2px solid var(--${tone})`;
+  if (o.mode === 'popup') {
+    e.innerHTML = `<div style="position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.5);display:grid;place-items:center;padding:20px" onclick="hideConfirm()"><div style="width:100%;max-width:420px;background:var(--card);color:var(--ink);border-radius:26px;padding:24px 20px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.4)" onclick="event.stopPropagation()">
+      <div style="width:84px;height:84px;margin:0 auto 12px;border-radius:50%;display:grid;place-items:center;font-size:44px;font-weight:800;overflow:hidden;${colors}">${pic}</div>
+      <div style="font-size:14px;color:var(--${tone});font-weight:700">${head}</div>
+      <div style="font-size:26px;font-weight:800;line-height:1.3;margin:6px 0 4px">${esc(o.name)}</div>
+      <div class="muted" style="font-size:14px">${esc(o.sub || '')}</div>${o.reason ? `<div class="banner bad" style="margin-top:10px">${esc(o.reason)}</div>` : ''}
+      <div style="display:flex;gap:10px;margin-top:18px">${ok ? `<button class="btn alt" style="flex:1" onclick="undo(); hideConfirm()">${l.undo}</button>` : ''}<button class="btn" style="flex:1" onclick="hideConfirm()">${l.next}</button></div></div></div>`;
+    if (ok) cfmTimer = setTimeout(hideConfirm, 4000);
+  } else {
+    e.innerHTML = `<div style="position:fixed;top:10px;inset-inline:10px;z-index:60;max-width:520px;margin:0 auto;${colors};border-radius:20px;padding:12px 14px;box-shadow:0 10px 30px rgba(0,0,0,.35)" onclick="hideConfirm()">
+      <div style="display:flex;gap:12px;align-items:center"><div style="width:56px;height:56px;border-radius:16px;flex:none;display:grid;place-items:center;font-size:30px;font-weight:800;overflow:hidden;background:var(--card);color:var(--${tone})">${pic}</div>
+      <div style="flex:1;min-width:0"><div style="font-size:12.5px;font-weight:700">${head}</div><div style="font-size:21px;font-weight:800;line-height:1.25">${esc(o.name)}</div><div style="font-size:12.5px;opacity:.9">${esc(o.reason || o.sub || '')}</div></div></div>${undoBtn}</div>`;
+    cfmTimer = setTimeout(hideConfirm, ok ? 2600 : 6000);
+  }
 }
 /* ---------- feedback: a short high beep + buzz when accepted, a low double beep + long buzz when refused ---------- */
 let audioCtx = null;
@@ -283,7 +317,7 @@ async function onQr(text) {
   if (id === lastQr.id) lastQr.seen = now;
   if (qrBusy || !id || continuous) return;
   lastQr = { id: id, seen: now }; qrBusy = true;
-  try { await identify(id); if (st.cur && !cardRefused(st.cur)) board(true); } finally { qrBusy = false; }
+  try { await identify(id); if (st.cur && !cardRefused(st.cur)) board(true); else if (st.cur) showConfirm({ ok: false, name: st.cur.name || id, reason: refusalText(st.cur), mode: 'banner' }); } finally { qrBusy = false; }
 }
 window.__onQr = onQr; // used by tests
 
