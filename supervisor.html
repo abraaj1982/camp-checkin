@@ -17,11 +17,18 @@
   <section class="hero compact"><div class="ic" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#17301C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="15" rx="3"/><path d="M4 11h16"/><circle cx="8.5" cy="14.5" r=".7"/><circle cx="15.5" cy="14.5" r=".7"/><path d="M6.5 18v2.5M17.5 18v2.5"/></svg></div><div><h1 id="busTitle">—</h1><p id="supName"></p></div></section>
   <div id="netbar" class="netbar" hidden></div>
   <main id="app"></main>
+  <div id="tmline" class="muted" style="font-size:11.5px;text-align:center;padding:6px 0" hidden></div>
 </div>
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4lEBGPNxghwq9UmK0iljI5QdS-8iCvC-K09dDtbZCXGvGZyA4repTE3rFVVRp5zS4yw/exec';
 const LOC_INTERVAL_MS = 45000; // C4: was 20 s. Every position update takes the shared write lock; 45 s keeps the leader map "fresh" (< 90 s, see ageClass in leader.html)
 
+/* ---------- timing line (TEST copy only): where do the seconds go? ---------- */
+const DBG = /camp-checkin-test|localhost|127\.0\.0\.1/.test(location.hostname), TM = {};
+const secs = ms => (ms / 1000).toFixed(1);
+function paintTm() { if (!DBG) return; const e = document.getElementById('tmline'); if (!e) return; if (TM.first === undefined) TM.first = performance.now();
+  let dcl = 0; try { dcl = performance.getEntriesByType('navigation')[0].domContentLoadedEventEnd; } catch (x) {}
+  e.hidden = false; e.textContent = '⏱ فتح الصفحة ' + secs(dcl) + ' ث · أول عرض ' + secs(TM.first) + ' ث · القائمة ' + (TM.roster === undefined ? '…' : secs(TM.roster) + ' ث') + ' · البلاغات ' + (TM.rep === undefined ? '…' : secs(TM.rep) + ' ث') + ' · الدخول ' + (sessionStorage.getItem('mk_t_login') || '—') + ' ث'; }
 /* ---------- session ---------- */
 function endSession(code) { try { localStorage.setItem('mk_logout_reason', code + '|' + Date.now()); } catch (e) {} sessionStorage.clear(); location.href = 'login.html'; } // only the REASON is kept (never the token), so the login page can say why
 const token = sessionStorage.getItem('mukhayyam_token');
@@ -152,8 +159,9 @@ function withQueue(r) {
 }
 async function refreshRoster(silent) {
   if (!navigator.onLine) return;
+  const a0 = performance.now();
   try {
-    const r = await api({ action: 'roster' });
+    const r = await api({ action: 'roster' }); TM.roster = performance.now() - a0; paintTm();
     if (r.success) { st.roster = withQueue(r); store.set('roster', st.roster); if (r.bus) { me.bus = r.bus; paintHero(); } }
     else if (r.code && AUTH_ERR.test(r.code)) { endSession(r.code); }
     else { st.loadErr = r.error || 'تعذّر تحميل القائمة'; render(); }
@@ -354,6 +362,7 @@ function failBox() {
   return `<div class="banner warn" id="failbox" role="status">${esc(L().retrying(names.join('، ') + (bad.length > 5 ? ' …(+' + (bad.length - 5) + ')' : '')))}</div>`;
 }
 function render() {
+  paintTm();
   if (st.round) { head(); bar(); $('app').innerHTML = failBox() + roundView(); return; }
   const keepReader = st.cam ? document.getElementById('reader') : null; if (keepReader) keepReader.remove(); // the live video must survive re-renders
   head(); bar();
@@ -456,7 +465,7 @@ function curCard() {
   return `<div class="card" style="border-color:${c.mine && !dup && !wd ? 'var(--brand)' : 'var(--line)'}"><div style="display:flex;gap:14px;align-items:center"><div class="photo">${safeUrl(c.photo) ? `<img src="${esc(safeUrl(c.photo))}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}<span>${L().student}</span></div><div style="flex:1;min-width:0"><div class="muted" style="font-size:13px">${l.student} ${esc(c.id)}</div><div class="big2">${esc(c.name)}</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><span class="pill">${esc(c.team)}</span>${c.cls ? `<span class="pill">${l.cls} ${esc(c.cls)}</span>` : ''}<span class="pill ${c.mine ? 'ok' : 'bad'}">${l.bus(c.bus)}</span></div></div></div>${act}${bags}<button class="btn alt full" style="margin-top:8px;min-height:44px;font-size:14px" onclick="resetCur()">${l.cancel}</button></div>`;
 }
 // My reports: only what THIS supervisor sent, with the status the leader gave it.
-async function loadMyReports() { if (!navigator.onLine) return; try { const r = await api({ action: 'myCases' }); if (r.success) { st.myRep = r.cases; store.set('myrep', r.cases); render(); } } catch (e) {} }
+async function loadMyReports() { if (!navigator.onLine) return; const a0 = performance.now(); try { const r = await api({ action: 'myCases' }); TM.rep = performance.now() - a0; paintTm(); if (r.success) { st.myRep = r.cases; store.set('myrep', r.cases); render(); } } catch (e) {} }
 function myReportsCard() {
   const l = L(), list = st.myRep || store.get('myrep', []); if (!list.length) return '';
   const lab = { open: l.repOpen, ack: l.repAck, closed: l.repClosed }, cls = { open: 'warn', ack: 'ok', closed: '' };
