@@ -4,137 +4,106 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>شاشة العرض — MUKHAYYAM</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Amiri:wght@700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Reem+Kufi:wght@500;700&family=Amiri:wght@700&display=swap">
 <style>
-/* Landscape TV (16:9). All sizes in vw so it scales with the screen. */
-:root{--gold:#E8B04B;--gold2:#F6D58E;--ink:#F4F1E8;--mute:rgba(244,241,232,.68);--glass:rgba(10,22,38,.55);--line:rgba(246,213,142,.28);--ok:#4CC38A;--bad:#E5484D;--onAccent:#1b1b1b;--track:rgba(255,255,255,.12);
-  --shade:linear-gradient(180deg,rgba(4,12,22,.85) 0,rgba(4,12,22,.55) 28%,rgba(4,12,22,.6) 70%,rgba(4,12,22,.92) 100%);--tint:transparent;--photo:brightness(.78) saturate(1.05);--sky:linear-gradient(160deg,#0b1d33,#071321 60%,#0e1a12);--shadow:rgba(0,0,0,.35)}
-/* Themes follow the time of day (set by the script from the prayer times). evening = the default above. */
-body[data-t="dawn"]{--gold:#F2A65A;--gold2:#FFD3A3;--ink:#FFF8F1;--mute:rgba(255,240,228,.75);--glass:rgba(58,28,52,.42);--line:rgba(255,211,163,.38);
-  --shade:linear-gradient(180deg,rgba(44,22,52,.78) 0,rgba(120,60,80,.25) 35%,rgba(150,80,70,.3) 70%,rgba(36,16,40,.9) 100%);--tint:linear-gradient(180deg,rgba(255,140,120,.28),rgba(255,205,140,.22));--photo:brightness(.9) saturate(1.1);--sky:linear-gradient(180deg,#2b1d3f,#9c5a78 45%,#f2a65a 80%,#ffd3a3)}
-body[data-t="day"]{--gold:#0E8C8C;--gold2:#0B6F6F;--ink:#0E2B33;--mute:rgba(14,43,51,.72);--glass:rgba(255,255,255,.8);--line:rgba(14,140,140,.28);--onAccent:#fff;--track:rgba(14,43,51,.12);--shadow:rgba(14,43,51,.18);
-  --shade:linear-gradient(180deg,rgba(240,250,250,.86) 0,rgba(240,250,250,.35) 30%,rgba(240,250,250,.4) 70%,rgba(240,250,250,.9) 100%);--photo:brightness(1.02) saturate(1.05);--sky:linear-gradient(180deg,#bfe6ee,#eef8f7 60%,#f7f1e3)}
-body[data-t="noon"]{--gold:#B8741A;--gold2:#8A5510;--ink:#3A2410;--mute:rgba(58,36,16,.72);--glass:rgba(255,249,238,.82);--line:rgba(184,116,26,.3);--onAccent:#fff;--track:rgba(58,36,16,.12);--shadow:rgba(58,36,16,.18);
-  --shade:linear-gradient(180deg,rgba(252,243,226,.86) 0,rgba(252,243,226,.35) 30%,rgba(252,243,226,.42) 70%,rgba(252,243,226,.9) 100%);--tint:linear-gradient(180deg,rgba(255,200,120,.12),transparent);--photo:brightness(1) saturate(1.1) sepia(.12);--sky:linear-gradient(180deg,#f3d9a6,#fbf0dc 60%,#f6e7c8)}
-body[data-t="sunset"]{--gold:#FF8A3D;--gold2:#FFC27A;--ink:#FFF5EC;--mute:rgba(255,236,220,.75);--glass:rgba(52,18,42,.5);--line:rgba(255,194,122,.35);
-  --shade:linear-gradient(180deg,rgba(42,12,40,.82) 0,rgba(130,45,45,.32) 35%,rgba(160,60,40,.35) 65%,rgba(26,8,24,.92) 100%);--tint:linear-gradient(180deg,rgba(120,40,120,.35),rgba(255,120,50,.35));--photo:brightness(.85) saturate(1.2);--sky:linear-gradient(180deg,#2a0f3a,#8c2f5a 40%,#ff8a3d 75%,#ffc27a)}
-body[data-t="night"]{--gold:#C9B37E;--gold2:#E2D3A8;--ink:#ECEAE4;--mute:rgba(236,234,228,.6);--glass:rgba(0,0,0,.55);--line:rgba(201,179,126,.22);
-  --shade:linear-gradient(180deg,rgba(0,0,0,.9) 0,rgba(0,0,0,.7) 30%,rgba(0,0,0,.72) 70%,rgba(0,0,0,.95) 100%);--photo:brightness(.5) saturate(.6);--sky:linear-gradient(180deg,#05070c,#000)}
- body[data-t="jumuah"]{--gold:#D9C27A;--gold2:#EADBA6;--ink:#F2F5EE;--mute:rgba(236,242,230,.7);--glass:rgba(8,40,30,.55);--line:rgba(217,194,122,.32);
-  --shade:linear-gradient(180deg,rgba(4,28,20,.88) 0,rgba(6,40,28,.55) 30%,rgba(6,40,28,.6) 70%,rgba(3,20,14,.94) 100%);--tint:linear-gradient(180deg,rgba(40,140,90,.3),rgba(20,80,60,.25));--photo:brightness(.7) saturate(.9);--sky:linear-gradient(180deg,#032016,#0b3b2a 60%,#14503a)}
-body[data-t="festive"]{--gold:#F5C542;--gold2:#FFE08A;--ink:#FFFBEF;--mute:rgba(255,248,225,.75);--glass:rgba(40,22,6,.5);--line:rgba(255,224,138,.45);
-  --shade:linear-gradient(180deg,rgba(30,16,4,.85) 0,rgba(90,55,10,.35) 30%,rgba(90,55,10,.4) 70%,rgba(24,12,2,.94) 100%);--tint:linear-gradient(135deg,rgba(255,200,60,.35),rgba(255,120,80,.2));--photo:brightness(.85) saturate(1.2);--sky:linear-gradient(160deg,#2a1604,#6b3d0a 60%,#b27b1c)}
-body[data-t="festive"] .pattern{opacity:.16;animation:twinkle 6s ease-in-out infinite}
-@keyframes twinkle{50%{opacity:.05}}
-.tint{position:fixed;inset:0;background:var(--tint);mix-blend-mode:soft-light;pointer-events:none}
-#fader{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;z-index:40;transition:opacity 1.2s ease}
+/* "Camp broadcast" identity: navy, copper and gold (from the camp logo). Landscape projector / TV, all sizes in vw.
+   Variants: jumuah (Thursday night), festive (closing day), night (quiet). The media committee can pin one. */
+:root{--navy:#08142a;--navy2:#10264a;--ink:#f3f6fc;--mute:#a9b8d6;--gold:#e8b25f;--cop:#c8773a;--ok:#51cf66;--bad:#ff6b6b;
+  --o1:#c8773a;--o2:#2e6bd6;--glass:rgba(255,255,255,.08);--line:rgba(255,255,255,.14);--frame:rgba(232,178,95,.5);--track:rgba(255,255,255,.14);
+  --bg:linear-gradient(160deg,var(--navy2),var(--navy) 62%)}
+body[data-t="jumuah"]{--o1:#2f8f66;--o2:#c8a24a;--bg:linear-gradient(160deg,#0d2c24,#061a14 62%)}
+body[data-t="festive"]{--o1:#e8b25f;--o2:#d2453a;--bg:linear-gradient(160deg,#2a1a08,#120a02 62%)}
+body[data-t="night"]{--o1:#2a3d63;--o2:#1b2744;--bg:linear-gradient(160deg,#050b18,#02050d 70%);--ink:#d9dfeb;--gold:#c9a66b}
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;background:#071321;color:var(--ink);font-family:'IBM Plex Sans Arabic',system-ui,sans-serif;overflow:hidden;cursor:none}
-.bg{position:fixed;inset:0;background-size:cover;background-position:center;opacity:0;transition:opacity 2.5s ease;animation:kb 40s ease-in-out infinite alternate}
-.bg.on{opacity:1}.bg:not(.none){filter:var(--photo)}
-.bg.none{background:var(--sky)}
-@keyframes kb{from{transform:scale(1)}to{transform:scale(1.08) translate(-1%,-1%)}}
-.shade{position:fixed;inset:0;background:var(--shade)}
-.pattern{position:fixed;inset:0;opacity:.06;background-image:radial-gradient(circle at 1.5vw 1.5vw,var(--gold2) .12vw,transparent .14vw);background-size:3vw 3vw}
-.top{position:fixed;top:0;inset-inline:0;padding:1.6vw 2.4vw 0;display:flex;justify-content:space-between;align-items:flex-start;gap:2vw;z-index:5}
-.brand{display:flex;align-items:center;gap:1.1vw}
-.logo{width:4.6vw;height:4.6vw;border-radius:1vw;background:var(--gold);color:#1b2a1b;display:grid;place-items:center;font:700 2.6vw 'IBM Plex Sans Arabic';overflow:hidden;box-shadow:0 .4vw 1.4vw rgba(0,0,0,.35)}
-.logo img{width:100%;height:100%;object-fit:contain;background:#fff}
-.cname{font-size:2vw;font-weight:700;line-height:1.2}.slogan{font-size:1.15vw;color:var(--gold2)}
-.dates{font-size:1vw;color:var(--mute);margin-top:.3vw}
-.clock{text-align:left;direction:ltr}
-.clock .t{font-size:3.6vw;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
-.clock .ap{font-size:1.6vw;margin-inline-start:.4vw;color:var(--gold2)}
-.chips{display:flex;gap:.6vw;justify-content:flex-end;margin-top:.6vw;direction:rtl}
-.chip{background:var(--glass);border:1px solid var(--line);border-radius:99px;padding:.3vw .9vw;font-size:1vw;white-space:nowrap;backdrop-filter:blur(6px)}
-.chip b{color:var(--gold2);font-variant-numeric:tabular-nums}
-.dot{display:inline-block;width:.6vw;height:.6vw;border-radius:50%;background:var(--ok);margin-inline-end:.4vw;animation:pulse 2s infinite}
-.dot.off{background:#888;animation:none}
-@keyframes pulse{50%{opacity:.35}}
-.stage{position:fixed;top:10.5vw;bottom:6.2vw;inset-inline:3vw;display:grid;place-items:center;z-index:4}
-.slide{width:100%;max-height:100%;animation:in .9s cubic-bezier(.2,.8,.2,1)}
-@keyframes in{from{opacity:0;transform:translateY(1.5vw) scale(.985)}to{opacity:1;transform:none}}
-.glass{background:var(--glass);border:1px solid var(--line);border-radius:1.6vw;backdrop-filter:blur(10px);box-shadow:0 1.5vw 4vw var(--shadow)}
-.kicker{color:var(--gold2);font-size:1.3vw;font-weight:600;letter-spacing:.02em}
-.h1{font-size:3.4vw;font-weight:700;line-height:1.25}
-.h2{font-size:2.3vw;font-weight:700;margin-bottom:1.4vw;display:flex;align-items:center;gap:.8vw;justify-content:center}
-.center{text-align:center}
-.big{font-size:9vw;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;direction:ltr}
-.cd{font-size:7vw;font-weight:700;color:var(--gold);font-variant-numeric:tabular-nums;direction:ltr;line-height:1.1;text-shadow:0 0 2.5vw rgba(232,176,75,.35)}
-.list{max-width:62vw;margin:0 auto;display:grid;gap:.9vw}
-.ev{display:flex;justify-content:space-between;align-items:center;padding:1.1vw 1.6vw}
-.ev .n{font-size:1.9vw;font-weight:600}.ev .w{font-size:1.15vw;color:var(--mute)}
-.ev .tm{font-size:1.6vw;color:var(--gold2);font-weight:600;white-space:nowrap}
-.ev.soon{border-color:var(--gold);box-shadow:0 0 0 .15vw rgba(232,176,75,.35)}
-.rank{max-width:66vw;margin:0 auto;display:grid;gap:1vw}
-.rrow{display:grid;grid-template-columns:3vw 14vw 1fr 6vw;align-items:center;gap:1.2vw;padding:.9vw 1.6vw;font-size:1.9vw}
-.bar{height:1.1vw;border-radius:99px;background:var(--track);overflow:hidden}.bar i{display:block;height:100%;border-radius:99px;transition:width 1.4s ease}
-.pts{font-weight:700;font-variant-numeric:tabular-nums;direction:ltr;text-align:left}
-.pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.2vw;max-width:62vw;margin:0 auto}
-.pcell{padding:1.4vw;text-align:center}.pcell .pn{font-size:1.6vw;color:var(--mute)}.pcell .pt{font-size:3.2vw;font-weight:700;direction:ltr}.pcell .iq{font-size:1vw;color:var(--mute)}
-.pcell.next{border-color:var(--gold);box-shadow:0 0 0 .15vw rgba(232,176,75,.45)}.pcell.past{opacity:.5}
-.card{padding:3vw 4vw;max-width:70vw;margin:0 auto;text-align:center}
-.icon{font-size:4.5vw;line-height:1;margin-bottom:1vw}
-.verse{font-family:'Amiri',serif;font-size:3.6vw;line-height:1.7;color:var(--ink)}
-.src{color:var(--gold2);font-size:1.4vw;margin-top:1vw}
-.podium{display:flex;justify-content:center;align-items:flex-end;gap:2vw;height:30vw}
-.pod{width:16vw;text-align:center}.pod .blk{border-radius:1vw 1vw 0 0;display:grid;place-items:center;font-size:3vw;font-weight:700;color:#10151c}
-.pod .tn{font-size:1.9vw;font-weight:700;margin:.6vw 0}.pod .md{font-size:3vw}
-.full{--ink:#F4F1E8;--gold:#E8B04B;--gold2:#F6D58E;--mute:rgba(244,241,232,.7);color:var(--ink);position:fixed;inset:0;z-index:20;display:grid;place-items:center;background:radial-gradient(ellipse at center,rgba(14,40,30,.97),rgba(4,12,22,.99));text-align:center;padding:4vw}
-.full.urgent{background:radial-gradient(ellipse at center,#5c1114,#1a0507)}
-.full .ttl{font-size:5vw;font-weight:700;line-height:1.3}
-.full .sub{font-size:2.2vw;color:var(--gold2);margin-top:1.4vw}
-.mosque{font-size:7vw}
-.ticker{position:fixed;bottom:2.2vw;inset-inline:2.4vw;height:3vw;overflow:hidden;border-radius:99px;background:var(--glass);border:1px solid var(--line);display:flex;align-items:center;z-index:6}
-.ticker .lb{flex:none;background:var(--gold);color:var(--onAccent);font-weight:700;font-size:1.1vw;padding:0 1.2vw;height:100%;display:grid;place-items:center}
-.ticker .tr{flex:1;overflow:hidden;white-space:nowrap;position:relative;height:100%}
-.ticker .tr span{position:absolute;top:50%;font-size:1.3vw;white-space:nowrap;animation:tick linear infinite}
-@keyframes tick{from{left:0;transform:translate(-100%,-50%)}to{left:100%;transform:translate(0,-50%)}}
-.dots{position:fixed;bottom:.8vw;inset-inline:0;display:flex;justify-content:center;gap:.4vw;z-index:6}
-.dots i{width:.5vw;height:.5vw;border-radius:99px;background:var(--track);transition:all .4s}.dots i.on{width:1.6vw;background:var(--gold)}
-.badge{display:inline-block;background:var(--gold);color:var(--onAccent);border-radius:99px;padding:.15vw .8vw;font-size:1vw;font-weight:700;vertical-align:middle}
-.setup{--ink:#F4F1E8;--mute:rgba(244,241,232,.7);--gold:#E8B04B;--line:rgba(246,213,142,.28);color:var(--ink);position:fixed;inset:0;display:grid;place-items:center;z-index:50;cursor:auto;background:#071321}
-.setup .box{width:min(560px,90vw);padding:28px;border-radius:18px;background:#0f2238;border:1px solid var(--line);font-size:16px}
-.setup input{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:#071321;color:var(--ink);font-size:16px;margin:10px 0;direction:ltr}
-.setup button{width:100%;padding:12px;border-radius:10px;border:0;color:#1b1b1b;background:var(--gold);font-weight:700;font-size:16px;cursor:pointer}
-.fs{position:fixed;bottom:5.6vw;left:1vw;z-index:30;cursor:pointer;background:var(--glass);color:var(--ink);border:1px solid var(--line);border-radius:99px;padding:.4vw 1vw;font-size:1vw;opacity:.7}
+html,body{height:100%;overflow:hidden;background:var(--navy)}
+body{background:var(--bg);color:var(--ink);font-family:Cairo,system-ui,sans-serif;cursor:none;transition:background 2s}
+.orb{position:fixed;border-radius:50%;filter:blur(4vw);opacity:.28;animation:orbf 18s ease-in-out infinite alternate;pointer-events:none}
+.o1{width:42vw;height:42vw;background:var(--o1);top:-14vw;right:-10vw}.o2{width:34vw;height:34vw;background:var(--o2);bottom:-12vw;left:-8vw;animation-delay:-6s}
+@keyframes orbf{to{transform:translate(-5vw,4vh) scale(1.15)}}
+.app{position:fixed;inset:0;display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:1.2vw;padding:1.6vw 2.6vw 1.2vw}
+.hd{display:flex;align-items:center;gap:1.2vw}
+.logo{width:5.4vw;height:5.4vw;border-radius:1vw;background:#fff;color:var(--navy);display:grid;place-items:center;font:700 2.6vw 'Reem Kufi';overflow:hidden;box-shadow:0 0 0 .2vw rgba(232,178,95,.55),0 .5vw 2vw rgba(0,0,0,.35)}
+.logo img{width:100%;height:100%;object-fit:contain}
+.cname{font-family:'Reem Kufi';font-size:2.5vw;line-height:1.25}.slogan{font-size:1.25vw;color:var(--gold)}
+.live{margin-inline-start:auto;display:flex;align-items:center;gap:.6vw;background:rgba(255,80,80,.16);border:1px solid rgba(255,100,100,.5);padding:.3vw 1vw;border-radius:99px;font-weight:700;font-size:1.2vw}
+.live i{width:.75vw;height:.75vw;border-radius:50%;background:#ff5252;animation:pls 1.4s infinite}.live.off{background:rgba(255,255,255,.08);border-color:var(--line)}.live.off i{background:#888;animation:none}
+@keyframes pls{0%{box-shadow:0 0 0 0 rgba(255,82,82,.7)}70%{box-shadow:0 0 0 .8vw rgba(255,82,82,0)}100%{box-shadow:0 0 0 0 rgba(255,82,82,0)}}
+.main{display:grid;grid-template-columns:minmax(0,1fr) 24vw;gap:1.6vw;min-height:0}
+.stage{position:relative;min-width:0;border-radius:2vw;background:linear-gradient(160deg,rgba(255,255,255,.11),rgba(255,255,255,.03));border:.12vw solid var(--frame);box-shadow:0 0 4vw rgba(232,178,95,.15);overflow:hidden}
+.sc{position:absolute;inset:0;padding:2vw 2.4vw 2.6vw;display:flex;flex-direction:column;justify-content:center;animation:scin .7s cubic-bezier(.2,.8,.2,1) both}
+@keyframes scin{from{opacity:0;transform:translateY(2vh) scale(.985)}to{opacity:1;transform:none}}
+.dots{position:absolute;bottom:.9vw;inset-inline:0;display:flex;justify-content:center;gap:.5vw;z-index:2}.dots i{width:.7vw;height:.7vw;border-radius:99px;background:var(--track);transition:all .4s}.dots i.on{width:2.4vw;background:var(--gold)}
+.k{color:var(--gold);font-weight:800;font-size:1.35vw}.h{font-family:'Reem Kufi';font-size:2.9vw;line-height:1.3;margin:.2vw 0 1vw}
+.st{font-family:'Reem Kufi';font-size:2.5vw;text-align:center;margin-bottom:1.2vw;text-shadow:0 .2vw 1.2vw rgba(232,178,95,.35)}
+.new{background:linear-gradient(90deg,var(--gold),var(--cop));color:#1a1206;border-radius:.7vw;padding:0 .7vw;font-size:.6em;vertical-align:middle}
+.g{display:grid;grid-template-columns:9vw minmax(0,1fr) auto;gap:1.2vw;align-items:center;padding:.85vw 0;border-top:1px solid var(--line);font-size:1.9vw;font-weight:700}
+.g:first-of-type{border-top:0}.grp{background:linear-gradient(135deg,var(--cop),var(--gold));color:#1a1206;border-radius:.8vw;text-align:center;padding:.3vw 0;font-size:1.4vw;font-weight:800}
+.pl{font-size:1.3vw;color:var(--mute);font-weight:600;white-space:nowrap}
+.bar{height:1vw;background:var(--track);border-radius:99px;overflow:hidden;margin-top:1.4vw}.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--cop),var(--gold));border-radius:99px;transition:width 1s linear}
+.rem{display:flex;justify-content:space-between;color:var(--mute);font-size:1.25vw;margin-top:.5vw}
+.day{display:flex;flex-direction:column;gap:.5vw}
+.dr{display:grid;grid-template-columns:11vw minmax(0,1fr) auto;gap:1vw;align-items:center;background:var(--glass);border:1px solid var(--line);border-radius:1vw;padding:.5vw 1.2vw;font-size:1.45vw}
+.dr.past{opacity:.42}.dr.now{background:rgba(232,178,95,.2);border-color:var(--gold);box-shadow:0 0 0 .12vw var(--gold) inset}.dr .tm{font-weight:800;direction:ltr;text-align:right;font-variant-numeric:tabular-nums}
+.nowb{background:#ff5252;color:#fff;border-radius:99px;padding:0 .7vw;font-size:.75em;margin-inline-start:.5vw}
+.rail{display:flex;flex-direction:column;gap:.9vw;min-height:0}
+.rc{background:var(--glass);border:1px solid var(--line);border-radius:1.5vw;padding:.9vw 1.2vw}
+.clk{font-size:4vw;font-weight:800;direction:ltr;text-align:center;line-height:1.05;font-variant-numeric:tabular-nums}.clk small{font-size:.4em;color:var(--gold)}
+.date{text-align:center;color:var(--mute);font-size:1.05vw;margin-top:.3vw}
+.rc .t{color:var(--gold);font-weight:800;font-size:1.1vw}.rc .v{font-size:1.6vw;font-weight:800;line-height:1.35}.rc .s{color:var(--mute);font-size:1.02vw}
+.cd{font-weight:800;color:var(--gold);direction:ltr;font-variant-numeric:tabular-nums;display:inline-block}.rc .cd{font-size:2.2vw}
+.tick{display:flex;align-items:center;gap:1vw;background:rgba(0,0,0,.32);border:1px solid var(--line);border-radius:1vw;height:3.4vw;overflow:hidden;font-size:1.45vw}
+.tick b{flex:none;background:linear-gradient(135deg,var(--cop),var(--gold));color:#1a1206;height:100%;display:grid;place-items:center;padding:0 1.2vw}
+.tick .tr{flex:1;position:relative;height:100%;overflow:hidden;white-space:nowrap}.tick .tr span{position:absolute;top:50%;animation:mq linear infinite}
+@keyframes mq{from{left:0;transform:translate(-100%,-50%)}to{left:100%;transform:translate(0,-50%)}}
+.card2{max-width:90%;margin:0 auto;text-align:center}.ai{font-size:5vw;line-height:1.1;animation:bob 1.6s ease-in-out infinite alternate}
+@keyframes bob{to{transform:translateY(-1vh) rotate(-6deg)}}
+.al{font-size:1.5vw;color:var(--gold);font-weight:800;margin:.4vw 0}.at{font-family:'Reem Kufi';font-size:3.4vw;line-height:1.4}.sub2{font-size:1.8vw;opacity:.92;margin-top:.6vw}
+.verse{font-family:Amiri,serif;font-size:3vw;line-height:1.7}
+.rank{display:flex;flex-direction:column;gap:.7vw;max-width:92%;margin:0 auto;width:100%}
+.lr{display:grid;grid-template-columns:4vw 15vw 1fr 7vw;align-items:center;gap:1.2vw;font-size:1.9vw;background:linear-gradient(90deg,rgba(255,255,255,.1),rgba(255,255,255,.04));border:1px solid var(--line);border-radius:1.2vw;padding:.45vw 1.4vw}
+.lr .bar{margin:0;height:1.4vw}.lr .bar i{margin:0;transition:width 1.4s cubic-bezier(.2,.8,.2,1)}.lr .pt{text-align:left;font-weight:900;color:var(--gold);direction:ltr}
+.pq{display:grid;gap:.9vw;max-width:92%;margin:0 auto;width:100%}
+.pc{text-align:center;border-radius:1.3vw;padding:.9vw;background:linear-gradient(160deg,rgba(255,255,255,.12),rgba(255,255,255,.04));border:1px solid var(--line)}
+.pc .pn{font-size:1.6vw;font-weight:800}.pc .pt{font-size:2.5vw;font-weight:900;color:var(--gold);direction:ltr}.pc small{font-size:1vw;opacity:.75}
+.pc.nx{border:.15vw solid var(--gold);box-shadow:0 0 3vw rgba(232,178,95,.45)}.pc.dn{opacity:.42}
+.pod{display:flex;align-items:flex-end;justify-content:center;gap:2vw;height:26vw}.pd{width:14vw;text-align:center}
+.pd .m{font-size:3vw}.pd .n{font-size:1.8vw;font-weight:800}.pd .b{border-radius:1vw 1vw 0 0;display:grid;place-items:center;font-size:2.4vw;font-weight:900;color:#1a1206}
+.full{position:fixed;inset:0;z-index:20;display:grid;place-items:center;text-align:center;padding:4vw;background:radial-gradient(ellipse at center,rgba(16,38,74,.97),rgba(4,10,22,.99))}
+.full.urgent{background:radial-gradient(ellipse at center,#6a1418,#1a0507)}.full.adhan{background:radial-gradient(ellipse at center,rgba(20,70,45,.97),rgba(4,16,10,.99))}
+.full .ttl{font-family:'Reem Kufi';font-size:5vw;line-height:1.3}.full .sub{font-size:2.1vw;color:var(--gold);margin-top:1.2vw}.full .ic{font-size:7vw}
+.full .big{font-size:8vw;font-weight:900;color:var(--gold);direction:ltr;font-variant-numeric:tabular-nums;line-height:1.1;margin:1vw 0}
+.setup{position:fixed;inset:0;display:grid;place-items:center;z-index:50;cursor:auto;background:var(--navy)}
+.setup .box{width:min(560px,90vw);padding:28px;border-radius:18px;background:var(--navy2);border:1px solid var(--frame);font-size:16px}
+.setup input{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--navy);color:var(--ink);font-size:16px;margin:10px 0;direction:ltr}
+.setup button,.fs{border:0;border-radius:10px;font-weight:700;cursor:pointer;background:linear-gradient(135deg,var(--cop),var(--gold));color:#1a1206}
+.setup button{width:100%;padding:12px;font-size:16px}
+.fs{position:fixed;bottom:6.4vw;left:3vw;z-index:30;padding:.4vw 1vw;font-size:1vw;opacity:.8}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01s!important;transition-duration:.01s!important}}
 </style>
 </head>
 <body>
-<div class="bg none on" id="bgA"></div><div class="bg none" id="bgB"></div>
-<div class="shade"></div><div class="tint"></div><div id="fader"></div><div class="pattern"></div>
-<header class="top">
-  <div class="brand"><div class="logo" id="logo">م</div><div><div class="cname" id="cname"></div><div class="slogan" id="slogan"></div><div class="dates" id="dates"></div></div></div>
-  <div><div class="clock"><span class="t" id="clk">--:--</span><span class="ap" id="ap"></span></div><div class="chips" id="chips"></div></div>
-</header>
-<main class="stage" id="stage"></main>
-<div class="ticker" id="ticker" style="display:none"><div class="lb">📣 إعلانات</div><div class="tr" id="tick"></div></div>
-<div class="dots" id="dots"></div>
+<i class="orb o1"></i><i class="orb o2"></i>
+<div class="app">
+  <header class="hd"><div class="logo" id="logo">م</div><div><div class="cname" id="cname"></div><div class="slogan" id="slogan"></div></div><span class="live" id="live"><i></i><span id="liveTx">مباشر</span></span></header>
+  <div class="main"><section class="stage"><div id="stage"></div><nav class="dots" id="dots"></nav></section><aside class="rail" id="rail"></aside></div>
+  <div class="tick" id="ticker" style="display:none"><b>📣</b><div class="tr" id="tick"></div></div>
+</div>
 <div id="over"></div>
 <button class="fs" id="fsBtn">⛶ ملء الشاشة</button>
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4lEBGPNxghwq9UmK0iljI5QdS-8iCvC-K09dDtbZCXGvGZyA4repTE3rFVVRp5zS4yw/exec';
-// Edit here: camp name/slogan (until set from the system), logo file and background photos (put files next to this page).
-const CONFIG = {
-  name: 'المخيّم الطلابي', slogan: 'في الخير محفلًا',
-  logo: '',                     // e.g. 'display/logo.png'
-  // each photo can be limited to some themes (leave "themes" out = all themes)
-  backgrounds: [
-    { src: 'display/bg1.jpg' },
-    { src: 'display/bg2.jpg', themes: ['dawn', 'day', 'noon', 'sunset', 'festive'] },
-    { src: 'display/bg3.jpg', themes: ['dawn', 'day', 'noon', 'sunset', 'jumuah', 'festive'] }
-  ],
-  slideSeconds: 10, prayingMinutes: 10, eventAlertMinutes: 15, nightFrom: 22, nightTo: 4
-};
+// Edit here until they are set from the system: camp name, slogan and the logo file (put it next to this page).
+const CONFIG = { name: 'المخيّم الطلابي', slogan: 'في الخير محمَّلًا', logo: '', slideSeconds: 12, prayingMinutes: 12, soonMinutes: 5, nightFrom: 22, nightTo: 4 };
 const $ = id => document.getElementById(id);
 const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
 const PR = { fajr: 'الفجر', dhuhr: 'الظهر', asr: 'العصر', maghrib: 'المغرب', isha: 'العشاء' };
 const TEAM_COLORS = ['#E5484D', '#4CC38A', '#3E8BFF', '#E8B04B', '#A06CF0', '#F07E3A', '#2EC4C4', '#E86BA7'];
+const HIDE_TYPES = ['حركة']; // bus movements are for the supervisors, not for the big screen
 
-let D = null, offset = 0, online = false, idx = 0, seen = {}, lastSlideKey = '';
+let D = null, offset = 0, online = false, idx = -1, seen = {}, lastKey = '', lastSync = 0;
 try { D = JSON.parse(store.get('mk_display_cache') || 'null'); } catch (e) {}
-// Preview only: display.html?at=2026-12-28T17:20 pretends it is that time (clock keeps running from there).
+// Preview only: display.html?at=2026-12-31T10:22 pretends it is that time (the clock keeps running from there).
 const PREVIEW_AT = (() => { const v = new URLSearchParams(location.search).get('at'); const d = v ? new Date(v) : null; return d && !isNaN(d) ? d.getTime() - Date.now() : null; })();
 const now = () => new Date(Date.now() + (PREVIEW_AT !== null ? PREVIEW_AT : offset));
 const p2 = n => String(n).padStart(2, '0');
@@ -142,20 +111,39 @@ const ymd = d => d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDa
 const hms = ms => { ms = Math.max(0, ms); const s = Math.floor(ms / 1000); return p2(Math.floor(s / 3600)) + ':' + p2(Math.floor(s % 3600 / 60)) + ':' + p2(s % 60); };
 const t12 = hhmm => { const [h, m] = hhmm.split(':').map(Number); return ((h % 12) || 12) + ':' + p2(m) + ' ' + (h < 12 ? 'ص' : 'م'); };
 const atTime = (day, hhmm) => { const [h, m] = hhmm.split(':').map(Number); const d = new Date(day); d.setHours(h, m, 0, 0); return d; };
-const timeOf = iso => { const d = new Date(iso); return t12(p2(d.getHours()) + ':' + p2(d.getMinutes())); };
+const dur = ms => { const m = Math.max(0, Math.round(ms / 60000)), h = Math.floor(m / 60), r = m % 60; return h ? (h === 1 ? 'ساعة' : h === 2 ? 'ساعتين' : h + ' ساعات') + (r ? ' و' + r + ' دقيقة' : '') : r + ' دقيقة'; };
 
 /* ---------- data ---------- */
 async function load() {
   const key = store.get('mk_feed_key'); if (!key) return;
   try {
     const r = await (await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'feed', key: key }) })).json();
-    if (r.success) { D = r; const so = new Date(r.serverTime).getTime() - Date.now(); offset = isFinite(so) ? so : 0; online = true; store.set('mk_display_cache', JSON.stringify(r)); }
+    if (r.success) { D = r; const so = new Date(r.serverTime).getTime() - Date.now(); offset = isFinite(so) ? so : 0; online = true; lastSync = Date.now(); store.set('mk_display_cache', JSON.stringify(r)); }
     else { online = false; if (/key/i.test(r.error || '')) { store.set('mk_feed_key', ''); setup('المفتاح غير صحيح. أدخله من جديد.'); } }
   } catch (e) { online = false; }
 }
 
-/* ---------- prayers ---------- */
-function prayerEvents() { // adhan times for yesterday, today, tomorrow
+/* ---------- program: blocks of activities that start together (one per group) ---------- */
+function blocksOf(day) {
+  const items = (D && D.program || []).filter(x => x.date === day && HIDE_TYPES.indexOf(x.type) === -1), map = {};
+  items.forEach(x => { (map[x.from] = map[x.from] || []).push(x); });
+  const keys = Object.keys(map).sort();
+  return keys.map((k, i) => { const list = map[k], start = atTime(day + 'T00:00:00', k), ends = list.map(x => x.to).filter(Boolean).sort();
+    const nextStart = keys[i + 1] ? atTime(day + 'T00:00:00', keys[i + 1]) : null;
+    const end = ends.length ? atTime(day + 'T00:00:00', ends[ends.length - 1]) : (nextStart || new Date(start.getTime() + 30 * 60000));
+    return { start: start, end: end < start ? new Date(start.getTime() + 30 * 60000) : end, items: list }; });
+}
+function programState() {
+  const t = now(), today = blocksOf(ymd(t)), tom = new Date(t); tom.setDate(tom.getDate() + 1);
+  const cur = today.filter(b => b.start <= t && t < b.end).pop() || null;
+  const next = today.concat(blocksOf(ymd(tom))).find(b => b.start > t) || null;
+  return { today: today, cur: cur, next: next };
+}
+const blockTitle = b => { const ts = Array.from(new Set(b.items.map(x => x.title))); return b.items.length > 1 && ts.length > 1 ? 'أنشطة المجموعات' : ts[0]; };
+const groupName = g => String(g || '').replace(/[()]/g, '').replace('جميع الموجودين', 'الجميع').trim() || 'الجميع';
+
+/* ---------- prayers (the adhan is live from the camp mosque: the screen only shows it, no sound) ---------- */
+function prayerEvents() {
   if (!D || !D.prayers) return [];
   const out = [], base = now();
   for (const k of [-1, 0, 1]) { const day = new Date(base); day.setDate(day.getDate() + k); const p = D.prayers[ymd(day)]; if (!p) continue;
@@ -165,183 +153,165 @@ function prayerEvents() { // adhan times for yesterday, today, tomorrow
 const iqMs = () => (D && D.iqamaMinutes || 15) * 60000;
 function prayerState() {
   const t = now().getTime(), ev = prayerEvents();
-  const cur = ev.filter(e => e.at.getTime() <= t && t < e.at.getTime() + iqMs() + CONFIG.prayingMinutes * 60000).pop();
-  const next = ev.find(e => e.at.getTime() > t);
-  return { cur: cur, next: next };
+  return { cur: ev.filter(e => e.at.getTime() <= t && t < e.at.getTime() + iqMs() + CONFIG.prayingMinutes * 60000).pop(), next: ev.find(e => e.at.getTime() > t) };
 }
 
-/* ---------- content ---------- */
+/* ---------- scenes ---------- */
 const ann = k => (D && D.announcements || []).filter(a => a.kind === k);
-function upcomingEvents() { const t = now().getTime(); return ann('event').concat(ann('finale')).filter(a => a.startsAt && new Date(a.startsAt).getTime() > t - 30 * 60000).sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt)); }
-function whenText(iso) {
-  const d = new Date(iso), t = now(), ms = d - t;
-  if (ms < 0) return 'جارية الآن';
-  if (ms < 60 * 60000) return 'بعد ' + Math.ceil(ms / 60000) + ' دقيقة';
-  const day = ymd(d) === ymd(t) ? 'اليوم' : ymd(d) === ymd(new Date(t.getTime() + 864e5)) ? 'غداً' : d.toLocaleDateString('ar-u-nu-latn', { weekday: 'long' });
-  return day + ' ' + timeOf(iso);
+function nowScene(ps) {
+  const b = ps.cur, t = now();
+  if (!b) return '';
+  const pct = Math.min(100, Math.round((t - b.start) / (b.end - b.start) * 100));
+  const rows = b.items.length > 1 ? b.items.map(x => `<div class="g"><span class="grp">${esc(groupName(x.group))}</span><span>${esc(x.title)}</span><span class="pl">${x.place ? '📍 ' + esc(x.place) : ''}</span></div>`).join('')
+    : `<div class="sub2" style="font-size:1.7vw">${b.items[0].place ? '📍 ' + esc(b.items[0].place) : ''}${b.items[0].group ? ' · ' + esc(groupName(b.items[0].group)) : ''}</div>`;
+  return `<div class="k">⏺ الآن · ${t12(b.items[0].from)}${b.items[0].to ? ' – ' + t12(b.items[0].to) : ''}</div><div class="h">${esc(blockTitle(b))}</div>${rows}
+    <div class="bar"><i style="width:${Math.max(2, pct)}%"></i></div><div class="rem"><span>مضى ${dur(t - b.start)}</span><span>متبقٍ ${dur(b.end - t)}</span></div>`;
 }
-function slides() {
+function dayScene(ps) {
+  const t = now(), list = ps.today; if (!list.length) return '';
+  const ci = list.indexOf(ps.cur), from = Math.max(0, Math.min(ci < 0 ? list.findIndex(b => b.start > t) - 1 : ci - 2, list.length - 8)), show = list.slice(Math.max(0, from), Math.max(0, from) + 8);
+  return `<h2 class="st">📅 برنامج اليوم · ${esc(t.toLocaleDateString('ar-u-nu-latn', { weekday: 'long', day: 'numeric', month: 'long' }))}</h2><div class="day">${show.map(b => { const isNow = b === ps.cur, past = b.end <= t;
+    return `<div class="dr ${isNow ? 'now' : past ? 'past' : ''}"><span class="tm">${t12(b.items[0].from)}</span><span>${esc(blockTitle(b))}${isNow ? '<span class="nowb">الآن</span>' : ''}</span><span class="pl">${b.items.length > 1 ? b.items.length + ' مجموعات' : (b.items[0].place ? '📍 ' + esc(b.items[0].place) : '')}</span></div>`; }).join('')}</div>`;
+}
+function rankScene() {
+  const tt = D.totals, mx = Math.max(1, ...tt.map(x => x.points)), medal = ['🥇', '🥈', '🥉'];
+  return `<h2 class="st">🏆 الترتيب العام للفرق</h2><div class="rank">${tt.slice(0, 8).map((x, i) => `<div class="lr"><span style="text-align:center">${medal[i] || (i + 1)}</span><b>${esc(x.team)}</b><div class="bar"><i style="width:${Math.round(x.points / mx * 100)}%;background:${TEAM_COLORS[i % TEAM_COLORS.length]}"></i></div><span class="pt">${x.points}</span></div>`).join('')}</div>`;
+}
+function prayersScene() {
+  const t = now(), p = D.prayers[ymd(t)], st = prayerState(), iq = D.iqamaMinutes || 15, names = Object.keys(PR).filter(n => p[n]);
+  return `<h2 class="st">🕌 أوقات الصلاة</h2>${st.next ? `<div class="al" style="text-align:center;margin:-.4vw 0 1vw">الصلاة القادمة: ${PR[st.next.n]} بعد <span class="cd" data-cd="${st.next.at.getTime()}">${hms(st.next.at - t)}</span></div>` : ''}
+    <div class="pq" style="grid-template-columns:repeat(${Math.min(names.length, 5)},1fr)">${names.map(n => { const at = atTime(t, p[n]), nx = st.next && st.next.n === n && ymd(st.next.at) === ymd(t);
+      return `<div class="pc ${nx ? 'nx' : at < t ? 'dn' : ''}"><div class="pn">${PR[n]}</div><div class="pt">${t12(p[n])}</div><small>الإقامة +${iq} د</small></div>`; }).join('')}</div>`;
+}
+const textScene = (icon, kicker, title, body, verse) => `<div class="card2"><div class="ai">${icon}</div><div class="al">${esc(kicker)}</div>${verse ? `<div class="verse">${esc(title)}</div>${body ? `<div class="sub2" style="color:var(--gold)">${esc(body)}</div>` : ''}` : `<div class="at">${esc(title)}</div>${body ? `<div class="sub2">${esc(body)}</div>` : ''}`}</div>`;
+function podiumScene(g) {
+  const rows = g.rows.slice(0, 3), order = [rows[1], rows[0], rows[2]].filter(Boolean), h = [22, 16, 12], col = ['#E8B25F', '#C0C7D0', '#C98A4B'], md = ['🥇', '🥈', '🥉'];
+  return `<h2 class="st">🎯 ${esc(g.competition)} <span class="new">النتيجة</span></h2><div class="pod">${order.map(r => { const i = rows.indexOf(r);
+    return `<div class="pd"><div class="m">${md[i]}</div><div class="n">${esc(r.team)}</div><div class="b" style="height:${h[i]}vw;background:${col[i]}">${r.points !== null ? r.points : '#' + (i + 1)}</div></div>`; }).join('')}</div>`;
+}
+function welcomeScene() {
+  const t = now(), h = t.getHours(), g = ann('greeting')[0];
+  return textScene('🏕️', h < 12 ? 'صباح الخير' : h < 18 ? 'طاب يومكم' : 'مساء النور', g ? g.title : campName(), g ? g.body : campSlogan());
+}
+function finaleScene(a) {
+  const ms = new Date(a.startsAt) - now(), d = Math.floor(ms / 864e5), hh = Math.floor(ms % 864e5 / 36e5), m = Math.floor(ms % 36e5 / 6e4);
+  return `<div class="card2"><div class="ai">🎉</div><div class="al">العدّ التنازلي</div><div class="at">${esc(a.title)}</div><div class="sub2" style="font-size:3vw;color:var(--gold);font-weight:900">${d > 0 ? d + ' يوم · ' : ''}${hh} ساعة · ${m} دقيقة</div></div>`;
+}
+function scenes(ps) {
   const s = [], t = now();
-  s.push({ key: 'welcome', html: welcomeSlide() });
-  const fin = ann('finale')[0];
-  if (fin && fin.startsAt && new Date(fin.startsAt) - t > 60 * 60000) s.push({ key: 'finale', html: finaleSlide(fin) });
-  const evs = upcomingEvents(); if (evs.length) s.push({ key: 'events', html: eventsSlide(evs.slice(0, 5)) });
-  if (D && D.totals && D.totals.length) s.push({ key: 'rank', html: rankSlide() });
-  if (D && D.prayers && D.prayers[ymd(t)]) s.push({ key: 'prayers', html: prayersSlide() });
-  ann('wisdom').slice(0, 1).forEach(a => s.push({ key: a.id, at: a.publishedAt, html: textSlide('📖', 'حكمة اليوم', a.title, a.body, true) }));
-  ann('announce').slice(0, 5).forEach(a => s.push({ key: a.id, at: a.publishedAt, html: textSlide('📣', 'إعلان', a.title, a.body) }));
-  ann('kudos').slice(0, 3).forEach(a => s.push({ key: a.id, at: a.publishedAt, html: textSlide('🤝', 'موقف اليوم', a.title, a.body) }));
-  ann('quote').slice(0, 3).forEach(a => s.push({ key: a.id, at: a.publishedAt, html: textSlide('💬', 'قالوا عن المخيم', '«' + a.body + '»', a.title) }));
-  ann('call').slice(0, 3).forEach(a => s.push({ key: a.id, at: a.publishedAt, html: textSlide('🔔', 'استدعاء', a.title, a.body || 'يُرجى المراجعة') }));
-  const res = D && D.results || []; if (res.length) s.push({ key: 'pod-' + res[res.length - 1].competition, html: podiumSlide(res[res.length - 1]) });
+  if (ps.cur) s.push({ key: 'now', live: true, html: () => nowScene(programState()) });
+  if (ps.today.length) s.push({ key: 'day', live: true, html: () => dayScene(programState()) });
+  ann('announce').slice(0, 5).forEach(a => s.push({ key: a.id, at: a.publishedAt, html: () => textScene('📣', 'إعلان', a.title, a.body) }));
+  ann('call').slice(0, 3).forEach(a => s.push({ key: a.id, at: a.publishedAt, html: () => textScene('🔔', 'استدعاء', a.title, a.body || 'يُرجى المراجعة') }));
+  if (D && D.totals && D.totals.length) s.push({ key: 'rank', html: rankScene });
+  if (D && D.prayers && D.prayers[ymd(t)]) s.push({ key: 'prayers', live: true, html: prayersScene });
+  const res = D && D.results || []; if (res.length) s.push({ key: 'pod-' + res[res.length - 1].competition, html: () => podiumScene(res[res.length - 1]) });
+  ann('wisdom').slice(0, 1).forEach(a => s.push({ key: a.id, at: a.publishedAt, html: () => textScene('📖', 'حكمة اليوم', a.title, a.body, true) }));
+  ann('kudos').slice(0, 3).forEach(a => s.push({ key: a.id, at: a.publishedAt, html: () => textScene('🤝', 'موقف اليوم', a.title, a.body) }));
+  ann('quote').slice(0, 3).forEach(a => s.push({ key: a.id, at: a.publishedAt, html: () => textScene('💬', 'قالوا عن المخيم', '«' + a.body + '»', a.title) }));
+  const fin = ann('finale')[0]; if (fin && fin.startsAt && new Date(fin.startsAt) - t > 60 * 60000) s.push({ key: 'finale', live: true, html: () => finaleScene(fin) });
+  if (!s.length) s.push({ key: 'welcome', html: welcomeScene });
   return s;
 }
-function welcomeSlide() {
-  const t = now(), h = t.getHours(), th = document.body.dataset.t, g = ann('greeting')[0];
-  const greet = th === 'jumuah' ? 'ليلة الجمعة المباركة' : th === 'festive' ? 'يوم الختام 🎉' : h < 12 ? 'صباح الخير' : h < 18 ? 'طاب يومكم' : 'مساء النور';
-  const start = D && D.campStart ? new Date(D.campStart + 'T00:00:00') : null, days = D && D.campDays || 4;
-  const n = start ? Math.floor((new Date(ymd(t) + 'T00:00:00') - start) / 864e5) + 1 : 0;
-  const dayLine = n >= 1 && n <= days ? `اليوم <b style="color:var(--gold)">${n}</b> من ${days}` : n < 1 && start ? `يبدأ المخيم بعد <b style="color:var(--gold)">${Math.ceil((start - t) / 864e5)}</b> يوم` : '';
-  return `<div class="center"><div class="kicker">${greet}</div><div class="h1" style="font-size:4.6vw;margin:.6vw 0">${esc(campName())}</div><div class="slogan" style="font-size:2vw">${esc(campSlogan())}</div>${g ? `<div style="font-size:2.2vw;margin-top:1.6vw;font-weight:600">${esc(g.title)}</div>${g.body ? `<div style="font-size:1.5vw;color:var(--mute);margin-top:.4vw">${esc(g.body)}</div>` : ''}` : ''}${dayLine ? `<div class="chip" style="display:inline-block;font-size:1.6vw;margin-top:2vw;padding:.6vw 1.8vw">${dayLine}</div>` : ''}</div>`;
-}
-function finaleSlide(a) {
-  const ms = new Date(a.startsAt) - now(), d = Math.floor(ms / 864e5), h = Math.floor(ms % 864e5 / 36e5), m = Math.floor(ms % 36e5 / 6e4);
-  const box = (v, l) => `<div class="glass" style="padding:1.4vw 2vw;min-width:12vw"><div class="cd" style="font-size:6vw">${v}</div><div class="kicker">${l}</div></div>`;
-  return `<div class="center"><div class="icon">🎉</div><div class="kicker">العدّ التنازلي</div><div class="h1" style="margin:.4vw 0 1.6vw">${esc(a.title)}</div>
-    <div style="display:flex;gap:1.4vw;justify-content:center">${d > 0 ? box(d, 'يوم') : ''}${box(h, 'ساعة')}${box(m, 'دقيقة')}</div>${a.body ? `<div class="src" style="margin-top:1.4vw">📍 ${esc(a.body)} · ${esc(whenText(a.startsAt))}</div>` : ''}</div>`;
-}
-function eventsSlide(evs) {
-  const t = now().getTime();
-  return `<div><div class="h2">📅 الفعاليات القادمة</div><div class="list">${evs.map(a => { const ms = new Date(a.startsAt) - t;
-    return `<div class="glass ev ${ms > 0 && ms < 60 * 60000 ? 'soon' : ''}"><div><div class="n">${esc(a.title)}</div>${a.body ? `<div class="w">📍 ${esc(a.body)}</div>` : ''}</div><div class="tm">${esc(whenText(a.startsAt))}</div></div>`; }).join('')}</div></div>`;
-}
-function rankSlide() {
-  const tt = D.totals, mx = Math.max(1, ...tt.map(x => x.points)), medal = ['🥇', '🥈', '🥉'];
-  return `<div><div class="h2">🏆 الترتيب العام للفرق</div><div class="rank">${tt.slice(0, 8).map((x, i) => `<div class="glass rrow"><span>${medal[i] || (i + 1)}</span><b>${esc(x.team)}</b><div class="bar"><i style="width:${Math.round(x.points / mx * 100)}%;background:${TEAM_COLORS[i % TEAM_COLORS.length]}"></i></div><span class="pts">${x.points}</span></div>`).join('')}</div></div>`;
-}
-function prayersSlide() {
-  const t = now(), p = D.prayers[ymd(t)], st = prayerState(), iq = D.iqamaMinutes || 15;
-  const names = Object.keys(PR).filter(n => p[n]);
-  return `<div><div class="h2">🕌 أوقات الصلاة</div>${st.next ? `<div class="center kicker" style="margin:-.6vw 0 1.2vw">الصلاة القادمة: ${PR[st.next.n]} بعد <b>${hms(st.next.at - t)}</b></div>` : ''}
-    <div class="pgrid" style="grid-template-columns:repeat(${Math.min(names.length, 5)},1fr)">${names.map(n => { const at = atTime(t, p[n]); const isNext = st.next && st.next.n === n && ymd(st.next.at) === ymd(t);
-      return `<div class="glass pcell ${isNext ? 'next' : at < t ? 'past' : ''}"><div class="pn">${PR[n]}</div><div class="pt">${t12(p[n])}</div><div class="iq">الإقامة +${iq} د</div></div>`; }).join('')}</div></div>`;
-}
-function textSlide(icon, kicker, title, body, verse) {
-  return `<div class="glass card"><div class="icon">${icon}</div><div class="kicker">${esc(kicker)}</div>${verse ? `<div class="verse" style="margin-top:1vw">${esc(title)}</div>${body ? `<div class="src">${esc(body)}</div>` : ''}` : `<div class="h1" style="margin-top:.8vw">${esc(title)}</div>${body ? `<div class="src" style="color:var(--ink);font-size:1.8vw">${esc(body)}</div>` : ''}`}</div>`;
-}
-function podiumSlide(g) {
-  const rows = g.rows.slice(0, 3), order = [rows[1], rows[0], rows[2]].filter(Boolean), h = { 0: 24, 1: 18, 2: 13 }, col = ['#E8B04B', '#C0C7D0', '#C98A4B'], md = ['🥇', '🥈', '🥉'];
-  return `<div><div class="h2">🎯 ${esc(g.competition)} <span class="badge">النتيجة</span></div><div class="podium">${order.map(r => { const i = rows.indexOf(r);
-    return `<div class="pod"><div class="md">${md[i]}</div><div class="tn">${esc(r.team)}</div><div class="blk" style="height:${h[i]}vw;background:${col[i]}">${r.points !== null ? r.points : '#' + (i + 1)}</div></div>`; }).join('')}</div></div>`;
-}
 
-/* ---------- full-screen overrides (priority order) ---------- */
+/* ---------- full-screen moments (priority order) ---------- */
 function override() {
   const t = now(), u = ann('urgent')[0];
-  if (u) return `<div class="full urgent"><div><div class="icon">🚨</div><div class="ttl">${esc(u.title)}</div>${u.body ? `<div class="sub" style="color:#fff">${esc(u.body)}</div>` : ''}</div></div>`;
+  if (u) return `<div class="full urgent"><div><div class="ic">🚨</div><div class="ttl">${esc(u.title)}</div>${u.body ? `<div class="sub" style="color:#fff">${esc(u.body)}</div>` : ''}</div></div>`;
   const ps = prayerState();
   if (ps.cur) {
-    const adhan = ps.cur.at.getTime(), iqama = adhan + iqMs();
-    if (t < iqama) return `<div class="full"><div><div class="mosque">🕌</div><div class="kicker" style="font-size:1.8vw">حان الآن موعد</div><div class="ttl">أذان ${PR[ps.cur.n]}</div><div class="sub">الإقامة بعد <b class="cd" style="font-size:5vw;display:block;margin-top:.6vw">${hms(iqama - t)}</b></div></div></div>`;
-    return `<div class="full"><div><div class="mosque">🤲</div><div class="ttl">صلاة ${PR[ps.cur.n]} قائمة</div><div class="sub">نسألكم الدعاء · نرجو الهدوء</div></div></div>`;
+    const adhan = ps.cur.at.getTime(), iqama = adhan + iqMs(), n = PR[ps.cur.n];
+    if (t < iqama) return `<div class="full adhan"><div><div class="ic">🕌</div><div class="sub" style="margin:0">حان الآن موعد</div><div class="ttl">أذان ${n}</div><div class="sub">تُقام صلاة ${n} بعد</div><div class="big">${hms(iqama - t)}</div><div class="sub" style="color:var(--ink);opacity:.8">يُرجى التوجّه إلى المسجد</div></div></div>`;
+    return `<div class="full adhan"><div><div class="ic">🤲</div><div class="ttl">تُقام الآن صلاة ${n}</div><div class="sub">نرجو الهدوء · تقبّل الله طاعاتكم</div></div></div>`;
   }
-  const soon = upcomingEvents().find(a => { const ms = new Date(a.startsAt) - t; return ms > 0 && ms <= CONFIG.eventAlertMinutes * 60000; });
-  if (soon) return `<div class="full" style="background:radial-gradient(ellipse at center,rgba(40,30,8,.9),rgba(4,12,22,.97))"><div><div class="icon">⏰</div><div class="kicker" style="font-size:1.8vw">تبدأ بعد قليل</div><div class="ttl">${esc(soon.title)}</div><div class="cd" style="margin:1vw 0">${hms(new Date(soon.startsAt) - t)}</div>${soon.body ? `<div class="sub">📍 ${esc(soon.body)}</div>` : ''}</div></div>`;
+  const pg = programState(), nb = pg.next;
+  if (nb && nb.start - t > 0 && nb.start - t <= CONFIG.soonMinutes * 60000 && nb.items.some(x => x.type !== 'راحة'))
+    return `<div class="full"><div><div class="ic">⏰</div><div class="sub" style="margin:0">يبدأ بعد قليل</div><div class="ttl">${esc(blockTitle(nb))}</div><div class="big">${hms(nb.start - t)}</div><div class="sub">${nb.items.length > 1 ? nb.items.map(x => esc(groupName(x.group)) + ': ' + esc(x.place || x.title)).join(' · ') : (nb.items[0].place ? '📍 ' + esc(nb.items[0].place) : '')}</div></div></div>`;
   const h = t.getHours();
   if (h >= CONFIG.nightFrom || h < CONFIG.nightTo) { const n = ps.next;
-    return `<div class="full" style="background:radial-gradient(ellipse at center,#0b1a2e,#02060c)"><div><div class="icon">🌙</div><div class="big">${esc(t12(p2(h) + ':' + p2(t.getMinutes())))}</div>${n ? `<div class="sub">الصلاة القادمة: ${PR[n.n]} بعد ${hms(n.at - t)}</div>` : ''}<div class="kicker" style="margin-top:1vw">تصبحون على خير</div></div></div>`; }
+    return `<div class="full" style="background:radial-gradient(ellipse at center,#0b1a2e,#02060c)"><div><div class="ic">🌙</div><div class="big" style="color:var(--ink)">${esc(t12(p2(h) + ':' + p2(t.getMinutes())))}</div>${n ? `<div class="sub">الصلاة القادمة: ${PR[n.n]} بعد ${hms(n.at - t)}</div>` : ''}<div class="sub" style="color:var(--ink);opacity:.7">تصبحون على خير</div></div></div>`; }
   return '';
 }
 
-/* ---------- themes by time of day ---------- */
-// dawn (after Fajr, sunrise) -> day -> noon (afternoon) -> sunset (around Maghrib) -> evening -> night.
-const THEME_NAMES = { dawn: 'الشروق', day: 'النهار', noon: 'العصر', sunset: 'الغروب', evening: 'المساء', night: 'الليل', jumuah: 'ليلة الجمعة', festive: 'احتفالي' };
+/* ---------- identity variant ---------- */
 function themeNow() {
-  const forced = new URLSearchParams(location.search).get('theme'); if (forced && THEME_NAMES[forced]) return forced; // preview only
-  if (D && D.displayTheme && THEME_NAMES[D.displayTheme]) return D.displayTheme;   // pinned by the media committee
-  const t = now(), p = (D && D.prayers && D.prayers[ymd(t)]) || {};
-  const at = (hhmm, def) => atTime(t, hhmm || def).getTime();
-  const fajr = at(p.fajr, '05:30'), dhuhr = at(p.dhuhr, '12:10'), maghrib = at(p.maghrib, '17:30'), x = t.getTime(), m = 60000;
-  const night = new Date(t); night.setHours(CONFIG.nightFrom, 0, 0, 0);
-  const fin = ann('finale')[0];
-  if (fin && fin.startsAt && ymd(new Date(fin.startsAt)) === ymd(t) && x >= fajr && t.getHours() < CONFIG.nightFrom) return 'festive';  // closing day
-  if ((t.getDay() === 4 && x >= maghrib + 40 * m) || (t.getDay() === 5 && x < fajr)) return 'jumuah';                       // Thursday night
-  if (x >= fajr && x < fajr + 150 * m) return 'dawn';
-  if (x >= fajr && x < dhuhr + 150 * m) return 'day';
-  if (x >= fajr && x < maghrib - 50 * m) return 'noon';
-  if (x >= maghrib - 50 * m && x < maghrib + 40 * m) return 'sunset';
-  if (x >= maghrib && x < night.getTime()) return 'evening';
-  return 'night';
-}
-function applyTheme() {
-  const th = themeNow(), cur = document.body.dataset.t;
-  if (th === cur) return;
-  if (!cur) { document.body.dataset.t = th; return; }
-  $('fader').style.opacity = '1';
-  setTimeout(() => { document.body.dataset.t = th; $('fader').style.opacity = '0'; }, 1200);
+  const forced = new URLSearchParams(location.search).get('theme'); if (forced) return forced; // preview only
+  if (D && D.displayTheme && ['brand', 'jumuah', 'festive', 'night'].indexOf(D.displayTheme) !== -1) return D.displayTheme; // pinned by the media committee
+  const t = now(), fin = ann('finale')[0], h = t.getHours();
+  if (fin && fin.startsAt && ymd(new Date(fin.startsAt)) === ymd(t)) return 'festive';
+  if ((t.getDay() === 4 && h >= 18) || (t.getDay() === 5 && h < 4)) return 'jumuah';
+  if (h >= CONFIG.nightFrom || h < CONFIG.nightTo) return 'night';
+  return 'brand';
 }
 
 /* ---------- painting ---------- */
 const campName = () => (D && D.campName) || CONFIG.name;
 const campSlogan = () => (D && D.campSlogan) || CONFIG.slogan;
+function dayLine() {
+  const t = now(), start = D && D.campStart ? new Date(D.campStart + 'T00:00:00') : null, days = D && D.campDays || 4;
+  const n = start ? Math.floor((new Date(ymd(t) + 'T00:00:00') - start) / 864e5) + 1 : 0;
+  return n >= 1 && n <= days ? ' · اليوم ' + n + ' من ' + days : n < 1 && start ? ' · يبدأ المخيم بعد ' + Math.ceil((start - t) / 864e5) + ' يوم' : '';
+}
 function paintHeader() {
-  const t = now();
-  $('cname').textContent = campName(); $('slogan').textContent = campSlogan();
-  const h = t.getHours(); $('clk').textContent = ((h % 12) || 12) + ':' + p2(t.getMinutes()); $('ap').textContent = h < 12 ? 'ص' : 'م';
-  let hij = ''; try { hij = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura-nu-latn', { day: 'numeric', month: 'long', year: 'numeric' }).format(t); } catch (e) {}
-  $('dates').textContent = t.toLocaleDateString('ar-u-nu-latn', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) + (hij ? ' · ' + hij : '');
-  const n = prayerState().next;
-  $('chips').innerHTML = `<span class="chip"><span class="dot ${online ? '' : 'off'}"></span>${online ? 'مباشر' : 'غير متصل'}</span>${n ? `<span class="chip">🕌 ${PR[n.n]} بعد <b>${hms(n.at - t)}</b></span>` : ''}`;
+  const th = themeNow(); if (document.body.dataset.t !== th) document.body.dataset.t = th;
+  $('cname').textContent = campName(); $('slogan').textContent = campSlogan() + dayLine();
+  $('live').className = 'live' + (online ? '' : ' off');
+  $('liveTx').textContent = online ? 'مباشر' : 'دون اتصال · آخر تحديث ' + (lastSync ? new Date(lastSync).toTimeString().slice(0, 5) : '—');
+}
+function paintRail() {
+  const t = now(), h = t.getHours(), pg = programState(), ps = prayerState(), w = D && D.weather && D.weather.days ? D.weather.days.find(x => x.date === ymd(t)) : null;
+  const tt = D && D.totals || [];
+  let html = `<div class="rc"><div class="clk">${(h % 12) || 12}:${p2(t.getMinutes())} <small>${h < 12 ? 'ص' : 'م'}</small></div><div class="date">${esc(t.toLocaleDateString('ar-u-nu-latn', { weekday: 'long', day: 'numeric', month: 'long' }))}${w ? ` · ${w.tmax}° · 🌧 ${w.rain}%` : ''}</div></div>`;
+  if (pg.next) html += `<div class="rc"><div class="t">⏭ التالي</div><div class="v">${esc(blockTitle(pg.next))}</div><div class="s">${t12(pg.next.items[0].from)}${pg.next.items.length === 1 && pg.next.items[0].place ? ' · ' + esc(pg.next.items[0].place) : ''}</div><div class="cd">${hms(pg.next.start - t)}</div></div>`;
+  if (ps.next) html += `<div class="rc"><div class="t">🕌 الصلاة القادمة</div><div class="v">${PR[ps.next.n]} · ${t12(p2(ps.next.at.getHours()) + ':' + p2(ps.next.at.getMinutes()))}</div><div class="s">بعد ${dur(ps.next.at - t)} · الإقامة +${D && D.iqamaMinutes || 15} د</div></div>`;
+  if (tt.length) html += `<div class="rc"><div class="t">🏆 المتصدّر</div><div class="v">${esc(tt[0].team)} · ${tt[0].points}</div>${tt[1] ? `<div class="s">يليه ${esc(tt[1].team)} ${tt[1].points}</div>` : ''}</div>`;
+  $('rail').innerHTML = html;
 }
 function paintTicker() {
   const items = ann('announce').concat(ann('call')).map(a => a.title + (a.body ? ' — ' + a.body : ''));
-  const el = $('tick'), txt = items.join('   ✦   ');
+  const el = $('tick'), txt = items.join('     ✦     ');
   $('ticker').style.display = items.length ? '' : 'none';
-  if (el.dataset.txt !== txt) { el.dataset.txt = txt; el.innerHTML = `<span style="animation-duration:${Math.max(20, txt.length * 0.25)}s">${esc(txt)}</span>`; }
+  if (el.dataset.txt !== txt) { el.dataset.txt = txt; el.innerHTML = `<span style="animation-duration:${Math.max(22, txt.length * 0.25)}s">${esc(txt)}</span>`; }
 }
-let bgI = -1, bgFlip = false;
-function nextBg() {
-  const th = document.body.dataset.t, all = CONFIG.backgrounds.map(b => typeof b === 'string' ? { src: b } : b);
-  const list = all.filter(b => !b.themes || b.themes.indexOf(th) !== -1);
-  const use = list.length ? list : all; if (!use.length) return;
-  bgI = (bgI + 1) % use.length; bgFlip = !bgFlip;
-  const on = bgFlip ? $('bgB') : $('bgA'), off = bgFlip ? $('bgA') : $('bgB');
-  on.classList.remove('none'); on.style.backgroundImage = `url("${use[bgI].src}")`; on.classList.add('on'); off.classList.remove('on');
-}
-function showSlide() {
-  const ov = override();
-  $('over').innerHTML = ov;
-  if (ov) return;
-  const s = slides(); if (!s.length) return;
+let cur = null;
+function showScene() {
+  const ov = override(); $('over').innerHTML = ov; if (ov) return;
+  const s = scenes(programState()); if (!s.length) return;
   // something new (published in the last 3 minutes, not shown yet) jumps the queue
   const t = now().getTime(), fresh = s.find(x => x.at && !seen[x.key] && t - new Date(x.at).getTime() < 3 * 60000);
-  let cur;
   if (fresh) cur = fresh; else { idx = (idx + 1) % s.length; cur = s[idx]; }
   seen[cur.key] = true;
-  if (cur.key !== lastSlideKey || cur.key === 'prayers' || cur.key === 'events') $('stage').innerHTML = `<div class="slide">${fresh ? '<div class="center" style="margin-bottom:1vw"><span class="badge">جديد</span></div>' : ''}${cur.html}</div>`;
-  lastSlideKey = cur.key;
+  $('stage').innerHTML = `<section class="sc">${fresh ? '<div style="text-align:center;margin-bottom:.6vw"><span class="new">جديد</span></div>' : ''}${cur.html()}</section>`;
+  lastKey = cur.key;
   $('dots').innerHTML = s.map(x => `<i class="${x.key === cur.key ? 'on' : ''}"></i>`).join('');
-  nextBg();
 }
-function tick() { applyTheme(); paintHeader(); const ov = override(); if (ov || $('over').innerHTML) $('over').innerHTML = ov; }
+function tick() {
+  paintHeader(); paintRail();
+  const ov = override(); if (ov || $('over').innerHTML) $('over').innerHTML = ov;
+  if (cur && cur.live && !ov && now().getSeconds() % 5 === 0) { const sc = document.querySelector('#stage .sc'); if (sc) sc.innerHTML = cur.html(); } // live scenes refresh their numbers
+  document.querySelectorAll('[data-cd]').forEach(e => { e.textContent = hms(Number(e.dataset.cd) - now().getTime()); });
+}
 
-/* ---------- setup (key typed once on the TV, never in the URL) ---------- */
+/* ---------- setup (the key is typed once on the screen computer, never in the URL) ---------- */
 function setup(msg) {
   const d = document.createElement('div'); d.className = 'setup';
   d.innerHTML = `<div class="box"><h2 style="margin-bottom:8px">إعداد شاشة العرض</h2><div style="color:var(--mute)">أدخل «مفتاح العرض» مرة واحدة على هذا الجهاز. تحصل عليه من مسؤول النظام.</div>${msg ? `<div style="color:#ff8a8a;margin-top:8px">${esc(msg)}</div>` : ''}<input id="kIn" type="password" autocomplete="off" placeholder="FEED KEY"><button id="kBtn">حفظ وبدء العرض</button></div>`;
   document.body.appendChild(d);
-  d.querySelector('#kBtn').onclick = async () => { const v = d.querySelector('#kIn').value.trim(); if (!v) return; store.set('mk_feed_key', v); d.remove(); await load(); showSlide(); };
+  d.querySelector('#kBtn').onclick = async () => { const v = d.querySelector('#kIn').value.trim(); if (!v) return; store.set('mk_feed_key', v); d.remove(); await load(); paintTicker(); showScene(); };
 }
-
-$('fsBtn').onclick = () => { (document.documentElement.requestFullscreen || function () {}).call(document.documentElement); $('fsBtn').style.display = 'none'; try { navigator.wakeLock && navigator.wakeLock.request('screen'); } catch (e) {} };
+let wakeLock = null;
+async function keepAwake() { try { if (navigator.wakeLock) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {} }
+$('fsBtn').onclick = () => { (document.documentElement.requestFullscreen || function () {}).call(document.documentElement); $('fsBtn').style.display = 'none'; keepAwake(); };
 if (CONFIG.logo) $('logo').innerHTML = `<img src="${esc(CONFIG.logo)}" alt="">`;
 if (!store.get('mk_feed_key')) setup();
-applyTheme(); paintHeader(); paintTicker(); showSlide();
-load().then(() => { paintHeader(); paintTicker(); showSlide(); });
+paintHeader(); paintRail(); paintTicker(); showScene();
+load().then(() => { idx = -1; paintHeader(); paintRail(); paintTicker(); showScene(); }); // start the loop from "now" once the data is in
 setInterval(tick, 1000);
-setInterval(showSlide, CONFIG.slideSeconds * 1000);
+setInterval(showScene, CONFIG.slideSeconds * 1000);
 setInterval(() => load().then(paintTicker), 20000);
-document.addEventListener('visibilitychange', () => { if (!document.hidden) load().then(() => { paintTicker(); showSlide(); }); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { keepAwake(); load().then(() => { paintTicker(); showScene(); }); } });
+// a fresh start every night at 3:00 (clears any memory build-up on a screen that runs for days)
+setInterval(() => { const t = new Date(); if (t.getHours() === 3 && t.getMinutes() === 0 && t.getSeconds() < 2) location.reload(); }, 1000);
 </script>
 </body>
 </html>

@@ -10,7 +10,7 @@
 // kudos = موقف اليوم, quote = قالوا عن المخيم, call = استدعاء طالب (by number only), greeting = عبارة الترحيب,
 // finale = الحفل الختامي (countdown + festive theme on its day), other.
 const ANN_KINDS_ = ['announce', 'event', 'finale', 'urgent', 'wisdom', 'kudos', 'quote', 'call', 'greeting', 'other'];
-const DISPLAY_THEMES_ = ['auto', 'dawn', 'day', 'noon', 'sunset', 'evening', 'night', 'jumuah', 'festive'];
+const DISPLAY_THEMES_ = ['auto', 'brand', 'jumuah', 'festive', 'night']; // 'auto' = brand by day, Thursday night, closing day, quiet night
 const ANN_AUDIENCE_ = ['public', 'staff'];
 function annSheet_() { return getSheetByName_('Announcements'); }
 function resultsSheet_() { return getSheetByName_('Results'); }
@@ -204,7 +204,68 @@ function handleFeed_(data) {
   return { success: true, serverTime: new Date().toISOString(), campStart: String(getSetting_('CampStart') || '2026-12-27'),
     announcements: publicAnnouncements_(['public']).slice(0, 30), results: groupResults_(),
     prayers: allPrayers_(), iqamaMinutes: iqamaMinutes_(), totals: teamTotals_(), displayTheme: displayTheme_(),
+    program: readProgram_(), weather: (function() { try { return weatherCached_(); } catch (e) { return null; } })(),
     campName: String(getSetting_('CampName') || ''), campSlogan: String(getSetting_('CampSlogan') || ''), campDays: Number(getSetting_('CampDays')) || 4 };
+}
+
+// ---------------- Camp program (the committee attaches the Excel file; the big screen derives "now" and "next" from it) ----------------
+// Tab "Program": one row per activity. Parallel activities (one per group) share the same Date + From. Text cells (no date conversion).
+const PROGRAM_HEADERS_ = ['Date', 'From', 'To', 'Group', 'Title', 'Place', 'Type', 'Note'];
+function hhmm_(min) { return min === null || min === undefined ? '' : (min < 600 ? '0' : '') + Math.floor(min / 60) + ':' + (min % 60 < 10 ? '0' : '') + (min % 60); }
+function readProgram_() {
+  const cache = CacheService.getScriptCache();
+  try { const hit = cache.get('program_v1'); if (hit) return JSON.parse(hit); } catch (e) { /* reread */ }
+  let v; try { v = getSheetByName_('Program').getDataRange().getValues(); } catch (e) { return []; }
+  const h = v[0] || [], out = [];
+  for (let r = 1; r < v.length; r++) {
+    const g = function(n) { const i = h.indexOf(n); return i === -1 ? '' : v[r][i]; };
+    const d = parseStageDate_(g('Date')), from = parseStageTime_(g('From'));
+    if (!d || from === null || !String(g('Title')).trim()) continue;
+    const to = parseStageTime_(g('To'));
+    out.push({ date: d.y + '-' + (d.m < 10 ? '0' : '') + d.m + '-' + (d.d < 10 ? '0' : '') + d.d, from: hhmm_(from), to: to === null ? '' : hhmm_(to),
+      group: String(g('Group') || '').trim(), title: String(g('Title')).trim(), place: String(g('Place') || '').trim(), type: String(g('Type') || '').trim(), note: String(g('Note') || '').trim() });
+  }
+  out.sort(function(a, b) { return (a.date + a.from) < (b.date + b.from) ? -1 : (a.date + a.from) > (b.date + b.from) ? 1 : 0; });
+  try { cache.put('program_v1', JSON.stringify(out), 300); } catch (e) { /* too large: read again next time */ }
+  return out;
+}
+function handleProgramList_(data) {
+  return withAuth_(data, requirePerm_('announce'), function() { return { success: true, program: readProgram_() }; });
+}
+// The rows come from the Excel file read in the browser. All rows are checked first; nothing is written if one is wrong.
+function handleProgramImport_(data) {
+  return withAuth_(data, requirePerm_('announce'), function(user) {
+    const rows = Array.isArray(data.rows) ? data.rows : [];
+    if (!rows.length || rows.length > 600) return { success: false, error: 'الملف لا يحوي برنامجًا صالحًا' };
+    const clean = [], bad = [];
+    rows.forEach(function(x, i) {
+      const d = /^\d{4}-\d{2}-\d{2}$/.test(String(x.date || '')) ? String(x.date) : '', f = parseStageTime_(x.from), to = String(x.to || '').trim() ? parseStageTime_(x.to) : null;
+      const title = String(x.title || '').trim().slice(0, 120);
+      if (!d || f === null || !title || (String(x.to || '').trim() && to === null)) { bad.push(i + 1); return; }
+      const txt = function(s, n) { return cellSafe_(String(s || '').trim().slice(0, n)); };
+      clean.push(["'" + d, "'" + hhmm_(f), to === null ? '' : "'" + hhmm_(to), txt(x.group, 40), txt(title, 120), txt(x.place, 80), txt(x.type, 20), txt(x.note, 160)]);
+    });
+    if (bad.length) return { success: false, code: 'BAD_ROWS', error: 'أسطر غير صالحة: ' + bad.slice(0, 15).join('، '), rows: bad };
+    const lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    try {
+      let sheet; try { sheet = getSheetByName_('Program'); } catch (e) { return { success: false, code: 'NEEDS_SETUP', error: 'شغّل SETUP_createTabs مرة واحدة' }; }
+      const old = sheet.getDataRange().getValues(), w = PROGRAM_HEADERS_.length;
+      if (old.length > 1) { // the previous program is kept in "ProgramArchive" (one write)
+        try { const arc = getSheetByName_('ProgramArchive'), stamp = new Date(); const prev = old.slice(1).map(function(r) { const o = [stamp]; for (let c = 0; c < w; c++) o.push(r[c] === undefined ? '' : r[c]); return o; });
+          arc.getRange(arc.getLastRow() + 1, 1, prev.length, w + 1).setValues(prev); } catch (e) { /* no archive tab: skip */ }
+      }
+      sheet.getRange(1, 1, 1, w).setValues([PROGRAM_HEADERS_]);
+      sheet.getRange(2, 1, clean.length, w).setValues(clean);
+      const extra = old.length - 1 - clean.length; // blank what is left of a longer old program
+      if (extra > 0) { const blank = []; for (let i = 0; i < extra; i++) { const b = []; for (let c = 0; c < w; c++) b.push(''); blank.push(b); } sheet.getRange(2 + clean.length, 1, extra, w).setValues(blank); }
+      try { CacheService.getScriptCache().remove('program_v1'); } catch (e) { /* ignore */ }
+      writeAudit_(user.Username, 'PROGRAM_IMPORTED', '', 'rows=' + clean.length);
+      return { success: true, rows: clean.length };
+    } finally {
+      lock.releaseLock();
+    }
+  });
 }
 
 // ---------------- Prayer times (typed by the committee, one row per day in Settings) ----------------

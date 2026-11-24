@@ -82,6 +82,8 @@ const ACTIONS_ = {
   prayerList: function(d) { return handlePrayerList_(d); },
   prayerSave: function(d) { return handlePrayerSave_(d); },
   displayTheme: function(d) { return handleDisplayTheme_(d); },
+  programList: function(d) { return handleProgramList_(d); },
+  programImport: function(d) { return handleProgramImport_(d); },
   roundSave: function(d) { return handleRoundSave_(d); },
   receptionFind: function(d) { return handleReceptionFind_(d); },
   receptionArrive: function(d) { return handleReceptionArrive_(d); },

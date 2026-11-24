@@ -357,6 +357,16 @@ const fk=run('ADMIN_createFeedKey')();
 r=post({action:'feed',key:'wrong'+fk});assert(!r.success,'feed rejects a wrong key');
 r=post({action:'feed',key:fk});assert(r.success&&r.announcements.length===1&&r.announcements[0].title==='حفل الافتتاح'&&!JSON.stringify(r).includes('تعليمات للمشرفين'),'feed shows ONLY published public items');
 assert(r.campStart==='2026-12-27'&&!!r.serverTime,'feed carries camp start + server time');
+// ---- camp program from the Excel file: checked row by row, written in one go, the old one archived, served to the screen
+{const P=[{date:'2026-12-31',from:'10:00',to:'11:45',group:'(7-9) أ',title:'نشاط رياضي',place:'ملعب 3 و4',type:'فعالية'},{date:'2026-12-31',from:'10:00',to:'11:45',group:'(7-9) ب',title:'نشاط ديني وثقافي',place:'خيمة الفعاليات 1',type:'فعالية'},{date:'2026-12-31',from:'12:00',to:'13:00',group:'جميع الموجودين',title:'برنامج الصلاة',place:'خيمة الفعاليات',type:'صلاة'},{date:'2026-12-30',from:'22:15',to:'',group:'',title:'إغلاق الأنوار',type:'راحة'}];
+ let q=post({action:'programImport',token:t1,rows:P});assert(!q.success,'only the media committee imports the program');
+ q=post({action:'programImport',token:tm,rows:P.concat([{date:'31/12/2026',from:'9',title:'x'}])});assert(!q.success&&q.code==='BAD_ROWS'&&q.rows.join()==='5'&&!(book.Program&&book.Program.rows.length>1),'a wrong row stops the whole import, and says which row');
+ q=post({action:'programImport',token:tm,rows:P});assert(q.success&&q.rows===4,'program imported');
+ q=post({action:'programImport',token:tm,rows:P.slice(0,2)});assert(q.success&&book.ProgramArchive.rows.length===5,'a new import archives the previous program');
+ assert(book.Program.rows.slice(3).every(r=>r.every(c=>c===''||c===undefined)),'the rows of the longer old program are blanked');
+ q=post({action:'programImport',token:tm,rows:P});
+ const f=post({action:'feed',key:fk});assert(f.program.length===4&&f.program[0].date==='2026-12-30'&&f.program[0].to===''&&f.program[1].from==='10:00'&&f.program[1].group==='(7-9) أ'&&f.program[3].type==='صلاة','the screen feed carries the program, sorted by time');
+ assert(post({action:'programList',token:tm}).program.length===4,'the committee reads it back');}
 r=post({action:'resSave',token:tm,competition:'كرة القدم',team:'الأزرق',place:1,points:30});assert(r.success,'result entered');const r1=r.id;
 r=post({action:'resSave',token:tm,competition:'كرة القدم',team:'الأحمر',place:2,points:20});const r2=r.id;
 r=post({action:'resSave',token:tm,competition:'كرة القدم',team:'الأخضر'});assert(!r.success,'place or points required');

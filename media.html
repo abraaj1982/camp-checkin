@@ -41,20 +41,22 @@ async function api(payload) {
 const T = {
  ar: { dir: 'rtl', title: 'الإعلامية', sub: 'الإعلانات والفعاليات والنتائج', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
   tAnn: 'الإعلانات', tRes: 'النتائج', countdown: 'العد التنازلي لبداية المخيم', days: 'يوم', hours: 'ساعة', mins: 'دقيقة', started: 'بدأ المخيم',
-  newAnn: 'إعلان / فعالية جديدة', title_: 'العنوان', body: 'النص', kind: 'النوع', announce: 'إعلان (الشريط والشرائح)', event: 'فعالية (بعدّ تنازلي)', urgent: '🚨 رسالة طارئة (تملأ الشاشة)', wisdom: 'حكمة اليوم', kudos: 'موقف اليوم (لفتة طيبة)', quote: 'قالوا عن المخيم', call: 'استدعاء طالب (بالرقم فقط)', greeting: 'عبارة الترحيب (على شاشة البداية)', finale: '🎉 الحفل الختامي (عدّ تنازلي وثيم احتفالي)', thTitle: 'ثيم شاشة العرض', thNote: '«تلقائي» يغيّر الثيم حسب الوقت: الشروق، النهار، العصر، الغروب، المساء، الليل، وليلة الجمعة، ويوم الحفل الختامي.', thSave: 'تطبيق الثيم', th_auto: 'تلقائي (حسب الوقت) — موصى به', th_dawn: 'الشروق', th_day: 'النهار', th_noon: 'العصر', th_sunset: 'الغروب', th_evening: 'المساء', th_night: 'الليل', th_jumuah: 'ليلة الجمعة', th_festive: 'احتفالي (الختام)', preview: 'معاينة الشاشة', other: 'أخرى', tPr: 'الصلاة والشاشة', prDate: 'التاريخ', fajr: 'الفجر', dhuhr: 'الظهر', asr: 'العصر', maghrib: 'المغرب', isha: 'العشاء', iqama: 'الإقامة بعد الأذان (دقائق)', prSave: 'حفظ أوقات هذا اليوم', prNote: 'اكتب أوقات اليوم من تقويم الوزارة. اترك الفارغ ليُخفى من الشاشة.', prSaved: 'الأيام المحفوظة', urgentNote: 'تظهر بملء شاشة العرض حتى تؤرشفها.', callNote: 'اكتب رقم الطالب فقط، بدون الاسم.', when: 'موعد الفعالية', audience: 'الجمهور', public: 'شاشات العرض والجميع', staff: 'فريق العمل فقط', pinned: 'تثبيت في الأعلى',
+  newAnn: 'إعلان / فعالية جديدة', title_: 'العنوان', body: 'النص', kind: 'النوع', announce: 'إعلان (الشريط والشرائح)', event: 'فعالية (بعدّ تنازلي)', urgent: '🚨 رسالة طارئة (تملأ الشاشة)', wisdom: 'حكمة اليوم', kudos: 'موقف اليوم (لفتة طيبة)', quote: 'قالوا عن المخيم', call: 'استدعاء طالب (بالرقم فقط)', greeting: 'عبارة الترحيب (على شاشة البداية)', finale: '🎉 الحفل الختامي (عدّ تنازلي وثيم احتفالي)', thTitle: 'ثيم شاشة العرض', thNote: '«تلقائي» يغيّر الثيم حسب الوقت: الشروق، النهار، العصر، الغروب، المساء، الليل، وليلة الجمعة، ويوم الحفل الختامي.', thSave: 'تطبيق الثيم', pgTitle: '📎 برنامج المخيم (ملف الإكسل)', pgNote: 'أرفق ملف البرنامج (ورقة «البرنامج»). تظهر معاينة، ثم «اعتماد» فتعمل الشاشة به خلال دقيقة. الرفع الجديد يحل محل القديم ويُحفظ القديم في الأرشيف.', pgPick: '📎 اختيار ملف .xlsx', pgOk: (d, n, g) => '✓ ' + d + ' أيام · ' + n + ' نشاطًا' + (g ? ' · ' + g + ' فئات' : ''), pgNoTo: n => '⚠ ' + n + ' أسطر بلا وقت نهاية (تُحسب حتى النشاط التالي)', pgBad: r => '✖ أسطر لا يُفهم تاريخها أو وقتها: ' + r, pgNoSheet: 'لم أجد في الملف عمودَي «التاريخ» و«الفعالية».', pgSave: 'اعتماد البرنامج', pgDone: n => 'اعتُمد البرنامج: ' + n + ' نشاطًا. الشاشة تعمل به الآن.', pgCur: n => 'البرنامج الحالي: ' + n + ' نشاطًا.', pgReading: 'جارٍ قراءة الملف…',
+  th_auto: 'تلقائي (حسب الوقت) — موصى به', th_brand: 'هوية المخيم (كحلي ونحاسي)', th_dawn: 'الشروق', th_day: 'النهار', th_noon: 'العصر', th_sunset: 'الغروب', th_evening: 'المساء', th_night: 'الليل', th_jumuah: 'ليلة الجمعة', th_festive: 'احتفالي (الختام)', preview: 'معاينة الشاشة', other: 'أخرى', tPr: 'الصلاة والشاشة', prDate: 'التاريخ', fajr: 'الفجر', dhuhr: 'الظهر', asr: 'العصر', maghrib: 'المغرب', isha: 'العشاء', iqama: 'الإقامة بعد الأذان (دقائق)', prSave: 'حفظ أوقات هذا اليوم', prNote: 'اكتب أوقات اليوم من تقويم الوزارة. اترك الفارغ ليُخفى من الشاشة.', prSaved: 'الأيام المحفوظة', urgentNote: 'تظهر بملء شاشة العرض حتى تؤرشفها.', callNote: 'اكتب رقم الطالب فقط، بدون الاسم.', when: 'موعد الفعالية', audience: 'الجمهور', public: 'شاشات العرض والجميع', staff: 'فريق العمل فقط', pinned: 'تثبيت في الأعلى',
   saveDraft: 'حفظ كمسودة', update: 'تحديث', cancelEdit: 'إلغاء التعديل', publish: 'نشر', unpublish: 'إعادة لمسودة', archive: 'أرشفة', edit: 'تعديل', draft: 'مسودة', published: 'منشور', archived: 'مؤرشف',
   noAnn: 'لا توجد إعلانات.', newRes: 'إدخال نتيجة', comp: 'المسابقة', team: 'الفريق', place: 'المركز', points: 'النقاط', addRes: 'إضافة', needVerify: 'النشر يحتاج صلاحية «التحقق من النتائج».',
   publishAll: 'نشر مسابقة', noRes: 'لا توجد نتائج.', done: 'تم', error: 'تعذّر الاتصال. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.', confirmPub: 'نشر هذا العنصر؟', feedNote: 'المنشور للجمهور يظهر في شاشات العرض خلال ثوانٍ.' },
  en: { dir: 'ltr', title: 'Media', sub: 'Announcements, events and results', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
   tAnn: 'Announcements', tRes: 'Results', countdown: 'Countdown to camp', days: 'days', hours: 'hours', mins: 'min', started: 'Camp has started',
-  newAnn: 'New announcement / event', title_: 'Title', body: 'Text', kind: 'Type', announce: 'Announcement (ticker + slides)', event: 'Event (countdown)', urgent: '🚨 Urgent (full screen)', wisdom: 'Wisdom of the day', kudos: 'Kind act of the day', quote: 'They said about the camp', call: 'Call a student (number only)', greeting: 'Welcome line (start slide)', finale: '🎉 Closing ceremony (countdown + festive theme)', thTitle: 'Display theme', thNote: '“Automatic” follows the time of day, Thursday night and the closing day.', thSave: 'Apply theme', th_auto: 'Automatic (recommended)', th_dawn: 'Dawn', th_day: 'Day', th_noon: 'Afternoon', th_sunset: 'Sunset', th_evening: 'Evening', th_night: 'Night', th_jumuah: 'Thursday night', th_festive: 'Festive (closing)', preview: 'Preview display', other: 'Other', tPr: 'Prayers & screen', prDate: 'Date', fajr: 'Fajr', dhuhr: 'Dhuhr', asr: 'Asr', maghrib: 'Maghrib', isha: 'Isha', iqama: 'Iqama after adhan (minutes)', prSave: 'Save this day', prNote: 'Type the day’s times from the ministry calendar. Leave empty to hide.', prSaved: 'Saved days', urgentNote: 'Fills the display screen until you archive it.', callNote: 'Student number only, no name.', when: 'Event time', audience: 'Audience', public: 'Display screens and everyone', staff: 'Staff only', pinned: 'Pin to top',
+  newAnn: 'New announcement / event', title_: 'Title', body: 'Text', kind: 'Type', announce: 'Announcement (ticker + slides)', event: 'Event (countdown)', urgent: '🚨 Urgent (full screen)', wisdom: 'Wisdom of the day', kudos: 'Kind act of the day', quote: 'They said about the camp', call: 'Call a student (number only)', greeting: 'Welcome line (start slide)', finale: '🎉 Closing ceremony (countdown + festive theme)', thTitle: 'Display theme', thNote: '“Automatic” follows the time of day, Thursday night and the closing day.', thSave: 'Apply theme', pgTitle: '📎 Camp program (Excel file)', pgNote: 'Attach the program file (sheet «البرنامج»). A preview appears; then «Approve» and the screen uses it within a minute. A new file replaces the old one; the old one is archived.', pgPick: '📎 Choose a .xlsx file', pgOk: (d, n, g) => '✓ ' + d + ' days · ' + n + ' activities' + (g ? ' · ' + g + ' groups' : ''), pgNoTo: n => '⚠ ' + n + ' rows without an end time (they run until the next activity)', pgBad: r => '✖ Rows whose date or time cannot be read: ' + r, pgNoSheet: 'The file has no «التاريخ» and «الفعالية» columns.', pgSave: 'Approve the program', pgDone: n => 'Program approved: ' + n + ' activities. The screen uses it now.', pgCur: n => 'Current program: ' + n + ' activities.', pgReading: 'Reading the file…',
+  th_auto: 'Automatic (recommended)', th_brand: 'Camp identity (navy and copper)', th_dawn: 'Dawn', th_day: 'Day', th_noon: 'Afternoon', th_sunset: 'Sunset', th_evening: 'Evening', th_night: 'Night', th_jumuah: 'Thursday night', th_festive: 'Festive (closing)', preview: 'Preview display', other: 'Other', tPr: 'Prayers & screen', prDate: 'Date', fajr: 'Fajr', dhuhr: 'Dhuhr', asr: 'Asr', maghrib: 'Maghrib', isha: 'Isha', iqama: 'Iqama after adhan (minutes)', prSave: 'Save this day', prNote: 'Type the day’s times from the ministry calendar. Leave empty to hide.', prSaved: 'Saved days', urgentNote: 'Fills the display screen until you archive it.', callNote: 'Student number only, no name.', when: 'Event time', audience: 'Audience', public: 'Display screens and everyone', staff: 'Staff only', pinned: 'Pin to top',
   saveDraft: 'Save draft', update: 'Update', cancelEdit: 'Cancel edit', publish: 'Publish', unpublish: 'Back to draft', archive: 'Archive', edit: 'Edit', draft: 'Draft', published: 'Published', archived: 'Archived',
   noAnn: 'No announcements.', newRes: 'Enter a result', comp: 'Competition', team: 'Team', place: 'Place', points: 'Points', addRes: 'Add', needVerify: 'Publishing needs the “verify results” permission.',
   publishAll: 'Publish competition', noRes: 'No results.', done: 'Done', error: 'Connection problem. Try again.', sessionEnd: 'Session expired. Please log in again.', confirmPub: 'Publish this item?', feedNote: 'Public items appear on the display screens within seconds.' }
 };
 const L = () => T[st.lang];
 const KINDS = ['announce', 'event', 'finale', 'urgent', 'wisdom', 'kudos', 'quote', 'call', 'greeting', 'other'];
-const THEMES = ['auto', 'dawn', 'day', 'noon', 'sunset', 'evening', 'night', 'jumuah', 'festive'];
+const THEMES = ['auto', 'brand', 'jumuah', 'festive', 'night'];
 const timed = k => k === 'event' || k === 'finale';
 const PR = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
 const blank = () => ({ id: '', title: '', body: '', kind: 'announce', startsAt: '', audience: 'public', pinned: false });
@@ -62,13 +64,73 @@ const st = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), ta
 const say = (cls, t) => { st.msg = { cls: cls, t: t }; };
 const errText = r => (r && r.code === 'NEEDS_VERIFY' ? L().needVerify : (r && r.error) || L().error);
 
-async function load() { try { const r = await api({ action: 'mediaList' }); if (r.success) { st.anns = r.announcements; st.results = r.results; st.campStart = r.campStart; } } catch (e) {} render(); }
+async function load() { try { const r = await api({ action: 'mediaList' }); if (r.success) { st.anns = r.announcements; st.results = r.results; st.campStart = r.campStart; } if (can('announce')) { const g = await api({ action: 'programList' }); if (g.success) st.pgCount = g.program.length; } } catch (e) {} render(); }
 async function loadPr() { try { const r = await api({ action: 'prayerList' }); if (r.success) { st.prayers = r.prayers; st.iqama = r.iqamaMinutes; st.theme = r.displayTheme || 'auto'; st.pr.t = Object.assign({}, st.prayers[st.pr.date] || {}); } } catch (e) {} render(); }
 async function savePr() { const r = await call({ action: 'prayerSave', date: st.pr.date, times: st.pr.t, iqamaMinutes: st.pr.iq }); if (r.success) { st.pr.iq = ''; await loadPr(); } else render(); }
 async function saveTheme() { const v = $('thSel').value; const r = await call({ action: 'displayTheme', theme: v }); if (r.success) st.theme = v; render(); }
+/* ---------- camp program: the Excel file is read here in the browser, checked, previewed, then sent ---------- */
+const XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+let xlsxP = null;
+function loadXlsx() { if (window.XLSX) return Promise.resolve(); if (!xlsxP) xlsxP = new Promise((res, rej) => { const s = document.createElement('script'); s.src = XLSX_URL; s.onload = res; s.onerror = () => { xlsxP = null; rej(new Error('lib')); }; document.head.appendChild(s); }); return xlsxP; }
+const P2 = n => String(n).padStart(2, '0');
+function xDate(v) {
+  if (v instanceof Date && !isNaN(v)) return v.getFullYear() + '-' + P2(v.getMonth() + 1) + '-' + P2(v.getDate());
+  const s = String(v == null ? '' : v).trim().replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)); let m;
+  if ((m = /^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/.exec(s))) return m[1] + '-' + P2(+m[2]) + '-' + P2(+m[3]);
+  if ((m = /^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})/.exec(s))) return m[3] + '-' + P2(+m[2]) + '-' + P2(+m[1]);
+  return '';
+}
+function xTime(v) {
+  if (v instanceof Date && !isNaN(v)) return P2(v.getHours()) + ':' + P2(v.getMinutes());
+  if (typeof v === 'number' && v >= 0 && v < 1) { const m = Math.round(v * 1440); return P2(Math.floor(m / 60)) + ':' + P2(m % 60); }
+  const s = String(v == null ? '' : v).trim().replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)), m = /^(\d{1,2}):(\d{2})/.exec(s);
+  return m ? P2(+m[1]) + ':' + m[2] : '';
+}
+const COLS = { date: ['التاريخ', 'date'], from: ['من', 'from'], to: ['إلى', 'الى', 'to'], group: ['الفئة', 'المجموعة', 'group'], title: ['الفعالية', 'النشاط', 'title'], place: ['المكان', 'place'], type: ['النوع', 'type'], note: ['ملاحظة', 'ملاحظات', 'note'] };
+async function readProgramFile(file) {
+  st.pg = { reading: true }; render();
+  try {
+    await loadXlsx();
+    const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
+    const names = wb.SheetNames.slice().sort((a, b) => (b === 'البرنامج') - (a === 'البرنامج'));
+    for (const n of names) {
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: true, defval: '' });
+      const hi = rows.findIndex(r => r.some(c => COLS.title.indexOf(String(c).trim().toLowerCase()) !== -1) && r.some(c => COLS.date.indexOf(String(c).trim().toLowerCase()) !== -1));
+      if (hi === -1) continue;
+      const head = rows[hi].map(c => String(c).trim().toLowerCase()), ix = {};
+      Object.keys(COLS).forEach(k => { ix[k] = head.findIndex(h => COLS[k].indexOf(h) !== -1); });
+      const out = [], bad = []; let noTo = 0;
+      rows.slice(hi + 1).forEach((r, i) => {
+        const g = k => ix[k] === -1 ? '' : r[ix[k]], title = String(g('title')).trim(); if (!title) return;
+        const x = { date: xDate(g('date')), from: xTime(g('from')), to: xTime(g('to')), group: String(g('group')).trim(), title: title, place: String(g('place')).trim(), type: String(g('type')).trim(), note: String(g('note')).trim() };
+        if (!x.date || !x.from) bad.push(hi + i + 2); if (!x.to) noTo++; out.push(x);
+      });
+      const days = new Set(out.map(x => x.date)).size, groups = new Set(out.map(x => x.group).filter(g => g && !/جميع/.test(g))).size;
+      st.pg = { name: file.name, rows: out, bad: bad, noTo: noTo, days: days, groups: groups }; return render();
+    }
+    st.pg = { name: file.name, err: L().pgNoSheet };
+  } catch (e) { st.pg = { err: L().error }; }
+  render();
+}
+async function saveProgram() {
+  const g = st.pg; if (!g || !g.rows || g.bad.length) return;
+  try { const r = await api({ action: 'programImport', rows: g.rows }); if (r.success) { st.pg = { done: r.rows }; st.pgCount = r.rows; } else st.pg.err = r.error || L().error; } catch (e) { if (e.message !== 'auth') st.pg.err = L().error; }
+  render();
+}
+function programCard() {
+  const l = L(), g = st.pg || {};
+  const prev = g.reading ? `<div class="muted" style="margin-top:8px">${l.pgReading}</div>`
+    : g.done ? `<div class="banner ok" style="margin-top:8px">${esc(l.pgDone(g.done))}</div>`
+    : g.err ? `<div class="banner bad" style="margin-top:8px">${esc(g.err)}</div>`
+    : g.rows ? `<div class="item" style="margin-top:10px;border:1px dashed var(--line);border-radius:12px;padding:10px"><b>${esc(g.name)}</b><div style="color:var(--ok);margin-top:4px">${esc(l.pgOk(g.days, g.rows.length, g.groups))}</div>${g.noTo ? `<div class="muted">${esc(l.pgNoTo(g.noTo))}</div>` : ''}${g.bad.length ? `<div style="color:var(--bad)">${esc(l.pgBad(g.bad.slice(0, 12).join('، ')))}</div>` : ''}</div>
+       <button class="btn full" style="margin-top:10px" data-savepg="1" ${g.bad.length ? 'disabled' : ''}>${l.pgSave}</button>` : '';
+  return `<section class="card"><h2 class="h2" style="margin-bottom:6px">${l.pgTitle}</h2><div class="muted" style="font-size:13px;margin-bottom:8px">${l.pgNote}</div>
+    ${st.pgCount ? `<div class="muted" style="font-size:13px;margin-bottom:8px">${esc(l.pgCur(st.pgCount))}</div>` : ''}
+    <label class="btn alt full" style="display:flex;justify-content:center;cursor:pointer">${l.pgPick}<input id="pgFile" type="file" accept=".xlsx,.xls" hidden></label>${prev}</section>`;
+}
 function prView() {
   const l = L(), p = st.pr, days = Object.keys(st.prayers).sort();
-  return `<section class="card"><h2 class="h2" style="margin-bottom:6px">${l.tPr}</h2><div class="muted" style="font-size:13px;margin-bottom:8px">${l.prNote}</div>
+  return `${programCard()}<section class="card"><h2 class="h2" style="margin-bottom:6px">${l.tPr}</h2><div class="muted" style="font-size:13px;margin-bottom:8px">${l.prNote}</div>
     <label class="lbl" for="pd">${l.prDate}</label><input id="pd" type="date" value="${esc(p.date)}">
     <div class="two" style="margin-top:8px">${PR.map(n => `<div><label class="lbl" for="p-${n}">${l[n]}</label><input id="p-${n}" data-pr="${n}" type="time" value="${esc(p.t[n] || '')}"></div>`).join('')}</div>
     <label class="lbl" for="piq" style="margin-top:8px">${l.iqama}</label><input id="piq" type="number" min="1" max="60" placeholder="${st.iqama}" value="${esc(p.iq)}">
@@ -143,12 +205,12 @@ document.addEventListener('input', e => {
   else if (e.target.dataset.pr) st.pr.t[e.target.dataset.pr] = v; else if (i === 'piq') st.pr.iq = v;
   else if (i === 'rc') st.rf.competition = v; else if (i === 'rt') st.rf.team = v; else if (i === 'rp') st.rf.place = v; else if (i === 'rs') st.rf.points = v;
 });
-document.addEventListener('change', e => { if (e.target.id === 'pd') { st.pr.date = e.target.value; st.pr.t = Object.assign({}, st.prayers[st.pr.date] || {}); render(); } else if (e.target.id === 'fk') { st.form.kind = e.target.value; render(); } else if (e.target.id === 'fa') st.form.audience = e.target.value; });
+document.addEventListener('change', e => { if (e.target.id === 'pgFile' && e.target.files && e.target.files[0]) { readProgramFile(e.target.files[0]); return; } if (e.target.id === 'pd') { st.pr.date = e.target.value; st.pr.t = Object.assign({}, st.prayers[st.pr.date] || {}); render(); } else if (e.target.id === 'fk') { st.form.kind = e.target.value; render(); } else if (e.target.id === 'fa') st.form.audience = e.target.value; });
 document.addEventListener('click', e => {
   const b = e.target.closest && e.target.closest('button'); if (!b) return; const d = b.dataset;
   if (d.tab) setTab(d.tab); else if (d.saveann) saveAnn(); else if (d.canceledit) { st.form = blank(); render(); }
   else if (d.edit) editAnn(d.edit); else if (d.annst) { const p = d.annst.split(':'); annStatus(p[0], p[1]); }
-  else if (d.savepr) savePr(); else if (d.savetheme) saveTheme(); else if (d.addres) addRes(); else if (d.respub) resStatus(d.respub.split(','), 'published');
+  else if (d.savepg) saveProgram(); else if (d.savepr) savePr(); else if (d.savetheme) saveTheme(); else if (d.addres) addRes(); else if (d.respub) resStatus(d.respub.split(','), 'published');
 });
 $('langBtn').onclick = () => { st.lang = st.lang === 'ar' ? 'en' : 'ar'; pref.set('lang', st.lang); render(); };
 $('themeBtn').onclick = () => { st.theme = st.theme === 'light' ? 'dark' : 'light'; pref.set('theme', st.theme); render(); };
