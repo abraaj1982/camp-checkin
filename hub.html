@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="theme.css">
 <script src="ui.js" defer></script>
 <style>
+#adminArea{display:none!important}.adminView #adminArea{display:block!important}.adminView #tilesCard,.adminView #bulletinCard,.adminView .hero{display:none!important}
 /* aliases kept for older inline styles in this page's script */
 :root,[data-theme=dark]{--sap-gray:var(--muted);--sap-red:var(--bad);--sap-green:var(--ok);--sap-border:var(--line);--sap-bg:var(--soft)}
 .container{padding:16px;display:flex;flex-direction:column;gap:14px;flex:1}
@@ -73,13 +74,14 @@ html[dir=rtl] #usersListCard td:nth-child(2){text-align:right}
 <div class="container">
 
   <div class="card" id="bulletinCard" style="display:none;"><h2>📢 إعلانات</h2><div id="bulletinList"></div></div>
-  <div class="card">
+  <div class="card" id="tilesCard">
     <h2>شاشاتك</h2>
     <div class="tiles" id="tiles"></div>
     <div class="hint" id="noTiles" style="display:none;">لا توجد شاشات مفعّلة لحسابك بعد. تواصل مع السكرتارية.</div>
   </div>
 
   <div id="adminArea" style="display:none;">
+    <button type="button" class="btn secondary" id="backBtn" style="margin-bottom:12px">→ رجوع إلى الشاشات</button>
 
     <div class="card" id="createCard">
       <h2>➕ إضافة مستخدم جديد</h2>
@@ -279,7 +281,7 @@ function renderTiles() {
   }
   if (can('manage') || can('support')) {
     const a = document.createElement('a');
-    a.className = 'tile'; a.href = '#adminArea';
+    a.className = 'tile'; a.href = '#users';
     a.innerHTML = '<div class="i">👥</div><div class="t"></div><div class="s">المستخدمون والصلاحيات</div>';
     a.querySelector('.t').textContent = can('manage') ? 'إدارة المستخدمين' : 'الدعم الفني';
     box.appendChild(a);
@@ -288,7 +290,17 @@ function renderTiles() {
   document.getElementById('adminArea').style.display = (can('manage') || can('support')) ? 'block' : 'none';
   // Support staff help with passwords/unlock only: no creating users, no editing permissions.
   document.getElementById('createCard').style.display = can('manage') ? 'block' : 'none';
+  applyView();
 }
+
+// Users management is its own view inside the hub: the tile opens it, "back" returns to the screens.
+function applyView() {
+  const on = location.hash === '#users' && (can('manage') || can('support'));
+  document.body.classList.toggle('adminView', on);
+  window.scrollTo(0, 0);
+}
+window.addEventListener('hashchange', applyView);
+document.getElementById('backBtn').addEventListener('click', () => { location.hash = ''; history.replaceState(null, '', location.pathname + location.search); applyView(); });
 
 // ---------------- tick-box helpers ----------------
 
