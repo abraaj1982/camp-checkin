@@ -4,101 +4,99 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>شاشة العرض — MUKHAYYAM</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Reem+Kufi:wght@500;700&family=Amiri:wght@700&display=swap">
+<link rel="stylesheet" href="brand/brand.css">
 <style>
-/* "Camp broadcast" identity: navy, copper and gold (from the camp logo). Landscape projector / TV, all sizes in vw.
-   Variants: jumuah (Thursday night), festive (closing day), night (quiet). The media committee can pin one. */
-:root{--navy:#08142a;--navy2:#10264a;--ink:#f3f6fc;--mute:#a9b8d6;--gold:#e8b25f;--cop:#c8773a;--ok:#51cf66;--bad:#ff6b6b;
-  --o1:#c8773a;--o2:#2e6bd6;--glass:rgba(255,255,255,.08);--line:rgba(255,255,255,.14);--frame:rgba(232,178,95,.5);--track:rgba(255,255,255,.14);
-  --bg:linear-gradient(160deg,var(--navy2),var(--navy) 62%)}
-body[data-t="jumuah"]{--o1:#2f8f66;--o2:#c8a24a;--bg:linear-gradient(160deg,#0d2c24,#061a14 62%)}
-body[data-t="festive"]{--o1:#e8b25f;--o2:#d2453a;--bg:linear-gradient(160deg,#2a1a08,#120a02 62%)}
-body[data-t="night"]{--o1:#2a3d63;--o2:#1b2744;--bg:linear-gradient(160deg,#050b18,#02050d 70%);--ink:#d9dfeb;--gold:#c9a66b}
+/* Camp 13 identity (brand/brand.css + the visual identity guide): flat dark brown and cream, gold only for numbers and one highlight.
+   Landscape projector / TV, all sizes in vw. Scenes alternate dark and light, as the guide asks of posts. */
+:root{--ink:var(--cream);--mute:rgba(251,243,215,.7);--gold:var(--gd);--line:rgba(251,243,215,.2);--track:rgba(251,243,215,.18);--fill:var(--gd)}
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;overflow:hidden;background:var(--navy)}
-body{background:var(--bg);color:var(--ink);font-family:Cairo,system-ui,sans-serif;cursor:none;transition:background 2s}
-.orb{position:fixed;border-radius:50%;filter:blur(4vw);opacity:.28;animation:orbf 18s ease-in-out infinite alternate;pointer-events:none}
-.o1{width:42vw;height:42vw;background:var(--o1);top:-14vw;right:-10vw}.o2{width:34vw;height:34vw;background:var(--o2);bottom:-12vw;left:-8vw;animation-delay:-6s}
-@keyframes orbf{to{transform:translate(-5vw,4vh) scale(1.15)}}
-.app{position:fixed;inset:0;display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:1.2vw;padding:1.6vw 2.6vw 1.2vw}
+html,body{height:100%;overflow:hidden;background:var(--dark)}
+body{color:var(--ink);font-family:Tajawal,system-ui,sans-serif;font-weight:500;cursor:none}
+.app{position:fixed;inset:0;display:grid;grid-template-rows:auto minmax(0,1fr) auto auto;gap:1vw;padding:1.4vw 2.6vw 0}
 .hd{display:flex;align-items:center;gap:1.2vw}
-.logo{width:5.4vw;height:5.4vw;border-radius:1vw;background:#fff;color:var(--navy);display:grid;place-items:center;font:700 2.6vw 'Reem Kufi';overflow:hidden;box-shadow:0 0 0 .2vw rgba(232,178,95,.55),0 .5vw 2vw rgba(0,0,0,.35)}
-.logo img{width:100%;height:100%;object-fit:contain}
-.cname{font-family:'Reem Kufi';font-size:2.5vw;line-height:1.25}.slogan{font-size:1.25vw;color:var(--gold)}
-.live{margin-inline-start:auto;display:flex;align-items:center;gap:.6vw;background:rgba(255,80,80,.16);border:1px solid rgba(255,100,100,.5);padding:.3vw 1vw;border-radius:99px;font-weight:700;font-size:1.2vw}
-.live i{width:.75vw;height:.75vw;border-radius:50%;background:#ff5252;animation:pls 1.4s infinite}.live.off{background:rgba(255,255,255,.08);border-color:var(--line)}.live.off i{background:#888;animation:none}
-@keyframes pls{0%{box-shadow:0 0 0 0 rgba(255,82,82,.7)}70%{box-shadow:0 0 0 .8vw rgba(255,82,82,0)}100%{box-shadow:0 0 0 0 rgba(255,82,82,0)}}
+.logo{width:6.2vw;height:6.2vw;display:grid;place-items:center}.logo img{width:100%;height:100%;object-fit:contain}
+.cname{font-family:Lalezar,Tajawal,sans-serif;font-size:2.7vw;line-height:1.2}
+.slogan{display:flex;align-items:center;gap:1vw;font-size:1.25vw;font-weight:700;color:var(--mute)}.slogan img{height:2.2vw}
+.live{margin-inline-start:auto;display:flex;align-items:center;gap:.6vw;border:1.5px solid rgba(255,110,100,.6);padding:.3vw 1vw;border-radius:99px;font-weight:700;font-size:1.2vw}
+.live i{width:.75vw;height:.75vw;border-radius:50%;background:#ff5a4f;animation:pls 1.4s infinite}.live.off{border-color:var(--line)}.live.off i{background:#8d8178;animation:none}
+@keyframes pls{0%{opacity:1}50%{opacity:.35}100%{opacity:1}}
 .main{display:grid;grid-template-columns:minmax(0,1fr) 24vw;gap:1.6vw;min-height:0}
-.stage{position:relative;min-width:0;border-radius:2vw;background:linear-gradient(160deg,rgba(255,255,255,.11),rgba(255,255,255,.03));border:.12vw solid var(--frame);box-shadow:0 0 4vw rgba(232,178,95,.15);overflow:hidden}
+.stage{position:relative;min-width:0;border-radius:2vw;overflow:hidden;background:var(--dark);border:.15vw solid var(--line);transition:background .6s,color .6s}
+.stage[data-tone="light"]{background:var(--cream);border-color:var(--cream);color:var(--dark);--ink:var(--dark);--mute:rgba(55,42,37,.68);--gold:var(--dark);--line:rgba(55,42,37,.16);--track:rgba(55,42,37,.14);--fill:var(--dark)}
 .sc{position:absolute;inset:0;padding:2vw 2.4vw 2.6vw;display:flex;flex-direction:column;justify-content:center;animation:scin .7s cubic-bezier(.2,.8,.2,1) both}
-@keyframes scin{from{opacity:0;transform:translateY(2vh) scale(.985)}to{opacity:1;transform:none}}
-.dots{position:absolute;bottom:.9vw;inset-inline:0;display:flex;justify-content:center;gap:.5vw;z-index:2}.dots i{width:.7vw;height:.7vw;border-radius:99px;background:var(--track);transition:all .4s}.dots i.on{width:2.4vw;background:var(--gold)}
-.k{color:var(--gold);font-weight:800;font-size:1.35vw}.h{font-family:'Reem Kufi';font-size:2.9vw;line-height:1.3;margin:.2vw 0 1vw}
-.st{font-family:'Reem Kufi';font-size:2.5vw;text-align:center;margin-bottom:1.2vw;text-shadow:0 .2vw 1.2vw rgba(232,178,95,.35)}
-.new{background:linear-gradient(90deg,var(--gold),var(--cop));color:#1a1206;border-radius:.7vw;padding:0 .7vw;font-size:.6em;vertical-align:middle}
+@keyframes scin{from{opacity:0;transform:translateY(2vh)}to{opacity:1;transform:none}}
+.dots{position:absolute;bottom:.9vw;inset-inline:0;display:flex;justify-content:center;gap:.5vw;z-index:2}.dots i{width:.7vw;height:.7vw;border-radius:99px;background:var(--track);transition:all .4s}.dots i.on{width:2.4vw;background:var(--fill)}
+.k{color:var(--gold);font-weight:800;font-size:1.35vw}.h{font-family:Lalezar,Tajawal,sans-serif;font-size:3vw;line-height:1.3;margin:.2vw 0 1vw}
+.st{font-family:Lalezar,Tajawal,sans-serif;font-size:2.6vw;text-align:center;margin-bottom:1.2vw}
+.new{background:var(--gd);color:var(--dark);border-radius:.7vw;padding:0 .7vw;font-family:Tajawal,sans-serif;font-weight:800;font-size:.55em;vertical-align:middle}
 .g{display:grid;grid-template-columns:9vw minmax(0,1fr) auto;gap:1.2vw;align-items:center;padding:.85vw 0;border-top:1px solid var(--line);font-size:1.9vw;font-weight:700}
-.g:first-of-type{border-top:0}.grp{background:linear-gradient(135deg,var(--cop),var(--gold));color:#1a1206;border-radius:.8vw;text-align:center;padding:.3vw 0;font-size:1.4vw;font-weight:800}
-.pl{font-size:1.3vw;color:var(--mute);font-weight:600;white-space:nowrap}
-.bar{height:1vw;background:var(--track);border-radius:99px;overflow:hidden;margin-top:1.4vw}.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--cop),var(--gold));border-radius:99px;transition:width 1s linear}
+.g:first-of-type{border-top:0}.grp{background:var(--gd);color:var(--dark);border-radius:.8vw;text-align:center;padding:.3vw 0;font-size:1.4vw;font-weight:800}
+.pl{font-size:1.3vw;color:var(--mute);font-weight:700;white-space:nowrap}
+.bar{height:1vw;background:var(--track);border-radius:99px;overflow:hidden;margin-top:1.4vw}.bar i{display:block;height:100%;background:var(--fill);border-radius:99px;transition:width 1s linear}
 .rem{display:flex;justify-content:space-between;color:var(--mute);font-size:1.25vw;margin-top:.5vw}
 .day{display:flex;flex-direction:column;gap:.5vw}
-.dr{display:grid;grid-template-columns:11vw minmax(0,1fr) auto;gap:1vw;align-items:center;background:var(--glass);border:1px solid var(--line);border-radius:1vw;padding:.5vw 1.2vw;font-size:1.45vw}
-.dr.past{opacity:.42}.dr.now{background:rgba(232,178,95,.2);border-color:var(--gold);box-shadow:0 0 0 .12vw var(--gold) inset}.dr .tm{font-weight:800;direction:ltr;text-align:right;font-variant-numeric:tabular-nums}
-.nowb{background:#ff5252;color:#fff;border-radius:99px;padding:0 .7vw;font-size:.75em;margin-inline-start:.5vw}
+.dr{display:grid;grid-template-columns:11vw minmax(0,1fr) auto;gap:1vw;align-items:center;border:1px solid var(--line);border-radius:1vw;padding:.5vw 1.2vw;font-size:1.45vw}
+.dr.past{opacity:.42}.dr.now{background:rgba(235,186,78,.28);border:.15vw solid var(--gd)}.dr .tm{font-family:Lalezar,Tajawal,sans-serif;direction:ltr;text-align:right;font-variant-numeric:tabular-nums}
+.nowb{background:var(--gd);color:var(--dark);border-radius:99px;padding:0 .7vw;font-size:.75em;font-weight:800;margin-inline-start:.5vw}
 .rail{display:flex;flex-direction:column;gap:.9vw;min-height:0}
-.rc{background:var(--glass);border:1px solid var(--line);border-radius:1.5vw;padding:.9vw 1.2vw}
-.clk{font-size:4vw;font-weight:800;direction:ltr;text-align:center;line-height:1.05;font-variant-numeric:tabular-nums}.clk small{font-size:.4em;color:var(--gold)}
+.rc{border:1.5px solid var(--line);border-radius:1.5vw;padding:.9vw 1.2vw}
+.clk{font-family:Lalezar,Tajawal,sans-serif;font-size:4.2vw;direction:ltr;text-align:center;line-height:1.05;font-variant-numeric:tabular-nums}.clk small{font-size:.4em;color:var(--gd)}
 .date{text-align:center;color:var(--mute);font-size:1.05vw;margin-top:.3vw}
-.rc .t{color:var(--gold);font-weight:800;font-size:1.1vw}.rc .v{font-size:1.6vw;font-weight:800;line-height:1.35}.rc .s{color:var(--mute);font-size:1.02vw}
-.cd{font-weight:800;color:var(--gold);direction:ltr;font-variant-numeric:tabular-nums;display:inline-block}.rc .cd{font-size:2.2vw}
-.tick{display:flex;align-items:center;gap:1vw;background:rgba(0,0,0,.32);border:1px solid var(--line);border-radius:1vw;height:3.4vw;overflow:hidden;font-size:1.45vw}
-.tick b{flex:none;background:linear-gradient(135deg,var(--cop),var(--gold));color:#1a1206;height:100%;display:grid;place-items:center;padding:0 1.2vw}
+.rc .t{color:var(--gd);font-weight:700;font-size:1.1vw}.rc .v{font-size:1.6vw;font-weight:800;line-height:1.35}.rc .s{color:var(--mute);font-size:1.02vw}
+.cd{font-family:Lalezar,Tajawal,sans-serif;color:var(--gold);direction:ltr;font-variant-numeric:tabular-nums;display:inline-block}.rc .cd{font-size:2.3vw;color:var(--gd)}
+.tick{display:flex;align-items:center;gap:1vw;border:1.5px solid var(--line);border-radius:1vw;height:3.4vw;overflow:hidden;font-size:1.45vw;font-weight:700}
+.tick b{flex:none;background:var(--gd);color:var(--dark);height:100%;display:grid;place-items:center;padding:0 1.2vw}
 .tick .tr{flex:1;position:relative;height:100%;overflow:hidden;white-space:nowrap}.tick .tr span{position:absolute;top:50%;animation:mq linear infinite}
 @keyframes mq{from{left:0;transform:translate(-100%,-50%)}to{left:100%;transform:translate(0,-50%)}}
+.strip{height:2.4vw;margin:0 -2.6vw;background:url(brand/strip.png) repeat-x center/auto 100%}
 .card2{max-width:90%;margin:0 auto;text-align:center}.ai{font-size:5vw;line-height:1.1;animation:bob 1.6s ease-in-out infinite alternate}
 @keyframes bob{to{transform:translateY(-1vh) rotate(-6deg)}}
-.al{font-size:1.5vw;color:var(--gold);font-weight:800;margin:.4vw 0}.at{font-family:'Reem Kufi';font-size:3.4vw;line-height:1.4}.sub2{font-size:1.8vw;opacity:.92;margin-top:.6vw}
-.verse{font-family:Amiri,serif;font-size:3vw;line-height:1.7}
+.al{font-size:1.5vw;color:var(--gold);font-weight:800;margin:.4vw 0}.at{font-family:Lalezar,Tajawal,sans-serif;font-size:3.4vw;line-height:1.4}.sub2{font-size:1.8vw;opacity:.92;margin-top:.6vw}
+.verse{font-family:Amiri,serif;font-size:3vw;line-height:1.8}
 .rank{display:flex;flex-direction:column;gap:.7vw;max-width:92%;margin:0 auto;width:100%}
-.lr{display:grid;grid-template-columns:4vw 15vw 1fr 7vw;align-items:center;gap:1.2vw;font-size:1.9vw;background:linear-gradient(90deg,rgba(255,255,255,.1),rgba(255,255,255,.04));border:1px solid var(--line);border-radius:1.2vw;padding:.45vw 1.4vw}
-.lr .bar{margin:0;height:1.4vw}.lr .bar i{margin:0;transition:width 1.4s cubic-bezier(.2,.8,.2,1)}.lr .pt{text-align:left;font-weight:900;color:var(--gold);direction:ltr}
+.lr{display:grid;grid-template-columns:4vw 15vw 1fr 7vw;align-items:center;gap:1.2vw;font-size:1.9vw;font-weight:700;border:1px solid var(--line);border-radius:1.2vw;padding:.45vw 1.4vw}
+.lr .bar{margin:0;height:1.4vw}.lr .bar i{margin:0;transition:width 1.4s cubic-bezier(.2,.8,.2,1)}.lr .pt{text-align:left;font-family:Lalezar,Tajawal,sans-serif;color:var(--gold);direction:ltr}
 .pq{display:grid;gap:.9vw;max-width:92%;margin:0 auto;width:100%}
-.pc{text-align:center;border-radius:1.3vw;padding:.9vw;background:linear-gradient(160deg,rgba(255,255,255,.12),rgba(255,255,255,.04));border:1px solid var(--line)}
-.pc .pn{font-size:1.6vw;font-weight:800}.pc .pt{font-size:2.5vw;font-weight:900;color:var(--gold);direction:ltr}.pc small{font-size:1vw;opacity:.75}
-.pc.nx{border:.15vw solid var(--gold);box-shadow:0 0 3vw rgba(232,178,95,.45)}.pc.dn{opacity:.42}
-.pod{display:flex;align-items:flex-end;justify-content:center;gap:2vw;height:26vw}.pd{width:14vw;text-align:center}
-.pd .m{font-size:3vw}.pd .n{font-size:1.8vw;font-weight:800}.pd .b{border-radius:1vw 1vw 0 0;display:grid;place-items:center;font-size:2.4vw;font-weight:900;color:#1a1206}
-.full{position:fixed;inset:0;z-index:20;display:grid;place-items:center;text-align:center;padding:4vw;background:radial-gradient(ellipse at center,rgba(16,38,74,.97),rgba(4,10,22,.99))}
-.full.urgent{background:radial-gradient(ellipse at center,#6a1418,#1a0507)}.full.adhan{background:radial-gradient(ellipse at center,rgba(20,70,45,.97),rgba(4,16,10,.99))}
-.full .ttl{font-family:'Reem Kufi';font-size:5vw;line-height:1.3}.full .sub{font-size:2.1vw;color:var(--gold);margin-top:1.2vw}.full .ic{font-size:7vw}
-.full .big{font-size:8vw;font-weight:900;color:var(--gold);direction:ltr;font-variant-numeric:tabular-nums;line-height:1.1;margin:1vw 0}
-.setup{position:fixed;inset:0;display:grid;place-items:center;z-index:50;cursor:auto;background:var(--navy)}
-.setup .box{width:min(560px,90vw);padding:28px;border-radius:18px;background:var(--navy2);border:1px solid var(--frame);font-size:16px}
-.setup input{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--navy);color:var(--ink);font-size:16px;margin:10px 0;direction:ltr}
-.setup button,.fs{border:0;border-radius:10px;font-weight:700;cursor:pointer;background:linear-gradient(135deg,var(--cop),var(--gold));color:#1a1206}
+.pc{text-align:center;border-radius:1.3vw;padding:.9vw;border:1px solid var(--line)}
+.pc .pn{font-size:1.6vw;font-weight:800}.pc .pt{font-family:Lalezar,Tajawal,sans-serif;font-size:2.6vw;color:var(--gold);direction:ltr}.pc small{font-size:1vw;opacity:.75}
+.pc.nx{border:.2vw solid var(--gd);background:rgba(235,186,78,.22)}.pc.dn{opacity:.42}
+.pod{display:flex;align-items:flex-end;justify-content:center;gap:2vw;height:22vw}.pd{width:14vw;text-align:center}
+.pd .m{font-size:2.6vw}.pd .n{font-size:1.8vw;font-weight:800}.pd .b{border-radius:1vw 1vw 0 0;display:grid;place-items:center;font-family:Lalezar,Tajawal,sans-serif;font-size:2.6vw;background:var(--ink);color:var(--stage-bg,var(--dark))}
+.stage[data-tone="light"] .pd .b{color:var(--cream)}.stage:not([data-tone="light"]) .pd .b{color:var(--dark)}.pd .b.first{background:var(--gd);color:var(--dark)!important}
+.full{position:fixed;inset:0;z-index:20;display:grid;place-items:center;text-align:center;padding:4vw;background:var(--dark)}
+.full.urgent{background:#9e2a22}
+.full .ttl{font-family:Lalezar,Tajawal,sans-serif;font-size:5.4vw;line-height:1.3}.full .sub{font-size:2.1vw;font-weight:700;color:var(--gd);margin-top:1.2vw}.full.urgent .sub{color:var(--cream)}.full .ic{font-size:7vw}
+.full .big{font-family:Lalezar,Tajawal,sans-serif;font-size:8vw;color:var(--gd);direction:ltr;font-variant-numeric:tabular-nums;line-height:1.1;margin:1vw 0}
+.setup{position:fixed;inset:0;display:grid;place-items:center;z-index:50;cursor:auto;background:var(--dark)}
+.setup .box{width:min(560px,90vw);padding:28px;border-radius:18px;background:var(--cream);color:var(--dark);font-size:16px}
+.setup input{width:100%;padding:12px;border-radius:10px;border:1.5px solid rgba(55,42,37,.3);background:#fff;color:var(--dark);font-size:16px;margin:10px 0;direction:ltr}
+.setup button,.fs{border:0;border-radius:10px;font-family:Tajawal,sans-serif;font-weight:800;cursor:pointer;background:var(--gd);color:var(--dark)}
 .setup button{width:100%;padding:12px;font-size:16px}
-.fs{position:fixed;bottom:6.4vw;left:3vw;z-index:30;padding:.4vw 1vw;font-size:1vw;opacity:.8}
+.fs{position:fixed;bottom:8.6vw;left:3vw;z-index:30;padding:.4vw 1vw;font-size:1vw;opacity:.85}
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01s!important;transition-duration:.01s!important}}
 </style>
 </head>
 <body>
-<i class="orb o1"></i><i class="orb o2"></i>
 <div class="app">
-  <header class="hd"><div class="logo" id="logo">م</div><div><div class="cname" id="cname"></div><div class="slogan" id="slogan"></div></div><span class="live" id="live"><i></i><span id="liveTx">مباشر</span></span></header>
+  <header class="hd"><div class="logo" id="logo"><img src="brand/symbol.png" alt=""></div><div><div class="cname" id="cname"></div><div class="slogan"><img src="brand/slogan.png" alt="في الخير محملاً"><span id="slogan"></span></div></div><span class="live" id="live"><i></i><span id="liveTx">مباشر</span></span></header>
   <div class="main"><section class="stage"><div id="stage"></div><nav class="dots" id="dots"></nav></section><aside class="rail" id="rail"></aside></div>
   <div class="tick" id="ticker" style="display:none"><b>📣</b><div class="tr" id="tick"></div></div>
+  <div class="strip" aria-hidden="true"></div>
 </div>
 <div id="over"></div>
 <button class="fs" id="fsBtn">⛶ ملء الشاشة</button>
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4lEBGPNxghwq9UmK0iljI5QdS-8iCvC-K09dDtbZCXGvGZyA4repTE3rFVVRp5zS4yw/exec';
-// Edit here until they are set from the system: camp name, slogan and the logo file (put it next to this page).
-const CONFIG = { name: 'المخيّم الطلابي', slogan: 'في الخير محمَّلًا', logo: '', slideSeconds: 12, adhanMinutes: 4, soonMinutes: 5 };
+// The camp name can also be set from the system (CampName). The logo and the slogan come from the official files in brand/ (the guide forbids retyping the slogan).
+const CONFIG = { name: 'مخيم نشاط التدريس ١٣', slideSeconds: 12, adhanMinutes: 4, soonMinutes: 5 };
 const $ = id => document.getElementById(id);
 const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
 const PR = { fajr: 'الفجر', dhuhr: 'الظهر', asr: 'العصر', maghrib: 'المغرب', isha: 'العشاء' };
 const TEAM_COLORS = ['#E5484D', '#4CC38A', '#3E8BFF', '#E8B04B', '#A06CF0', '#F07E3A', '#2EC4C4', '#E86BA7'];
+// A team named after a colour is drawn in that colour; other teams take the next colour of the list.
+const NAMED_COLORS = [['أحمر', '#E5484D'], ['أخضر', '#4CC38A'], ['أزرق', '#3E8BFF'], ['أصفر', '#E8B04B'], ['بنفسج', '#A06CF0'], ['برتقال', '#F07E3A'], ['فيروز', '#2EC4C4'], ['وردي', '#E86BA7']];
+const teamColor = (name, i) => { const n = String(name || ''); const hit = NAMED_COLORS.find(c => n.indexOf(c[0]) !== -1); return hit ? hit[1] : TEAM_COLORS[i % TEAM_COLORS.length]; };
 const HIDE_TYPES = ['حركة']; // bus movements are for the supervisors, not for the big screen
 
 let D = null, offset = 0, online = false, tried = false, loading = false, idx = -1, seen = {}, lastKey = '', lastSync = 0;
@@ -177,7 +175,7 @@ function dayScene(ps) {
 }
 function rankScene() {
   const tt = D.totals, mx = Math.max(1, ...tt.map(x => x.points)), medal = ['🥇', '🥈', '🥉'];
-  return `<h2 class="st">🏆 الترتيب العام للفرق</h2><div class="rank">${tt.slice(0, 8).map((x, i) => `<div class="lr"><span style="text-align:center">${medal[i] || (i + 1)}</span><b>${esc(x.team)}</b><div class="bar"><i style="width:${Math.round(x.points / mx * 100)}%;background:${TEAM_COLORS[i % TEAM_COLORS.length]}"></i></div><span class="pt">${x.points}</span></div>`).join('')}</div>`;
+  return `<h2 class="st">🏆 الترتيب العام للفرق</h2><div class="rank">${tt.slice(0, 8).map((x, i) => `<div class="lr"><span style="text-align:center">${medal[i] || (i + 1)}</span><b>${esc(x.team)}</b><div class="bar"><i style="width:${Math.round(x.points / mx * 100)}%;background:${teamColor(x.team, i)}"></i></div><span class="pt">${x.points}</span></div>`).join('')}</div>`;
 }
 function prayersScene() {
   const t = now(), p = D.prayers[ymd(t)], st = prayerState(), names = Object.keys(PR).filter(n => p[n]);
@@ -187,13 +185,13 @@ function prayersScene() {
 }
 const textScene = (icon, kicker, title, body, verse) => `<div class="card2"><div class="ai">${icon}</div><div class="al">${esc(kicker)}</div>${verse ? `<div class="verse">${esc(title)}</div>${body ? `<div class="sub2" style="color:var(--gold)">${esc(body)}</div>` : ''}` : `<div class="at">${esc(title)}</div>${body ? `<div class="sub2">${esc(body)}</div>` : ''}`}</div>`;
 function podiumScene(g) {
-  const rows = g.rows.slice(0, 3), order = [rows[1], rows[0], rows[2]].filter(Boolean), h = [22, 16, 12], col = ['#E8B25F', '#C0C7D0', '#C98A4B'], md = ['🥇', '🥈', '🥉'];
+  const rows = g.rows.slice(0, 3), order = [rows[1], rows[0], rows[2]].filter(Boolean), h = [17, 12, 9], md = ['🥇', '🥈', '🥉'];
   return `<h2 class="st">🎯 ${esc(g.competition)} <span class="new">النتيجة</span></h2><div class="pod">${order.map(r => { const i = rows.indexOf(r);
-    return `<div class="pd"><div class="m">${md[i]}</div><div class="n">${esc(r.team)}</div><div class="b" style="height:${h[i]}vw;background:${col[i]}">${r.points !== null ? r.points : '#' + (i + 1)}</div></div>`; }).join('')}</div>`;
+    return `<div class="pd"><div class="m">${md[i]}</div><div class="n">${esc(r.team)}</div><div class="b${i === 0 ? ' first' : ''}" style="height:${h[i]}vw">${r.points !== null ? r.points : '#' + (i + 1)}</div></div>`; }).join('')}</div>`;
 }
 function welcomeScene() {
   const t = now(), h = t.getHours(), g = ann('greeting')[0];
-  return textScene('🏕️', h < 12 ? 'صباح الخير' : h < 18 ? 'طاب يومكم' : 'مساء النور', g ? g.title : campName(), g ? g.body : campSlogan());
+  return textScene('🏕️', h < 12 ? 'صباح الخير' : h < 18 ? 'طاب يومكم' : 'مساء النور', g ? g.title : campName(), g ? g.body : '');
 }
 function finaleScene(a) {
   const ms = new Date(a.startsAt) - now(), d = Math.floor(ms / 864e5), hh = Math.floor(ms % 864e5 / 36e5), m = Math.floor(ms % 36e5 / 6e4);
@@ -232,18 +230,11 @@ function override() {
 }
 
 /* ---------- identity variant ---------- */
-function themeNow() {
-  const forced = new URLSearchParams(location.search).get('theme'); if (forced) return forced; // preview only
-  if (D && D.displayTheme && ['brand', 'jumuah', 'festive', 'night'].indexOf(D.displayTheme) !== -1) return D.displayTheme; // pinned by the media committee
-  const t = now(), fin = ann('finale')[0], h = t.getHours();
-  if (fin && fin.startsAt && ymd(new Date(fin.startsAt)) === ymd(t)) return 'festive';
-  if ((t.getDay() === 4 && h >= 18) || (t.getDay() === 5 && h < 4)) return 'jumuah';
-  return 'brand';
-}
+// The identity guide allows only the dark and cream backgrounds, so there are no colour variants any more.
+function themeNow() { return 'brand'; }
 
 /* ---------- painting ---------- */
 const campName = () => (D && D.campName) || CONFIG.name;
-const campSlogan = () => (D && D.campSlogan) || CONFIG.slogan;
 function dayLine() {
   const t = now(), start = D && D.campStart ? new Date(D.campStart + 'T00:00:00') : null, days = D && D.campDays || 4;
   const n = start ? Math.floor((new Date(ymd(t) + 'T00:00:00') - start) / 864e5) + 1 : 0;
@@ -251,7 +242,7 @@ function dayLine() {
 }
 function paintHeader() {
   const th = themeNow(); if (document.body.dataset.t !== th) document.body.dataset.t = th;
-  $('cname').textContent = campName(); $('slogan').textContent = campSlogan() + dayLine();
+  $('cname').textContent = campName(); $('slogan').textContent = dayLine().replace(/^ · /, '');
   $('live').className = 'live' + (online ? '' : ' off');
   $('liveTx').textContent = online ? 'مباشر' : !tried ? 'جارٍ التحديث…' : 'دون اتصال · آخر تحديث ' + (lastSync ? new Date(lastSync).toTimeString().slice(0, 5) : '—');
 }
@@ -278,6 +269,7 @@ function showScene() {
   const t = now().getTime(), fresh = s.find(x => x.at && !seen[x.key] && t - new Date(x.at).getTime() < 3 * 60000);
   if (fresh) cur = fresh; else { idx = (idx + 1) % s.length; cur = s[idx]; }
   seen[cur.key] = true;
+  const st = $('stage').parentElement; st.dataset.tone = st.dataset.tone === 'light' ? 'dark' : 'light';
   $('stage').innerHTML = `<section class="sc">${fresh ? '<div style="text-align:center;margin-bottom:.6vw"><span class="new">جديد</span></div>' : ''}${cur.html()}</section>`;
   lastKey = cur.key;
   $('dots').innerHTML = s.map(x => `<i class="${x.key === cur.key ? 'on' : ''}"></i>`).join('');
@@ -292,14 +284,13 @@ function tick() {
 /* ---------- setup (the key is typed once on the screen computer, never in the URL) ---------- */
 function setup(msg) {
   const d = document.createElement('div'); d.className = 'setup';
-  d.innerHTML = `<div class="box"><h2 style="margin-bottom:8px">إعداد شاشة العرض</h2><div style="color:var(--mute)">أدخل «مفتاح العرض» مرة واحدة على هذا الجهاز. تحصل عليه من مسؤول النظام.</div>${msg ? `<div style="color:#ff8a8a;margin-top:8px">${esc(msg)}</div>` : ''}<input id="kIn" type="password" autocomplete="off" placeholder="FEED KEY"><button id="kBtn">حفظ وبدء العرض</button></div>`;
+  d.innerHTML = `<div class="box"><h2 style="margin-bottom:8px">إعداد شاشة العرض</h2><div style="color:var(--mute)">أدخل «مفتاح العرض» مرة واحدة على هذا الجهاز. تحصل عليه من مسؤول النظام.</div>${msg ? `<div style="color:#9e2a22;margin-top:8px">${esc(msg)}</div>` : ''}<input id="kIn" type="password" autocomplete="off" placeholder="FEED KEY"><button id="kBtn">حفظ وبدء العرض</button></div>`;
   document.body.appendChild(d);
   d.querySelector('#kBtn').onclick = async () => { const v = d.querySelector('#kIn').value.trim(); if (!v) return; store.set('mk_feed_key', v); d.remove(); await load(); paintTicker(); showScene(); };
 }
 let wakeLock = null;
 async function keepAwake() { try { if (navigator.wakeLock) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {} }
 $('fsBtn').onclick = () => { (document.documentElement.requestFullscreen || function () {}).call(document.documentElement); $('fsBtn').style.display = 'none'; keepAwake(); };
-if (CONFIG.logo) $('logo').innerHTML = `<img src="${esc(CONFIG.logo)}" alt="">`;
 if (!store.get('mk_feed_key')) setup();
 paintHeader(); paintRail(); paintTicker(); showScene();
 load().then(() => { idx = -1; paintHeader(); paintRail(); paintTicker(); showScene(); }); // start the loop from "now" once the data is in

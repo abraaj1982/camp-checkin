@@ -1,0 +1,10 @@
+/* Camp 13 identity (from the visual identity guide). Shared by every page that adopts it.
+   Colours: dark #372A25 and cream #FBF3D7 for backgrounds and text, gold #EBBA4E for one highlight and numbers.
+   The logo gold #EAA920 lives only inside the logo files. Flat colours: no gradients, no shadows.
+   Fonts: Lalezar for titles and numbers, Tajawal for text (500 text, 700 labels, 800 buttons), Amiri for verses. */
+@font-face{font-family:Lalezar;src:url(fonts/Lalezar-Regular.ttf) format('truetype');font-display:swap}
+@font-face{font-family:Tajawal;src:url(fonts/Tajawal-Medium.ttf) format('truetype');font-weight:100 500;font-display:swap}
+@font-face{font-family:Tajawal;src:url(fonts/Tajawal-Bold.ttf) format('truetype');font-weight:600 700;font-display:swap}
+@font-face{font-family:Tajawal;src:url(fonts/Tajawal-ExtraBold.ttf) format('truetype');font-weight:800 900;font-display:swap}
+@font-face{font-family:Amiri;src:url(fonts/Amiri-Regular.ttf) format('truetype');font-display:swap}
+:root{--dark:#372A25;--cream:#FBF3D7;--gd:#EBBA4E}
