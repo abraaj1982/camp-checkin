@@ -7,8 +7,32 @@
 <link rel="stylesheet" href="theme.css">
 <script src="ui.js" defer></script>
 <style>
-.brow2{display:grid;grid-template-columns:1fr 60px 60px;gap:8px;align-items:center;padding:5px 0;font-size:14px}
-.cd{font-size:28px;font-weight:700}
+/* Media committee: pick the day, check its program, then four big actions. Nothing reaches the screen before «نشر». */
+.daysel{display:flex;gap:10px;align-items:center}.daysel select{flex:1;font-weight:800;font-size:17px}
+.rv{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px;flex-wrap:wrap}
+.blk{border:1px solid var(--line);border-radius:14px;padding:9px 12px;margin-top:7px;background:var(--card)}
+.blk .bt{display:flex;gap:10px;align-items:baseline}.blk .bt b{font-variant-numeric:tabular-nums;min-width:96px;direction:ltr;text-align:right}
+.blk .bs{color:var(--muted);font-size:13px;margin-top:3px;padding-inline-start:106px}
+.blk.off{opacity:.5}.blk.now{border:2px solid var(--gold)}
+.acts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.act{border:0;border-radius:18px;min-height:92px;font:inherit;font-weight:800;font-size:17px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:var(--brand);color:var(--btnink)}
+.act span{font-size:28px;line-height:1}.act.lt{background:var(--card);color:var(--ink);border:1.5px solid var(--line)}
+.kd{display:inline-block;width:12px;height:12px;border-radius:4px;vertical-align:middle;margin-inline-end:6px;border:1px solid rgba(0,0,0,.15)}
+.kinds{display:flex;flex-wrap:wrap;gap:6px}.kinds .chip{display:inline-flex;align-items:center;min-height:40px}
+.tpl{display:flex;flex-wrap:wrap;gap:6px}.tpl .chip{min-height:38px;font-size:13.5px}
+.pv{border-radius:16px;padding:18px;text-align:center;background:#372A25;color:#FBF3D7;margin-top:10px}
+.pv .k{display:inline-block;border-radius:999px;padding:2px 12px;font-weight:800;font-size:13px;color:#372A25}
+.pv .t{font-weight:800;font-size:20px;margin-top:8px}.pv .b{opacity:.85;margin-top:4px}
+.pv.urgent{background:#9e2a22}
+.ai{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:14px;padding:10px 12px;background:var(--card);margin-top:8px}
+.ai .bd{flex:1;min-width:0}.ai .tt{font-weight:800}.ai .mt{color:var(--muted);font-size:12.5px}
+.ai .bb{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.ai .bb .chip{min-height:36px;font-size:13px}
+.tm{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:14px;padding:6px 10px;margin-top:7px;background:var(--card)}
+.tm .nm{flex:1;font-weight:800}.tm input{width:84px;min-height:46px;text-align:center;font-weight:800;font-size:18px;padding:0 6px}
+.tm .step{width:44px;height:44px}
+.tm .pl{min-width:34px;text-align:center;font-weight:800;color:var(--muted)}
+.sec{font-weight:800;font-size:16px;margin:4px 2px 0}
+.back{align-self:flex-start}
 </style>
 </head>
 <body>
@@ -37,41 +61,89 @@ async function api(payload) {
   if (r && r.code && AUTH_ERR.test(r.code)) { st.msg = { cls: 'bad', t: L().sessionEnd }; render(); setTimeout(() => { sessionStorage.clear(); location.href = 'login.html'; }, 1500); throw new Error('auth'); }
   return r;
 }
+// The big screen works from Fajr on Thursday 31 December (no screen on the arrival day).
+const SCREEN_FROM = '2026-12-31';
+const SCREEN_OFF = '21:00';
+// One colour per kind, the same on the big screen (colours of the identity guide; urgent stays red for safety).
+const KIND_COLOR = { announce: '#EBBA4E', event: '#A3A867', urgent: '#B3261E', wisdom: '#ECCA9C', kudos: '#A8D285', quote: '#D39D66', call: '#372A25', greeting: '#FBF3D7' };
+const KINDS = ['announce', 'event', 'urgent', 'wisdom', 'kudos', 'quote', 'call', 'greeting'];
+const PR = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
 const T = {
- ar: { dir: 'rtl', title: 'الإعلامية', sub: 'الإعلانات والفعاليات والنتائج', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
-  tAnn: 'الإعلانات', tRes: 'النتائج', countdown: 'العد التنازلي لبداية المخيم', days: 'يوم', hours: 'ساعة', mins: 'دقيقة', started: 'بدأ المخيم',
-  newAnn: 'إعلان / فعالية جديدة', title_: 'العنوان', body: 'النص', kind: 'النوع', announce: 'إعلان (الشريط والشرائح)', event: 'فعالية (بعدّ تنازلي)', urgent: '🚨 رسالة طارئة (تملأ الشاشة)', wisdom: 'حكمة اليوم', kudos: 'موقف اليوم (لفتة طيبة)', quote: 'قالوا عن المخيم', call: 'استدعاء طالب (بالرقم فقط)', greeting: 'عبارة الترحيب (على شاشة البداية)', finale: '🎉 الحفل الختامي (عدّ تنازلي وثيم احتفالي)', thTitle: 'ثيم شاشة العرض', thNote: '«تلقائي» يغيّر الثيم حسب الوقت: الشروق، النهار، العصر، الغروب، المساء، الليل، وليلة الجمعة، ويوم الحفل الختامي.', thSave: 'تطبيق الثيم', pgTitle: '📎 برنامج المخيم (ملف الإكسل)', pgNote: 'أرفق ملف البرنامج (ورقة «البرنامج»). تظهر معاينة، ثم «اعتماد» فتعمل الشاشة به خلال دقيقة. الرفع الجديد يحل محل القديم ويُحفظ القديم في الأرشيف.', pgPick: '📎 اختيار ملف .xlsx', pgOk: (d, n, g) => '✓ ' + d + ' أيام · ' + n + ' نشاطًا' + (g ? ' · ' + g + ' فئات' : ''), pgNoTo: n => '⚠ ' + n + ' أسطر بلا وقت نهاية (تُحسب حتى النشاط التالي)', pgBad: r => '✖ أسطر لا يُفهم تاريخها أو وقتها: ' + r, pgNoSheet: 'لم أجد في الملف عمودَي «التاريخ» و«الفعالية».', pgSave: 'اعتماد البرنامج', pgDone: n => 'اعتُمد البرنامج: ' + n + ' نشاطًا. الشاشة تعمل به الآن.', pgCur: n => 'البرنامج الحالي: ' + n + ' نشاطًا.', pgReading: 'جارٍ قراءة الملف…',
-  th_auto: 'تلقائي (حسب الوقت) — موصى به', th_brand: 'هوية المخيم (كحلي ونحاسي)', th_dawn: 'الشروق', th_day: 'النهار', th_noon: 'العصر', th_sunset: 'الغروب', th_evening: 'المساء', th_night: 'الليل', th_jumuah: 'ليلة الجمعة', th_festive: 'احتفالي (الختام)', preview: 'معاينة الشاشة', other: 'أخرى', tPr: 'الصلاة والشاشة', prDate: 'التاريخ', fajr: 'الفجر', dhuhr: 'الظهر', asr: 'العصر', maghrib: 'المغرب', isha: 'العشاء', iqama: 'الإقامة بعد الأذان (دقائق)', prSave: 'حفظ أوقات هذا اليوم', prNote: 'اكتب أوقات اليوم من تقويم الوزارة. اترك الفارغ ليُخفى من الشاشة.', prSaved: 'الأيام المحفوظة', urgentNote: 'تظهر بملء شاشة العرض حتى تؤرشفها.', callNote: 'اكتب رقم الطالب فقط، بدون الاسم.', when: 'موعد الفعالية', audience: 'الجمهور', public: 'شاشات العرض والجميع', staff: 'فريق العمل فقط', pinned: 'تثبيت في الأعلى',
-  saveDraft: 'حفظ كمسودة', update: 'تحديث', cancelEdit: 'إلغاء التعديل', publish: 'نشر', unpublish: 'إعادة لمسودة', archive: 'أرشفة', edit: 'تعديل', draft: 'مسودة', published: 'منشور', archived: 'مؤرشف',
-  noAnn: 'لا توجد إعلانات.', newRes: 'إدخال نتيجة', comp: 'المسابقة', team: 'الفريق', place: 'المركز', points: 'النقاط', addRes: 'إضافة', needVerify: 'النشر يحتاج صلاحية «التحقق من النتائج».',
-  publishAll: 'نشر مسابقة', noRes: 'لا توجد نتائج.', done: 'تم', error: 'تعذّر الاتصال. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.', confirmPub: 'نشر هذا العنصر؟', feedNote: 'المنشور للجمهور يظهر في شاشات العرض خلال ثوانٍ.' },
- en: { dir: 'ltr', title: 'Media', sub: 'Announcements, events and results', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
-  tAnn: 'Announcements', tRes: 'Results', countdown: 'Countdown to camp', days: 'days', hours: 'hours', mins: 'min', started: 'Camp has started',
-  newAnn: 'New announcement / event', title_: 'Title', body: 'Text', kind: 'Type', announce: 'Announcement (ticker + slides)', event: 'Event (countdown)', urgent: '🚨 Urgent (full screen)', wisdom: 'Wisdom of the day', kudos: 'Kind act of the day', quote: 'They said about the camp', call: 'Call a student (number only)', greeting: 'Welcome line (start slide)', finale: '🎉 Closing ceremony (countdown + festive theme)', thTitle: 'Display theme', thNote: '“Automatic” follows the time of day, Thursday night and the closing day.', thSave: 'Apply theme', pgTitle: '📎 Camp program (Excel file)', pgNote: 'Attach the program file (sheet «البرنامج»). A preview appears; then «Approve» and the screen uses it within a minute. A new file replaces the old one; the old one is archived.', pgPick: '📎 Choose a .xlsx file', pgOk: (d, n, g) => '✓ ' + d + ' days · ' + n + ' activities' + (g ? ' · ' + g + ' groups' : ''), pgNoTo: n => '⚠ ' + n + ' rows without an end time (they run until the next activity)', pgBad: r => '✖ Rows whose date or time cannot be read: ' + r, pgNoSheet: 'The file has no «التاريخ» and «الفعالية» columns.', pgSave: 'Approve the program', pgDone: n => 'Program approved: ' + n + ' activities. The screen uses it now.', pgCur: n => 'Current program: ' + n + ' activities.', pgReading: 'Reading the file…',
-  th_auto: 'Automatic (recommended)', th_brand: 'Camp identity (navy and copper)', th_dawn: 'Dawn', th_day: 'Day', th_noon: 'Afternoon', th_sunset: 'Sunset', th_evening: 'Evening', th_night: 'Night', th_jumuah: 'Thursday night', th_festive: 'Festive (closing)', preview: 'Preview display', other: 'Other', tPr: 'Prayers & screen', prDate: 'Date', fajr: 'Fajr', dhuhr: 'Dhuhr', asr: 'Asr', maghrib: 'Maghrib', isha: 'Isha', iqama: 'Iqama after adhan (minutes)', prSave: 'Save this day', prNote: 'Type the day’s times from the ministry calendar. Leave empty to hide.', prSaved: 'Saved days', urgentNote: 'Fills the display screen until you archive it.', callNote: 'Student number only, no name.', when: 'Event time', audience: 'Audience', public: 'Display screens and everyone', staff: 'Staff only', pinned: 'Pin to top',
-  saveDraft: 'Save draft', update: 'Update', cancelEdit: 'Cancel edit', publish: 'Publish', unpublish: 'Back to draft', archive: 'Archive', edit: 'Edit', draft: 'Draft', published: 'Published', archived: 'Archived',
-  noAnn: 'No announcements.', newRes: 'Enter a result', comp: 'Competition', team: 'Team', place: 'Place', points: 'Points', addRes: 'Add', needVerify: 'Publishing needs the “verify results” permission.',
-  publishAll: 'Publish competition', noRes: 'No results.', done: 'Done', error: 'Connection problem. Try again.', sessionEnd: 'Session expired. Please log in again.', confirmPub: 'Publish this item?', feedNote: 'Public items appear on the display screens within seconds.' }
+ ar: { dir: 'rtl', title: 'الإعلامية', sub: 'برنامج اليوم والإعلانات والنتائج', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
+  day: 'اليوم', dayProgram: n => '📋 برنامج اليوم (' + n + ' فقرة)', noProgram: 'لم يُرفق برنامج المخيم بعد. أرفق ملف الإكسل من «المزيد».', reviewed: (by, at) => '✓ راجعه ' + by + (at ? ' · ' + at : ''), notReviewed: 'لم يُراجَع بعد',
+  markReviewed: '✓ راجعتُ برنامج هذا اليوم', unmark: 'إلغاء المراجعة', reviewNote: 'راجع الأوقات والأماكن. البرنامج يظهر على الشاشة تلقائيًا؛ المراجعة علامة للفريق فقط.',
+  afterOff: 'بعد إطفاء الشاشة', staffOnly: 'للمشرفين، لا يظهر على الشاشة', nowB: 'الآن',
+  aAnn: 'إعلان', aRes: 'نتيجة فعالية', aPr: 'أوقات الصلاة', aMore: 'المزيد', back: '→ رجوع',
+  live: 'على الشاشة الآن', drafts: 'مسودات بانتظار النشر', noLive: 'لا شيء منشور الآن.', resTitle: 'النتائج',
+  kind: 'النوع', announce: 'إعلان', event: 'فعالية قادمة', urgent: '🚨 عاجل (يملأ الشاشة)', wisdom: 'حكمة', kudos: 'شكر وموقف طيب', quote: 'قالوا عن المخيم', call: 'استدعاء', greeting: 'ترحيب', finale: 'الحفل الختامي', other: 'أخرى',
+  templates: 'قوالب جاهزة', title_: 'العنوان', body: 'التفاصيل (اختياري)', when: 'موعد الفعالية', audience: 'يظهر لـ', public: 'الشاشة والجميع', staff: 'فريق العمل فقط', pinned: 'تثبيت في الأعلى',
+  preview: 'هكذا يظهر على الشاشة', saveDraft: 'حفظ مسودة', publishNow: 'نشر الآن', update: 'حفظ التعديل', edit: 'تعديل', publish: 'نشر', stop: 'إيقاف من الشاشة', remove: 'حذف',
+  urgentNote: 'يملأ الشاشة الكبيرة ويقطع كل شيء حتى توقفه.', callNote: 'اكتب رقم الطالب فقط، بدون اسمه.', confirmPub: 'راجعتَ النص؟ سيظهر على الشاشة الآن.', confirmStop: 'إيقافه من الشاشة؟',
+  comp: 'اسم الفعالية أو المسابقة', teams: 'الفرق', noTeams: 'لم تُضف الفرق بعد. أضفها مرة واحدة من «المزيد».', pointsOf: 'النقاط', placeAuto: 'المراكز تُحسب من النقاط تلقائيًا.',
+  replace: 'لهذه الفعالية نتيجة سابقة: الحفظ يستبدلها (تصحيح).', saveRes: 'حفظ مسودة', pubRes: 'حفظ ونشر', needVerify: 'النشر يحتاج صلاحية «التحقق من النتائج»؛ تبقى مسودة حتى ينشرها المسؤول.', publishComp: 'نشر النتيجة',
+  prDate: 'التاريخ', fajr: 'الفجر', dhuhr: 'الظهر', asr: 'العصر', maghrib: 'المغرب', isha: 'العشاء', prNote: 'انقلها من موقع التوقيت بالدقيقة. الفارغ لا يظهر.', prSave: 'حفظ أوقات هذا اليوم', prSaved: 'الأيام المحفوظة',
+  moreTeams: 'الفرق', teamsNote: 'اسم فريق في كل سطر. الفريق الذي اسمه لون (الأحمر، الأزرق…) يُرسم بلونه على الشاشة.', saveTeams: 'حفظ الفرق', openScreen: '🖥️ فتح الشاشة الكبيرة',
+  pgTitle: '📎 برنامج المخيم (ملف الإكسل)', pgNote: 'أرفق ملف البرنامج (ورقة «البرنامج»). تظهر معاينة، ثم «اعتماد» فتعمل الشاشة به خلال دقيقة. الرفع الجديد يحل محل القديم ويُحفظ القديم في الأرشيف.', pgPick: '📎 اختيار ملف .xlsx',
+  pgOk: (d, n, g) => '✓ ' + d + ' أيام · ' + n + ' نشاطًا' + (g ? ' · ' + g + ' فئات' : ''), pgNoTo: n => '⚠ ' + n + ' أسطر بلا وقت نهاية (تُحسب حتى النشاط التالي)', pgBad: r => '✖ أسطر لا يُفهم تاريخها أو وقتها: ' + r,
+  pgNoSheet: 'لم أجد في الملف عمودَي «التاريخ» و«الفعالية».', pgSave: 'اعتماد البرنامج', pgDone: n => 'اعتُمد البرنامج: ' + n + ' نشاطًا. الشاشة تعمل به الآن.', pgCur: n => 'البرنامج الحالي: ' + n + ' نشاطًا.', pgReading: 'جارٍ قراءة الملف…',
+  saved: 'حُفظ.', published: 'نُشر على الشاشة.', stopped: 'أُوقف من الشاشة.', error: 'تعذّر الاتصال. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.', draft: 'مسودة', pubd: 'منشور', loading: 'جارٍ التحميل…',
+  tplWater: '💧 ماء', tplDelay: '⏰ تأخير', tplCold: '🧥 برد', tplLost: '🧳 مفقودات', tplWisdom: '📖 حكمة الموسم', tplCall: '🔔 استدعاء', tplGather: '🚨 تجمّع',
+  tWater: 'تذكير: لا تنسوا زجاجة الماء', tDelay: 'تأخير الفقرة القادمة ١٥ دقيقة', tCold: 'الجو بارد: ارتدوا ملابس ثقيلة', tLost: 'مفقودات: ', tLostB: 'للاستلام: السكرتارية',
+  tWisdom: 'ضع أمر أخيك على أحسنه حتى يأتيك ما يغلبك منه', tWisdomB: 'أمير المؤمنين علي (ع)', tCall: 'يُرجى من الطالب رقم … مراجعة السكرتارية', tGather: 'تجمّع الجميع عند الساحة الآن' },
+ en: { dir: 'ltr', title: 'Media', sub: 'Day program, announcements and results', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
+  day: 'Day', dayProgram: n => '📋 Day program (' + n + ' items)', noProgram: 'No camp program yet. Attach the Excel file from «More».', reviewed: (by, at) => '✓ Checked by ' + by + (at ? ' · ' + at : ''), notReviewed: 'Not checked yet',
+  markReviewed: '✓ I checked this day', unmark: 'Undo', reviewNote: 'Check times and places. The program reaches the screen by itself; the mark is for the team only.',
+  afterOff: 'After the screen is off', staffOnly: 'For supervisors, not on the screen', nowB: 'Now',
+  aAnn: 'Announcement', aRes: 'Result', aPr: 'Prayer times', aMore: 'More', back: '← Back',
+  live: 'On the screen now', drafts: 'Drafts waiting', noLive: 'Nothing published now.', resTitle: 'Results',
+  kind: 'Type', announce: 'Announcement', event: 'Upcoming event', urgent: '🚨 Urgent (full screen)', wisdom: 'Wisdom', kudos: 'Thanks / kind act', quote: 'They said', call: 'Call a student', greeting: 'Welcome', finale: 'Closing ceremony', other: 'Other',
+  templates: 'Templates', title_: 'Title', body: 'Details (optional)', when: 'Event time', audience: 'Shown to', public: 'Screen and everyone', staff: 'Staff only', pinned: 'Pin to top',
+  preview: 'How it looks on the screen', saveDraft: 'Save draft', publishNow: 'Publish now', update: 'Save changes', edit: 'Edit', publish: 'Publish', stop: 'Take off the screen', remove: 'Delete',
+  urgentNote: 'Fills the big screen and interrupts everything until you stop it.', callNote: 'Student number only, no name.', confirmPub: 'Checked the text? It goes on the screen now.', confirmStop: 'Take it off the screen?',
+  comp: 'Activity / competition', teams: 'Teams', noTeams: 'No teams yet. Add them once from «More».', pointsOf: 'Points', placeAuto: 'Places come from the points.',
+  replace: 'This activity already has a result: saving replaces it (a correction).', saveRes: 'Save draft', pubRes: 'Save and publish', needVerify: 'Publishing needs the “verify results” permission; it stays a draft until approved.', publishComp: 'Publish result',
+  prDate: 'Date', fajr: 'Fajr', dhuhr: 'Dhuhr', asr: 'Asr', maghrib: 'Maghrib', isha: 'Isha', prNote: 'Copy them from the prayer-time site, to the minute. Empty = hidden.', prSave: 'Save this day', prSaved: 'Saved days',
+  moreTeams: 'Teams', teamsNote: 'One team per line. A team named after a colour is drawn in that colour.', saveTeams: 'Save teams', openScreen: '🖥️ Open the big screen',
+  pgTitle: '📎 Camp program (Excel file)', pgNote: 'Attach the program file (sheet «البرنامج»). A preview appears; then «Approve» and the screen uses it within a minute. A new file replaces the old one; the old one is archived.', pgPick: '📎 Choose a .xlsx file',
+  pgOk: (d, n, g) => '✓ ' + d + ' days · ' + n + ' activities' + (g ? ' · ' + g + ' groups' : ''), pgNoTo: n => '⚠ ' + n + ' rows without an end time (they run until the next activity)', pgBad: r => '✖ Rows whose date or time cannot be read: ' + r,
+  pgNoSheet: 'The file has no «التاريخ» and «الفعالية» columns.', pgSave: 'Approve the program', pgDone: n => 'Program approved: ' + n + ' activities. The screen uses it now.', pgCur: n => 'Current program: ' + n + ' activities.', pgReading: 'Reading the file…',
+  saved: 'Saved.', published: 'Published on the screen.', stopped: 'Taken off the screen.', error: 'Connection problem. Try again.', sessionEnd: 'Session expired. Please log in again.', draft: 'Draft', pubd: 'Published', loading: 'Loading…',
+  tplWater: '💧 Water', tplDelay: '⏰ Delay', tplCold: '🧥 Cold', tplLost: '🧳 Lost item', tplWisdom: '📖 Season quote', tplCall: '🔔 Call', tplGather: '🚨 Gather',
+  tWater: 'Reminder: bring your water bottle', tDelay: 'The next activity is delayed 15 minutes', tCold: 'It is cold: wear warm clothes', tLost: 'Lost item: ', tLostB: 'Collect it from the secretariat',
+  tWisdom: 'ضع أمر أخيك على أحسنه حتى يأتيك ما يغلبك منه', tWisdomB: 'أمير المؤمنين علي (ع)', tCall: 'Student number … please come to the secretariat', tGather: 'Everyone gather at the square now' }
 };
 const L = () => T[st.lang];
-const KINDS = ['announce', 'event', 'finale', 'urgent', 'wisdom', 'kudos', 'quote', 'call', 'greeting', 'other'];
-const THEMES = ['auto', 'brand', 'jumuah', 'festive', 'night'];
-const timed = k => k === 'event' || k === 'finale';
-const PR = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
+const TEMPLATES = [['tplWater', 'announce', 'tWater', ''], ['tplDelay', 'announce', 'tDelay', ''], ['tplCold', 'announce', 'tCold', ''], ['tplLost', 'announce', 'tLost', 'tLostB'], ['tplWisdom', 'wisdom', 'tWisdom', 'tWisdomB'], ['tplCall', 'call', 'tCall', ''], ['tplGather', 'urgent', 'tGather', '']];
+const P2 = n => String(n).padStart(2, '0');
+const ymdL = d => d.getFullYear() + '-' + P2(d.getMonth() + 1) + '-' + P2(d.getDate());
+const hm = iso => { const d = new Date(iso); return isNaN(d) ? '' : P2(d.getHours()) + ':' + P2(d.getMinutes()); };
 const blank = () => ({ id: '', title: '', body: '', kind: 'announce', startsAt: '', audience: 'public', pinned: false });
-const st = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), tab: can('announce') ? 'ann' : 'res', anns: [], results: [], campStart: '2026-12-30', form: blank(), pr: { date: new Date().toISOString().slice(0, 10), t: {}, iq: '' }, prayers: {}, iqama: 15, theme: 'auto', rf: { competition: '', team: '', place: '', points: '' }, msg: null };
+const st = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), view: 'home', loaded: false, day: '', program: [], reviewed: {}, anns: [], results: [], teams: [],
+  form: blank(), rf: { competition: '', pts: {} }, pr: { date: '', t: {} }, prayers: {}, teamsText: null, msg: null, busy: false };
 const say = (cls, t) => { st.msg = { cls: cls, t: t }; };
 const errText = r => (r && r.code === 'NEEDS_VERIFY' ? L().needVerify : (r && r.error) || L().error);
+async function call(body, okMsg) { try { const r = await api(body); say(r.success ? 'ok' : 'bad', r.success ? (okMsg || L().saved) : errText(r)); return r; } catch (e) { if (e.message !== 'auth') say('bad', L().error); return { success: false }; } }
 
-async function load() { try { const r = await api({ action: 'mediaList' }); if (r.success) { st.anns = r.announcements; st.results = r.results; st.campStart = r.campStart; } if (can('announce')) { const g = await api({ action: 'programList' }); if (g.success) st.pgCount = g.program.length; } } catch (e) {} render(); }
-async function loadPr() { try { const r = await api({ action: 'prayerList' }); if (r.success) { st.prayers = r.prayers; st.iqama = r.iqamaMinutes; st.theme = r.displayTheme || 'auto'; st.pr.t = Object.assign({}, st.prayers[st.pr.date] || {}); } } catch (e) {} render(); }
-async function savePr() { const r = await call({ action: 'prayerSave', date: st.pr.date, times: st.pr.t, iqamaMinutes: st.pr.iq }); if (r.success) { st.pr.iq = ''; await loadPr(); } else render(); }
-async function saveTheme() { const v = $('thSel').value; const r = await call({ action: 'displayTheme', theme: v }); if (r.success) st.theme = v; render(); }
+async function load() {
+  try {
+    const jobs = [api({ action: 'mediaList' })];
+    if (can('announce')) jobs.push(api({ action: 'programList' }), api({ action: 'prayerList' }));
+    const [m, g, p] = await Promise.all(jobs);
+    if (m && m.success) { st.anns = m.announcements; st.results = m.results; st.teams = m.teams || []; }
+    if (g && g.success) { st.program = g.program; st.reviewed = g.reviewed || {}; }
+    if (p && p.success) st.prayers = p.prayers || {};
+  } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
+  st.loaded = true;
+  const days = dayList(), today = ymdL(new Date());
+  if (!st.day || days.indexOf(st.day) === -1) st.day = days.indexOf(today) !== -1 ? today : (days.find(d => d > today) || days[0] || '');
+  render();
+}
+const dayList = () => Array.from(new Set(st.program.map(x => x.date))).filter(d => d >= SCREEN_FROM).sort();
+const dayName = d => { const x = new Date(d + 'T12:00:00'); return isNaN(x) ? d : x.toLocaleDateString(st.lang === 'ar' ? 'ar-u-nu-latn' : 'en', { weekday: 'long', day: 'numeric', month: 'long' }); };
 /* ---------- camp program: the Excel file is read here in the browser, checked, previewed, then sent ---------- */
 const XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
 let xlsxP = null;
 function loadXlsx() { if (window.XLSX) return Promise.resolve(); if (!xlsxP) xlsxP = new Promise((res, rej) => { const s = document.createElement('script'); s.src = XLSX_URL; s.onload = res; s.onerror = () => { xlsxP = null; rej(new Error('lib')); }; document.head.appendChild(s); }); return xlsxP; }
-const P2 = n => String(n).padStart(2, '0');
 function xDate(v) {
   if (v instanceof Date && !isNaN(v)) return v.getFullYear() + '-' + P2(v.getMonth() + 1) + '-' + P2(v.getDate());
   const s = String(v == null ? '' : v).trim().replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)); let m;
@@ -116,6 +188,132 @@ async function saveProgram() {
   try { const r = await api({ action: 'programImport', rows: g.rows }); if (r.success) { st.pg = { done: r.rows }; st.pgCount = r.rows; } else st.pg.err = r.error || L().error; } catch (e) { if (e.message !== 'auth') st.pg.err = L().error; }
   render();
 }
+
+/* ---------- home: the day, its program, the four actions, what is on the screen ---------- */
+function blocksOf(day) {
+  const map = {};
+  st.program.filter(x => x.date === day).forEach(x => { (map[x.from] = map[x.from] || []).push(x); });
+  return Object.keys(map).sort().map(k => ({ from: k, items: map[k], to: map[k].map(x => x.to).filter(Boolean).sort().pop() || '' }));
+}
+function dayCard() {
+  const l = L(), days = dayList();
+  if (!days.length) return `<section class="card"><div class="banner warn" style="margin:0">${esc(l.noProgram)}</div></section>`;
+  const rv = st.reviewed[st.day], nowT = P2(new Date().getHours()) + ':' + P2(new Date().getMinutes()), isToday = st.day === ymdL(new Date());
+  const blocks = blocksOf(st.day).map(b => {
+    const moving = b.items.every(x => x.type === 'حركة'), off = b.from >= SCREEN_OFF, now = isToday && b.from <= nowT && (!b.to || nowT < b.to);
+    const titles = Array.from(new Set(b.items.map(x => x.title)));
+    const sub = b.items.length > 1 ? b.items.map(x => esc((x.group || '').replace(/[()]/g, '')) + (x.place ? ' · ' + esc(x.place) : '')).join(' — ') : (b.items[0].place ? '📍 ' + esc(b.items[0].place) : '');
+    const tag = moving ? l.staffOnly : off ? l.afterOff : '';
+    return `<div class="blk ${moving || off ? 'off' : ''} ${now ? 'now' : ''}"><div class="bt"><b>${esc(b.from)}${b.to ? ' – ' + esc(b.to) : ''}</b><span style="font-weight:700">${esc(titles.join(' · '))}${now ? ` <span class="pill ok">${l.nowB}</span>` : ''}</span></div>${sub || tag ? `<div class="bs">${sub}${tag ? (sub ? ' · ' : '') + esc(tag) : ''}</div>` : ''}</div>`;
+  }).join('');
+  return `<section class="card"><div class="daysel"><label class="lbl" for="daySel" style="margin:0">${l.day}</label><select id="daySel">${days.map(d => `<option value="${d}" ${d === st.day ? 'selected' : ''}>${esc(dayName(d))}</option>`).join('')}</select></div>
+    <div class="rv">${rv ? `<span class="pill ok">${esc(l.reviewed(rv.by, hm(rv.at)))}</span><button class="chip" data-review="0">${l.unmark}</button>` : `<span class="pill warn">${l.notReviewed}</span><button class="chip on" data-review="1">${l.markReviewed}</button>`}</div>
+    <details ${rv ? '' : 'open'} style="margin-top:8px"><summary style="cursor:pointer;font-weight:800">${esc(l.dayProgram(blocksOf(st.day).length))}</summary><div class="muted" style="font-size:12.5px;margin-top:6px">${l.reviewNote}</div>${blocks}</details></section>`;
+}
+const kindChip = k => `<span class="kd" style="background:${KIND_COLOR[k] || '#ccc'}"></span>`;
+function annItem(a) {
+  const l = L(), pub = a.status === 'published';
+  return `<div class="ai"><div class="bd"><div class="tt">${kindChip(a.kind)}${a.pinned ? '📌 ' : ''}${esc(a.title)}</div>${a.body ? `<div style="font-size:14px">${esc(a.body)}</div>` : ''}
+    <div class="mt">${esc(l[a.kind] || a.kind)}${a.audience === 'staff' ? ' · ' + esc(l.staff) : ''}${a.startsAt ? ' · 🕒 ' + esc(new Date(a.startsAt).toLocaleString(st.lang === 'ar' ? 'ar-u-nu-latn' : 'en', { weekday: 'short', hour: '2-digit', minute: '2-digit' })) : ''}${pub && a.publishedAt ? ' · ' + esc(hm(a.publishedAt)) : ''}</div>
+    <div class="bb">${pub ? `<button class="chip" data-annst="${esc(a.id)}:archived">${l.stop}</button>` : `<button class="chip on" data-annst="${esc(a.id)}:published">${l.publish}</button>`}<button class="chip" data-edit="${esc(a.id)}">${l.edit}</button>${pub ? '' : `<button class="chip" data-annst="${esc(a.id)}:archived">${l.remove}</button>`}</div></div></div>`;
+}
+function resGroups() {
+  const groups = {}, order = [];
+  st.results.filter(r => r.status !== 'archived').forEach(r => { if (!groups[r.competition]) { groups[r.competition] = []; order.push(r.competition); } groups[r.competition].push(r); });
+  return order.map(c => ({ competition: c, rows: groups[c].slice().sort((a, b) => (a.place || 999) - (b.place || 999)) }));
+}
+function resultsCard() {
+  const l = L(), gs = resGroups().slice(0, 8);
+  if (!gs.length) return '';
+  return `<div class="sec">🏆 ${l.resTitle}</div>${gs.map(g => { const drafts = g.rows.filter(r => r.status === 'draft').map(r => r.id);
+    return `<div class="ai"><div class="bd"><div class="tt">${esc(g.competition)} <span class="pill ${drafts.length ? 'warn' : 'ok'}">${drafts.length ? l.draft : l.pubd}</span></div>
+      <div style="font-size:14px">${g.rows.map(r => `${r.place ? '#' + r.place + ' ' : ''}${esc(r.team)} (${r.points === null ? '—' : r.points})`).join(' · ')}</div>
+      ${drafts.length ? (can('verify') ? `<div class="bb"><button class="chip on" data-respub="${esc(drafts.join(','))}">${l.publishComp}</button></div>` : `<div class="mt">${l.needVerify}</div>`) : ''}</div></div>`; }).join('')}`;
+}
+function homeView() {
+  const l = L(), live = st.anns.filter(a => a.status === 'published'), drafts = st.anns.filter(a => a.status === 'draft');
+  const acts = [can('announce') ? ['ann', '📣', l.aAnn, ''] : null, can('results') || can('verify') ? ['res', '🏆', l.aRes, ''] : null, can('announce') ? ['pr', '🕌', l.aPr, 'lt'] : null, can('announce') ? ['more', '⚙️', l.aMore, 'lt'] : null].filter(Boolean);
+  return `<div class="acts">${acts.map(a => `<button class="act ${a[3]}" data-view="${a[0]}"><span>${a[1]}</span>${a[2]}</button>`).join('')}</div>${can('announce') ? dayCard() : ''}
+    ${can('announce') ? `<div class="sec">📺 ${l.live}</div>${live.length ? live.map(annItem).join('') : `<div class="muted" style="padding:4px 2px">${l.noLive}</div>`}
+    ${drafts.length ? `<div class="sec">📝 ${l.drafts}</div>${drafts.map(annItem).join('')}` : ''}` : ''}${resultsCard()}`;
+}
+
+/* ---------- announcement ---------- */
+function annView() {
+  const l = L(), f = st.form;
+  return `<button class="chip back" data-view="home">${l.back}</button><section class="card">
+    <div class="lbl">${l.templates}</div><div class="tpl">${TEMPLATES.map((t, i) => `<button class="chip" data-tpl="${i}">${esc(l[t[0]])}</button>`).join('')}</div>
+    <div class="lbl" style="margin-top:14px">${l.kind}</div><div class="kinds">${KINDS.map(k => `<button class="chip ${f.kind === k ? 'on' : ''}" data-kind="${k}">${kindChip(k)}${esc(l[k])}</button>`).join('')}</div>
+    ${f.kind === 'urgent' ? `<div class="banner warn">${l.urgentNote}</div>` : f.kind === 'call' ? `<div class="banner warn">${l.callNote}</div>` : ''}
+    <label class="lbl" for="ft" style="margin-top:14px">${l.title_}</label><input id="ft" type="text" maxlength="100" value="${esc(f.title)}">
+    <label class="lbl" for="fb" style="margin-top:10px">${l.body}</label><textarea id="fb" maxlength="600" style="min-height:80px">${esc(f.body)}</textarea>
+    ${f.kind === 'event' ? `<label class="lbl" for="fw" style="margin-top:10px">${l.when}</label><input id="fw" type="datetime-local" value="${esc(f.startsAt)}">` : ''}
+    <div class="two" style="margin-top:10px;align-items:end"><div><label class="lbl" for="fa">${l.audience}</label><select id="fa"><option value="public" ${f.audience === 'public' ? 'selected' : ''}>${l.public}</option><option value="staff" ${f.audience === 'staff' ? 'selected' : ''}>${l.staff}</option></select></div>
+      <label class="chk" style="min-height:56px"><input id="fp" type="checkbox" ${f.pinned ? 'checked' : ''}> ${l.pinned}</label></div>
+    <div class="lbl" style="margin-top:14px">${l.preview}</div><div id="pv">${previewBox()}</div>
+    <div class="two" style="margin-top:12px">${f.id ? `<button class="btn full" data-saveann="draft">${l.update}</button>` : `<button class="btn alt full" data-saveann="draft">${l.saveDraft}</button><button class="btn full" data-saveann="publish">${l.publishNow}</button>`}</div></section>`;
+}
+function previewBox() { const l = L(), f = st.form; return `<div class="pv ${f.kind === 'urgent' ? 'urgent' : ''}"><span class="k" style="background:${KIND_COLOR[f.kind] || '#EBBA4E'};${f.kind === 'call' ? 'color:#FBF3D7;border:1px solid #FBF3D7' : ''}">${esc(l[f.kind] || '')}</span><div class="t">${esc(f.title || '…')}</div>${f.body ? `<div class="b">${esc(f.body)}</div>` : ''}</div>`; }
+async function saveAnn(mode) {
+  const l = L(), f = st.form;
+  if (mode === 'publish' && !confirm(l.confirmPub)) return;
+  const r = await call({ action: 'annSave', id: f.id || undefined, title: f.title, body: f.body, kind: f.kind, startsAt: f.kind === 'event' && f.startsAt ? new Date(f.startsAt).toISOString() : '', audience: f.audience, pinned: f.pinned, clientId: f.id ? undefined : uid() });
+  if (!r.success) return render();
+  if (mode === 'publish') { const p = await call({ action: 'annStatus', id: r.id, status: 'published' }, l.published); if (!p.success) return render(); }
+  st.form = blank(); st.view = 'home'; await load(); window.scrollTo(0, 0);
+}
+async function annStatus(id, status) {
+  const l = L(); if (status === 'published' && !confirm(l.confirmPub)) return; if (status === 'archived' && !confirm(l.confirmStop)) return;
+  await call({ action: 'annStatus', id: id, status: status }, status === 'published' ? l.published : status === 'archived' ? l.stopped : l.saved); await load();
+}
+const toLocal = iso => { const d = new Date(iso); return isNaN(d) ? '' : ymdL(d) + 'T' + P2(d.getHours()) + ':' + P2(d.getMinutes()); };
+function editAnn(id) { const a = st.anns.find(x => x.id === id); if (!a) return; st.form = { id: a.id, title: a.title, body: a.body, kind: KINDS.indexOf(a.kind) !== -1 ? a.kind : 'announce', startsAt: a.startsAt ? toLocal(a.startsAt) : '', audience: a.audience, pinned: a.pinned }; st.view = 'ann'; st.msg = null; render(); window.scrollTo(0, 0); }
+
+/* ---------- results: one activity, the points of every team, places computed ---------- */
+function placesOf(pts) {
+  const rows = Object.keys(pts).filter(t => pts[t] !== '' && pts[t] !== undefined && isFinite(Number(pts[t]))).map(t => ({ team: t, points: Number(pts[t]) })).sort((a, b) => b.points - a.points);
+  rows.forEach((r, i) => { r.place = i && rows[i - 1].points === r.points ? rows[i - 1].place : i + 1; }); const out = {}; rows.forEach(r => { out[r.team] = r.place; }); return out;
+}
+function resView() {
+  const l = L(), f = st.rf, comps = Array.from(new Set(st.results.map(r => r.competition))), exists = f.competition.trim() && st.results.some(r => r.competition === f.competition.trim() && r.status !== 'archived'), places = placesOf(f.pts);
+  return `<button class="chip back" data-view="home">${l.back}</button><section class="card">
+    <label class="lbl" for="rc">${l.comp}</label><input id="rc" type="text" maxlength="60" list="compList" value="${esc(f.competition)}"><datalist id="compList">${comps.map(c => `<option value="${esc(c)}">`).join('')}</datalist>
+    <div id="repNote">${exists ? `<div class="banner warn">${l.replace}</div>` : ''}</div>
+    <div class="lbl" style="margin-top:14px">${l.teams} · ${l.pointsOf}</div>
+    ${st.teams.length ? st.teams.map((t, i) => `<div class="tm"><span class="pl" id="pl${i}">${places[t] ? '#' + places[t] : ''}</span><span class="nm">${esc(t)}</span><button class="step" data-pt="${i}:-1">−</button><input id="pt${i}" data-team="${i}" type="text" inputmode="numeric" value="${esc(f.pts[t] === undefined ? '' : f.pts[t])}"><button class="step" data-pt="${i}:1">+</button></div>`).join('')
+      : `<div class="banner warn">${l.noTeams}</div>`}
+    <div class="muted" style="font-size:12.5px;margin-top:8px">${l.placeAuto}</div>
+    ${st.teams.length ? `<div class="two" style="margin-top:12px"><button class="btn alt full" data-saveres="0">${l.saveRes}</button>${can('verify') ? `<button class="btn full" data-saveres="1">${l.pubRes}</button>` : ''}</div>${can('verify') ? '' : `<div class="muted" style="font-size:12.5px;margin-top:6px">${l.needVerify}</div>`}` : ''}</section>`;
+}
+async function saveRes(publish) {
+  const l = L(), f = st.rf, comp = f.competition.trim(), replace = st.results.some(r => r.competition === comp && r.status !== 'archived');
+  if (publish && !confirm(l.confirmPub)) return;
+  const r = await call({ action: 'resSaveBatch', competition: comp, rows: st.teams.map(t => ({ team: t, points: f.pts[t] === undefined ? '' : f.pts[t] })), replace: replace, publish: publish, clientId: uid() }, publish ? l.published : l.saved);
+  if (r.success) { st.rf = { competition: '', pts: {} }; st.view = 'home'; await load(); window.scrollTo(0, 0); } else render();
+}
+async function resPublish(ids) { const l = L(); if (!confirm(l.confirmPub)) return; await call({ action: 'resStatus', ids: ids, status: 'published' }, l.published); await load(); }
+// Only the note changes (a full redraw here would swallow the tap that caused the blur).
+function paintReplace() { const c = st.rf.competition.trim(), n = $('repNote'); if (n) n.innerHTML = c && st.results.some(r => r.competition === c && r.status !== 'archived') ? `<div class="banner warn">${L().replace}</div>` : ''; }
+function paintPlaces() { const pl = placesOf(st.rf.pts); st.teams.forEach((t, i) => { const e = $('pl' + i); if (e) e.textContent = pl[t] ? '#' + pl[t] : ''; }); }
+
+/* ---------- prayer times (the countdown on the screen counts to these) ---------- */
+function prView() {
+  const l = L(), p = st.pr, saved = Object.keys(st.prayers).sort();
+  if (!p.date) { p.date = st.day || ymdL(new Date()); p.t = Object.assign({}, st.prayers[p.date] || {}); }
+  return `<button class="chip back" data-view="home">${l.back}</button><section class="card">
+    <label class="lbl" for="pd">${l.prDate}</label><input id="pd" type="date" value="${esc(p.date)}">
+    <div class="muted" style="font-size:12.5px;margin:8px 0">${l.prNote}</div>
+    ${PR.map(n => `<div class="tm"><span class="nm">${l[n]}</span><input id="p-${n}" data-pr="${n}" type="time" value="${esc(p.t[n] || '')}" style="width:140px"></div>`).join('')}
+    <button class="btn full" style="margin-top:12px" data-savepr="1">${l.prSave}</button></section>
+    ${saved.length ? `<section class="card"><div class="lbl">${l.prSaved}</div>${saved.map(d => `<div class="row"><b>${esc(dayName(d))}</b><span class="muted" style="font-size:13px">${PR.filter(n => st.prayers[d][n]).map(n => l[n] + ' ' + st.prayers[d][n]).join(' · ')}</span></div>`).join('')}</section>` : ''}`;
+}
+async function savePr() {
+  const r = await call({ action: 'prayerSave', date: st.pr.date, times: st.pr.t });
+  if (r.success) { try { const p = await api({ action: 'prayerList' }); if (p.success) st.prayers = p.prayers || {}; } catch (e) {} }
+  render();
+}
+
+/* ---------- more: the program file, the teams, open the screen ---------- */
 function programCard() {
   const l = L(), g = st.pg || {};
   const prev = g.reading ? `<div class="muted" style="margin-top:8px">${l.pgReading}</div>`
@@ -124,96 +322,71 @@ function programCard() {
     : g.rows ? `<div class="item" style="margin-top:10px;border:1px dashed var(--line);border-radius:12px;padding:10px"><b>${esc(g.name)}</b><div style="color:var(--ok);margin-top:4px">${esc(l.pgOk(g.days, g.rows.length, g.groups))}</div>${g.noTo ? `<div class="muted">${esc(l.pgNoTo(g.noTo))}</div>` : ''}${g.bad.length ? `<div style="color:var(--bad)">${esc(l.pgBad(g.bad.slice(0, 12).join('، ')))}</div>` : ''}</div>
        <button class="btn full" style="margin-top:10px" data-savepg="1" ${g.bad.length ? 'disabled' : ''}>${l.pgSave}</button>` : '';
   return `<section class="card"><h2 class="h2" style="margin-bottom:6px">${l.pgTitle}</h2><div class="muted" style="font-size:13px;margin-bottom:8px">${l.pgNote}</div>
-    ${st.pgCount ? `<div class="muted" style="font-size:13px;margin-bottom:8px">${esc(l.pgCur(st.pgCount))}</div>` : ''}
+    ${st.program.length ? `<div class="muted" style="font-size:13px;margin-bottom:8px">${esc(l.pgCur(st.program.length))}</div>` : ''}
     <label class="btn alt full" style="display:flex;justify-content:center;cursor:pointer">${l.pgPick}<input id="pgFile" type="file" accept=".xlsx,.xls" hidden></label>${prev}</section>`;
 }
-function prView() {
-  const l = L(), p = st.pr, days = Object.keys(st.prayers).sort();
-  return `${programCard()}<section class="card"><h2 class="h2" style="margin-bottom:6px">${l.tPr}</h2><div class="muted" style="font-size:13px;margin-bottom:8px">${l.prNote}</div>
-    <label class="lbl" for="pd">${l.prDate}</label><input id="pd" type="date" value="${esc(p.date)}">
-    <div class="two" style="margin-top:8px">${PR.map(n => `<div><label class="lbl" for="p-${n}">${l[n]}</label><input id="p-${n}" data-pr="${n}" type="time" value="${esc(p.t[n] || '')}"></div>`).join('')}</div>
-    <label class="lbl" for="piq" style="margin-top:8px">${l.iqama}</label><input id="piq" type="number" min="1" max="60" placeholder="${st.iqama}" value="${esc(p.iq)}">
-    <button class="btn full" style="margin-top:10px" data-savepr="1">${l.prSave}</button></section>
-    <section class="card"><h2 class="h2" style="margin-bottom:6px">${l.thTitle}</h2><div class="muted" style="font-size:13px;margin-bottom:8px">${l.thNote}</div>
-      <select id="thSel">${THEMES.map(t => `<option value="${t}" ${st.theme === t ? 'selected' : ''}>${l['th_' + t]}</option>`).join('')}</select>
-      <div class="two" style="margin-top:10px"><button class="btn" data-savetheme="1">${l.thSave}</button><a class="btn alt" href="display.html" target="_blank" rel="noopener" style="text-align:center;text-decoration:none">${l.preview}</a></div></section>
-    ${days.length ? `<section class="card"><h2 class="h2" style="margin-bottom:6px">${l.prSaved}</h2>${days.map(d => `<div class="row"><b>${esc(d)}</b><span class="muted">${PR.filter(n => st.prayers[d][n]).map(n => l[n] + ' ' + st.prayers[d][n]).join(' · ')}</span></div>`).join('')}</section>` : ''}`;
+function moreView() {
+  const l = L(); if (st.teamsText === null) st.teamsText = st.teams.join('\n');
+  return `<button class="chip back" data-view="home">${l.back}</button>${programCard()}
+    <section class="card"><h2 class="h2" style="margin-bottom:6px">${l.moreTeams}</h2><div class="muted" style="font-size:13px;margin-bottom:8px">${l.teamsNote}</div>
+      <textarea id="teamsTx" rows="6">${esc(st.teamsText)}</textarea><button class="btn full" style="margin-top:10px" data-saveteams="1">${l.saveTeams}</button></section>
+    <a class="btn alt full" href="display.html" target="_blank" rel="noopener" style="text-decoration:none">${l.openScreen}</a>`;
 }
-async function call(body, okMsg) { try { const r = await api(body); say(r.success ? 'ok' : 'bad', r.success ? (okMsg || L().done) : errText(r)); return r; } catch (e) { if (e.message !== 'auth') say('bad', L().error); return { success: false }; } }
-async function saveAnn() {
-  const f = st.form, body = { action: 'annSave', id: f.id || undefined, title: f.title, body: f.body, kind: f.kind, startsAt: timed(f.kind) && f.startsAt ? new Date(f.startsAt).toISOString() : '', audience: f.audience, pinned: f.pinned, clientId: f.id ? undefined : uid() };
-  const r = await call(body); if (r.success) st.form = blank(); await load();
+async function saveTeams() { const r = await call({ action: 'teamsSave', teams: st.teamsText.split('\n') }); if (r.success) { st.teams = r.teams; st.teamsText = r.teams.join('\n'); } render(); }
+async function saveProgram() {
+  const g = st.pg; if (!g || !g.rows || g.bad.length) return;
+  try { const r = await api({ action: 'programImport', rows: g.rows }); if (r.success) { st.pg = { done: r.rows }; await load(); return; } st.pg.err = r.error || L().error; } catch (e) { if (e.message !== 'auth') st.pg.err = L().error; }
+  render();
 }
-async function annStatus(id, status) { if (status === 'published' && !confirm(L().confirmPub)) return; await call({ action: 'annStatus', id: id, status: status }); await load(); }
-function editAnn(id) { const a = st.anns.find(x => x.id === id); if (!a) return; st.form = { id: a.id, title: a.title, body: a.body, kind: a.kind, startsAt: a.startsAt ? toLocal(a.startsAt) : '', audience: a.audience, pinned: a.pinned }; st.msg = null; render(); window.scrollTo(0, 0); }
-const toLocal = iso => { const d = new Date(iso); if (isNaN(d)) return ''; const p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes()); };
-async function addRes() { const f = st.rf; const r = await call({ action: 'resSave', competition: f.competition, team: f.team, place: f.place, points: f.points, clientId: uid() }); if (r.success) { st.rf.team = ''; st.rf.place = ''; st.rf.points = ''; } await load(); }
-async function resStatus(ids, status) { if (status === 'published' && !confirm(L().confirmPub)) return; await call({ action: 'resStatus', ids: ids, status: status }); await load(); }
-function setTab(t) { st.tab = t; st.msg = null; render(); if (t === 'pr') loadPr(); }
 
-function countdown() {
-  const l = L(), ms = new Date(st.campStart + 'T00:00:00').getTime() - Date.now();
-  if (isNaN(ms)) return '';
-  if (ms <= 0) return `<b class="cd">${l.started}</b>`;
-  const d = Math.floor(ms / 864e5), h = Math.floor(ms % 864e5 / 36e5), m = Math.floor(ms % 36e5 / 6e4);
-  return `<span class="cd">${d}</span> ${l.days} <span class="cd">${h}</span> ${l.hours} <span class="cd">${m}</span> ${l.mins}`;
-}
-const pill = s => `<span class="pill ${s === 'published' ? 'ok' : s === 'draft' ? 'warn' : ''}">${esc(L()[s] || s)}</span>`;
-function annView() {
-  const l = L(), f = st.form;
-  const form = `<section class="card"><h2 class="h2" style="margin-bottom:8px">${l.newAnn}</h2>
-    <label class="lbl" for="ft">${l.title_}</label><input id="ft" type="text" maxlength="100" value="${esc(f.title)}">
-    <label class="lbl" for="fb" style="margin-top:8px">${l.body}</label><textarea id="fb" maxlength="600">${esc(f.body)}</textarea>
-    <div class="two" style="margin-top:8px"><div><label class="lbl" for="fk">${l.kind}</label><select id="fk">${KINDS.map(k => `<option value="${k}" ${f.kind === k ? 'selected' : ''}>${l[k]}</option>`).join('')}</select></div>
-      <div><label class="lbl" for="fa">${l.audience}</label><select id="fa"><option value="public" ${f.audience === 'public' ? 'selected' : ''}>${l.public}</option><option value="staff" ${f.audience === 'staff' ? 'selected' : ''}>${l.staff}</option></select></div></div>
-    ${timed(f.kind) ? `<label class="lbl" for="fw" style="margin-top:8px">${l.when}</label><input id="fw" type="datetime-local" value="${esc(f.startsAt)}">` : ''}
-    ${f.kind === 'urgent' ? `<div class="banner warn">${l.urgentNote}</div>` : f.kind === 'call' ? `<div class="banner warn">${l.callNote}</div>` : ''}
-    <label class="chk" style="margin-top:8px"><input id="fp" type="checkbox" ${f.pinned ? 'checked' : ''}> ${l.pinned}</label>
-    <div class="two" style="margin-top:10px"><button class="btn" data-saveann="1">${f.id ? l.update : l.saveDraft}</button>${f.id ? `<button class="btn alt" data-canceledit="1">${l.cancelEdit}</button>` : ''}</div></section>`;
-  const list = st.anns.length ? st.anns.map(a => `<div class="item"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>${a.pinned ? '📌 ' : ''}${esc(a.title)}</b><span>${pill(a.status)} <span class="pill">${esc(l[a.kind] || a.kind)}</span> <span class="pill">${esc(l[a.audience])}</span></span></div>
-    ${timed(a.kind) && a.startsAt ? `<div class="muted" style="font-size:13px">🕒 ${esc(new Date(a.startsAt).toLocaleString(st.lang === 'ar' ? 'ar' : 'en'))}</div>` : ''}<div style="margin:6px 0">${esc(a.body)}</div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="chip" data-edit="${esc(a.id)}">${l.edit}</button>${a.status !== 'published' ? `<button class="chip on" data-annst="${esc(a.id)}:published">${l.publish}</button>` : `<button class="chip" data-annst="${esc(a.id)}:draft">${l.unpublish}</button>`}${a.status !== 'archived' ? `<button class="chip" data-annst="${esc(a.id)}:archived">${l.archive}</button>` : ''}</div></div>`).join('') : `<div class="card muted">${l.noAnn}</div>`;
-  return (can('announce') ? form : '') + list;
-}
-function resView() {
-  const l = L(), f = st.rf;
-  const form = `<section class="card"><h2 class="h2" style="margin-bottom:8px">${l.newRes}</h2><label class="lbl" for="rc">${l.comp}</label><input id="rc" type="text" maxlength="60" value="${esc(f.competition)}">
-    <div class="two" style="margin-top:8px"><div><label class="lbl" for="rt">${l.team}</label><input id="rt" type="text" maxlength="40" value="${esc(f.team)}"></div><div><label class="lbl" for="rp">${l.place}</label><input id="rp" type="text" inputmode="numeric" value="${esc(f.place)}"></div><div><label class="lbl" for="rs">${l.points}</label><input id="rs" type="text" inputmode="decimal" value="${esc(f.points)}"></div></div>
-    <button class="btn full" style="margin-top:10px" data-addres="1">${l.addRes}</button></section>`;
-  const groups = {}; const order = [];
-  st.results.forEach(r => { (groups[r.competition] = groups[r.competition] || (order.push(r.competition), [])).push(r); });
-  const list = order.length ? order.map(c => { const rows = groups[c].slice().sort((a, b) => (a.place || 999) - (b.place || 999)); const drafts = rows.filter(r => r.status === 'draft').map(r => r.id);
-    return `<div class="item"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>${esc(c)}</b>${drafts.length && can('verify') ? `<button class="chip on" data-respub="${esc(drafts.join(','))}">${l.publishAll}</button>` : ''}</div>
-     ${rows.map(r => `<div class="brow2"><span>${esc(r.team)} ${pill(r.status)}</span><span>${r.place === null ? '—' : '#' + r.place}</span><span>${r.points === null ? '—' : r.points}</span></div>`).join('')}
-     ${drafts.length && !can('verify') ? `<div class="muted" style="font-size:12.5px">${l.needVerify}</div>` : ''}</div>`; }).join('') : `<div class="card muted">${l.noRes}</div>`;
-  return (can('results') || can('verify') ? form : '') + list;
-}
+/* ---------- page ---------- */
 function render() {
   const l = L(); document.documentElement.lang = st.lang; document.documentElement.dir = l.dir; document.documentElement.dataset.theme = st.theme; document.title = l.title + ' — MUKHAYYAM';
   $('hT').textContent = l.title; $('hS').textContent = l.sub; $('homeBtn').textContent = l.home; $('langBtn').textContent = l.lang; $('themeBtn').textContent = st.theme === 'light' ? l.dark : l.light;
   const ae = document.activeElement, keep = ae && ae.id && ae.tagName !== 'BUTTON' ? { id: ae.id, pos: ae.selectionStart } : null;
-  const tabs = [can('announce') ? ['ann', l.tAnn] : null, can('results') || can('verify') ? ['res', l.tRes] : null, can('announce') ? ['pr', l.tPr] : null].filter(Boolean);
-  $('app').innerHTML = `${st.msg ? `<div class="banner ${st.msg.cls}" role="alert">${esc(st.msg.t)}</div>` : ''}
-   <section class="card"><div class="kl">${l.countdown}</div><div id="cd">${countdown()}</div><div class="muted" style="font-size:12.5px;margin-top:4px">${l.feedNote}</div></section>
-   <div class="tabs">${tabs.map(t => `<button class="${st.tab === t[0] ? 'on' : ''}" data-tab="${t[0]}">${t[1]}</button>`).join('')}</div>${st.tab === 'ann' ? annView() : st.tab === 'pr' ? prView() : resView()}`;
+  const body = !st.loaded ? `<div class="card muted">${l.loading}</div>` : st.view === 'ann' ? annView() : st.view === 'res' ? resView() : st.view === 'pr' ? prView() : st.view === 'more' ? moreView() : homeView();
+  $('app').innerHTML = `${st.msg ? `<div class="banner ${st.msg.cls}" role="alert">${esc(st.msg.t)}</div>` : ''}${body}`;
   if (keep && $(keep.id)) { const e = $(keep.id); e.focus(); try { e.setSelectionRange(keep.pos, keep.pos); } catch (x) {} }
 }
+function go(view) { st.view = view; st.msg = null; if (view === 'ann' && !st.form.id) st.form = blank(); if (view === 'more') st.teamsText = null; if (view === 'pr') st.pr = { date: '', t: {} }; render(); window.scrollTo(0, 0); }
 document.addEventListener('input', e => {
-  const i = e.target.id, v = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
-  if (i === 'ft') st.form.title = v; else if (i === 'fb') st.form.body = v; else if (i === 'fw') st.form.startsAt = v; else if (i === 'fp') st.form.pinned = v;
-  else if (e.target.dataset.pr) st.pr.t[e.target.dataset.pr] = v; else if (i === 'piq') st.pr.iq = v;
-  else if (i === 'rc') st.rf.competition = v; else if (i === 'rt') st.rf.team = v; else if (i === 'rp') st.rf.place = v; else if (i === 'rs') st.rf.points = v;
+  const t = e.target, i = t.id, v = t.type === 'checkbox' ? t.checked : t.value;
+  if (i === 'ft') { st.form.title = v; const p = $('pv'); if (p) p.innerHTML = previewBox(); }
+  else if (i === 'fb') { st.form.body = v; const p = $('pv'); if (p) p.innerHTML = previewBox(); }
+  else if (i === 'fw') st.form.startsAt = v; else if (i === 'fp') st.form.pinned = v;
+  else if (t.dataset.pr) st.pr.t[t.dataset.pr] = v;
+  else if (i === 'rc') st.rf.competition = v;
+  else if (t.dataset.team !== undefined) { st.rf.pts[st.teams[+t.dataset.team]] = v.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^\d.]/g, ''); paintPlaces(); }
+  else if (i === 'teamsTx') st.teamsText = v;
 });
-document.addEventListener('change', e => { if (e.target.id === 'pgFile' && e.target.files && e.target.files[0]) { readProgramFile(e.target.files[0]); return; } if (e.target.id === 'pd') { st.pr.date = e.target.value; st.pr.t = Object.assign({}, st.prayers[st.pr.date] || {}); render(); } else if (e.target.id === 'fk') { st.form.kind = e.target.value; render(); } else if (e.target.id === 'fa') st.form.audience = e.target.value; });
-document.addEventListener('click', e => {
-  const b = e.target.closest && e.target.closest('button'); if (!b) return; const d = b.dataset;
-  if (d.tab) setTab(d.tab); else if (d.saveann) saveAnn(); else if (d.canceledit) { st.form = blank(); render(); }
-  else if (d.edit) editAnn(d.edit); else if (d.annst) { const p = d.annst.split(':'); annStatus(p[0], p[1]); }
-  else if (d.savepg) saveProgram(); else if (d.savepr) savePr(); else if (d.savetheme) saveTheme(); else if (d.addres) addRes(); else if (d.respub) resStatus(d.respub.split(','), 'published');
+document.addEventListener('change', e => {
+  const i = e.target.id;
+  if (i === 'pgFile' && e.target.files && e.target.files[0]) readProgramFile(e.target.files[0]);
+  else if (i === 'daySel') { st.day = e.target.value; render(); }
+  else if (i === 'pd') { st.pr.date = e.target.value; st.pr.t = Object.assign({}, st.prayers[st.pr.date] || {}); render(); }
+  else if (i === 'fa') st.form.audience = e.target.value;
+  else if (i === 'rc') paintReplace();
+});
+document.addEventListener('click', async e => {
+  const b = e.target.closest && e.target.closest('button'); if (!b || b.disabled) return; const d = b.dataset;
+  if (st.busy && (d.saveann || d.saveres || d.savepr || d.saveteams || d.savepg || d.annst || d.respub || d.review)) return;
+  const run = async f => { st.busy = true; b.disabled = true; try { await f(); } finally { st.busy = false; b.disabled = false; } };
+  if (d.view) go(d.view);
+  else if (d.review) run(async () => { await call({ action: 'programReview', date: st.day, reviewed: d.review === '1' }); await load(); });
+  else if (d.tpl) { const t = TEMPLATES[+d.tpl], l = L(); st.form.kind = t[1]; st.form.title = l[t[2]]; st.form.body = t[3] ? l[t[3]] : ''; render(); const f = $('ft'); if (f) f.focus(); }
+  else if (d.kind) { st.form.kind = d.kind; render(); }
+  else if (d.saveann) run(() => saveAnn(d.saveann));
+  else if (d.edit) editAnn(d.edit);
+  else if (d.annst) { const p = d.annst.split(':'); run(() => annStatus(p[0], p[1])); }
+  else if (d.pt) { const [i, s] = d.pt.split(':'), t = st.teams[+i], v = Math.max(0, (Number(st.rf.pts[t]) || 0) + Number(s)); st.rf.pts[t] = String(v); const inp = $('pt' + i); if (inp) inp.value = v; paintPlaces(); }
+  else if (d.saveres) run(() => saveRes(d.saveres === '1'));
+  else if (d.respub) run(() => resPublish(d.respub.split(',')));
+  else if (d.savepr) run(savePr);
+  else if (d.saveteams) run(saveTeams);
+  else if (d.savepg) run(saveProgram);
 });
 $('langBtn').onclick = () => { st.lang = st.lang === 'ar' ? 'en' : 'ar'; pref.set('lang', st.lang); render(); };
 $('themeBtn').onclick = () => { st.theme = st.theme === 'light' ? 'dark' : 'light'; pref.set('theme', st.theme); render(); };
-setInterval(() => { const e = $('cd'); if (e) e.innerHTML = countdown(); }, 30000);
 render(); load();
 </script>
 </body></html>

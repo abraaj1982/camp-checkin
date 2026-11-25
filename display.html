@@ -51,7 +51,7 @@ body{color:var(--ink);font-family:Tajawal,system-ui,sans-serif;font-weight:500;c
 .strip{height:2.4vw;margin:0 -2.6vw;background:url(brand/strip.png) repeat-x center/auto 100%}
 .card2{max-width:90%;margin:0 auto;text-align:center}.ai{font-size:5vw;line-height:1.1;animation:bob 1.6s ease-in-out infinite alternate}
 @keyframes bob{to{transform:translateY(-1vh) rotate(-6deg)}}
-.al{font-size:1.5vw;color:var(--gold);font-weight:800;margin:.4vw 0}.at{font-family:Lalezar,Tajawal,sans-serif;font-size:3.4vw;line-height:1.4}.sub2{font-size:1.8vw;opacity:.92;margin-top:.6vw}
+.al{font-size:1.5vw;color:var(--gold);font-weight:800;margin:.4vw 0}.kb{display:inline-block;border-radius:99px;padding:.15vw 1.2vw;color:var(--dark);border:1px solid rgba(55,42,37,.18)}.at{font-family:Lalezar,Tajawal,sans-serif;font-size:3.4vw;line-height:1.4}.sub2{font-size:1.8vw;opacity:.92;margin-top:.6vw}
 .verse{font-family:Amiri,serif;font-size:3vw;line-height:1.8}
 .rank{display:flex;flex-direction:column;gap:.7vw;max-width:92%;margin:0 auto;width:100%}
 .lr{display:grid;grid-template-columns:4vw 15vw 1fr 7vw;align-items:center;gap:1.2vw;font-size:1.9vw;font-weight:700;border:1px solid var(--line);border-radius:1.2vw;padding:.45vw 1.4vw}
@@ -183,7 +183,9 @@ function prayersScene() {
     <div class="pq" style="grid-template-columns:repeat(${Math.min(names.length, 5)},1fr)">${names.map(n => { const at = atTime(t, p[n]), nx = st.next && st.next.n === n && ymd(st.next.at) === ymd(t);
       return `<div class="pc ${nx ? 'nx' : at < t ? 'dn' : ''}"><div class="pn">${PR[n]}</div><div class="pt">${t12(p[n])}</div></div>`; }).join('')}</div>`;
 }
-const textScene = (icon, kicker, title, body, verse) => `<div class="card2"><div class="ai">${icon}</div><div class="al">${esc(kicker)}</div>${verse ? `<div class="verse">${esc(title)}</div>${body ? `<div class="sub2" style="color:var(--gold)">${esc(body)}</div>` : ''}` : `<div class="at">${esc(title)}</div>${body ? `<div class="sub2">${esc(body)}</div>` : ''}`}</div>`;
+// Each kind wears its colour (the same as on the media page) so the hall knows the kind at a glance.
+const KIND_COLOR = { announce: '#EBBA4E', event: '#A3A867', wisdom: '#ECCA9C', kudos: '#A8D285', quote: '#D39D66', call: '#372A25', greeting: '#FBF3D7' };
+const textScene = (icon, kicker, title, body, verse, kind) => `<div class="card2"><div class="ai">${icon}</div><div class="al"><span class="kb" style="background:${KIND_COLOR[kind] || 'var(--gd)'}${kind === 'call' ? ';color:#FBF3D7;border-color:#FBF3D7' : ''}">${esc(kicker)}</span></div>${verse ? `<div class="verse">${esc(title)}</div>${body ? `<div class="sub2" style="color:var(--gold)">${esc(body)}</div>` : ''}` : `<div class="at">${esc(title)}</div>${body ? `<div class="sub2">${esc(body)}</div>` : ''}`}</div>`;
 function podiumScene(g) {
   const rows = g.rows.slice(0, 3), order = [rows[1], rows[0], rows[2]].filter(Boolean), h = [17, 12, 9], md = ['🥇', '🥈', '🥉'];
   return `<h2 class="st">🎯 ${esc(g.competition)} <span class="new">النتيجة</span></h2><div class="pod">${order.map(r => { const i = rows.indexOf(r);
@@ -191,7 +193,7 @@ function podiumScene(g) {
 }
 function welcomeScene() {
   const t = now(), h = t.getHours(), g = ann('greeting')[0];
-  return textScene('🏕️', h < 12 ? 'صباح الخير' : h < 18 ? 'طاب يومكم' : 'مساء النور', g ? g.title : campName(), g ? g.body : '');
+  return textScene('🏕️', h < 12 ? 'صباح الخير' : h < 18 ? 'طاب يومكم' : 'مساء النور', g ? g.title : campName(), g ? g.body : '', false, 'greeting');
 }
 function finaleScene(a) {
   const ms = new Date(a.startsAt) - now(), d = Math.floor(ms / 864e5), hh = Math.floor(ms % 864e5 / 36e5), m = Math.floor(ms % 36e5 / 6e4);
@@ -201,14 +203,15 @@ function scenes(ps) {
   const s = [], t = now();
   if (ps.cur) s.push({ key: 'now', live: true, html: () => nowScene(programState()) });
   if (ps.today.length) s.push({ key: 'day', live: true, html: () => dayScene(programState()) });
-  ann('announce').slice(0, 5).forEach(a => s.push({ key: a.id, at: a.publishedAt, html: () => textScene('📣', 'إعلان', a.title, a.body) }));
-  ann('call').slice(0, 3).forEach(a => s.push({ key: a.id, at: a.publishedAt, html: () => textScene('🔔', 'استدعاء', a.title, a.body || 'يُرجى المراجعة') }));
+  ann('announce').slice(0, 5).forEach(a => s.push({ key: a.id, at: a.publishedAt, html: () => textScene('📣', 'إعلان', a.title, a.body, false, 'announce') }));
+  ann('event').filter(a => a.startsAt && new Date(a.startsAt) - t > -30 * 60000).slice(0, 3).forEach(a => s.push({ key: a.id, at: a.publishedAt, html: () => textScene('📅', 'فعالية قادمة', a.title, [a.body, t12(p2(new Date(a.startsAt).getHours()) + ':' + p2(new Date(a.startsAt).getMinutes()))].filter(Boolean).join(' · '), false, 'event') }));
+  ann('call').slice(0, 3).forEach(a => s.push({ key: a.id, at: a.publishedAt, html: () => textScene('🔔', 'استدعاء', a.title, a.body || 'يُرجى المراجعة', false, 'call') }));
   if (D && D.totals && D.totals.length) s.push({ key: 'rank', html: rankScene });
   if (D && D.prayers && D.prayers[ymd(t)]) s.push({ key: 'prayers', live: true, html: prayersScene });
   const res = D && D.results || []; if (res.length) s.push({ key: 'pod-' + res[res.length - 1].competition, html: () => podiumScene(res[res.length - 1]) });
-  ann('wisdom').slice(0, 1).forEach(a => s.push({ key: a.id, at: a.publishedAt, html: () => textScene('📖', 'حكمة اليوم', a.title, a.body, true) }));
-  ann('kudos').slice(0, 3).forEach(a => s.push({ key: a.id, at: a.publishedAt, html: () => textScene('🤝', 'موقف اليوم', a.title, a.body) }));
-  ann('quote').slice(0, 3).forEach(a => s.push({ key: a.id, at: a.publishedAt, html: () => textScene('💬', 'قالوا عن المخيم', '«' + a.body + '»', a.title) }));
+  ann('wisdom').slice(0, 1).forEach(a => s.push({ key: a.id, at: a.publishedAt, html: () => textScene('📖', 'حكمة اليوم', a.title, a.body, true, 'wisdom') }));
+  ann('kudos').slice(0, 3).forEach(a => s.push({ key: a.id, at: a.publishedAt, html: () => textScene('🤝', 'شكر وموقف طيب', a.title, a.body, false, 'kudos') }));
+  ann('quote').slice(0, 3).forEach(a => s.push({ key: a.id, at: a.publishedAt, html: () => textScene('💬', 'قالوا عن المخيم', '«' + a.body + '»', a.title, false, 'quote') }));
   const fin = ann('finale')[0]; if (fin && fin.startsAt && new Date(fin.startsAt) - t > 60 * 60000) s.push({ key: 'finale', live: true, html: () => finaleScene(fin) });
   if (!s.length) s.push({ key: 'welcome', html: welcomeScene });
   return s;

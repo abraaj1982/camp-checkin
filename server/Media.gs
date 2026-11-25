@@ -51,7 +51,7 @@ function handleMediaList_(data) {
     const rank = { draft: 0, published: 1, archived: 2 };
     const sortFn = function(a, b) { return (rank[a.status] - rank[b.status]) || (a.createdAt < b.createdAt ? 1 : -1); };
     return { success: true, announcements: readAnnouncements_().sort(sortFn).slice(0, 100), results: readResults_().sort(sortFn).slice(0, 300),
-      campStart: String(getSetting_('CampStart') || '2026-12-30') };
+      campStart: String(getSetting_('CampStart') || '2026-12-30'), teams: teamsList_() };
   });
 }
 
@@ -230,7 +230,26 @@ function readProgram_() {
   return out;
 }
 function handleProgramList_(data) {
-  return withAuth_(data, requirePerm_('announce'), function() { return { success: true, program: readProgram_() }; });
+  return withAuth_(data, requirePerm_('announce'), function() { return { success: true, program: readProgram_(), reviewed: programReviews_() }; });
+}
+// The committee marks each day "reviewed" after checking it. The mark never hides anything from the screen.
+function programReviews_() {
+  const out = {};
+  readSheetAsObjects_(SETTINGS_SHEET).rows.forEach(function(r) {
+    const k = String(r.Key || ''), v = String(r.Value || '');
+    if (k.indexOf('ProgramReviewed_') === 0 && v) { const p = v.split('|'); out[k.slice(16)] = { by: p[0], at: p[1] || '' }; }
+  });
+  return out;
+}
+function handleProgramReview_(data) {
+  return withAuth_(data, requirePerm_('announce'), function(user) {
+    const date = String(data.date || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { success: false, error: 'اختر اليوم' };
+    const on = data.reviewed !== false;
+    setSetting_('ProgramReviewed_' + date, on ? user.Username + '|' + new Date().toISOString() : '');
+    writeAudit_(user.Username, on ? 'PROGRAM_REVIEWED' : 'PROGRAM_UNREVIEWED', date, '');
+    return { success: true };
+  });
 }
 // The rows come from the Excel file read in the browser. All rows are checked first; nothing is written if one is wrong.
 function handleProgramImport_(data) {
@@ -270,6 +289,59 @@ function handleProgramImport_(data) {
 
 // ---------------- Prayer times (typed by the committee, one row per day in Settings) ----------------
 // Settings key "Prayer_YYYY-MM-DD" = "HH:MM|HH:MM|HH:MM|HH:MM|HH:MM" (Fajr|Dhuhr|Asr|Maghrib|Isha; empty = not shown).
+// One competition at a time: the points of every team in one request. The places come from the points (ties share a place).
+// replace: the earlier rows of the same competition are archived first (a correction). publish needs 'verify'.
+function handleResSaveBatch_(data) {
+  return withAuth_(data, requireAnyPerm_(['results', 'verify']), function(user) {
+    const competition = String(data.competition || '').trim().slice(0, 60);
+    if (competition.length < 2) return { success: false, error: 'اكتب اسم المسابقة' };
+    const rows = [], seen = {};
+    (Array.isArray(data.rows) ? data.rows : []).slice(0, 30).forEach(function(x) {
+      const team = String(x && x.team || '').trim().slice(0, 40);
+      if (!team || x.points === '' || x.points === null || x.points === undefined) return;
+      const pts = Number(x.points);
+      if (!isFinite(pts) || pts < 0 || pts > 100000) { rows.bad = true; return; }
+      if (seen[team]) { rows.dup = true; return; }
+      seen[team] = true; rows.push({ team: team, points: pts });
+    });
+    if (rows.bad) return { success: false, error: 'النقاط غير صالحة' };
+    if (rows.dup) return { success: false, error: 'فريق مكرر' };
+    if (!rows.length) return { success: false, error: 'أدخل نقاط فريق واحد على الأقل' };
+    const publish = data.publish === true;
+    if (publish && !hasPerm_(user, 'verify')) return { success: false, code: 'NEEDS_VERIFY', error: 'النشر يحتاج صلاحية التحقق من النتائج' };
+    rows.sort(function(a, b) { return b.points - a.points; });
+    rows.forEach(function(r, i) { r.place = i > 0 && rows[i - 1].points === r.points ? rows[i - 1].place : i + 1; });
+    const clientId = String(data.clientId || '').slice(0, 60);
+    const lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    try {
+      const all = readResults_(), sh = resultsSheet_();
+      if (clientId && all.some(function(x) { return x.clientId === clientId + ':0'; })) return { success: true, repeated: true };
+      let archived = 0;
+      if (data.replace === true) all.forEach(function(x) { if (x.competition === competition && x.status !== 'archived') { setCell_(sh, x._row, 'Status', 'archived'); archived++; } });
+      const now = new Date(), status = publish ? 'published' : 'draft';
+      rows.forEach(function(r, i) { appendSafe_(sh, [newId_('R'), now, competition, r.team, r.place, r.points, status, user.Username, publish ? now : '', clientId ? clientId + ':' + i : '']); });
+      writeAudit_(user.Username, publish ? 'RESULTS_PUBLISHED' : 'RESULTS_ENTERED', competition, 'n=' + rows.length + (archived ? ' replaced=' + archived : ''));
+      return { success: true, saved: rows.length, archived: archived, published: publish };
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+
+// ---------------- Teams (typed once by the media committee from the media page; used by the results entry) ----------------
+function teamsList_() { return String(getSetting_('Teams') || '').split('|').map(function(x) { return x.trim(); }).filter(Boolean).slice(0, 30); }
+function handleTeamsSave_(data) {
+  return withAuth_(data, requirePerm_('announce'), function(user) {
+    const list = [];
+    (Array.isArray(data.teams) ? data.teams : []).forEach(function(x) { const t = String(x || '').replace(/[|]/g, ' ').trim().slice(0, 40); if (t && list.indexOf(t) === -1) list.push(t); });
+    if (list.length > 30) return { success: false, error: 'الحد الأقصى 30 فريقًا' };
+    setSetting_('Teams', list.join('|'));
+    writeAudit_(user.Username, 'TEAMS_SAVED', '', 'n=' + list.length);
+    return { success: true, teams: list };
+  });
+}
+
 const PRAYER_NAMES_ = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
 function allPrayers_() {
   const out = {};

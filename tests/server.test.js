@@ -395,6 +395,27 @@ r=post({action:'displayTheme',token:tm,theme:'disco'});assert(!r.success,'unknow
 r=post({action:'feed',key:fk});assert(r.displayTheme==='auto','theme is automatic by default');
 r=post({action:'displayTheme',token:tm,theme:'jumuah'});assert(r.success&&post({action:'feed',key:fk}).displayTheme==='jumuah','committee pins a theme');
 r=post({action:'feed',key:fk});assert(r.prayers['2026-12-28'].maghrib==='17:30'&&r.iqamaMinutes===20&&r.totals[0].team==='الأزرق'&&r.totals[0].points===45&&r.campDays===4,'feed: prayers, iqama, team totals');
+// ---- media page: team list, one competition in one request (places from the points), corrections, the day "reviewed" mark
+{let q=post({action:'teamsSave',token:t1,teams:['أ']});assert(!q.success,'a supervisor cannot set the teams');
+ q=post({action:'teamsSave',token:tm,teams:[' الصقور ','النسور','الصقور','','=x|y']});assert(q.success&&q.teams.join()==='الصقور,النسور,=x y','teams saved: trimmed, no repeats, no separator');
+ assert(post({action:'mediaList',token:tm}).teams.length===3,'the media list carries the teams');
+ q=post({action:'resSaveBatch',token:tm,competition:'شد الحبل',rows:[{team:'الصقور',points:10},{team:'الصقور',points:5}]});assert(!q.success,'a team twice is refused');
+ q=post({action:'resSaveBatch',token:tm,competition:'شد الحبل',rows:[{team:'الصقور',points:''}]});assert(!q.success,'no points at all is refused');
+ q=post({action:'resSaveBatch',token:tm,competition:'شد الحبل',rows:[{team:'الصقور',points:10}],publish:true});assert(!q.success&&q.code==='NEEDS_VERIFY','publishing the batch needs verify');
+ q=post({action:'resSaveBatch',token:tm,competition:'شد الحبل',rows:[{team:'الصقور',points:10},{team:'النسور',points:30},{team:'الذئاب',points:10},{team:'البوم',points:''}],clientId:'b1'});
+ assert(q.success&&q.saved===3&&!q.published,'batch saved as drafts (an empty team is skipped)');
+ const tug=()=>post({action:'mediaList',token:tm}).results.filter(x=>x.competition==='شد الحبل'&&x.status!=='archived');
+ let g=tug();assert(g.length===3&&g.find(x=>x.team==='النسور').place===1&&g.find(x=>x.team==='الصقور').place===2&&g.find(x=>x.team==='الذئاب').place===2,'places from the points: ties share a place');
+ q=post({action:'resSaveBatch',token:tm,competition:'شد الحبل',rows:[{team:'الصقور',points:10}],clientId:'b1'});assert(q.repeated&&tug().length===3,'batch retry does not add rows');
+ q=post({action:'resSaveBatch',token:tv,competition:'شد الحبل',rows:[{team:'الصقور',points:40},{team:'النسور',points:30}],replace:true,publish:true});
+ assert(q.success&&q.archived===3&&q.published,'a correction archives the old rows and the verifier publishes at once');
+ g=tug();assert(g.length===2&&g.every(x=>x.status==='published')&&g.find(x=>x.team==='الصقور').place===1,'only the corrected rows remain');
+ const fd=post({action:'feed',key:fk});assert(fd.results.some(x=>x.competition==='شد الحبل'&&x.rows[0].team==='الصقور'),'the corrected result is on the screen');
+ post({action:'resStatus',token:tv,ids:g.map(x=>x.id),status:'archived'});
+ q=post({action:'programReview',token:t1,date:'2026-12-31'});assert(!q.success,'a supervisor cannot mark a day reviewed');
+ q=post({action:'programReview',token:tm,date:'31-12'});assert(!q.success,'a bad date is refused');
+ q=post({action:'programReview',token:tm,date:'2026-12-31'});let pl=post({action:'programList',token:tm});assert(q.success&&pl.reviewed['2026-12-31'].by==='med','day marked reviewed, with who');
+ q=post({action:'programReview',token:tm,date:'2026-12-31',reviewed:false});pl=post({action:'programList',token:tm});assert(!pl.reviewed['2026-12-31'],'the mark can be removed');}
 
 // ---- password policy + profile edit
 r=post({action:'createUser',token:T,username:'weak',password:'12345',fullName:'ضعيف',role:'supervisor',permissions:['checkin'],committees:[]});assert(!r.success&&r.code==='WEAK_PASSWORD','short password refused on create');

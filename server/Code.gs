@@ -84,6 +84,8 @@ const ACTIONS_ = {
   displayTheme: function(d) { return handleDisplayTheme_(d); },
   programList: function(d) { return handleProgramList_(d); },
   programImport: function(d) { return handleProgramImport_(d); },
+  programReview: function(d) { return handleProgramReview_(d); },
+  teamsSave: function(d) { return handleTeamsSave_(d); },
   roundSave: function(d) { return handleRoundSave_(d); },
   receptionFind: function(d) { return handleReceptionFind_(d); },
   receptionArrive: function(d) { return handleReceptionArrive_(d); },
@@ -104,6 +106,7 @@ const ACTIONS_ = {
   annStatus: function(d) { return handleAnnStatus_(d); },
   resSave: function(d) { return handleResSave_(d); },
   resStatus: function(d) { return handleResStatus_(d); },
+  resSaveBatch: function(d) { return handleResSaveBatch_(d); },
   bulletin: function(d) { return handleBulletin_(d); },
   stages: function(d) { return handleStages_(d); },
   feed: function(d) { return handleFeed_(d); }
