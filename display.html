@@ -229,7 +229,7 @@ function override() {
     return `<div class="full"><div><div class="ic">⏰</div><div class="sub" style="margin:0">يبدأ بعد قليل</div><div class="ttl">${esc(blockTitle(nb))}</div><div class="big">${hms(nb.start - t)}</div><div class="sub">${nb.items.length > 1 ? nb.items.map(x => esc(groupName(x.group)) + ': ' + esc(x.place || x.title)).join(' · ') : (nb.items[0].place ? '📍 ' + esc(nb.items[0].place) : '')}</div></div></div>`;
   const h = t.getHours();
   if (h >= CONFIG.nightFrom || h < CONFIG.nightTo) { const n = ps.next;
-    return `<div class="full" style="background:radial-gradient(ellipse at center,#0b1a2e,#02060c)"><div><div class="ic">🌙</div><div class="big" style="color:var(--ink)">${esc(t12(p2(h) + ':' + p2(t.getMinutes())))}</div>${n ? `<div class="sub">الصلاة القادمة: ${PR[n.n]} بعد ${hms(n.at - t)}</div>` : ''}<div class="sub" style="color:var(--ink);opacity:.7">تصبحون على خير</div></div></div>`; }
+    return `<div class="full" style="background:radial-gradient(ellipse at center,#0b1a2e,#02060c)"><div><div class="ic">🌙</div><div class="big" style="color:var(--ink)">${(h % 12) || 12}:${p2(t.getMinutes())} <small style="font-size:.33em;color:var(--gold)">${h < 12 ? 'ص' : 'م'}</small></div>${n ? `<div class="sub">الصلاة القادمة: ${PR[n.n]} بعد ${hms(n.at - t)}</div>` : ''}<div class="sub" style="color:var(--ink);opacity:.7">تصبحون على خير</div></div></div>`; }
   return '';
 }
 
