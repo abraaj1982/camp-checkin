@@ -35,6 +35,8 @@ a{color:var(--brand)}
 /* ---------- app shell ---------- */
 .wrap{max-width:576px;margin:0 auto;min-height:100vh;background:var(--bg);display:flex;flex-direction:column}
 .wrap.wide{max-width:1120px}
+/* The identity guide's strip of camp icons closes every screen. It sits after the content (never fixed over buttons), and nothing is drawn over it. */
+.wrap::after{content:"";display:block;flex:none;margin-top:auto;height:34px;background:url(brand/strip.png) repeat-x center/auto 100%}
 @media (min-width:620px){
   .wrap{margin:20px auto;min-height:calc(100vh - 40px);border-radius:var(--r-shell);box-shadow:var(--shadow);overflow:clip}
 }
@@ -112,4 +114,4 @@ main>.banner{margin-top:0}
 .tick{display:flex;align-items:center;gap:10px;border:1px solid var(--line);background:var(--card);border-radius:14px;padding:0 12px;min-height:50px;font-size:14px;cursor:pointer;color:var(--ink);width:100%;text-align:start}.tick.on{border-color:var(--brand);background:var(--soft)}.tick .sq{width:20px;height:20px;border-radius:6px;border:2px solid var(--muted);flex:none;display:flex;align-items:center;justify-content:center;color:transparent;font-size:13px}.tick.on .sq{background:var(--brand);border-color:var(--brand);color:var(--btnink)}
 .chk{display:flex;align-items:center;gap:8px;padding:6px 0}
 :focus-visible{outline:2px solid var(--gold);outline-offset:2px}
-@media print{body{background:#fff}.wrap{box-shadow:none;margin:0;border-radius:0;max-width:none}.hdr,.hero{display:none!important}}
+@media print{body{background:#fff}.wrap{box-shadow:none;margin:0;border-radius:0;max-width:none}.wrap::after{display:none}.hdr,.hero{display:none!important}}
