@@ -93,7 +93,7 @@ body{background:var(--bg);color:var(--ink);font-family:Cairo,system-ui,sans-seri
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4lEBGPNxghwq9UmK0iljI5QdS-8iCvC-K09dDtbZCXGvGZyA4repTE3rFVVRp5zS4yw/exec';
 // Edit here until they are set from the system: camp name, slogan and the logo file (put it next to this page).
-const CONFIG = { name: 'المخيّم الطلابي', slogan: 'في الخير محمَّلًا', logo: '', slideSeconds: 12, prayingMinutes: 12, soonMinutes: 5, nightFrom: 22, nightTo: 4 };
+const CONFIG = { name: 'المخيّم الطلابي', slogan: 'في الخير محمَّلًا', logo: '', slideSeconds: 12, prayingMinutes: 12, soonMinutes: 5 };
 const $ = id => document.getElementById(id);
 const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
@@ -101,8 +101,8 @@ const PR = { fajr: 'الفجر', dhuhr: 'الظهر', asr: 'العصر', maghrib
 const TEAM_COLORS = ['#E5484D', '#4CC38A', '#3E8BFF', '#E8B04B', '#A06CF0', '#F07E3A', '#2EC4C4', '#E86BA7'];
 const HIDE_TYPES = ['حركة']; // bus movements are for the supervisors, not for the big screen
 
-let D = null, offset = 0, online = false, idx = -1, seen = {}, lastKey = '', lastSync = 0;
-try { D = JSON.parse(store.get('mk_display_cache') || 'null'); } catch (e) {}
+let D = null, offset = 0, online = false, tried = false, loading = false, idx = -1, seen = {}, lastKey = '', lastSync = 0;
+try { D = JSON.parse(store.get('mk_display_cache') || 'null'); lastSync = Number(store.get('mk_display_sync')) || 0; offset = Number(store.get('mk_display_off')) || 0; } catch (e) {}
 // Preview only: display.html?at=2026-12-31T10:22 pretends it is that time (the clock keeps running from there).
 const PREVIEW_AT = (() => { const v = new URLSearchParams(location.search).get('at'); const d = v ? new Date(v) : null; return d && !isNaN(d) ? d.getTime() - Date.now() : null; })();
 const now = () => new Date(Date.now() + (PREVIEW_AT !== null ? PREVIEW_AT : offset));
@@ -115,12 +115,15 @@ const dur = ms => { const m = Math.max(0, Math.round(ms / 60000)), h = Math.floo
 
 /* ---------- data ---------- */
 async function load() {
-  const key = store.get('mk_feed_key'); if (!key) return;
+  const key = store.get('mk_feed_key'); if (!key || loading) return;
+  loading = true;
+  const ac = new AbortController(), to = setTimeout(() => ac.abort(), 15000); // a hung request must not block the next try
   try {
-    const r = await (await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'feed', key: key }) })).json();
-    if (r.success) { D = r; const so = new Date(r.serverTime).getTime() - Date.now(); offset = isFinite(so) ? so : 0; online = true; lastSync = Date.now(); store.set('mk_display_cache', JSON.stringify(r)); }
+    const r = await (await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'feed', key: key }), signal: ac.signal })).json();
+    if (r.success) { D = r; const so = new Date(r.serverTime).getTime() - Date.now(); offset = isFinite(so) ? so : 0; online = true; lastSync = Date.now(); store.set('mk_display_cache', JSON.stringify(r)); store.set('mk_display_sync', String(lastSync)); store.set('mk_display_off', String(offset)); }
     else { online = false; if (/key/i.test(r.error || '')) { store.set('mk_feed_key', ''); setup('المفتاح غير صحيح. أدخله من جديد.'); } }
   } catch (e) { online = false; }
+  clearTimeout(to); loading = false; tried = true;
 }
 
 /* ---------- program: blocks of activities that start together (one per group) ---------- */
@@ -227,9 +230,6 @@ function override() {
   const pg = programState(), nb = pg.next;
   if (nb && nb.start - t > 0 && nb.start - t <= CONFIG.soonMinutes * 60000 && nb.items.some(x => x.type !== 'راحة'))
     return `<div class="full"><div><div class="ic">⏰</div><div class="sub" style="margin:0">يبدأ بعد قليل</div><div class="ttl">${esc(blockTitle(nb))}</div><div class="big">${hms(nb.start - t)}</div><div class="sub">${nb.items.length > 1 ? nb.items.map(x => esc(groupName(x.group)) + ': ' + esc(x.place || x.title)).join(' · ') : (nb.items[0].place ? '📍 ' + esc(nb.items[0].place) : '')}</div></div></div>`;
-  const h = t.getHours();
-  if (h >= CONFIG.nightFrom || h < CONFIG.nightTo) { const n = ps.next;
-    return `<div class="full" style="background:radial-gradient(ellipse at center,#0b1a2e,#02060c)"><div><div class="ic">🌙</div><div class="big" style="color:var(--ink)">${(h % 12) || 12}:${p2(t.getMinutes())} <small style="font-size:.33em;color:var(--gold)">${h < 12 ? 'ص' : 'م'}</small></div>${n ? `<div class="sub">الصلاة القادمة: ${PR[n.n]} بعد ${hms(n.at - t)}</div>` : ''}<div class="sub" style="color:var(--ink);opacity:.7">تصبحون على خير</div></div></div>`; }
   return '';
 }
 
@@ -240,7 +240,6 @@ function themeNow() {
   const t = now(), fin = ann('finale')[0], h = t.getHours();
   if (fin && fin.startsAt && ymd(new Date(fin.startsAt)) === ymd(t)) return 'festive';
   if ((t.getDay() === 4 && h >= 18) || (t.getDay() === 5 && h < 4)) return 'jumuah';
-  if (h >= CONFIG.nightFrom || h < CONFIG.nightTo) return 'night';
   return 'brand';
 }
 
@@ -256,7 +255,7 @@ function paintHeader() {
   const th = themeNow(); if (document.body.dataset.t !== th) document.body.dataset.t = th;
   $('cname').textContent = campName(); $('slogan').textContent = campSlogan() + dayLine();
   $('live').className = 'live' + (online ? '' : ' off');
-  $('liveTx').textContent = online ? 'مباشر' : 'دون اتصال · آخر تحديث ' + (lastSync ? new Date(lastSync).toTimeString().slice(0, 5) : '—');
+  $('liveTx').textContent = online ? 'مباشر' : !tried ? 'جارٍ التحديث…' : 'دون اتصال · آخر تحديث ' + (lastSync ? new Date(lastSync).toTimeString().slice(0, 5) : '—');
 }
 function paintRail() {
   const t = now(), h = t.getHours(), pg = programState(), ps = prayerState(), w = D && D.weather && D.weather.days ? D.weather.days.find(x => x.date === ymd(t)) : null;
@@ -309,9 +308,9 @@ load().then(() => { idx = -1; paintHeader(); paintRail(); paintTicker(); showSce
 setInterval(tick, 1000);
 setInterval(showScene, CONFIG.slideSeconds * 1000);
 setInterval(() => load().then(paintTicker), 20000);
+window.addEventListener('online', () => load().then(paintTicker));
+keepAwake();
 document.addEventListener('visibilitychange', () => { if (!document.hidden) { keepAwake(); load().then(() => { paintTicker(); showScene(); }); } });
-// a fresh start every night at 3:00 (clears any memory build-up on a screen that runs for days)
-setInterval(() => { const t = new Date(); if (t.getHours() === 3 && t.getMinutes() === 0 && t.getSeconds() < 2) location.reload(); }, 1000);
 </script>
 </body>
 </html>
