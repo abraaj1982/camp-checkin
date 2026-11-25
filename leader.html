@@ -38,9 +38,10 @@
 .camp-pin{font-size:26px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))}
 .toolsbar{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 #printArea{display:none}
+@page{size:A4;margin:10mm}
 /* Printed reports wear the camp identity: the symbol, brown titles, a gold rule, brown table heads, the icon strip at the foot. */
-@media print{body *{visibility:hidden}#printArea,#printArea *{visibility:visible}
- #printArea{display:block;position:absolute;inset:0;padding:8mm 10mm;color:#372A25;background:#fff;font-family:Tajawal,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+@media print{body>*:not(#printArea){display:none!important} /* the hidden screen must not leave empty pages after the report */
+ #printArea{display:block;position:static;padding:0;color:#372A25;background:#fff;font-family:Tajawal,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}
  .pr-hd{display:flex;align-items:center;gap:4mm;padding-bottom:3mm;border-bottom:.8mm solid #EBBA4E}.pr-hd img{height:18mm}
  .pr-hd .n{font-weight:800;font-size:12pt}.pr-hd h1{font-family:Lalezar,Tajawal,sans-serif;font-weight:400;font-size:20pt;margin:0;line-height:1.2}.pr-hd .w{margin-inline-start:auto;font-size:10pt;text-align:end}
  .pr-k{display:flex;gap:3mm;margin:4mm 0 2mm}.pr-k div{flex:1;border:.3mm solid #D8C79C;border-radius:3mm;padding:2mm 3mm;background:#FBF3D7}.pr-k b{display:block;font-family:Lalezar,Tajawal,sans-serif;font-weight:400;font-size:18pt;line-height:1.1}.pr-k span{font-size:9.5pt}
