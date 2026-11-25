@@ -53,6 +53,7 @@ a{color:var(--brand)}
 .hero{background:var(--card);border:1px solid var(--line);border-radius:var(--r-card);box-shadow:var(--shadow);padding:28px 20px 24px;text-align:center;margin:16px 16px 0}
 .hero .ic{width:72px;height:72px;border-radius:18px;background:var(--gold);color:var(--logoink);display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:700;margin:0 auto 14px}
 .hero h1{font-size:24px;font-weight:700;line-height:1.35}
+.hero .ic.ic-img{background:none;padding:0;overflow:hidden}.hero .ic.ic-img img{width:100%;height:100%;display:block} /* an icon of the identity guide instead of an emoji */
 .hero .ic.ic-logo{background:#372A25 url(brand/symbol.png) center/80% no-repeat} /* the official symbol on the dark brown, as the guide shows it */
 .hero p{color:var(--muted);font-size:14.5px;margin-top:6px}
 .hero.compact{display:flex;align-items:center;gap:14px;text-align:start;padding:16px 18px}
