@@ -179,16 +179,22 @@ function handleNutritionSummary_(data) {
     const byTeam = {};
     present.forEach(function(s) { byTeam[s.team || '—'] = (byTeam[s.team || '—'] || 0) + 1; });
     const users = readSheetAsObjects_(USERS_SHEET).rows.filter(function(r) { return r.Active === true && String(r.AssignedBus).trim() !== ''; });
-    // Staff (cooks, committees, supervisors...) is typed by hand by the secretariat/nutrition; until then we use the bus-supervisor accounts.
-    const staffSetting = getSetting_('StaffCount');
-    const staffManual = staffSetting !== null && String(staffSetting).trim() !== '' && isFinite(Number(staffSetting));
-    const staff = staffManual ? Math.max(0, Math.round(Number(staffSetting))) : users.length;
+    // Staff (cooks, committees, supervisors...) is typed by hand by the secretariat/nutrition, per day: a day without its own number
+    // keeps the latest earlier one (then the general number); until anything is typed we use the bus-supervisor accounts.
+    const day = /^\d{4}-\d{2}-\d{2}$/.test(String(data.day || '')) ? String(data.day) : new Date().toISOString().slice(0, 10);
+    const sd = staffForDay_(day);
+    const staffManual = sd.manual;
+    const staff = staffManual ? sd.n : users.length;
+    // Where the students are right now: only "boarded" eat at camp. The others are shown beside the number, not hidden.
+    let awaiting = 0, onTrip = 0, gone = 0;
+    students.forEach(function(s) { const st = states[s.id]; if (!st) awaiting++; else if (st.state === 'on_trip') onTrip++; else if (st.state === 'departed' || st.state === 'withdrawn') gone++; });
     const withAllergyAll = students.filter(function(s) { return s.foodAllergy; });
     const sig = allergySig_(withAllergyAll);
     let ack = null;
     try { ack = JSON.parse(String(getSetting_('NutritionAck') || '')); } catch (e) { ack = null; }
     const out = { success: true, studentsTotal: students.length, studentsPresent: present.length, supervisors: users.length,
       staff: staff, staffManual: staffManual, mealsToPrepare: present.length + staff, mealsExpected: students.length + staff,
+      staffDay: sd.dayOwn, awaiting: awaiting, onTrip: onTrip, gone: gone, meals: nextMeals_(day), serverTime: new Date().toISOString(),
       allergyCount: withAllergyAll.length,
       ack: ack ? { by: ack.by, at: ack.at, current: ack.sig === sig } : null,
       byTeam: Object.keys(byTeam).sort().map(function(k) { return { team: k, count: byTeam[k] }; }) };
@@ -203,6 +209,34 @@ function handleNutritionSummary_(data) {
     }
     return out;
   });
+}
+
+// The latest staff number typed for a day on or before `day` ("StaffCount_YYYY-MM-DD"), else the general "StaffCount".
+function staffForDay_(day) {
+  let best = '', bestV = null;
+  readSheetAsObjects_(SETTINGS_SHEET).rows.forEach(function(r) {
+    const k = String(r.Key || '');
+    if (k.indexOf('StaffCount_') === 0 && k.slice(11) <= day && k.slice(11) > best && String(r.Value).trim() !== '' && isFinite(Number(r.Value))) { best = k.slice(11); bestV = Number(r.Value); }
+  });
+  if (bestV !== null) return { n: Math.max(0, Math.round(bestV)), manual: true, dayOwn: best === day };
+  const g = getSetting_('StaffCount');
+  if (g !== null && String(g).trim() !== '' && isFinite(Number(g))) return { n: Math.max(0, Math.round(Number(g))), manual: true, dayOwn: false };
+  return { n: 0, manual: false, dayOwn: false };
+}
+// The meals of the camp program (type "وجبة") for today and tomorrow: one per day and kind (breakfast / lunch / dinner), the latest time of the kind.
+function nextMeals_(day) {
+  const t = new Date(day + 'T12:00:00'); t.setDate(t.getDate() + 1);
+  const tomorrow = t.getFullYear() + '-' + ('0' + (t.getMonth() + 1)).slice(-2) + '-' + ('0' + t.getDate()).slice(-2);
+  const best = {};
+  try {
+    readProgram_().forEach(function(x) {
+      if (x.type !== 'وجبة' || (x.date !== day && x.date !== tomorrow)) return;
+      const kind = /إفطار|فطور/.test(x.title) ? 'الإفطار' : /غداء/.test(x.title) ? 'الغداء' : /عشاء/.test(x.title) ? 'العشاء' : x.title;
+      const k = x.date + '|' + kind;
+      if (!best[k] || x.from > best[k].from) best[k] = { date: x.date, from: x.from, name: kind };
+    });
+  } catch (e) { return []; }
+  return Object.keys(best).map(function(k) { return best[k]; }).sort(function(a, b) { return (a.date + a.from) < (b.date + b.from) ? -1 : 1; });
 }
 
 function allergySig_(list) {
@@ -227,8 +261,10 @@ function handleNutritionSetStaff_(data) {
   return withAuth_(data, requireAnyPerm_(['nutrition', 'manage']), function(user) {
     const n = Number(data.count);
     if (!isFinite(n) || n < 0 || n > 5000) return { success: false, error: 'رقم غير صالح' };
-    setSetting_('StaffCount', Math.round(n));
-    writeAudit_(user.Username, 'STAFF_COUNT_SET', '', String(Math.round(n)));
+    const day = String(data.day || '');
+    if (day && !/^\d{4}-\d{2}-\d{2}$/.test(day)) return { success: false, error: 'Invalid request' };
+    setSetting_(day ? 'StaffCount_' + day : 'StaffCount', Math.round(n));
+    writeAudit_(user.Username, 'STAFF_COUNT_SET', day, String(Math.round(n)));
     return { success: true, staff: Math.round(n) };
   });
 }

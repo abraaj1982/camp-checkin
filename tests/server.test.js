@@ -224,6 +224,17 @@ r=post({action:'nutritionSetStaff',token:t1,count:30});assert(!r.success,'superv
 r=post({action:'nutritionSetStaff',token:tn,count:-2});assert(!r.success,'bad staff count rejected');
 r=post({action:'nutritionSetStaff',token:tn,count:30});assert(r.success&&r.staff===30,'nutrition sets the staff count by hand');
 r=post({action:'nutritionSummary',token:tl});assert(r.staff===30&&r.staffManual===true&&r.mealsToPrepare===r.studentsPresent+30&&r.mealsExpected===34,'everyone sees the typed staff number in the meals');
+// staff per day: a day keeps the latest earlier number; meals come from the program; where the others are is shown beside the count
+{let q=post({action:'nutritionSetStaff',token:tn,count:35,day:'2026-12-31'});assert(q.success,'staff for one day');
+ q=post({action:'nutritionSetStaff',token:tn,count:36,day:'bad'});assert(!q.success,'a bad day is refused');
+ q=post({action:'nutritionSummary',token:tn,day:'2026-12-31'});assert(q.staff===35&&q.staffDay===true,'that day has its own number');
+ q=post({action:'nutritionSummary',token:tn,day:'2027-01-01'});assert(q.staff===35&&q.staffDay===false,'the next day keeps the latest earlier number (not set for itself)');
+ q=post({action:'nutritionSummary',token:tn,day:'2026-12-30'});assert(q.staff===30,'an earlier day uses the general number');
+ post({action:'nutritionSetStaff',token:tn,count:40,day:'2027-01-01'});q=post({action:'nutritionSummary',token:tn,day:'2027-01-01'});assert(q.staff===40&&q.staffDay===true,'a day can change it');
+ post({action:'programImport',token:T,rows:[{date:'2026-12-31',from:'07:00',to:'08:00',title:'وجبة الإفطار',type:'وجبة'},{date:'2026-12-31',from:'12:00',to:'13:00',title:'صلاة + راحة + وجبة الغداء',type:'وجبة'},{date:'2026-12-31',from:'13:00',to:'14:00',title:'الغداء',type:'وجبة'},{date:'2026-12-31',from:'20:00',title:'راحة + وجبة العشاء',type:'وجبة'},{date:'2026-12-31',from:'10:00',to:'11:00',title:'نشاط',type:'فعالية'},{date:'2027-01-01',from:'07:00',title:'وجبة الإفطار',type:'وجبة'},{date:'2027-01-05',from:'07:00',title:'وجبة الإفطار',type:'وجبة'}]});
+ q=post({action:'nutritionSummary',token:tn,day:'2026-12-31'});assert(q.meals.map(m=>m.date+' '+m.from+' '+m.name).join('|')==='2026-12-31 07:00 الإفطار|2026-12-31 13:00 الغداء|2026-12-31 20:00 العشاء|2027-01-01 07:00 الإفطار','meals: today and tomorrow only, one per kind (the latest lunch time), no activities');
+ assert(q.awaiting+q.onTrip+q.gone<=q.studentsTotal&&typeof q.onTrip==='number'&&q.serverTime,'the counts of the others are there');
+ book.Program.rows.length=1;if(book.ProgramArchive)book.ProgramArchive.rows.length=1;delete cache.program_v1;}
 r=post({action:'nutritionAck',token:tl});assert(!r.success,'leader cannot confirm the nutrition list');
 r=post({action:'nutritionAck',token:tn});assert(r.success&&r.ack.current,'nutrition confirms receiving the allergy list');
 r=post({action:'nutritionSummary',token:tl});assert(r.ack&&r.ack.current&&r.ack.by==='تغذية'&&!r.allergies,'leader sees WHO confirmed and when, never the names');

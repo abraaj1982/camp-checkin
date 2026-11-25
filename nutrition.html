@@ -8,7 +8,20 @@
 <script src="ui.js" defer></script>
 <style>
 .brow2{display:grid;grid-template-columns:90px 1fr 36px;gap:8px;align-items:center;padding:5px 0;font-size:14px}
-@media print{.hdr,.tool,.chip{display:none!important}}
+#pr{display:none}
+.nm{background:var(--brand);color:var(--btnink);border-radius:22px;padding:18px 20px}
+.nm .k1{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}.nm .nmn{font-weight:800;font-size:19px}.nm .cdn{font-family:Lalezar,Tajawal,sans-serif;font-size:22px;direction:ltr;color:var(--gold)}
+.nm .big{font-family:Lalezar,Tajawal,sans-serif;font-size:64px;line-height:1.05;margin-top:2px}.nm .big small{font-size:18px;font-family:Tajawal,sans-serif;font-weight:700;opacity:.85;margin-inline-start:8px}
+.nm .ln{font-size:14.5px;margin-top:4px;opacity:.92}.nm .sub2{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}.nm .sub2 span{background:rgba(251,243,215,.14);border-radius:999px;padding:3px 11px;font-size:13px}
+[data-theme=dark] .nm{background:#43342D;color:#FBF3D7}
+.up3{display:flex;gap:8px;flex-wrap:wrap}.up3 span{border:1px solid var(--line);border-radius:12px;padding:6px 12px;font-size:13.5px;background:var(--card)}
+@media print{body *{visibility:hidden}#pr,#pr *{visibility:visible}
+ #pr{display:block;position:absolute;inset:0;padding:8mm 10mm;color:#372A25;background:#fff;font-family:Tajawal,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+ .pr-hd{display:flex;align-items:center;gap:4mm;padding-bottom:3mm;border-bottom:.8mm solid #EBBA4E}.pr-hd img{height:18mm}.pr-hd .n{font-weight:800;font-size:12pt}.pr-hd h1{font-family:Lalezar,Tajawal,sans-serif;font-weight:400;font-size:20pt;margin:0;line-height:1.2}.pr-hd .w{margin-inline-start:auto;font-size:10pt;text-align:end}
+ .pr-k{display:flex;gap:3mm;margin:4mm 0 2mm}.pr-k div{flex:1;border:.3mm solid #D8C79C;border-radius:3mm;padding:2mm 3mm;background:#FBF3D7}.pr-k b{display:block;font-family:Lalezar,Tajawal,sans-serif;font-weight:400;font-size:18pt;line-height:1.1}.pr-k span{font-size:9.5pt}
+ #pr h2{font-size:13pt;font-weight:800;margin:5mm 0 2mm;padding-inline-start:2.5mm;border-inline-start:1.2mm solid #EBBA4E}
+ #pr table{width:100%;border-collapse:collapse;font-size:10.5pt}#pr td,#pr th{border:.3mm solid #D8C79C;padding:1.5mm 2mm;text-align:start}#pr th{background:#372A25;color:#FBF3D7}#pr tr:nth-child(even) td{background:#FBF3D7}
+ .pr-ft{margin-top:6mm;height:9mm;background:url(brand/strip.png) repeat-x center/auto 100%}}
 </style>
 </head>
 <body>
@@ -20,6 +33,7 @@
   <section class="hero compact"><div class="ic ic-img" aria-hidden="true"><img src="brand/icons/fire-dark.png" alt=""></div><div><h1 id="hT"></h1><p id="hS"></p></div></section>
   <main id="app"></main>
 </div>
+<div id="pr"></div>
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4lEBGPNxghwq9UmK0iljI5QdS-8iCvC-K09dDtbZCXGvGZyA4repTE3rFVVRp5zS4yw/exec';
 const token = sessionStorage.getItem('mukhayyam_token');
@@ -43,18 +57,49 @@ const errText = r => (r && L().codes && L().codes[r.code]) || (r && r.error) || 
 if (!token) location.href = 'login.html'; else if (!can('nutrition')) location.href = 'hub.html';
 const T = {
  ar: { dir: 'rtl', title: 'التغذية', sub: 'أعداد الوجبات والحساسية الغذائية', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
-  present: 'الطلاب الحاضرون', total: 'إجمالي الطلاب', staff: 'الكادر', staffEdit: 'تعديل', staffAsk: 'اكتب عدد الكادر (مشرفون، لجان، طباخون...)', staffAuto: 'تقدير: حسابات المشرفين. اكتب الرقم الفعلي.', expected: 'وجبات متوقعة (الكل)', byAllergen: 'حسب نوع الحساسية', students: 'طلاب', ackBtn: '✓ تأكيد استلام التفاصيل', ackOk: 'استُلمت التفاصيل', ackBy: 'بواسطة', ackNew: 'تفاصيل جديدة أو تغيّرت — بانتظار تأكيد لجنة التغذية', ackWait: 'بانتظار تأكيد لجنة التغذية', ackDone: 'تم',  of: 'من', sups: 'المشرفون', meals: 'وجبات للتحضير', note: 'الحاضرون = من سُجّل صعوده ولم يغادر. الكادر يُكتب يدويًا. الحساسية تأتي تلقائيًا من نموذج الأهل.',
+  present: 'الحاضرون في المخيم', total: 'إجمالي الطلاب', staff: 'الكادر', nextMeal: 'الوجبة القادمة', noMeals: 'الوجبات الآن', after: 'بعد', staffToday: 'الكادر اليوم', students_: 'طلاب حاضرون', withAl: n => 'منهم ' + n + ' بحساسية غذائية', notArr: n => 'لم يصلوا بعد: ' + n, onTrip: n => 'في الرحلة: ' + n, gone: n => 'غادروا أو خرجوا بإذن: ' + n, comingMeals: 'الوجبات القادمة', mealsNote: 'العدد = من هو في المخيم الآن + الكادر. طلاب الرحلة والمغادرون لا يُحسبون، ويتحدث الرقم وحده.', printK: 'طباعة ورقة المطبخ', kTitle: 'ورقة المطبخ', staffAskDay: 'عدد الكادر لهذا اليوم (مشرفون، لجان، طباخون...)', staffKeep: 'إن لم تكتب رقمًا ليوم لاحق فيبقى آخر رقم كتبته.', staffEdit: 'تعديل', staffAsk: 'اكتب عدد الكادر (مشرفون، لجان، طباخون...)', staffAuto: 'تقدير: حسابات المشرفين. اكتب الرقم الفعلي.', expected: 'وجبات متوقعة (الكل)', byAllergen: 'حسب نوع الحساسية', students: 'طلاب', ackBtn: '✓ تأكيد استلام التفاصيل', ackOk: 'استُلمت التفاصيل', ackBy: 'بواسطة', ackNew: 'تفاصيل جديدة أو تغيّرت — بانتظار تأكيد لجنة التغذية', ackWait: 'بانتظار تأكيد لجنة التغذية', ackDone: 'تم',  of: 'من', sups: 'المشرفون', meals: 'وجبات للتحضير', note: 'الحاضرون = من سُجّل صعوده ولم يغادر. الكادر يُكتب يدويًا. الحساسية تأتي تلقائيًا من نموذج الأهل.',
   byTeam: 'الحاضرون حسب الفريق', allergies: 'الحساسية الغذائية', onlyPresent: 'الحاضرون فقط', all: 'الكل', presentB: 'حاضر', absentB: 'لم يصل', none: 'لا توجد حالات حساسية غذائية مسجّلة.',
   noCol: 'عمود «Food allergy» غير موجود في كشف الطلاب. أضِفه ليظهر هنا.', team: 'الفريق', updated: 'آخر تحديث', error: 'تعذّر تحميل البيانات.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.', print: 'طباعة' },
  en: { dir: 'ltr', title: 'Nutrition', sub: 'Meal counts and food allergies', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
-  present: 'Students present', total: 'Total students', staff: 'Staff', staffEdit: 'Edit', staffAsk: 'Enter the number of staff (supervisors, committees, cooks...)', staffAuto: 'Estimate: supervisor accounts. Enter the real number.', expected: 'Expected meals (everyone)', byAllergen: 'By allergen', students: 'students', ackBtn: '✓ Confirm details received', ackOk: 'Details received', ackBy: 'by', ackNew: 'New or changed details — waiting for the nutrition committee to confirm', ackWait: 'Waiting for the nutrition committee to confirm', ackDone: 'Done',  of: 'of', sups: 'Supervisors', meals: 'Meals to prepare', note: 'Present = checked in and not left. Staff is typed by hand. Allergies come automatically from the parents’ form.',
+  present: 'At camp', total: 'Total students', staff: 'Staff', nextMeal: 'Next meal', noMeals: 'Meals now', after: 'in', staffToday: 'Staff today', students_: 'students at camp', withAl: n => n + ' with a food allergy', notArr: n => 'Not arrived: ' + n, onTrip: n => 'On the trip: ' + n, gone: n => 'Left or withdrawn: ' + n, comingMeals: 'Coming meals', mealsNote: 'Count = who is at camp now + staff. Trip students and those who left are not counted; the number updates by itself.', printK: 'Print kitchen sheet', kTitle: 'Kitchen sheet', staffAskDay: 'Staff for this day (supervisors, committees, cooks...)', staffKeep: 'A later day keeps the last number you typed.', staffEdit: 'Edit', staffAsk: 'Enter the number of staff (supervisors, committees, cooks...)', staffAuto: 'Estimate: supervisor accounts. Enter the real number.', expected: 'Expected meals (everyone)', byAllergen: 'By allergen', students: 'students', ackBtn: '✓ Confirm details received', ackOk: 'Details received', ackBy: 'by', ackNew: 'New or changed details — waiting for the nutrition committee to confirm', ackWait: 'Waiting for the nutrition committee to confirm', ackDone: 'Done',  of: 'of', sups: 'Supervisors', meals: 'Meals to prepare', note: 'Present = checked in and not left. Staff is typed by hand. Allergies come automatically from the parents’ form.',
   byTeam: 'Present by team', allergies: 'Food allergies', onlyPresent: 'Present only', all: 'All', presentB: 'Present', absentB: 'Not arrived', none: 'No food allergies on record.',
   noCol: 'The “Food allergy” column is missing from the student sheet. Add it to show it here.', team: 'Team', updated: 'Updated', error: 'Could not load data.', sessionEnd: 'Session expired. Please log in again.', print: 'Print' }
 };
-const st = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), d: null, onlyPresent: false, err: '', at: '', msg: null };
+const P2 = n => String(n).padStart(2, '0');
+const today = () => { const d = new Date(); return d.getFullYear() + '-' + P2(d.getMonth() + 1) + '-' + P2(d.getDate()); };
+const hmsOf = ms => { ms = Math.max(0, ms); const s = Math.floor(ms / 1000); return P2(Math.floor(s / 3600)) + ':' + P2(Math.floor(s % 3600 / 60)) + ':' + P2(s % 60); };
+const t12 = hhmm => { const [h, m] = hhmm.split(':').map(Number); return ((h % 12) || 12) + ':' + P2(m) + ' ' + (h < 12 ? 'ص' : 'م'); };
+const st = { loadedAt: Date.now(), lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), d: null, onlyPresent: false, err: '', at: '', msg: null };
 async function load() {
-  try { const r = await api({ action: 'nutritionSummary' }); if (r.success) { st.d = r; st.err = ''; st.at = new Date().toTimeString().slice(0, 5); } else st.err = L().error; } catch (e) { if (e.message !== 'auth') st.err = L().error; }
+  try { const r = await api({ action: 'nutritionSummary', day: today() }); if (r.success) { st.d = r; st.loadedAt = Date.now(); st.err = ''; st.at = new Date().toTimeString().slice(0, 5); } else st.err = L().error; } catch (e) { if (e.message !== 'auth') st.err = L().error; }
   render();
+}
+// The next meal of the camp program (the server sends today's and tomorrow's), with a live countdown and the count to prepare.
+function nextMealOf(d) {
+  const nowMs = Date.now() + (d.serverTime ? new Date(d.serverTime).getTime() - st.loadedAt : 0);
+  const list = (d.meals || []).map(m => ({ m: m, at: new Date(m.date + 'T' + m.from + ':00').getTime() })).filter(x => x.at > nowMs - 20 * 60000);
+  return { next: list[0] || null, more: list.slice(1, 4), nowMs: nowMs };
+}
+function mealCard(d, l, canEdit) {
+  const nm = nextMealOf(d), n = d.studentsPresent, total = n + d.staff;
+  const al = (d.allergies || []).filter(a => a.present).length, hasAl = Array.isArray(d.allergies);
+  const head = nm.next ? `<div class="k1"><span class="nmn">${l.nextMeal}: ${esc(nm.next.m.name)} · ${esc(t12(nm.next.m.from))}</span><span class="cdn" id="mcd" data-at="${nm.next.at}">${nm.next.at > nm.nowMs ? hmsOf(nm.next.at - nm.nowMs) : '00:00:00'}</span></div>` : `<div class="k1"><span class="nmn">${l.noMeals}</span></div>`;
+  const others = [d.awaiting ? l.notArr(d.awaiting) : '', d.onTrip ? l.onTrip(d.onTrip) : '', d.gone ? l.gone(d.gone) : ''].filter(Boolean);
+  return `<section class="nm">${head}<div class="big">${total}<small>${st.lang === 'ar' ? 'وجبة' : 'meals'}</small></div>
+    <div class="ln">${n} ${l.students_} + ${d.staff} ${l.staff}${hasAl ? ' · ' + l.withAl(al) : ''}</div>
+    ${others.length ? `<div class="sub2">${others.map(o => `<span>${esc(o)}</span>`).join('')}</div>` : ''}
+    ${nm.more.length ? `<div style="margin-top:12px;font-size:13px;opacity:.85">${l.comingMeals}</div><div class="up3" style="margin-top:6px">${nm.more.map(x => `<span style="color:#372A25">${esc(x.m.name)} · ${esc(t12(x.m.from))}${x.m.date !== today() ? (st.lang === 'ar' ? ' (غدًا)' : ' (tomorrow)') : ''}</span>`).join('')}</div>` : ''}</section>`;
+}
+function printKitchen() {
+  const d = st.d, l = L(); if (!d) return;
+  const nm = nextMealOf(d), when = new Date().toLocaleString(st.lang === 'ar' ? 'ar' : 'en');
+  const groups = {}; (d.allergies || []).forEach(a => { String(a.allergy).split(/[،,;\/\n]+|\s+و\s+/).map(x => x.trim()).filter(Boolean).forEach(g => { (groups[g] = groups[g] || []).push(a); }); });
+  const gk = Object.keys(groups).sort((a, b) => groups[b].length - groups[a].length || a.localeCompare(b));
+  $('pr').innerHTML = `<div class="pr-hd"><img src="brand/logo-season.svg" alt=""><div><div class="n">${esc($('campT').textContent)}</div><h1>${l.kTitle}</h1></div><div class="w">${esc(when)}</div></div>
+   <div class="pr-k"><div><b>${d.studentsPresent + d.staff}</b><span>${nm.next ? esc(nm.next.m.name) + ' · ' + esc(t12(nm.next.m.from)) : l.noMeals}</span></div><div><b>${d.studentsPresent}</b><span>${l.students_}</span></div><div><b>${d.staff}</b><span>${l.staff}</span></div><div><b>${(d.allergies || []).filter(a => a.present).length}</b><span>${l.withAl('').replace(/^\s*/, '')}</span></div></div>
+   <h2>${l.allergies}</h2>${gk.length ? gk.map(g => `<table style="margin-bottom:3mm"><tr><th colspan="3">${esc(g)} (${groups[g].filter(a => a.present).length} / ${groups[g].length})</th></tr>${groups[g].sort((a, b) => (b.present - a.present) || a.name.localeCompare(b.name)).map(a => `<tr><td>${esc(a.name)} · ${esc(a.id)}</td><td>${esc(a.team)}</td><td>${a.present ? l.presentB : l.absentB}</td></tr>`).join('')}</table>`).join('') : `<div>${l.none}</div>`}
+   <div class="pr-ft"></div>`;
+  window.print();
 }
 function render() {
   const l = L(); document.documentElement.lang = st.lang; document.documentElement.dir = l.dir; document.documentElement.dataset.theme = st.theme; document.title = l.title + ' — MUKHAYYAM';
@@ -70,23 +115,26 @@ function render() {
     : `<div class="banner warn">${canAck ? l.ackNew : l.ackWait}${canAck ? ` <button class="btn full" style="margin-top:8px" data-ack="1">${l.ackBtn}</button>` : ''}</div>`;
   const mx = Math.max(1, ...d.byTeam.map(t => t.count));
   $('app').innerHTML = `${st.err ? `<div class="banner bad">${esc(st.err)}</div>` : ''}${st.msg ? `<div class="banner ${st.msg.cls}">${esc(st.msg.t)}</div>` : ''}
-   <div class="kpis">${k(l.total, d.studentsTotal)}${k(l.staff, d.staff + (canEdit ? ' <button class="chip" data-staff="1">✎ ' + l.staffEdit + '</button>' : ''), d.staffManual ? '' : l.staffAuto)}${k(l.present, d.studentsPresent, l.of + ' ' + d.studentsTotal)}${k(l.meals, d.mealsToPrepare, l.expected + ': ' + d.mealsExpected)}</div>
+   ${mealCard(d, l, canEdit)}
+   <div class="kpis">${k(l.total, d.studentsTotal)}${k(l.present, d.studentsPresent, l.of + ' ' + d.studentsTotal)}${k(l.staffToday, d.staff + (canEdit ? ' <button class="chip" data-staff="1">✎ ' + l.staffEdit + '</button>' : ''), d.staffManual ? '' : l.staffAuto)}</div>
    ${!d.allergies && d.allergyCount ? `<div class="banner ${d.ack && d.ack.current ? 'ok' : 'warn'}">${d.ack && d.ack.current ? '✓ ' + l.ackOk + ' · ' + esc(d.ack.by) : l.ackWait}</div>` : ''}
-   <div class="muted" style="font-size:12.5px">${l.note} · ${l.updated} ${esc(st.at)}</div>
+   <div class="muted" style="font-size:12.5px">${l.mealsNote} · ${l.updated} ${esc(st.at)}</div>
    <section class="card"><h2 class="h2" style="margin-bottom:6px">${l.byTeam}</h2>${d.byTeam.length ? d.byTeam.map(t => `<div class="brow2"><span>${esc(t.team)}</span><div class="bar" style="margin:0"><i style="width:${Math.round(t.count / mx * 100)}%"></i></div><b>${t.count}</b></div>`).join('') : '<div class="muted">—</div>'}</section>
    <section class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px"><h2 class="h2">${l.allergies} (${(d.allergies || []).length})</h2>
-     <span style="display:flex;gap:6px"><button class="chip ${st.onlyPresent ? 'on' : ''}" data-filter="1">${l.onlyPresent}</button><button class="chip" data-print="1">${l.print}</button></span></div>
+     <span style="display:flex;gap:6px"><button class="chip ${st.onlyPresent ? 'on' : ''}" data-filter="1">${l.onlyPresent}</button><button class="chip" data-print="1" title="${l.printK}">🖨 ${l.print}</button></span></div>
      ${d.allergyColumnPresent === false ? `<div class="banner warn">${l.noCol}</div>` : ''}
      ${ackCard}
      ${gKeys.length ? gKeys.map(g => { const arr = groups[g].filter(a => !st.onlyPresent || a.present); return arr.length ? `<div class="item" style="margin-top:8px"><div style="display:flex;justify-content:space-between;align-items:center"><b style="color:var(--bad)">${esc(g)}</b><span class="pill">${arr.length} ${l.students}</span></div>${arr.sort((a, b) => (b.present - a.present) || a.name.localeCompare(b.name)).map(a => `<div class="row"><span><b>${esc(a.name)}</b> <span class="muted">· ${esc(a.team)}</span></span><span class="pill ${a.present ? 'ok' : ''}">${a.present ? l.presentB : l.absentB}</span></div>`).join('')}</div>` : ''; }).join('') : `<div class="muted">${l.none}</div>`}</section>`;
 }
-document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('button'); if (!b) return; if (b.dataset.filter) { st.onlyPresent = !st.onlyPresent; render(); } else if (b.dataset.print) window.print();
+document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('button'); if (!b) return; if (b.dataset.filter) { st.onlyPresent = !st.onlyPresent; render(); } else if (b.dataset.print) printKitchen();
   else if (b.dataset.ack) ackIt(); else if (b.dataset.staff) setStaff(); });
 async function ackIt() { try { const r = await api({ action: 'nutritionAck' }); st.msg = r.success ? { cls: 'ok', t: L().ackDone } : { cls: 'bad', t: r.error || L().error }; } catch (e) { if (e.message !== 'auth') st.msg = { cls: 'bad', t: L().error }; } await load(); }
-async function setStaff() { const v = prompt(L().staffAsk, st.d && st.d.staffManual ? st.d.staff : ''); if (v === null || v.trim() === '') return; try { const r = await api({ action: 'nutritionSetStaff', count: Number(v) }); st.msg = r.success ? { cls: 'ok', t: L().ackDone } : { cls: 'bad', t: r.error || L().error }; } catch (e) { if (e.message !== 'auth') st.msg = { cls: 'bad', t: L().error }; } await load(); }
+async function setStaff() { const v = prompt(L().staffAskDay + '\n' + L().staffKeep, st.d && st.d.staffManual ? st.d.staff : ''); if (v === null || v.trim() === '') return; try { const r = await api({ action: 'nutritionSetStaff', count: Number(v), day: today() }); st.msg = r.success ? { cls: 'ok', t: L().ackDone } : { cls: 'bad', t: r.error || L().error }; } catch (e) { if (e.message !== 'auth') st.msg = { cls: 'bad', t: L().error }; } await load(); }
 
 $('langBtn').onclick = () => { st.lang = st.lang === 'ar' ? 'en' : 'ar'; pref.set('lang', st.lang); render(); };
 $('themeBtn').onclick = () => { st.theme = st.theme === 'light' ? 'dark' : 'light'; pref.set('theme', st.theme); render(); };
 render(); load(); setInterval(() => { if (!document.hidden && navigator.onLine) load(); }, 30000);
+// the countdown ticks every second without redrawing the page
+setInterval(() => { const e = $('mcd'); if (e) e.textContent = hmsOf(Number(e.dataset.at) - (Date.now() + (st.d && st.d.serverTime ? new Date(st.d.serverTime).getTime() - st.loadedAt : 0))); }, 1000);
 </script>
 </body></html>
