@@ -93,7 +93,7 @@ body{background:var(--bg);color:var(--ink);font-family:Cairo,system-ui,sans-seri
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4lEBGPNxghwq9UmK0iljI5QdS-8iCvC-K09dDtbZCXGvGZyA4repTE3rFVVRp5zS4yw/exec';
 // Edit here until they are set from the system: camp name, slogan and the logo file (put it next to this page).
-const CONFIG = { name: 'المخيّم الطلابي', slogan: 'في الخير محمَّلًا', logo: '', slideSeconds: 12, prayingMinutes: 12, soonMinutes: 5 };
+const CONFIG = { name: 'المخيّم الطلابي', slogan: 'في الخير محمَّلًا', logo: '', slideSeconds: 12, adhanMinutes: 4, soonMinutes: 5 };
 const $ = id => document.getElementById(id);
 const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
@@ -153,10 +153,9 @@ function prayerEvents() {
     for (const n of Object.keys(PR)) if (p[n]) out.push({ n: n, at: atTime(day, p[n]) }); }
   return out.sort((a, b) => a.at - b.at);
 }
-const iqMs = () => (D && D.iqamaMinutes || 15) * 60000;
 function prayerState() {
   const t = now().getTime(), ev = prayerEvents();
-  return { cur: ev.filter(e => e.at.getTime() <= t && t < e.at.getTime() + iqMs() + CONFIG.prayingMinutes * 60000).pop(), next: ev.find(e => e.at.getTime() > t) };
+  return { cur: ev.filter(e => e.at.getTime() <= t && t < e.at.getTime() + CONFIG.adhanMinutes * 60000).pop(), next: ev.find(e => e.at.getTime() > t) };
 }
 
 /* ---------- scenes ---------- */
@@ -181,10 +180,10 @@ function rankScene() {
   return `<h2 class="st">🏆 الترتيب العام للفرق</h2><div class="rank">${tt.slice(0, 8).map((x, i) => `<div class="lr"><span style="text-align:center">${medal[i] || (i + 1)}</span><b>${esc(x.team)}</b><div class="bar"><i style="width:${Math.round(x.points / mx * 100)}%;background:${TEAM_COLORS[i % TEAM_COLORS.length]}"></i></div><span class="pt">${x.points}</span></div>`).join('')}</div>`;
 }
 function prayersScene() {
-  const t = now(), p = D.prayers[ymd(t)], st = prayerState(), iq = D.iqamaMinutes || 15, names = Object.keys(PR).filter(n => p[n]);
+  const t = now(), p = D.prayers[ymd(t)], st = prayerState(), names = Object.keys(PR).filter(n => p[n]);
   return `<h2 class="st">🕌 أوقات الصلاة</h2>${st.next ? `<div class="al" style="text-align:center;margin:-.4vw 0 1vw">الصلاة القادمة: ${PR[st.next.n]} بعد <span class="cd" data-cd="${st.next.at.getTime()}">${hms(st.next.at - t)}</span></div>` : ''}
     <div class="pq" style="grid-template-columns:repeat(${Math.min(names.length, 5)},1fr)">${names.map(n => { const at = atTime(t, p[n]), nx = st.next && st.next.n === n && ymd(st.next.at) === ymd(t);
-      return `<div class="pc ${nx ? 'nx' : at < t ? 'dn' : ''}"><div class="pn">${PR[n]}</div><div class="pt">${t12(p[n])}</div><small>الإقامة +${iq} د</small></div>`; }).join('')}</div>`;
+      return `<div class="pc ${nx ? 'nx' : at < t ? 'dn' : ''}"><div class="pn">${PR[n]}</div><div class="pt">${t12(p[n])}</div></div>`; }).join('')}</div>`;
 }
 const textScene = (icon, kicker, title, body, verse) => `<div class="card2"><div class="ai">${icon}</div><div class="al">${esc(kicker)}</div>${verse ? `<div class="verse">${esc(title)}</div>${body ? `<div class="sub2" style="color:var(--gold)">${esc(body)}</div>` : ''}` : `<div class="at">${esc(title)}</div>${body ? `<div class="sub2">${esc(body)}</div>` : ''}`}</div>`;
 function podiumScene(g) {
@@ -223,9 +222,8 @@ function override() {
   if (u) return `<div class="full urgent"><div><div class="ic">🚨</div><div class="ttl">${esc(u.title)}</div>${u.body ? `<div class="sub" style="color:#fff">${esc(u.body)}</div>` : ''}</div></div>`;
   const ps = prayerState();
   if (ps.cur) {
-    const adhan = ps.cur.at.getTime(), iqama = adhan + iqMs(), n = PR[ps.cur.n];
-    if (t < iqama) return `<div class="full adhan"><div><div class="ic">🕌</div><div class="sub" style="margin:0">حان الآن موعد</div><div class="ttl">أذان ${n}</div><div class="sub">تُقام صلاة ${n} بعد</div><div class="big">${hms(iqama - t)}</div><div class="sub" style="color:var(--ink);opacity:.8">يُرجى التوجّه إلى المسجد</div></div></div>`;
-    return `<div class="full adhan"><div><div class="ic">🤲</div><div class="ttl">تُقام الآن صلاة ${n}</div><div class="sub">نرجو الهدوء · تقبّل الله طاعاتكم</div></div></div>`;
+    const n = PR[ps.cur.n];
+    return `<div class="full adhan"><div><div class="ic">🕌</div><div class="sub" style="margin:0">حان الآن موعد</div><div class="ttl">أذان ${n}</div><div class="sub" style="color:var(--ink);opacity:.8">يُرجى التوجّه إلى المسجد</div></div></div>`;
   }
   const pg = programState(), nb = pg.next;
   if (nb && nb.start - t > 0 && nb.start - t <= CONFIG.soonMinutes * 60000 && nb.items.some(x => x.type !== 'راحة'))
@@ -262,7 +260,7 @@ function paintRail() {
   const tt = D && D.totals || [];
   let html = `<div class="rc"><div class="clk">${(h % 12) || 12}:${p2(t.getMinutes())} <small>${h < 12 ? 'ص' : 'م'}</small></div><div class="date">${esc(t.toLocaleDateString('ar-u-nu-latn', { weekday: 'long', day: 'numeric', month: 'long' }))}${w ? ` · ${w.tmax}° · 🌧 ${w.rain}%` : ''}</div></div>`;
   if (pg.next) html += `<div class="rc"><div class="t">⏭ التالي</div><div class="v">${esc(blockTitle(pg.next))}</div><div class="s">${t12(pg.next.items[0].from)}${pg.next.items.length === 1 && pg.next.items[0].place ? ' · ' + esc(pg.next.items[0].place) : ''}</div><div class="cd">${hms(pg.next.start - t)}</div></div>`;
-  if (ps.next) html += `<div class="rc"><div class="t">🕌 الصلاة القادمة</div><div class="v">${PR[ps.next.n]} · ${t12(p2(ps.next.at.getHours()) + ':' + p2(ps.next.at.getMinutes()))}</div><div class="s">بعد ${dur(ps.next.at - t)} · الإقامة +${D && D.iqamaMinutes || 15} د</div></div>`;
+  if (ps.next) html += `<div class="rc"><div class="t">🕌 الصلاة القادمة</div><div class="v">${PR[ps.next.n]} · ${t12(p2(ps.next.at.getHours()) + ':' + p2(ps.next.at.getMinutes()))}</div><div class="s">بعد <span class="cd" data-cd="${ps.next.at.getTime()}" style="direction:ltr;display:inline-block;font-variant-numeric:tabular-nums">${hms(ps.next.at - t)}</span></div></div>`;
   if (tt.length) html += `<div class="rc"><div class="t">🏆 المتصدّر</div><div class="v">${esc(tt[0].team)} · ${tt[0].points}</div>${tt[1] ? `<div class="s">يليه ${esc(tt[1].team)} ${tt[1].points}</div>` : ''}</div>`;
   $('rail').innerHTML = html;
 }
