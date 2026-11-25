@@ -1,7 +1,7 @@
 // Shared header text for every screen (camp name + date), follows the page language.
 // Edit the camp name/date here once and every screen updates.
 (function () {
-  var CAMP = { ar: { t: 'المخيّم الطلابي', s: '27 ديسمبر 2026' }, en: { t: 'Student Camp', s: '27 December 2026' } };
+  var CAMP = { ar: { t: 'مخيم نشاط التدريس ١٣', s: '30 ديسمبر 2026 – 2 يناير 2027' }, en: { t: 'Teaching Activity Camp 13', s: '30 Dec 2026 – 2 Jan 2027' } };
   function paint() {
     var l = document.documentElement.lang === 'en' ? 'en' : 'ar';
     var a = document.getElementById('campT'), b = document.getElementById('campS');

@@ -4,7 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>الإعلامية — MUKHAYYAM</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="theme.css">
 <script src="ui.js" defer></script>
 <style>
@@ -60,7 +59,7 @@ const THEMES = ['auto', 'brand', 'jumuah', 'festive', 'night'];
 const timed = k => k === 'event' || k === 'finale';
 const PR = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
 const blank = () => ({ id: '', title: '', body: '', kind: 'announce', startsAt: '', audience: 'public', pinned: false });
-const st = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), tab: can('announce') ? 'ann' : 'res', anns: [], results: [], campStart: '2026-12-27', form: blank(), pr: { date: new Date().toISOString().slice(0, 10), t: {}, iq: '' }, prayers: {}, iqama: 15, theme: 'auto', rf: { competition: '', team: '', place: '', points: '' }, msg: null };
+const st = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), tab: can('announce') ? 'ann' : 'res', anns: [], results: [], campStart: '2026-12-30', form: blank(), pr: { date: new Date().toISOString().slice(0, 10), t: {}, iq: '' }, prayers: {}, iqama: 15, theme: 'auto', rf: { competition: '', team: '', place: '', points: '' }, msg: null };
 const say = (cls, t) => { st.msg = { cls: cls, t: t }; };
 const errText = r => (r && r.code === 'NEEDS_VERIFY' ? L().needVerify : (r && r.error) || L().error);
 

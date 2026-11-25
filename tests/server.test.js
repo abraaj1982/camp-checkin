@@ -356,7 +356,7 @@ r=post({action:'feed',key:'anything'});assert(!r.success,'feed disabled until a 
 const fk=run('ADMIN_createFeedKey')();
 r=post({action:'feed',key:'wrong'+fk});assert(!r.success,'feed rejects a wrong key');
 r=post({action:'feed',key:fk});assert(r.success&&r.announcements.length===1&&r.announcements[0].title==='حفل الافتتاح'&&!JSON.stringify(r).includes('تعليمات للمشرفين'),'feed shows ONLY published public items');
-assert(r.campStart==='2026-12-27'&&!!r.serverTime,'feed carries camp start + server time');
+assert(r.campStart==='2026-12-30'&&!!r.serverTime,'feed carries camp start + server time');
 // ---- camp program from the Excel file: checked row by row, written in one go, the old one archived, served to the screen
 {const P=[{date:'2026-12-31',from:'10:00',to:'11:45',group:'(7-9) أ',title:'نشاط رياضي',place:'ملعب 3 و4',type:'فعالية'},{date:'2026-12-31',from:'10:00',to:'11:45',group:'(7-9) ب',title:'نشاط ديني وثقافي',place:'خيمة الفعاليات 1',type:'فعالية'},{date:'2026-12-31',from:'12:00',to:'13:00',group:'جميع الموجودين',title:'برنامج الصلاة',place:'خيمة الفعاليات',type:'صلاة'},{date:'2026-12-30',from:'22:15',to:'',group:'',title:'إغلاق الأنوار',type:'راحة'}];
  let q=post({action:'programImport',token:t1,rows:P});assert(!q.success,'only the media committee imports the program');

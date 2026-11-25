@@ -51,7 +51,7 @@ function handleMediaList_(data) {
     const rank = { draft: 0, published: 1, archived: 2 };
     const sortFn = function(a, b) { return (rank[a.status] - rank[b.status]) || (a.createdAt < b.createdAt ? 1 : -1); };
     return { success: true, announcements: readAnnouncements_().sort(sortFn).slice(0, 100), results: readResults_().sort(sortFn).slice(0, 300),
-      campStart: String(getSetting_('CampStart') || '2026-12-27') };
+      campStart: String(getSetting_('CampStart') || '2026-12-30') };
   });
 }
 
@@ -178,7 +178,7 @@ function publicAnnouncements_(audiences) {
 // Any signed-in user: staff bulletin (published public + staff items).
 function handleBulletin_(data) {
   return withAuth_(data, function() { return true; }, function() {
-    return { success: true, items: publicAnnouncements_(['public', 'staff']).slice(0, 10), campStart: String(getSetting_('CampStart') || '2026-12-27') };
+    return { success: true, items: publicAnnouncements_(['public', 'staff']).slice(0, 10), campStart: String(getSetting_('CampStart') || '2026-12-30') };
   });
 }
 
@@ -201,7 +201,7 @@ function handleFeed_(data) {
   let same = !!key && given.length === key.length;
   if (same) { let diff = 0; for (let i = 0; i < key.length; i++) diff |= key.charCodeAt(i) ^ given.charCodeAt(i); same = diff === 0; }
   if (!same) return { success: false, error: 'Invalid key' };
-  return { success: true, serverTime: new Date().toISOString(), campStart: String(getSetting_('CampStart') || '2026-12-27'),
+  return { success: true, serverTime: new Date().toISOString(), campStart: String(getSetting_('CampStart') || '2026-12-30'),
     announcements: publicAnnouncements_(['public']).slice(0, 30), results: groupResults_(),
     prayers: allPrayers_(), iqamaMinutes: iqamaMinutes_(), totals: teamTotals_(), displayTheme: displayTheme_(),
     program: readProgram_(), weather: (function() { try { return weatherCached_(); } catch (e) { return null; } })(),

@@ -4,30 +4,38 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>تسجيل الدخول — MUKHAYYAM</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="theme.css">
 <script src="ui.js" defer></script>
 <style>
-.login{padding:16px;flex:1;display:flex;flex-direction:column}
-.login .card{padding:30px 22px 26px}
-.login .ic{width:72px;height:72px;border-radius:18px;background:var(--gold);color:var(--logoink);display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:700;margin:0 auto 14px}
-.login h1{font-size:24px;text-align:center}
-.login .sub{text-align:center;color:var(--muted);margin:6px 0 18px}
+/* Wide screens: the camp logo large on the left, the sign-in form on the right. Phones: the logo on top, the form under it. */
+.lg{min-height:100vh;display:grid;grid-template-columns:1fr;background:var(--bg)}
+.lg-brand{order:-1;background:#372A25;color:#FBF3D7;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:26px 20px 22px;text-align:center}
+.lg-brand img{width:190px;max-width:60vw;height:auto}
+.lg-brand .t{font-weight:800;font-size:19px;line-height:1.3}.lg-brand .s{font-size:13.5px;opacity:.8}
+[data-theme=dark] .lg-brand{background:#241B17}
+.lg-form{width:100%;max-width:520px;margin:0 auto;padding:18px 20px 28px;display:flex;flex-direction:column;justify-content:center}
+.lg-tools{display:flex;gap:8px;justify-content:flex-end;margin-bottom:14px}
+.lg-tools .tool{color:var(--ink);border-color:var(--field);background:transparent}.lg-tools .tool:hover{background:var(--soft)}
+.lg-form h1{font-size:26px;font-weight:800}
+.lg-form .sub{color:var(--muted);margin:6px 0 8px}
 .field{margin-top:18px}
 .pw{position:relative}.pw input{padding-inline-end:52px}
-.pw button{position:absolute;inset-inline-end:8px;top:50%;transform:translateY(-50%);border:0;background:transparent;color:var(--muted);cursor:pointer;min-height:40px;min-width:40px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:10px}.pw button:hover,.pw button:focus-visible{color:var(--brand)}
+.pw button{position:absolute;inset-inline-end:8px;top:50%;transform:translateY(-50%);border:0;background:transparent;color:var(--muted);cursor:pointer;min-height:40px;min-width:40px;padding:0;display:flex;align-items:center;justify-content:center}
 .caps{margin-top:8px;color:var(--warn);background:var(--warnbg);border-radius:10px;padding:6px 10px;font-size:13px}
 .foot{text-align:center;color:var(--muted);font-size:12.5px;margin-top:18px}
+@media (min-width:900px){
+  .lg{grid-template-columns:minmax(420px,1fr) 1.1fr}   /* in Arabic the first column is on the right */
+  .lg-brand{order:0;gap:16px;padding:40px}
+  .lg-brand img{width:min(400px,70%)}
+  .lg-brand .t{font-size:24px}.lg-brand .s{font-size:15px}
+  .lg-form{padding:40px 48px}
+}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header class="hdr">
-    <div class="brand"><div class="logo">م</div><div style="min-width:0"><div class="t" id="campT"></div><div class="s" id="campS"></div></div></div>
-    <div class="tools"><button class="tool" id="langBtn" aria-label="Language"></button><button class="tool" id="themeBtn"></button></div>
-  </header>
-  <div class="login"><div class="card">
-    <div class="ic" aria-hidden="true">م</div>
+<div class="lg">
+  <section class="lg-form">
+    <div class="lg-tools"><button class="tool" id="langBtn" aria-label="Language"></button><button class="tool" id="themeBtn"></button></div>
     <h1 id="title"></h1>
     <p class="sub" id="sub"></p>
     <form id="form" autocomplete="on">
@@ -37,7 +45,8 @@
       <button type="submit" class="btn full" id="btn" style="margin-top:22px"></button>
     </form>
     <p class="foot" id="foot"></p>
-  </div></div>
+  </section>
+  <aside class="lg-brand"><img src="brand/logo-season.svg" alt="شعار المخيم"><div class="t" id="campT"></div><div class="s" id="campS"></div></aside>
 </div>
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4lEBGPNxghwq9UmK0iljI5QdS-8iCvC-K09dDtbZCXGvGZyA4repTE3rFVVRp5zS4yw/exec';
