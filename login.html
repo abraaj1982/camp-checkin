@@ -23,7 +23,8 @@
 .pw{position:relative}.pw input{padding-inline-end:52px}
 .pw button{position:absolute;inset-inline-end:8px;top:50%;transform:translateY(-50%);border:0;background:transparent;color:var(--muted);cursor:pointer;min-height:40px;min-width:40px;padding:0;display:flex;align-items:center;justify-content:center}
 .caps{margin-top:8px;color:var(--warn);background:var(--warnbg);border-radius:10px;padding:6px 10px;font-size:13px}
-.foot{text-align:center;color:var(--muted);font-size:12.5px;margin-top:18px}
+.foot{text-align:center;margin-top:16px}.foot button{border:0;background:none;color:var(--ink);font:inherit;font-weight:700;font-size:14px;text-decoration:underline;cursor:pointer;padding:8px}
+.fg{margin-top:14px;border:1px solid var(--line);border-radius:18px;padding:16px;background:var(--card)}.fg h2{font-size:17px;font-weight:800}.fg p{color:var(--muted);font-size:13px;margin-top:4px}.fg .field{margin-top:12px}
 @media (min-width:900px){
   .lg{grid-template-columns:minmax(420px,1fr) 1.1fr}   /* in Arabic the first column is on the right */
   .lg-brand{order:0;gap:16px;padding:40px}
@@ -45,16 +46,24 @@
       <div id="msg" role="alert"></div>
       <button type="submit" class="btn full" id="btn" style="margin-top:22px"></button>
     </form>
-    <p class="foot" id="foot"></p>
+    <p class="foot"><button type="button" id="foot" aria-expanded="false"></button></p>
+    <div class="fg" id="fg" hidden>
+      <h2 id="fgT"></h2><p id="fgP"></p>
+      <div class="field"><label class="lbl" for="fgU"><span id="fgLU"></span><span class="req">*</span></label><input id="fgU" type="text" autocapitalize="off" spellcheck="false" maxlength="40"></div>
+      <div class="field"><label class="lbl" for="fgPh"><span id="fgLP"></span><span class="req">*</span></label><input id="fgPh" type="tel" inputmode="tel" maxlength="20" dir="ltr"></div>
+      <div class="field"><label class="lbl" for="fgN" id="fgLN"></label><input id="fgN" type="text" maxlength="200"></div>
+      <div id="fgMsg" role="alert"></div>
+      <div class="two" style="margin-top:12px"><button type="button" class="btn" id="fgSend"></button><button type="button" class="btn alt" id="fgCancel"></button></div>
+    </div>
   </section>
   <aside class="lg-brand"><img src="brand/logo-season.svg" alt="شعار المخيم"><div class="t" id="campT"></div><div class="s" id="campS"></div></aside>
 </div>
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4lEBGPNxghwq9UmK0iljI5QdS-8iCvC-K09dDtbZCXGvGZyA4repTE3rFVVRp5zS4yw/exec';
 const T = {
-  ar: { dir: 'rtl', why: { EXPIRED: 'انتهت مدة الجلسة (12 ساعة). ادخل من جديد.', IDLE_TIMEOUT: 'خرجت لعدم استخدام الشاشة مدة طويلة.', REVOKED: 'أُلغيت جلستك (تغيّرت كلمة المرور أو الصلاحيات).', NO_TOKEN: 'لم تعد جلسة الدخول محفوظة على هذا الجوال (غالباً أغلق الجوال الصفحة).', ACCOUNT_DISABLED: 'الحساب معطَّل.', other: c => 'انتهت الجلسة (' + c + ').' }, caps: 'مفتاح Caps Lock مفعّل', title: 'تسجيل الدخول', sub: 'منصة إدارة المخيم', note: '🔒 أدخل اسم المستخدم وكلمة المرور التي استلمتها من السكرتارية', show: 'إظهار', hide: 'إخفاء', foot: 'نسيت كلمة المرور؟ تواصل مع السكرتارية.', u: 'اسم المستخدم', p: 'كلمة المرور', go: 'دخول', going: 'جارٍ الدخول...', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
+  ar: { dir: 'rtl', why: { EXPIRED: 'انتهت مدة الجلسة (12 ساعة). ادخل من جديد.', IDLE_TIMEOUT: 'خرجت لعدم استخدام الشاشة مدة طويلة.', REVOKED: 'أُلغيت جلستك (تغيّرت كلمة المرور أو الصلاحيات).', NO_TOKEN: 'لم تعد جلسة الدخول محفوظة على هذا الجوال (غالباً أغلق الجوال الصفحة).', ACCOUNT_DISABLED: 'الحساب معطَّل.', other: c => 'انتهت الجلسة (' + c + ').' }, caps: 'مفتاح Caps Lock مفعّل', title: 'تسجيل الدخول', sub: 'منصة إدارة المخيم', note: '🔒 أدخل اسم المستخدم وكلمة المرور التي استلمتها من السكرتارية', show: 'إظهار', hide: 'إخفاء', foot: 'نسيت كلمة المرور؟', fgT: 'طلب كلمة مرور جديدة', fgP: 'يصل طلبك للسكرتارية، فيتصلون بك على رقمك للتأكد ثم يعطونك كلمة مرور جديدة.', fgU: 'اسم المستخدم', fgPh: 'رقم جوالك', fgN: 'ملاحظة (اختياري)', fgSend: 'إرسال الطلب', fgCancel: 'إلغاء', fgDone: '✓ وصل طلبك للسكرتارية، وسيتصلون بك قريبًا.', fgBad: 'اكتب اسم المستخدم ورقم جوال صحيحًا.', u: 'اسم المستخدم', p: 'كلمة المرور', go: 'دخول', going: 'جارٍ الدخول...', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
         bad: 'اسم المستخدم أو كلمة المرور غير صحيحة.', locked: 'الحساب مقفل مؤقتاً. تواصل مع السكرتارية.', disabled: 'الحساب معطَّل. تواصل مع السكرتارية.', net: 'تعذّر الاتصال. تحقق من الإنترنت وأعد المحاولة.', ok: 'تم الدخول...' },
-  en: { dir: 'ltr', why: { EXPIRED: 'Your session ended (12 hours). Please sign in again.', IDLE_TIMEOUT: 'You were signed out after a long time without use.', REVOKED: 'Your session was cancelled (password or permissions changed).', NO_TOKEN: 'The sign-in is no longer saved on this phone (usually the phone closed the page).', ACCOUNT_DISABLED: 'The account is disabled.', other: c => 'Session ended (' + c + ').' }, caps: 'Caps Lock is on', title: 'Sign in', sub: 'Camp management platform', note: '🔒 Enter the username and password you received from the secretariat', show: 'Show', hide: 'Hide', foot: 'Forgot your password? Contact the secretariat.', u: 'Username', p: 'Password', go: 'Sign in', going: 'Signing in...', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
+  en: { dir: 'ltr', why: { EXPIRED: 'Your session ended (12 hours). Please sign in again.', IDLE_TIMEOUT: 'You were signed out after a long time without use.', REVOKED: 'Your session was cancelled (password or permissions changed).', NO_TOKEN: 'The sign-in is no longer saved on this phone (usually the phone closed the page).', ACCOUNT_DISABLED: 'The account is disabled.', other: c => 'Session ended (' + c + ').' }, caps: 'Caps Lock is on', title: 'Sign in', sub: 'Camp management platform', note: '🔒 Enter the username and password you received from the secretariat', show: 'Show', hide: 'Hide', foot: 'Forgot your password?', fgT: 'Ask for a new password', fgP: 'Your request reaches the secretariat; they call your number to check, then give you a new password.', fgU: 'Username', fgPh: 'Your phone number', fgN: 'Note (optional)', fgSend: 'Send request', fgCancel: 'Cancel', fgDone: '✓ The secretariat received your request and will call you soon.', fgBad: 'Type your username and a valid phone number.', u: 'Username', p: 'Password', go: 'Sign in', going: 'Signing in...', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
         bad: 'Wrong username or password.', locked: 'Account temporarily locked. Contact the secretariat.', disabled: 'Account disabled. Contact the secretariat.', net: 'Could not connect. Check the internet and try again.', ok: 'Signed in...' }
 };
 const pref = { get(k, d) { try { return localStorage.getItem('mk_pref_' + k) || d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('mk_pref_' + k, v); } catch (e) {} } };
@@ -65,12 +74,26 @@ const S = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light') };
 const $ = id => document.getElementById(id);
 function paint() {
   const t = T[S.lang]; document.documentElement.lang = S.lang; document.documentElement.dir = t.dir; document.documentElement.dataset.theme = S.theme;
-  $('title').textContent = t.title; $('sub').textContent = t.sub; $('foot').textContent = t.foot; const shown = $('password').type !== 'password'; $('showPw').innerHTML = shown ? EYE_OFF : EYE; $('showPw').setAttribute('aria-label', shown ? t.hide : t.show); $('showPw').title = shown ? t.hide : t.show; $('lblU').textContent = t.u; $('lblP').textContent = t.p; $('btn').textContent = t.go;
+  $('title').textContent = t.title; $('sub').textContent = t.sub; $('foot').textContent = t.foot; ['fgT', 'fgP', 'fgSend', 'fgCancel'].forEach(k => { $(k).textContent = t[k]; }); $('fgLU').textContent = t.fgU; $('fgLP').textContent = t.fgPh; $('fgLN').textContent = t.fgN; const shown = $('password').type !== 'password'; $('showPw').innerHTML = shown ? EYE_OFF : EYE; $('showPw').setAttribute('aria-label', shown ? t.hide : t.show); $('showPw').title = shown ? t.hide : t.show; $('lblU').textContent = t.u; $('lblP').textContent = t.p; $('btn').textContent = t.go;
   $('langBtn').textContent = t.lang; $('themeBtn').textContent = S.theme === 'light' ? t.dark : t.light; document.title = t.title + ' — MUKHAYYAM';
 }
 function msg(cls, text) { $('msg').innerHTML = text ? '<div class="banner ' + cls + '"></div>' : ''; if (text) $('msg').firstChild.textContent = text; }
 $('langBtn').onclick = () => { S.lang = S.lang === 'ar' ? 'en' : 'ar'; pref.set('lang', S.lang); paint(); };
 $('themeBtn').onclick = () => { S.theme = S.theme === 'light' ? 'dark' : 'light'; pref.set('theme', S.theme); paint(); };
+// "Forgot password?": a small request to the secretariat (passwords are never sent back, only replaced).
+function fgMsg(cls, text) { $('fgMsg').innerHTML = text ? '<div class="banner ' + cls + '"></div>' : ''; if (text) $('fgMsg').firstChild.textContent = text; }
+$('foot').onclick = () => { const box = $('fg'), open = box.hidden; box.hidden = !open; $('foot').setAttribute('aria-expanded', String(open)); if (open) { fgMsg('', ''); if (!$('fgU').value) $('fgU').value = $('username').value.trim(); ($('fgU').value ? $('fgPh') : $('fgU')).focus(); } };
+$('fgCancel').onclick = () => { $('fg').hidden = true; $('foot').setAttribute('aria-expanded', 'false'); };
+$('fgSend').onclick = async () => {
+  const t = T[S.lang], u = $('fgU').value.trim(), ph = $('fgPh').value.trim();
+  if (!u || ph.replace(/\D/g, '').length < 7) return fgMsg('bad', t.fgBad);
+  $('fgSend').disabled = true;
+  try {
+    const r = await (await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'pwHelpRequest', username: u, phone: ph, note: $('fgN').value.trim() }) })).json();
+    if (r.success) { fgMsg('ok', t.fgDone); $('fgN').value = ''; } else fgMsg('bad', r.code === 'BAD_INPUT' ? t.fgBad : (r.error || t.net));
+  } catch (e) { fgMsg('warn', t.net); }
+  $('fgSend').disabled = false;
+};
 $('showPw').onclick = () => { const p = $('password'); p.type = p.type === 'password' ? 'text' : 'password'; paint(); p.focus(); };
 paint();
 // Why was he sent back here? (only when the app signed him out; a normal logout leaves nothing)

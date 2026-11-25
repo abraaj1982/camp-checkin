@@ -581,6 +581,70 @@ function handleResetPassword_(data) {
   }
 
   writeAudit_(auth.user.Username, 'RESET_PASSWORD', data.targetUsername, '');
+  closePwRequests_(data.targetUsername, auth.user.Username); // a new password answers that person's open requests
+  return { success: true };
+}
+
+// ---------------- "Forgot password?" from the login page ----------------
+// Passwords are never retrievable: the request only reaches the secretariat, who CALLS the number to check it is
+// the owner, then sets a new password. The answer is the same whether the username exists or not.
+const PW_REQ_SHEET = 'PasswordRequests';
+function handlePwHelpRequest_(data) {
+  const username = String(data.username || '').trim().toLowerCase().slice(0, 40);
+  const phone = String(data.phone || '').replace(/[^0-9+]/g, '').slice(0, 20);
+  const note = String(data.note || '').trim().slice(0, 200);
+  if (!username || phone.replace(/\D/g, '').length < 7) return { success: false, code: 'BAD_INPUT', error: 'اكتب اسم المستخدم ورقم جوال صحيحًا' };
+  const cache = CacheService.getScriptCache(), ku = 'pwh_u_' + username;
+  const nu = Number(cache.get(ku) || 0), na = Number(cache.get('pwh_all') || 0);
+  if (nu >= 3 || na >= 30) return { success: true }; // too many in the last hour: dropped quietly
+  cache.put(ku, String(nu + 1), 3600); cache.put('pwh_all', String(na + 1), 3600);
+  let sheet; try { sheet = getSheetByName_(PW_REQ_SHEET); } catch (e) { return { success: false, code: 'NEEDS_SETUP', error: 'تواصل مع السكرتارية مباشرة' }; }
+  const known = !!findUserRow_(username);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    appendSafe_(sheet, [newId_('P'), new Date(), username, "'" + phone, note, known, 'open', '', '']); // text cells: a phone keeps its leading zeros
+  } finally {
+    lock.releaseLock();
+  }
+  writeAudit_('-', 'PW_HELP_REQUEST', username, known ? 'known' : 'unknown');
+  return { success: true };
+}
+function readPwRequests_() {
+  let v; try { v = getSheetByName_(PW_REQ_SHEET).getDataRange().getValues(); } catch (e) { return []; }
+  const h = v[0] || [], out = [];
+  for (let r = 1; r < v.length; r++) {
+    const g = function(n) { return v[r][h.indexOf(n)]; };
+    if (!g('Id')) continue;
+    out.push({ id: String(g('Id')), at: g('CreatedAt') instanceof Date ? g('CreatedAt').toISOString() : String(g('CreatedAt')), username: String(g('Username')),
+      phone: String(g('Phone')).replace(/^'/, ''), note: String(g('Note') || ''), known: g('Known') === true, status: String(g('Status')), _row: r + 1 });
+  }
+  return out;
+}
+function handlePwHelpList_(data) {
+  const auth = authorize_(data.token, requireAnyPerm_(['manage', 'support']));
+  if (!auth.ok) return { success: false, error: 'Not authorized: ' + auth.reason, code: auth.reason };
+  const open = readPwRequests_().filter(function(x) { return x.status === 'open'; }).reverse().slice(0, 50)
+    .map(function(x) { return { id: x.id, at: x.at, username: x.username, phone: x.phone, note: x.note, known: x.known }; });
+  return { success: true, requests: open };
+}
+function closePwRequests_(username, by, onlyId) {
+  try {
+    const sheet = getSheetByName_(PW_REQ_SHEET), h = sheet.getDataRange().getValues()[0];
+    let n = 0;
+    readPwRequests_().forEach(function(x) {
+      if (x.status !== 'open' || (onlyId ? x.id !== onlyId : !sameUsername_(x.username, username))) return;
+      sheet.getRange(x._row, h.indexOf('Status') + 1, 1, 3).setValues([['done', cellSafe_(by), new Date()]]); n++;
+    });
+    return n;
+  } catch (e) { return 0; }
+}
+function handlePwHelpDone_(data) {
+  const auth = authorize_(data.token, requireAnyPerm_(['manage', 'support']));
+  if (!auth.ok) return { success: false, error: 'Not authorized: ' + auth.reason, code: auth.reason };
+  const n = closePwRequests_('', auth.user.Username, String(data.id || ''));
+  if (!n) return { success: false, error: 'غير موجود' };
+  writeAudit_(auth.user.Username, 'PW_HELP_CLOSED', String(data.id), '');
   return { success: true };
 }
 
@@ -777,6 +841,7 @@ function SETUP_createTabs() {
   const log = [];
 
   ensureSheetWithHeaders_(ss, 'Users', ['Committees', 'Permissions', 'Phone'], log);
+  ensureSheetWithHeaders_(ss, PW_REQ_SHEET, ['Id', 'CreatedAt', 'Username', 'Phone', 'Note', 'Known', 'Status', 'DoneBy', 'DoneAt'], log);
 
   const com = ensureSheetWithHeaders_(ss, 'Committees',
     ['CommitteeID', 'Name', 'Type', 'ResultsEnabled', 'Budget', 'SortOrder', 'Active'], log);

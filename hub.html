@@ -128,6 +128,12 @@ html[dir=rtl] #usersListCard td:nth-child(2){text-align:right}
       <div class="msg" id="createMsg"></div>
     </div>
 
+    <div class="card" id="pwReqCard" hidden>
+      <h2>🔑 طلبات كلمة المرور <span id="pwReqN"></span></h2>
+      <p style="color:var(--muted);font-size:13px;margin:4px 0 10px">اتصل بالرقم وتأكد أنه صاحب الحساب، ثم عيّن له كلمة مرور جديدة وأخبره بها شفهيًا. الطلب يُغلق وحده بعد التعيين.</p>
+      <div id="pwReqList"></div>
+    </div>
+
     <div class="card" id="usersListCard">
       <h2>📋 المستخدمون الحاليون</h2>
       <table>
@@ -302,6 +308,8 @@ function renderTiles() {
     a.innerHTML = '<div class="i">👥</div><div class="t"></div><div class="s">' + H().manageS + '</div>';
     a.querySelector('.t').textContent = can('manage') ? H().manage : H().support;
     box.appendChild(a);
+    // waiting "forgot password" requests show on the tile, so the secretariat sees them without opening the list
+    api({ action: 'pwHelpList' }).then(d => { if (d && d.success && d.requests.length) { const p = document.createElement('div'); p.className = 'pill bad'; p.style.marginTop = '6px'; p.textContent = '🔑 ' + d.requests.length + ' طلب كلمة مرور'; a.appendChild(p); } }).catch(() => {});
   }
   document.getElementById('noTiles').style.display = box.children.length ? 'none' : 'block';
   document.getElementById('adminArea').style.display = (can('manage') || can('support')) ? 'block' : 'none';
@@ -436,6 +444,30 @@ function permSummary(u) {
 
 function cell(text) { const td = document.createElement('td'); td.textContent = text; return td; }
 
+// Requests sent from "Forgot password?" on the login page.
+async function loadPwRequests() {
+  const card = document.getElementById('pwReqCard'), list = document.getElementById('pwReqList');
+  try {
+    const d = await api({ action: 'pwHelpList' });
+    if (!d.success || !d.requests.length) { card.hidden = true; return; }
+    card.hidden = false; document.getElementById('pwReqN').textContent = '(' + d.requests.length + ')'; list.innerHTML = '';
+    d.requests.forEach(q => {
+      const u = (usersCache || []).find(x => String(x.username).toLowerCase() === q.username);
+      const row = document.createElement('div'); row.className = 'item'; row.style.cssText = 'margin-top:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap';
+      const info = document.createElement('div'); info.style.cssText = 'flex:1;min-width:180px';
+      const b = document.createElement('b'); b.textContent = (u ? u.fullName + ' · ' : '') + q.username; info.appendChild(b);
+      const meta = document.createElement('div'); meta.style.cssText = 'color:var(--muted);font-size:13px';
+      meta.textContent = new Date(q.at).toLocaleString('ar-u-nu-latn', { weekday: 'short', hour: '2-digit', minute: '2-digit' }) + (q.note ? ' · ' + q.note : '') + (u ? '' : ' · ⚠ لا يوجد مستخدم بهذا الاسم');
+      info.appendChild(meta); row.appendChild(info);
+      const tel = document.createElement('a'); tel.className = 'rowBtn'; tel.href = 'tel:' + q.phone; tel.textContent = '📞 ' + q.phone; tel.dir = 'ltr'; row.appendChild(tel);
+      if (u) { const set = document.createElement('button'); set.className = 'rowBtn'; set.textContent = '🔑 تعيين كلمة جديدة'; set.addEventListener('click', () => openEditor(u, !can('manage'))); row.appendChild(set); }
+      const done = document.createElement('button'); done.className = 'rowBtn'; done.textContent = '✓ إغلاق الطلب';
+      done.addEventListener('click', async () => { done.disabled = true; try { await api({ action: 'pwHelpDone', id: q.id }); } catch (e) {} loadPwRequests(); });
+      row.appendChild(done); list.appendChild(row);
+    });
+  } catch (e) { card.hidden = true; }
+}
+
 async function loadUsersList() {
   try {
     const data = await api({ action: 'listUsers' });
@@ -444,7 +476,7 @@ async function loadUsersList() {
       usersListBody.querySelector('td').textContent = data.error || 'فشل التحميل';
       return;
     }
-    usersCache = data.users;
+    usersCache = data.users; loadPwRequests();
     if (data.users.length === 0) {
       usersListBody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--sap-gray);">لا يوجد مستخدمون</td></tr>';
       return;
@@ -553,7 +585,7 @@ async function openEditor(u, passwordOnly) {
     pBtn.disabled = true;
     try {
       const d = await api({ action: 'resetPassword', targetUsername: u.username, newPassword: v });
-      if (d.success) { flash('✓ تغيّرت كلمة المرور. سلّمها للمستخدم: ' + v); pf.input.value = ''; }
+      if (d.success) { flash('✓ تغيّرت كلمة المرور. سلّمها للمستخدم: ' + v); pf.input.value = ''; loadPwRequests(); }
       else flash('❌ ' + (d.error || 'فشلت العملية'), true);
     } catch (e) { flash('تعذّر الاتصال بالخادم', true); }
     pBtn.disabled = false;

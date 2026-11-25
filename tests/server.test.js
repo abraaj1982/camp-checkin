@@ -81,6 +81,20 @@ r=post({action:'busStatus',token:t1,lat:23.6,lng:58.5});assert(r.success&&book.B
 assert(book.BusLive.rows[1][1]==='departed','status preserved when only location is sent');
 r=post({action:'busStatus',token:t1,status:'weird'});assert(!r.success,'invalid status rejected');
 r=post({action:'busStatus',token:t1,lat:999,lng:1});assert(r.success&&book.BusLive.rows[1][2]===23.6,'out-of-range coordinates ignored');
+// "forgot password?": the request reaches the secretariat; nothing changes until they set a new password
+{post({action:'createUser',token:T,username:'fpw1',password:'fp-12345',fullName:'نسّاء',role:'supervisor',permissions:[],committees:[]});
+ let q=post({action:'pwHelpRequest',username:'',phone:'99123456'});assert(!q.success&&q.code==='BAD_INPUT','username and phone are needed');
+ q=post({action:'pwHelpRequest',username:'FPW1',phone:'0096899123456',note:'نسيتها'});assert(q.success,'request sent without a login');
+ q=post({action:'pwHelpRequest',username:'nobody',phone:'99000000'});assert(q.success&&!q.error,'same answer for a username that does not exist');
+ q=post({action:'pwHelpList',token:t1});assert(!q.success,'a supervisor cannot read the requests');
+ q=post({action:'pwHelpList',token:T});assert(q.success&&q.requests.length===2&&q.requests.find(x=>x.username==='fpw1').known===true&&q.requests.find(x=>x.username==='nobody').known===false&&q.requests.find(x=>x.username==='fpw1').phone==='0096899123456','secretariat sees the requests (known or not, phone kept as typed)');
+ assert(post({action:'login',username:'fpw1',password:'fp-12345'}).success,'a request alone changes nothing: the old password still works');
+ for(let i=0;i<4;i++)post({action:'pwHelpRequest',username:'flood',phone:'99000001'});
+ assert(post({action:'pwHelpList',token:T}).requests.filter(x=>x.username==='flood').length===3,'at most 3 requests an hour for one username');
+ const nob=post({action:'pwHelpList',token:T}).requests.find(x=>x.username==='nobody');
+ q=post({action:'pwHelpDone',token:T,id:nob.id});assert(q.success&&!post({action:'pwHelpList',token:T}).requests.some(x=>x.username==='nobody'),'a request can be closed by hand');
+ post({action:'resetPassword',token:T,targetUsername:'fpw1',newPassword:'fp-99999'});
+ assert(!post({action:'pwHelpList',token:T}).requests.some(x=>x.username==='fpw1'),'setting a new password closes that person\'s request');}
 r=post({action:'busLive',token:tl});assert(r.success&&r.buses.length===1&&r.buses[0].status==='departed'&&r.buses[0].ageSec>=0,'leader sees live buses');
 // the leader asks a supervisor to switch tracking on; the request ends when that bus sends a position
 r=post({action:'trackPing',token:t1,bus:'1'});assert(!r.success,'a supervisor cannot send the tracking request');
