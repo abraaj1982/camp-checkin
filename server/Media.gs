@@ -205,6 +205,7 @@ function handleFeed_(data) {
     announcements: publicAnnouncements_(['public']).slice(0, 30), results: groupResults_(),
     prayers: allPrayers_(), iqamaMinutes: iqamaMinutes_(), totals: teamTotals_(), displayTheme: displayTheme_(),
     program: readProgram_(), weather: (function() { try { return weatherCached_(); } catch (e) { return null; } })(),
+    lost: lostOpenPublic_(), lostFlash: lostFlash_(),
     campName: String(getSetting_('CampName') || ''), campSlogan: String(getSetting_('CampSlogan') || ''), campDays: Number(getSetting_('CampDays')) || 4 };
 }
 
@@ -397,6 +398,108 @@ function teamTotals_() {
   const sum = {};
   readResults_().filter(function(r) { return r.status === 'published' && r.points !== null; }).forEach(function(r) { sum[r.team] = (sum[r.team] || 0) + r.points; });
   return Object.keys(sum).map(function(k) { return { team: k, points: sum[k] }; }).sort(function(a, b) { return b.points - a.points; });
+}
+
+// ---------------- Lost and found (the secretariat photographs an item; the big screen shows it until it is handed over) ----------------
+// Tab "LostItems". A photo is a small JPEG as text: it goes in the LAST two columns (a cell holds ~50,000 characters), so the
+// lists read only the first columns and stay light. The small thumbnail (Thumb) is for the secretariat's own list.
+const LOST_HEADERS_ = ['Id', 'CreatedAt', 'Desc', 'Thumb', 'Status', 'CreatedBy', 'ReturnedAt', 'ReturnedBy', 'ClientId', 'Img1', 'Img2'];
+const LOST_META_COLS_ = 9, LOST_CELL_MAX_ = 49000, LOST_IMG_MAX_ = 98000, LOST_THUMB_MAX_ = 9000;
+function lostSheet_() { return getSheetByName_('LostItems'); }
+function readLost_(withThumb) {
+  const sh = lostSheet_(), n = sh.getLastRow();
+  if (n < 2) return [];
+  const v = sh.getRange(1, 1, n, LOST_META_COLS_).getValues(), out = [];
+  for (let r = 1; r < v.length; r++) {
+    if (!v[r][0]) continue;
+    const o = { id: String(v[r][0]), at: isoOf_(v[r][1]), desc: String(v[r][2] || ''), status: String(v[r][4]), by: String(v[r][5] || ''), clientId: String(v[r][8] || ''), _row: r + 1 };
+    if (withThumb) o.thumb = String(v[r][3] || '');
+    out.push(o);
+  }
+  return out;
+}
+// What the big screen needs (cached 30 s; every change clears it): the open items, newest first, without any picture.
+function lostOpenPublic_() {
+  const cache = CacheService.getScriptCache();
+  try { const hit = cache.get('lost_v1'); if (hit) return JSON.parse(hit); } catch (e) { /* read again */ }
+  let out = [];
+  try { out = readLost_(false).filter(function(x) { return x.status === 'open'; }).reverse().slice(0, 18).map(function(x) { return { id: x.id, at: x.at, desc: x.desc }; }); } catch (e) { out = []; }
+  try { cache.put('lost_v1', JSON.stringify(out), 30); } catch (e) { /* ignore */ }
+  return out;
+}
+function lostFlash_() { const v = String(getSetting_('LostFlash') || '').split('|'); return v[0] ? { id: v[0], at: v[1] || '' } : null; }
+function clearLostCache_() { try { CacheService.getScriptCache().remove('lost_v1'); } catch (e) { /* ignore */ } }
+
+function handleLostAdd_(data) {
+  return withAuth_(data, requirePerm_('lostfound'), function(user) {
+    const img = String(data.img || ''), thumb = String(data.thumb || ''), desc = String(data.desc || '').trim().slice(0, 100);
+    if (!/^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/.test(img) || img.length > LOST_IMG_MAX_ + 30) return { success: false, error: 'الصورة غير صالحة أو كبيرة' };
+    if (!/^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/.test(thumb) || thumb.length > LOST_THUMB_MAX_) return { success: false, error: 'الصورة المصغّرة غير صالحة' };
+    const clientId = String(data.clientId || '').slice(0, 60);
+    let sheet; try { sheet = lostSheet_(); } catch (e) { return { success: false, code: 'NEEDS_SETUP', error: 'شغّل SETUP_createTabs مرة واحدة' }; }
+    const lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    try {
+      if (clientId && readLost_(false).some(function(x) { return x.clientId === clientId; })) return { success: true, repeated: true };
+      const id = newId_('L'), cut = Math.min(img.length, LOST_CELL_MAX_);
+      sheet.appendRow([id, new Date(), cellSafe_(desc), thumb, 'open', user.Username, '', '', clientId, img.slice(0, cut), img.slice(cut)]);
+      clearLostCache_();
+      writeAudit_(user.Username, 'LOST_ADDED', id, '');
+      return { success: true, id: id };
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+function handleLostList_(data) {
+  return withAuth_(data, requirePerm_('lostfound'), function() {
+    const all = readLost_(true), open = all.filter(function(x) { return x.status === 'open'; }).reverse().slice(0, 80);
+    return { success: true, items: open.map(function(x) { return { id: x.id, at: x.at, desc: x.desc, thumb: x.thumb, by: x.by }; }), returned: all.filter(function(x) { return x.status === 'returned'; }).length, flash: lostFlash_() };
+  });
+}
+function handleLostReturn_(data) {
+  return withAuth_(data, requirePerm_('lostfound'), function(user) {
+    const lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    try {
+      const it = readLost_(false).filter(function(x) { return x.id === String(data.id) && x.status === 'open'; })[0];
+      if (!it) return { success: false, error: 'غير موجود أو سُلِّم مسبقًا' };
+      const sh = lostSheet_();
+      sh.getRange(it._row, 5, 1, 4).setValues([['returned', it.by, new Date(), user.Username]]);
+      clearLostCache_();
+      const f = lostFlash_(); if (f && f.id === it.id) setSetting_('LostFlash', '');
+      writeAudit_(user.Username, 'LOST_RETURNED', it.id, '');
+      return { success: true };
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+// "Show now": the big screen shows this item alone for about 20 seconds, then goes back to its loop.
+function handleLostFlash_(data) {
+  return withAuth_(data, requirePerm_('lostfound'), function(user) {
+    const it = readLost_(false).filter(function(x) { return x.id === String(data.id) && x.status === 'open'; })[0];
+    if (!it) return { success: false, error: 'غير موجود أو سُلِّم مسبقًا' };
+    setSetting_('LostFlash', it.id + '|' + new Date().toISOString());
+    writeAudit_(user.Username, 'LOST_FLASH', it.id, '');
+    return { success: true };
+  });
+}
+// The picture of one item: for the big screen (feed key) and for the secretariat (login with the permission).
+function handleLostImage_(data) {
+  const send = function() {
+    const it = readLost_(false).filter(function(x) { return x.id === String(data.id); })[0];
+    if (!it) return { success: false, error: 'غير موجود' };
+    const v = lostSheet_().getRange(it._row, LOST_META_COLS_ + 1, 1, 2).getValues()[0];
+    return { success: true, img: String(v[0] || '') + String(v[1] || '') };
+  };
+  if (data.key) {
+    const key = PropertiesService.getScriptProperties().getProperty('FEED_KEY'), given = String(data.key);
+    let same = !!key && given.length === key.length;
+    if (same) { let diff = 0; for (let i = 0; i < key.length; i++) diff |= key.charCodeAt(i) ^ given.charCodeAt(i); same = diff === 0; }
+    return same ? send() : { success: false, error: 'Invalid key' };
+  }
+  return withAuth_(data, requirePerm_('lostfound'), send);
 }
 
 // Run once from the Apps Script editor; copy the key from the log into the display-screen project. Run again to rotate.

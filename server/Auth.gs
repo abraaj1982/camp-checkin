@@ -810,7 +810,8 @@ const PERMISSIONS_SEED_ = [
   ['nutrition', 'التغذية (أعداد الوجبات والحساسية الغذائية)', 'شاشة'],
   ['reports', 'التقارير (استخراج وطباعة) — للسكرتارية', 'شاشة'],
   ['reception', 'الوصول المباشر: طلاب وصلوا مع ولي أمرهم أو متأخرين (بدون الباص)', 'شاشة'],
-  ['stages', 'المراحل: بدء وإنهاء مراحل الوصول والرحلة والمغادرة — للسكرتارية', 'شاشة']
+  ['stages', 'المراحل: بدء وإنهاء مراحل الوصول والرحلة والمغادرة — للسكرتارية', 'شاشة'],
+  ['lostfound', 'المفقودات: تصوير الغرض وعرضه على الشاشة الكبيرة وتسليمه — للسكرتارية', 'شاشة']
 ];
 
 // Creates the sheet if missing, and appends any missing header columns (never deletes anything).
@@ -874,6 +875,7 @@ function SETUP_createTabs() {
   ensureSheetWithHeaders_(ss, 'ProgramArchive', ['ImportedAt', 'Date', 'From', 'To', 'Group', 'Title', 'Place', 'Type', 'Note'], log);
   ensureSheetWithHeaders_(ss, 'Announcements', ['Id', 'CreatedAt', 'Title', 'Body', 'Kind', 'StartsAt', 'Audience', 'Pinned', 'Status', 'CreatedBy', 'PublishedAt', 'ClientId'], log);
   ensureSheetWithHeaders_(ss, 'Results', ['Id', 'CreatedAt', 'Competition', 'Team', 'Place', 'Points', 'Status', 'CreatedBy', 'PublishedAt', 'ClientId'], log);
+  ensureSheetWithHeaders_(ss, 'LostItems', ['Id', 'CreatedAt', 'Desc', 'Thumb', 'Status', 'CreatedBy', 'ReturnedAt', 'ReturnedBy', 'ClientId', 'Img1', 'Img2'], log);
   ensureSheetWithHeaders_(ss, 'Staff', ['Name', 'Size', 'Note'], log);
   ensureSheetWithHeaders_(ss, 'ShirtStock', ['Size', 'Total', 'LowAt'], log);
   ensureSheetWithHeaders_(ss, 'ShirtLog', ['Id', 'Time', 'Kind', 'PersonId', 'Name', 'Size', 'GivenBy', 'Status', 'Note', 'ClientId'], log);

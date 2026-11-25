@@ -401,6 +401,27 @@ r=post({action:'resStatus',token:tv,id:r2,status:'archived'});r=post({action:'fe
 r=post({action:'annStatus',token:tm,id:a2,status:'archived'});r=post({action:'feed',key:fk});assert(r.announcements.length===0,'archived announcement leaves the feed');
 assert(!JSON.stringify(post({action:'feed',key:fk})).match(/9999000|أحمد|ربو/),'feed has no student data');
 assert(book.AuditLog.rows.some(x=>x[2]==='RESULT_PUBLISHED'),'audit: results published');
+// lost and found: photo + short text, shown on the big screen until handed over
+{post({action:'createUser',token:T,username:'lostsec',password:'sc-12345',fullName:'سكرتارية',role:'supervisor',permissions:['lostfound'],committees:[]});
+ const ts=post({action:'login',username:'lostsec',password:'sc-12345'}).token;
+ const IMG='data:image/jpeg;base64,'+'A'.repeat(60000), TH='data:image/jpeg;base64,'+'B'.repeat(3000);
+ let q=post({action:'lostAdd',token:t1,img:IMG,thumb:TH});assert(!q.success,'a supervisor cannot add lost items');
+ q=post({action:'lostAdd',token:ts,img:'x',thumb:TH});assert(!q.success,'a bad picture is refused');
+ q=post({action:'lostAdd',token:ts,img:'data:image/jpeg;base64,'+'A'.repeat(120000),thumb:TH});assert(!q.success,'a too big picture is refused');
+ q=post({action:'lostAdd',token:ts,img:IMG,thumb:TH,desc:'زجاجة ماء زرقاء',clientId:'l1'});assert(q.success,'item added');const l1=q.id;
+ q=post({action:'lostAdd',token:ts,img:IMG,thumb:TH,desc:'x',clientId:'l1'});assert(q.repeated,'a retry does not add it twice');
+ q=post({action:'lostAdd',token:ts,img:IMG,thumb:TH});const l2=q.id;assert(q.success,'an item without text is fine (the photo is enough)');
+ q=post({action:'lostList',token:ts});assert(q.success&&q.items.length===2&&q.items[0].id===l2&&q.items[1].desc==='زجاجة ماء زرقاء'&&q.items[0].thumb===TH,'the secretariat list: newest first, with thumbnails');
+ assert(!JSON.stringify(q).includes('AAAAAAAAAA'),'the list does not carry the full pictures');
+ q=post({action:'lostList',token:t1});assert(!q.success,'a supervisor cannot read the list');
+ let f=post({action:'feed',key:fk});assert(f.lost.length===2&&f.lost[0].id===l2&&!JSON.stringify(f.lost).includes('AAAA'),'the feed lists open items without pictures');
+ q=post({action:'lostImage',key:fk,id:l1});assert(q.success&&q.img===IMG,'the big screen fetches the picture with the feed key (both cells joined)');
+ q=post({action:'lostImage',key:'bad',id:l1});assert(!q.success,'a wrong key gets no picture');
+ q=post({action:'lostImage',token:ts,id:l1});assert(q.success&&q.img===IMG,'the secretariat can see it too');
+ q=post({action:'lostFlash',token:ts,id:l1});assert(q.success,'show now');f=post({action:'feed',key:fk});assert(f.lostFlash&&f.lostFlash.id===l1&&!!f.lostFlash.at,'the feed carries the show-now request');
+ q=post({action:'lostReturn',token:ts,id:l1});assert(q.success,'handed over');f=post({action:'feed',key:fk});assert(f.lost.length===1&&f.lost[0].id===l2&&!f.lostFlash,'a handed-over item leaves the screen (and its show-now)');
+ q=post({action:'lostReturn',token:ts,id:l1});assert(!q.success,'handing over twice is refused');
+ q=post({action:'lostList',token:ts});assert(q.returned===1&&q.items.length===1,'the list keeps only open items; handed-over ones are counted');}
 // ---- display screen: prayer times typed by the committee, team totals, new kinds
 r=post({action:'prayerSave',token:t1,date:'2026-12-28',times:{fajr:'05:28'}});assert(!r.success,'supervisor cannot set prayer times');
 r=post({action:'prayerSave',token:tm,date:'2026-12-28',times:{fajr:'25:00'}});assert(!r.success,'bad time rejected (nothing valid)');

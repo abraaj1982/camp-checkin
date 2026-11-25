@@ -112,6 +112,11 @@ const ACTIONS_ = {
   resSave: function(d) { return handleResSave_(d); },
   resStatus: function(d) { return handleResStatus_(d); },
   resSaveBatch: function(d) { return handleResSaveBatch_(d); },
+  lostAdd: function(d) { return handleLostAdd_(d); },
+  lostList: function(d) { return handleLostList_(d); },
+  lostReturn: function(d) { return handleLostReturn_(d); },
+  lostFlash: function(d) { return handleLostFlash_(d); },
+  lostImage: function(d) { return handleLostImage_(d); },
   bulletin: function(d) { return handleBulletin_(d); },
   stages: function(d) { return handleStages_(d); },
   feed: function(d) { return handleFeed_(d); }
@@ -126,7 +131,7 @@ function doPost(e) {
     const fn = Object.prototype.hasOwnProperty.call(ACTIONS_, data.action) ? ACTIONS_[data.action] : null;
     if (!fn) return json_({ success: false, error: 'Invalid action' });
     const out = fn(data);
-    if (['leaderSummary', 'leaderAll', 'weather', 'trackPingCheck'].indexOf(data.action) === -1) { try { CacheService.getScriptCache().removeAll(['leader_v1', 'leader_x1']); } catch (e) { /* ignore */ } }
+    if (['leaderSummary', 'leaderAll', 'weather', 'trackPingCheck', 'lostImage', 'lostList', 'feed'].indexOf(data.action) === -1) { try { CacheService.getScriptCache().removeAll(['leader_v1', 'leader_x1']); } catch (e) { /* ignore */ } }
     return json_(out);
   } catch (error) {
     Logger.log('doPost error: ' + error + '\n' + (error && error.stack));

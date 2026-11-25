@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="ar" dir="rtl" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>المفقودات — MUKHAYYAM</title>
+<link rel="stylesheet" href="theme.css">
+<script src="ui.js" defer></script>
+<style>
+.add{min-height:84px;font-size:19px}
+.it{display:flex;gap:12px;align-items:center;border:1px solid var(--line);border-radius:16px;padding:10px;background:var(--card);margin-top:8px}
+.it .th{width:84px;height:84px;flex:none;border-radius:42px 42px 10px 10px;background:var(--soft) center/cover no-repeat}
+.it .bd{flex:1;min-width:0}.it .tt{font-weight:800}.it .mt{color:var(--muted);font-size:12.5px}
+.it .bb{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.it .bb .chip{min-height:40px;font-size:13.5px}
+.pv{width:100%;max-height:320px;object-fit:contain;border-radius:24px 24px 10px 10px;background:var(--soft);display:block;margin:0 auto}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hdr">
+    <div class="brand"><div class="logo">م</div><div style="min-width:0"><div class="t" id="campT"></div><div class="s" id="campS"></div></div></div>
+    <div class="tools"><a class="tool" href="hub.html" id="homeBtn"></a><button class="tool" id="langBtn"></button><button class="tool" id="themeBtn"></button></div>
+  </header>
+  <section class="hero compact"><div class="ic ic-img" aria-hidden="true"><img src="brand/icons/binoculars-light.png" alt=""></div><div><h1 id="hT"></h1><p id="hS"></p></div></section>
+  <main id="app"></main>
+</div>
+<input id="cam" type="file" accept="image/*" capture="environment" hidden>
+<script>
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4lEBGPNxghwq9UmK0iljI5QdS-8iCvC-K09dDtbZCXGvGZyA4repTE3rFVVRp5zS4yw/exec';
+const token = sessionStorage.getItem('mukhayyam_token');
+let perms = [];
+try { perms = JSON.parse(sessionStorage.getItem('mukhayyam_permissions') || '[]'); } catch (e) {}
+const can = k => perms.indexOf('*') !== -1 || perms.indexOf(k) !== -1;
+if (!token) location.href = 'login.html'; else if (!can('lostfound')) location.href = 'hub.html';
+const pref = { get(k, d) { try { return localStorage.getItem('mk_pref_' + k) || d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('mk_pref_' + k, v); } catch (e) {} } };
+const $ = id => document.getElementById(id);
+const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2));
+const AUTH_ERR = /EXPIRED|IDLE_TIMEOUT|REVOKED|BAD_SIGNATURE|MALFORMED|USER_NOT_FOUND|ACCOUNT_DISABLED|BAD_PAYLOAD/;
+async function api(payload) {
+  const r = await (await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(Object.assign({ token: token }, payload)) })).json();
+  if (r && r.code && AUTH_ERR.test(r.code)) { sessionStorage.clear(); location.href = 'login.html'; throw new Error('auth'); }
+  return r;
+}
+const T = {
+ ar: { dir: 'rtl', title: 'المفقودات', sub: 'صوّر الغرض ليظهر على الشاشة الكبيرة', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
+  add: '📷 غرض جديد', desc: 'وصف قصير (اختياري)', descPh: 'مثال: زجاجة ماء زرقاء', save: 'حفظ وعرض على الشاشة', cancel: 'إلغاء', again: 'إعادة التصوير', open: 'أغراض بانتظار أصحابها', none: 'لا توجد أغراض الآن.',
+  showNow: '📺 عرض فوري', shown: '✓ يُعرض الآن', handed: '✓ تم التسليم', confirmHand: 'هل تأكدت أن الشخص هو صاحب الغرض؟', handedN: n => 'سُلِّم اليوم: ' + n, at: 'وصل',
+  saving: 'جارٍ الحفظ…', saved: 'حُفظ، ويظهر على الشاشة خلال لحظات.', flashed: 'يظهر الآن على الشاشة الكبيرة نحو ٢٠ ثانية.', done: 'تم التسليم.', error: 'تعذّر الاتصال. حاول مرة أخرى.', setup: 'شغّل SETUP_createTabs مرة واحدة.',
+  note: 'عند وصول صاحب الغرض إلى خيمة السكرتارية، تأكد منه ثم اضغط «تم التسليم» فيختفي من الشاشة.', loading: 'جارٍ التحميل…', big: 'تعذّر تجهيز الصورة. صوّر من مسافة أقرب أو أعد المحاولة.' },
+ en: { dir: 'ltr', title: 'Lost and found', sub: 'Photograph the item to show it on the big screen', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
+  add: '📷 New item', desc: 'Short description (optional)', descPh: 'e.g. blue water bottle', save: 'Save and show on the screen', cancel: 'Cancel', again: 'Retake', open: 'Items waiting for their owners', none: 'No items now.',
+  showNow: '📺 Show now', shown: '✓ Showing now', handed: '✓ Handed over', confirmHand: 'Did you check that this person is the owner?', handedN: n => 'Handed over today: ' + n, at: 'found',
+  saving: 'Saving…', saved: 'Saved. It appears on the screen in a moment.', flashed: 'Showing on the big screen for about 20 seconds.', done: 'Handed over.', error: 'Connection problem. Try again.', setup: 'Run SETUP_createTabs once.',
+  note: 'When the owner comes to the secretariat tent, check them, then press «Handed over» and the item leaves the screen.', loading: 'Loading…', big: 'Could not prepare the photo. Take it closer or try again.' }
+};
+const L = () => T[st.lang];
+const st = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), items: [], returned: 0, flash: null, draft: null, msg: null, busy: false, loaded: false };
+const say = (cls, t) => { st.msg = { cls: cls, t: t }; };
+
+// The photo is reduced on the phone first: a JPEG small enough to be kept as text (about 90 KB), plus a tiny thumbnail.
+function drawJpeg(img, maxSide, q) {
+  const k = Math.min(1, maxSide / Math.max(img.width, img.height)), c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k));
+  const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(img, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', q);
+}
+async function prepare(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+    let out = '';
+    for (const side of [720, 600, 480, 380]) { for (const q of [.72, .6, .48]) { out = drawJpeg(img, side, q); if (out.length <= 90000) break; } if (out.length <= 90000) break; }
+    if (out.length > 98000) return null;
+    return { img: out, thumb: drawJpeg(img, 96, .5) };
+  } finally { URL.revokeObjectURL(url); }
+}
+
+async function load() {
+  try { const r = await api({ action: 'lostList' }); if (r.success) { st.items = r.items; st.returned = r.returned; st.flash = r.flash; } else say('bad', r.code === 'NEEDS_SETUP' ? L().setup : (r.error || L().error)); } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
+  st.loaded = true; render();
+}
+async function saveDraft() {
+  const d = st.draft; if (!d || st.busy) return; st.busy = true; say('', ''); st.msg = { cls: 'ok', t: L().saving }; render();
+  try {
+    const r = await api({ action: 'lostAdd', img: d.img, thumb: d.thumb, desc: d.desc.trim(), clientId: d.id });
+    if (r.success) { st.draft = null; say('ok', L().saved); } else say('bad', r.code === 'NEEDS_SETUP' ? L().setup : (r.error || L().error));
+  } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
+  st.busy = false; await load();
+}
+async function act(kind, id) {
+  if (st.busy) return; const l = L();
+  if (kind === 'return' && !confirm(l.confirmHand)) return;
+  st.busy = true;
+  try { const r = await api({ action: kind === 'return' ? 'lostReturn' : 'lostFlash', id: id }); say(r.success ? 'ok' : 'bad', r.success ? (kind === 'return' ? l.done : l.flashed) : (r.error || l.error)); if (r.success && kind === 'flash') st.flash = { id: id, at: new Date().toISOString() }; }
+  catch (e) { if (e.message !== 'auth') say('bad', l.error); }
+  st.busy = false; await load();
+}
+const hm = iso => { const d = new Date(iso); return isNaN(d) ? '' : String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+
+function render() {
+  const l = L(); document.documentElement.lang = st.lang; document.documentElement.dir = l.dir; document.documentElement.dataset.theme = st.theme; document.title = l.title + ' — MUKHAYYAM';
+  $('hT').textContent = l.title; $('hS').textContent = l.sub; $('homeBtn').textContent = l.home; $('langBtn').textContent = l.lang; $('themeBtn').textContent = st.theme === 'light' ? l.dark : l.light;
+  const ae = document.activeElement, keep = ae && ae.id === 'dsc' ? ae.selectionStart : null;
+  const d = st.draft;
+  const form = d ? `<section class="card"><img class="pv" src="${d.img}" alt="">
+      <label class="lbl" for="dsc" style="margin-top:12px">${l.desc}</label><input id="dsc" type="text" maxlength="100" placeholder="${l.descPh}" value="${esc(d.desc)}">
+      <div class="two" style="margin-top:12px"><button class="btn" data-save="1" ${st.busy ? 'disabled' : ''}>${l.save}</button><button class="btn alt" data-again="1">${l.again}</button></div>
+      <button class="chip" style="margin-top:8px" data-cancel="1">${l.cancel}</button></section>`
+    : `<button class="btn full add" data-add="1">${l.add}</button><div class="muted" style="font-size:13px">${l.note}</div>`;
+  const list = !st.loaded ? `<div class="card muted">${l.loading}</div>` : st.items.length ? st.items.map(x => `<div class="it"><div class="th" style="background-image:url(${x.thumb})"></div><div class="bd"><div class="tt">${esc(x.desc || '—')}</div><div class="mt">${l.at} ${esc(hm(x.at))}</div>
+      <div class="bb">${st.flash && st.flash.id === x.id && Date.now() - new Date(st.flash.at).getTime() < 25000 ? `<span class="pill ok">${l.shown}</span>` : `<button class="chip" data-flash="${esc(x.id)}">${l.showNow}</button>`}<button class="chip on" data-ret="${esc(x.id)}">${l.handed}</button></div></div></div>`).join('') : `<div class="card muted">${l.none}</div>`;
+  $('app').innerHTML = `${st.msg && st.msg.t ? `<div class="banner ${st.msg.cls}" role="alert">${esc(st.msg.t)}</div>` : ''}${form}<div class="lbl" style="margin:8px 2px 0">${l.open} (${st.items.length})</div>${list}${st.returned ? `<div class="muted" style="font-size:13px;margin-top:8px">${l.handedN(st.returned)}</div>` : ''}`;
+  if (keep !== null && $('dsc')) { $('dsc').focus(); try { $('dsc').setSelectionRange(keep, keep); } catch (e) {} }
+}
+$('cam').addEventListener('change', async e => {
+  const f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f) return;
+  st.msg = { cls: '', t: '' };
+  try { const p = await prepare(f); if (!p) { say('bad', L().big); return render(); } st.draft = { img: p.img, thumb: p.thumb, desc: st.draft ? st.draft.desc : '', id: uid() }; }
+  catch (err) { say('bad', L().big); }
+  render();
+});
+document.addEventListener('input', e => { if (e.target.id === 'dsc' && st.draft) st.draft.desc = e.target.value; });
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('button'); if (!b || b.disabled) return; const d = b.dataset;
+  if (d.add || d.again) $('cam').click();
+  else if (d.cancel) { st.draft = null; st.msg = null; render(); }
+  else if (d.save) saveDraft();
+  else if (d.flash) act('flash', d.flash);
+  else if (d.ret) act('return', d.ret);
+});
+$('langBtn').onclick = () => { st.lang = st.lang === 'ar' ? 'en' : 'ar'; pref.set('lang', st.lang); render(); };
+$('themeBtn').onclick = () => { st.theme = st.theme === 'light' ? 'dark' : 'light'; pref.set('theme', st.theme); render(); };
+render(); load(); setInterval(() => { if (!st.draft && !st.busy && navigator.onLine) load(); }, 60000);
+</script>
+</body></html>

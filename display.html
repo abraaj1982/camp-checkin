@@ -73,6 +73,11 @@ body{color:var(--ink);font-family:Tajawal,system-ui,sans-serif;font-weight:500;c
 .nx3 .r{display:grid;grid-template-columns:11vw minmax(0,1fr);gap:1.2vw;align-items:center;border:1px solid var(--line);border-radius:1.2vw;padding:.8vw 1.4vw}
 .nx3 .r:first-child{border:.2vw solid var(--gd)}.nx3 .tm{font-family:Lalezar,Tajawal,sans-serif;font-size:2.1vw;direction:ltr;text-align:right}
 .nx3 .ti{font-size:2vw;font-weight:800;line-height:1.3}.nx3 .pl{font-size:1.25vw;color:var(--mute);margin-top:.2vw}
+/* lost and found: photos sit in the identity's arch (the door of the tent) */
+.lg6{display:grid;grid-template-columns:repeat(3,1fr);gap:1.4vw;max-width:94%;margin:0 auto;width:100%}
+.li{text-align:center}.li .ph{aspect-ratio:1/1;border-radius:9vw 9vw 1.2vw 1.2vw;background:var(--track) center/cover no-repeat;border:.2vw solid var(--gd)}
+.li .ds{font-size:1.5vw;font-weight:800;line-height:1.3;margin-top:.5vw}
+.lbig{display:flex;flex-direction:column;align-items:center;gap:1.4vw}.lbig .ph{width:34vw;height:34vw;border-radius:17vw 17vw 2vw 2vw;background:var(--track) center/cover no-repeat;border:.35vw solid var(--gd)}
 #confetti{position:fixed;inset:0;z-index:15;pointer-events:none}
 .stage[data-tone="light"] .pd .b{color:var(--cream)}.stage:not([data-tone="light"]) .pd .b{color:var(--dark)}.pd .b.first{background:var(--gd);color:var(--dark)!important}
 .full{position:fixed;inset:0;z-index:20;display:grid;place-items:center;text-align:center;padding:4vw;background:var(--dark)}
@@ -111,6 +116,7 @@ const NAMED_COLORS = [['أحمر', '#E5484D'], ['أخضر', '#4CC38A'], ['أزر
 const teamColor = (name, i) => { const n = String(name || ''); const hit = NAMED_COLORS.find(c => n.indexOf(c[0]) !== -1); return hit ? hit[1] : TEAM_COLORS[i % TEAM_COLORS.length]; };
 const HIDE_TYPES = ['حركة']; // bus movements are for the supervisors, not for the big screen
 
+let lostImg = {}, lostAsk = {}; // pictures are fetched once per item (never inside the 20-second feed)
 let resSig = null, prevTotals = null, freshAt = {}; // what changed in the last load (new result -> podium then the race)
 let D = null, offset = 0, online = false, tried = false, loading = false, idx = -1, seen = {}, lastKey = '', lastSync = 0;
 try { D = JSON.parse(store.get('mk_display_cache') || 'null'); lastSync = Number(store.get('mk_display_sync')) || 0; offset = Number(store.get('mk_display_off')) || 0; } catch (e) {}
@@ -131,7 +137,7 @@ async function load() {
   const ac = new AbortController(), to = setTimeout(() => ac.abort(), 15000); // a hung request must not block the next try
   try {
     const r = await (await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'feed', key: key }), signal: ac.signal })).json();
-    if (r.success) { noteChanges(r); D = r; const so = new Date(r.serverTime).getTime() - Date.now(); offset = isFinite(so) ? so : 0; online = true; lastSync = Date.now(); store.set('mk_display_cache', JSON.stringify(r)); store.set('mk_display_sync', String(lastSync)); store.set('mk_display_off', String(offset)); }
+    if (r.success) { noteChanges(r); D = r; (r.lost || []).slice(0, 12).forEach(x => fetchLostImg(x.id)); if (r.lostFlash) fetchLostImg(r.lostFlash.id); const so = new Date(r.serverTime).getTime() - Date.now(); offset = isFinite(so) ? so : 0; online = true; lastSync = Date.now(); store.set('mk_display_cache', JSON.stringify(r)); store.set('mk_display_sync', String(lastSync)); store.set('mk_display_off', String(offset)); }
     else { online = false; if (/key/i.test(r.error || '')) { store.set('mk_feed_key', ''); setup('المفتاح غير صحيح. أدخله من جديد.'); } }
   } catch (e) { online = false; }
   clearTimeout(to); loading = false; tried = true;
@@ -220,6 +226,27 @@ function podiumScene(g) {
     return `<div class="pd"><div class="m">${md[i]}</div><div class="n">${esc(r.team)}</div><div class="b${i === 0 ? ' first' : ''}" style="height:${h[i]}vw">${r.points !== null ? r.points : '#' + (i + 1)}</div></div>`; }).join('')}</div>`;
 }
 // The next three activities of today, with their places, and a countdown to the first.
+async function fetchLostImg(id) {
+  if (lostImg[id] || lostAsk[id]) return; lostAsk[id] = true;
+  try { const r = await (await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'lostImage', key: store.get('mk_feed_key'), id: id }) })).json();
+    if (r && r.success && r.img) { lostImg[id] = r.img; document.querySelectorAll('[data-lost="' + id + '"]').forEach(e => { e.style.backgroundImage = 'url(' + r.img + ')'; }); } else delete lostAsk[id]; }
+  catch (e) { delete lostAsk[id]; }
+}
+const lostItems = () => (D && D.lost) || [];
+const lostTile = x => `<div class="li"><div class="ph" data-lost="${esc(x.id)}" ${lostImg[x.id] ? `style="background-image:url(${lostImg[x.id]})"` : ''}></div>${x.desc ? `<div class="ds">${esc(x.desc)}</div>` : ''}</div>`;
+// Up to six items a slide; more items make more slides.
+function lostScene(chunk) {
+  chunk.forEach(x => fetchLostImg(x.id));
+  return `<h2 class="st">🧳 مفقودات بانتظار أصحابها</h2><div class="lg6">${chunk.map(lostTile).join('')}</div><div class="rem" style="justify-content:center;margin-top:1.2vw"><span>للاستلام: خيمة السكرتارية</span></div>`;
+}
+// The secretariat pressed "show now": that one item, large, for 20 seconds.
+function lostFlashHtml() {
+  const f = D && D.lostFlash; if (!f || !f.at) return '';
+  const age = now().getTime() - new Date(f.at).getTime(); if (age < -5000 || age > 20000) return '';
+  const it = lostItems().find(x => x.id === f.id); if (!it) return '';
+  fetchLostImg(it.id);
+  return `<div class="full"><div class="lbig"><div class="sub" style="margin:0">🧳 غرض مفقود</div><div class="ph" data-lost="${esc(it.id)}" ${lostImg[it.id] ? `style="background-image:url(${lostImg[it.id]})"` : ''}></div>${it.desc ? `<div class="ttl" style="font-size:3.6vw">${esc(it.desc)}</div>` : ''}<div class="sub">للاستلام: خيمة السكرتارية</div></div></div>`;
+}
 function upcomingScene() {
   const t = now(), list = blocksOf(ymd(t)).filter(b => b.start > t).slice(0, 3);
   return `<h2 class="st">⏭ القادم الآن</h2><div class="nx3">${list.map((b, i) => `<div class="r"><div class="tm">${t12(p2(b.start.getHours()) + ':' + p2(b.start.getMinutes()))}</div><div><div class="ti">${esc(blockTitle(b))}${i === 0 ? ` <span class="cd" data-cd="${b.start.getTime()}" style="font-size:.8em">${hms(b.start - t)}</span>` : ''}</div><div class="pl">${b.items.length > 1 ? b.items.map(x => esc(groupName(x.group)) + (x.place ? ': ' + esc(x.place) : '')).join(' · ') : (b.items[0].place ? '📍 ' + esc(b.items[0].place) : '')}</div></div></div>`).join('')}</div>`;
@@ -239,6 +266,7 @@ function scenes(ps) {
   if (blocksOf(ymd(t)).filter(b => b.start > t).length >= 2) s.push({ key: 'next3', html: upcomingScene });
   ann('announce').slice(0, 5).forEach(a => s.push({ key: a.id, at: a.publishedAt, html: () => textScene('📣', 'إعلان', a.title, a.body, false, 'announce') }));
   ann('event').filter(a => a.startsAt && new Date(a.startsAt) - t > -30 * 60000).slice(0, 3).forEach(a => s.push({ key: a.id, at: a.publishedAt, html: () => textScene('📅', 'فعالية قادمة', a.title, [a.body, t12(p2(new Date(a.startsAt).getHours()) + ':' + p2(new Date(a.startsAt).getMinutes()))].filter(Boolean).join(' · '), false, 'event') }));
+  { const li = lostItems(); for (let i = 0; i < li.length && i < 12; i += 6) { const chunk = li.slice(i, i + 6); s.push({ key: 'lost-' + (i / 6) + '-' + chunk.map(x => x.id).join(','), html: () => lostScene(chunk) }); } }
   ann('call').slice(0, 3).forEach(a => s.push({ key: a.id, at: a.publishedAt, html: () => textScene('🔔', 'استدعاء', a.title, a.body || 'يُرجى المراجعة', false, 'call') }));
   if (D && D.prayers && D.prayers[ymd(t)]) s.push({ key: 'prayers', live: true, html: prayersScene });
   const res = D && D.results || [], fr = res.filter(g => freshAt['pod-' + g.competition]).sort((a, b) => freshAt['pod-' + b.competition] < freshAt['pod-' + a.competition] ? -1 : 1)[0] || res[res.length - 1];
@@ -272,6 +300,7 @@ function override() {
     const n = PR[ps.cur.n];
     return `<div class="full adhan"><div><div class="ic">🕌</div><div class="sub" style="margin:0">حان الآن موعد</div><div class="ttl">أذان ${n}</div><div class="sub" style="color:var(--ink);opacity:.8">يُرجى التوجّه إلى المسجد</div></div></div>`;
   }
+  const lf = lostFlashHtml(); if (lf) return lf;
   const pg = programState(), nb = pg.next;
   if (nb && nb.start - t > 0 && nb.start - t <= CONFIG.soonMinutes * 60000 && nb.items.some(x => x.type !== 'راحة'))
     return `<div class="full"><div><div class="ic">⏰</div><div class="sub" style="margin:0">يبدأ بعد قليل</div><div class="ttl">${esc(blockTitle(nb))}</div><div class="big">${hms(nb.start - t)}</div><div class="sub">${nb.items.length > 1 ? nb.items.map(x => esc(groupName(x.group)) + ': ' + esc(x.place || x.title)).join(' · ') : (nb.items[0].place ? '📍 ' + esc(nb.items[0].place) : '')}</div></div></div>`;
