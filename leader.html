@@ -38,7 +38,16 @@
 .camp-pin{font-size:26px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))}
 .toolsbar{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 #printArea{display:none}
-@media print{body *{visibility:hidden}#printArea,#printArea *{visibility:visible}#printArea{display:block;position:absolute;inset:0;padding:10mm;color:#000;background:#fff}#printArea h2{font-size:15pt;margin:6mm 0 2mm}#printArea table{width:100%;border-collapse:collapse;font-size:11pt}#printArea td,#printArea th{border:.3mm solid #555;padding:1.5mm 2mm;text-align:start}}
+/* Printed reports wear the camp identity: the symbol, brown titles, a gold rule, brown table heads, the icon strip at the foot. */
+@media print{body *{visibility:hidden}#printArea,#printArea *{visibility:visible}
+ #printArea{display:block;position:absolute;inset:0;padding:8mm 10mm;color:#372A25;background:#fff;font-family:Tajawal,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+ .pr-hd{display:flex;align-items:center;gap:4mm;padding-bottom:3mm;border-bottom:.8mm solid #EBBA4E}.pr-hd img{height:18mm}
+ .pr-hd .n{font-weight:800;font-size:12pt}.pr-hd h1{font-family:Lalezar,Tajawal,sans-serif;font-weight:400;font-size:20pt;margin:0;line-height:1.2}.pr-hd .w{margin-inline-start:auto;font-size:10pt;text-align:end}
+ .pr-k{display:flex;gap:3mm;margin:4mm 0 2mm}.pr-k div{flex:1;border:.3mm solid #D8C79C;border-radius:3mm;padding:2mm 3mm;background:#FBF3D7}.pr-k b{display:block;font-family:Lalezar,Tajawal,sans-serif;font-weight:400;font-size:18pt;line-height:1.1}.pr-k span{font-size:9.5pt}
+ #printArea h2{font-size:13pt;font-weight:800;margin:5mm 0 2mm;padding-inline-start:2.5mm;border-inline-start:1.2mm solid #EBBA4E}
+ #printArea table{width:100%;border-collapse:collapse;font-size:10.5pt}#printArea td,#printArea th{border:.3mm solid #D8C79C;padding:1.5mm 2mm;text-align:start}
+ #printArea th{background:#372A25;color:#FBF3D7;font-weight:700}#printArea tr:nth-child(even) td{background:#FBF3D7}
+ .pr-ft{margin-top:6mm;height:9mm;background:url(brand/strip.png) repeat-x center/auto 100%}}
 </style>
 </head>
 <body>
@@ -252,19 +261,23 @@ function drawMap() {
 }
 
 /* ---------- printing ---------- */
+// The identity head shared by both printouts.
+function printHead(title, when) { return `<div class="pr-hd"><img src="brand/logo-season.svg" alt=""><div><div class="n">${esc(($('campT') && $('campT').textContent) || '')}</div><h1>${esc(title)}</h1></div><div class="w">${esc(when)}</div></div>`; }
 function printAbsent() {
   const l = L_(), mb = (st.extra && st.extra.missingByBus) || {};
   const when = new Date().toLocaleString(st.lang === 'ar' ? 'ar' : 'en');
-  $('printArea').innerHTML = `<h1>${l.absentTitle}</h1><div>${esc(when)}</div>` + Object.keys(mb).sort((a, b) => a - b).map(b => `<h2>${l.bus(esc(b))} (${mb[b].length})</h2>${mb[b].length ? `<table><tr><th>${l.num}</th><th>${l.student}</th><th>${l.team}</th><th>${l.cls}</th></tr>${mb[b].map((s, i) => `<tr><td>${i + 1}</td><td>${esc(s.name)} · ${esc(s.id)}</td><td>${esc(s.team)}</td><td>${esc(s.cls)}</td></tr>`).join('')}</table>` : `<div>${l.allIn}</div>`}`).join('');
+  $('printArea').innerHTML = printHead(l.absentTitle, when) + Object.keys(mb).sort((a, b) => a - b).map(b => `<h2>${l.bus(esc(b))} (${mb[b].length})</h2>${mb[b].length ? `<table><tr><th>${l.num}</th><th>${l.student}</th><th>${l.team}</th><th>${l.cls}</th></tr>${mb[b].map((s, i) => `<tr><td>${i + 1}</td><td>${esc(s.name)} · ${esc(s.id)}</td><td>${esc(s.team)}</td><td>${esc(s.cls)}</td></tr>`).join('')}</table>` : `<div>${l.allIn}</div>`}`).join('') + '<div class="pr-ft"></div>';
   window.print();
 }
 function printReport() {
   const l = L_(), s = st.sum, x = st.extra || {}, c = x.committees || {};
   const when = new Date().toLocaleString(st.lang === 'ar' ? 'ar' : 'en');
-  $('printArea').innerHTML = `<h1>${l.reportTitle}</h1><div>${esc(when)}</div>
+  const arrived = allBuses().filter(b => b.status === 'arrived').length;
+  $('printArea').innerHTML = `${printHead(l.reportTitle, when)}
+   <div class="pr-k"><div><b>${s.boarded} / ${s.total}</b><span>${l.present}</span></div><div><b>${s.total - s.boarded - s.withdrawn}</b><span>${l.remaining}</span></div><div><b>${arrived} / ${allBuses().length}</b><span>${l.arrivedBuses}</span></div><div><b>${s.withdrawn}</b><span>${l.withdrawn}</span></div></div>
    <h2>${l.byBus}</h2><table><tr><th></th><th>${l.present}</th><th>${l.remaining}</th></tr>${allBuses().map(b => `<tr><td>${TONE_DOT[busTone(b)]} ${l.bus(esc(b.bus))} · ${esc(b.started ? l.tone[busTone(b)] : l.notStarted)}</td><td>${b.boarded} / ${b.total}</td><td>${b.missing}</td></tr>`).join('')}<tr><th>Σ</th><th>${s.boarded} / ${s.total}</th><th>${s.total - s.boarded - s.withdrawn}</th></tr></table>
    ${x.byTeam ? `<h2>${l.byTeam}</h2><table>${x.byTeam.map(t => `<tr><td>${esc(t.team)}</td><td>${t.present} / ${t.total}</td></tr>`).join('')}</table>` : ''}
-   <h2>${l.committees}</h2><table><tr><td>${l.medOpen}</td><td>${c.medOpen || 0}</td></tr><tr><td>${l.withdrawOpen}</td><td>${c.withdrawOpen || 0}</td></tr><tr><td>${l.meals}</td><td>${c.meals || 0}</td></tr></table>`;
+   <h2>${l.committees}</h2><table><tr><td>${l.medOpen}</td><td>${c.medOpen || 0}</td></tr><tr><td>${l.withdrawOpen}</td><td>${c.withdrawOpen || 0}</td></tr><tr><td>${l.meals}</td><td>${c.meals || 0}</td></tr></table><div class="pr-ft"></div>`;
   window.print();
 }
 
