@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>الإعلامية — MUKHAYYAM</title>
+<title>اللجنة الإعلامية — MUKHAYYAM</title>
 <link rel="stylesheet" href="theme.css">
 <script src="ui.js" defer></script>
 <style>
@@ -69,7 +69,7 @@ const KIND_COLOR = { announce: '#EBBA4E', event: '#A3A867', urgent: '#B3261E', w
 const KINDS = ['announce', 'event', 'urgent', 'wisdom', 'kudos', 'quote', 'call', 'greeting'];
 const PR = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
 const T = {
- ar: { dir: 'rtl', title: 'الإعلامية', sub: 'برنامج اليوم والإعلانات والنتائج', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
+ ar: { dir: 'rtl', title: 'اللجنة الإعلامية', sub: 'برنامج اليوم والإعلانات والنتائج', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
   day: 'اليوم', dayProgram: n => '📋 برنامج اليوم (' + n + ' فقرة)', noProgram: 'لم يُرفق برنامج المخيم بعد. أرفق ملف الإكسل من «المزيد».', reviewed: (by, at) => '✓ راجعه ' + by + (at ? ' · ' + at : ''), notReviewed: 'لم يُراجَع بعد',
   markReviewed: '✓ راجعتُ برنامج هذا اليوم', unmark: 'إلغاء المراجعة', reviewNote: 'راجع الأوقات والأماكن. البرنامج يظهر على الشاشة تلقائيًا؛ المراجعة علامة للفريق فقط.',
   afterOff: 'بعد إطفاء الشاشة', staffOnly: 'للمشرفين، لا يظهر على الشاشة', nowB: 'الآن',
@@ -90,7 +90,7 @@ const T = {
   tplWater: '💧 ماء', tplDelay: '⏰ تأخير', tplCold: '🧥 برد', tplLost: '🧳 مفقودات', tplWisdom: '📖 حكمة الموسم', tplCall: '🔔 استدعاء', tplGather: '🚨 تجمّع',
   tWater: 'تذكير: لا تنسوا زجاجة الماء', tDelay: 'تأخير الفقرة القادمة ١٥ دقيقة', tCold: 'الجو بارد: ارتدوا ملابس ثقيلة', tLost: 'مفقودات: ', tLostB: 'للاستلام: السكرتارية',
   tWisdom: 'ضع أمر أخيك على أحسنه حتى يأتيك ما يغلبك منه', tWisdomB: 'أمير المؤمنين علي (ع)', tCall: 'يُرجى من الطالب رقم … مراجعة السكرتارية', tGather: 'تجمّع الجميع عند الساحة الآن' },
- en: { dir: 'ltr', title: 'Media', sub: 'Day program, announcements and results', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
+ en: { dir: 'ltr', title: 'Media committee', sub: 'Day program, announcements and results', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
   day: 'Day', dayProgram: n => '📋 Day program (' + n + ' items)', noProgram: 'No camp program yet. Attach the Excel file from «More».', reviewed: (by, at) => '✓ Checked by ' + by + (at ? ' · ' + at : ''), notReviewed: 'Not checked yet',
   markReviewed: '✓ I checked this day', unmark: 'Undo', reviewNote: 'Check times and places. The program reaches the screen by itself; the mark is for the team only.',
   afterOff: 'After the screen is off', staffOnly: 'For supervisors, not on the screen', nowB: 'Now',

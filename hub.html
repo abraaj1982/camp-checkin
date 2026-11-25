@@ -225,19 +225,19 @@ const SCREEN_LINKS = {
   shirts: 'shirts.html'
 };
 const SCREEN_NAMES = {
-  checkin: 'تسجيل الحضور', dashboard: 'لوحة المعلومات', committee: 'مصاريف اللجنة',
+  checkin: 'تسجيل الحضور', dashboard: 'لوحة المعلومات - القائد', committee: 'مصاريف اللجنة',
   finance: 'اعتماد المصاريف', shirts: 'توزيع القمصان',
-  users: 'المستخدمون', results: 'الإعلامية والنتائج', medical: 'الصفحة الطبية', print: 'طباعة الأساور والكشوف', custody: 'استئذان الخروج من المخيم', gate: 'البوابة (الكشافة)', nutrition: 'التغذية', announce: 'الإعلامية والنتائج', reports: 'التقارير', reception: 'الوصول المباشر', addstudent: 'طالب جديد', verify: 'التحقق من النتائج', stages: 'جدول الوصول والمغادرة'
+  users: 'المستخدمون', results: 'اللجنة الإعلامية', medical: 'الصفحة الطبية', print: 'طباعة الأساور والكشوف', custody: 'استئذان الخروج من المخيم', gate: 'البوابة (الكشافة)', nutrition: 'التغذية', announce: 'الإعلامية والنتائج', reports: 'التقارير', reception: 'الوصول المباشر', addstudent: 'طالب جديد', verify: 'التحقق من النتائج', stages: 'جدول الوصول والمغادرة'
 };
 
-const SCREEN_ICONS = { stages: '📋', reception: '🚗', addstudent: '➕', reports: '📑', checkin: '🚌', dashboard: '📍', stats: '📊', shirts: '👕', print: '🖨️', custody: '📝', gate: '🚪', medical: '⚕️', nutrition: '🍽️', announce: '📣', results: '🏆', verify: '✅', team: '👥' };
+const SCREEN_ICONS = { stages: '📋', reception: '🚗', addstudent: '➕', reports: '📑', checkin: '🚌', dashboard: '🔭', stats: '📊', shirts: '👕', print: '🖨️', custody: '📝', gate: '🚪', medical: '⚕️', nutrition: '🍽️', announce: '📣', results: '🏆', verify: '✅', team: '👥' };
 
 // language (same preference as every other screen): the home page (tiles) has English; user management stays Arabic
 const HL = {
   ar: { hello: 'مرحباً،', tiles: 'شاشاتك', none: 'لا توجد شاشات مفعّلة لحسابك بعد. تواصل مع السكرتارية.', bull: '📢 إعلانات', logout: 'خروج', open: 'فتح', soon: 'قريباً', tv: 'شاشة العرض', tvS: 'فتح على التلفاز', manage: 'إدارة المستخدمين', support: 'الدعم الفني', manageS: 'المستخدمون والصلاحيات', dark: '🌙 داكن', light: '☀ فاتح', lang: 'English', back: '→ رجوع إلى الشاشات' },
   en: { hello: 'Welcome,', tiles: 'Your screens', none: 'No screens are enabled for your account yet. Contact the secretariat.', bull: '📢 Announcements', logout: 'Log out', open: 'Open', soon: 'Soon', tv: 'Display screen', tvS: 'Open on the TV', manage: 'User management', support: 'Technical support', manageS: 'Users and permissions', dark: '🌙 Dark', light: '☀ Light', lang: 'العربية', back: '← Back to screens' }
 };
-const SCREEN_NAMES_EN = { checkin: 'Bus check-in', dashboard: 'Dashboard', committee: 'Committee expenses', finance: 'Expense approval', shirts: 'Shirt distribution', results: 'Media and results', medical: 'Medical page', print: 'Print wristbands and lists', custody: 'Camp exit permission', gate: 'Gate (scouts)', nutrition: 'Nutrition', announce: 'Media and results', reports: 'Reports', reception: 'Direct Arrival', addstudent: 'New student', verify: 'Verify results', stages: 'Arrival and departure schedule' };
+const SCREEN_NAMES_EN = { checkin: 'Bus check-in', dashboard: 'Dashboard - leader', committee: 'Committee expenses', finance: 'Expense approval', shirts: 'Shirt distribution', results: 'Media committee', medical: 'Medical page', print: 'Print wristbands and lists', custody: 'Camp exit permission', gate: 'Gate (scouts)', nutrition: 'Nutrition', announce: 'Media and results', reports: 'Reports', reception: 'Direct Arrival', addstudent: 'New student', verify: 'Verify results', stages: 'Arrival and departure schedule' };
 const ROLE_EN = { admin: 'Secretariat', supervisor: 'Bus supervisor', camp_leader: 'Camp leader', shirts_coordinator: 'Shirts officer', general_supervisor: 'General supervisor', doctor: 'Doctor', nutrition_officer: 'Nutrition committee', custody_officer: 'Custody', secretariat: 'Secretariat', scout: 'Scouts (gate)', printer: 'Printing', support: 'Technical support' };
 let hlang = 'ar'; try { hlang = localStorage.getItem('mk_pref_lang') === 'en' ? 'en' : 'ar'; } catch (e) {}
 const H = () => HL[hlang];

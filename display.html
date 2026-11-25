@@ -62,6 +62,18 @@ body{color:var(--ink);font-family:Tajawal,system-ui,sans-serif;font-weight:500;c
 .pc.nx{border:.2vw solid var(--gd);background:rgba(235,186,78,.22)}.pc.dn{opacity:.42}
 .pod{display:flex;align-items:flex-end;justify-content:center;gap:2vw;height:22vw}.pd{width:14vw;text-align:center}
 .pd .m{font-size:2.6vw}.pd .n{font-size:1.8vw;font-weight:800}.pd .b{border-radius:1vw 1vw 0 0;display:grid;place-items:center;font-family:Lalezar,Tajawal,sans-serif;font-size:2.6vw;background:var(--ink);color:var(--stage-bg,var(--dark))}
+.pd{display:flex;flex-direction:column;justify-content:flex-end}
+.pd .b{transform-origin:bottom;animation:rise 1s cubic-bezier(.2,.8,.2,1) both}.pd .m,.pd .n{animation:pop .5s ease-out both}
+.pd:nth-child(3) .b{animation-delay:.2s}.pd:nth-child(3) .m,.pd:nth-child(3) .n{animation-delay:1s}
+.pd:nth-child(1) .b{animation-delay:.9s}.pd:nth-child(1) .m,.pd:nth-child(1) .n{animation-delay:1.7s}
+.pd:nth-child(2) .b{animation-delay:1.6s}.pd:nth-child(2) .m,.pd:nth-child(2) .n{animation-delay:2.4s}
+@keyframes rise{from{transform:scaleY(0)}to{transform:scaleY(1)}}@keyframes pop{from{opacity:0;transform:scale(.4)}to{opacity:1;transform:none}}
+.up{color:#4CC38A;font-size:.8em;margin-inline-start:.4vw}
+.nx3{display:flex;flex-direction:column;gap:.8vw;max-width:94%;margin:0 auto;width:100%}
+.nx3 .r{display:grid;grid-template-columns:11vw minmax(0,1fr);gap:1.2vw;align-items:center;border:1px solid var(--line);border-radius:1.2vw;padding:.8vw 1.4vw}
+.nx3 .r:first-child{border:.2vw solid var(--gd)}.nx3 .tm{font-family:Lalezar,Tajawal,sans-serif;font-size:2.1vw;direction:ltr;text-align:right}
+.nx3 .ti{font-size:2vw;font-weight:800;line-height:1.3}.nx3 .pl{font-size:1.25vw;color:var(--mute);margin-top:.2vw}
+#confetti{position:fixed;inset:0;z-index:15;pointer-events:none}
 .stage[data-tone="light"] .pd .b{color:var(--cream)}.stage:not([data-tone="light"]) .pd .b{color:var(--dark)}.pd .b.first{background:var(--gd);color:var(--dark)!important}
 .full{position:fixed;inset:0;z-index:20;display:grid;place-items:center;text-align:center;padding:4vw;background:var(--dark)}
 .full.urgent{background:#9e2a22}
@@ -99,6 +111,7 @@ const NAMED_COLORS = [['أحمر', '#E5484D'], ['أخضر', '#4CC38A'], ['أزر
 const teamColor = (name, i) => { const n = String(name || ''); const hit = NAMED_COLORS.find(c => n.indexOf(c[0]) !== -1); return hit ? hit[1] : TEAM_COLORS[i % TEAM_COLORS.length]; };
 const HIDE_TYPES = ['حركة']; // bus movements are for the supervisors, not for the big screen
 
+let resSig = null, prevTotals = null, freshAt = {}; // what changed in the last load (new result -> podium then the race)
 let D = null, offset = 0, online = false, tried = false, loading = false, idx = -1, seen = {}, lastKey = '', lastSync = 0;
 try { D = JSON.parse(store.get('mk_display_cache') || 'null'); lastSync = Number(store.get('mk_display_sync')) || 0; offset = Number(store.get('mk_display_off')) || 0; } catch (e) {}
 // Preview only: display.html?at=2026-12-31T10:22 pretends it is that time (the clock keeps running from there).
@@ -118,10 +131,22 @@ async function load() {
   const ac = new AbortController(), to = setTimeout(() => ac.abort(), 15000); // a hung request must not block the next try
   try {
     const r = await (await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'feed', key: key }), signal: ac.signal })).json();
-    if (r.success) { D = r; const so = new Date(r.serverTime).getTime() - Date.now(); offset = isFinite(so) ? so : 0; online = true; lastSync = Date.now(); store.set('mk_display_cache', JSON.stringify(r)); store.set('mk_display_sync', String(lastSync)); store.set('mk_display_off', String(offset)); }
+    if (r.success) { noteChanges(r); D = r; const so = new Date(r.serverTime).getTime() - Date.now(); offset = isFinite(so) ? so : 0; online = true; lastSync = Date.now(); store.set('mk_display_cache', JSON.stringify(r)); store.set('mk_display_sync', String(lastSync)); store.set('mk_display_off', String(offset)); }
     else { online = false; if (/key/i.test(r.error || '')) { store.set('mk_feed_key', ''); setup('المفتاح غير صحيح. أدخله من جديد.'); } }
   } catch (e) { online = false; }
   clearTimeout(to); loading = false; tried = true;
+}
+
+// A competition whose rows changed (or a new one) is shown at once as a podium, then the team ranking moves.
+function noteChanges(r) {
+  const sig = {}; (r.results || []).forEach(g => { sig[g.competition] = JSON.stringify(g.rows); });
+  if (resSig !== null) {
+    const at = now().getTime();
+    Object.keys(sig).forEach(c => { if (sig[c] !== resSig[c]) { freshAt['pod-' + c] = new Date(at).toISOString(); delete seen['pod-' + c]; } });
+    const tot = JSON.stringify(r.totals || []), old = JSON.stringify((D && D.totals) || []);
+    if (tot !== old) { if (!prevTotals) prevTotals = {}; ((D && D.totals) || []).forEach(x => { prevTotals[x.team] = x.points; }); freshAt.rank = new Date(at + 1).toISOString(); delete seen.rank; }
+  }
+  resSig = sig;
 }
 
 /* ---------- program: blocks of activities that start together (one per group) ---------- */
@@ -174,8 +199,11 @@ function dayScene(ps) {
     return `<div class="dr ${isNow ? 'now' : past ? 'past' : ''}"><span class="tm">${t12(b.items[0].from)}</span><span>${esc(blockTitle(b))}${isNow ? '<span class="nowb">الآن</span>' : ''}</span><span class="pl">${b.items.length > 1 ? b.items.length + ' مجموعات' : (b.items[0].place ? '📍 ' + esc(b.items[0].place) : '')}</span></div>`; }).join('')}</div>`;
 }
 function rankScene() {
-  const tt = D.totals, mx = Math.max(1, ...tt.map(x => x.points)), medal = ['🥇', '🥈', '🥉'];
-  return `<h2 class="st">🏆 الترتيب العام للفرق</h2><div class="rank">${tt.slice(0, 8).map((x, i) => `<div class="lr"><span style="text-align:center">${medal[i] || (i + 1)}</span><b>${esc(x.team)}</b><div class="bar"><i style="width:${Math.round(x.points / mx * 100)}%;background:${teamColor(x.team, i)}"></i></div><span class="pt">${x.points}</span></div>`).join('')}</div>`;
+  const tt = D.totals, mx = Math.max(1, ...tt.map(x => x.points)), medal = ['🥇', '🥈', '🥉'], before = prevTotals || {};
+  const oldOrder = Object.keys(before).sort((a, b) => before[b] - before[a]);
+  return `<h2 class="st">🏆 الترتيب العام للفرق</h2><div class="rank">${tt.slice(0, 8).map((x, i) => { const was = oldOrder.indexOf(x.team), up = prevTotals && (was === -1 ? false : was > i);
+    const from = before[x.team] === undefined ? (prevTotals ? 0 : x.points) : before[x.team];
+    return `<div class="lr"><span style="text-align:center">${medal[i] || (i + 1)}</span><b>${esc(x.team)}${up ? '<span class="up">▲</span>' : ''}</b><div class="bar"><i data-w="${Math.round(x.points / mx * 100)}%" style="width:${Math.round(from / mx * 100)}%;background:${teamColor(x.team, i)}"></i></div><span class="pt">${x.points}</span></div>`; }).join('')}</div>`;
 }
 function prayersScene() {
   const t = now(), p = D.prayers[ymd(t)], st = prayerState(), names = Object.keys(PR).filter(n => p[n]);
@@ -191,6 +219,11 @@ function podiumScene(g) {
   return `<h2 class="st">🎯 ${esc(g.competition)} <span class="new">النتيجة</span></h2><div class="pod">${order.map(r => { const i = rows.indexOf(r);
     return `<div class="pd"><div class="m">${md[i]}</div><div class="n">${esc(r.team)}</div><div class="b${i === 0 ? ' first' : ''}" style="height:${h[i]}vw">${r.points !== null ? r.points : '#' + (i + 1)}</div></div>`; }).join('')}</div>`;
 }
+// The next three activities of today, with their places, and a countdown to the first.
+function upcomingScene() {
+  const t = now(), list = blocksOf(ymd(t)).filter(b => b.start > t).slice(0, 3);
+  return `<h2 class="st">⏭ القادم الآن</h2><div class="nx3">${list.map((b, i) => `<div class="r"><div class="tm">${t12(p2(b.start.getHours()) + ':' + p2(b.start.getMinutes()))}</div><div><div class="ti">${esc(blockTitle(b))}${i === 0 ? ` <span class="cd" data-cd="${b.start.getTime()}" style="font-size:.8em">${hms(b.start - t)}</span>` : ''}</div><div class="pl">${b.items.length > 1 ? b.items.map(x => esc(groupName(x.group)) + (x.place ? ': ' + esc(x.place) : '')).join(' · ') : (b.items[0].place ? '📍 ' + esc(b.items[0].place) : '')}</div></div></div>`).join('')}</div>`;
+}
 function welcomeScene() {
   const t = now(), h = t.getHours(), g = ann('greeting')[0];
   return textScene('🏕️', h < 12 ? 'صباح الخير' : h < 18 ? 'طاب يومكم' : 'مساء النور', g ? g.title : campName(), g ? g.body : '', false, 'greeting');
@@ -203,18 +236,31 @@ function scenes(ps) {
   const s = [], t = now();
   if (ps.cur) s.push({ key: 'now', live: true, html: () => nowScene(programState()) });
   if (ps.today.length) s.push({ key: 'day', live: true, html: () => dayScene(programState()) });
+  if (blocksOf(ymd(t)).filter(b => b.start > t).length >= 2) s.push({ key: 'next3', html: upcomingScene });
   ann('announce').slice(0, 5).forEach(a => s.push({ key: a.id, at: a.publishedAt, html: () => textScene('📣', 'إعلان', a.title, a.body, false, 'announce') }));
   ann('event').filter(a => a.startsAt && new Date(a.startsAt) - t > -30 * 60000).slice(0, 3).forEach(a => s.push({ key: a.id, at: a.publishedAt, html: () => textScene('📅', 'فعالية قادمة', a.title, [a.body, t12(p2(new Date(a.startsAt).getHours()) + ':' + p2(new Date(a.startsAt).getMinutes()))].filter(Boolean).join(' · '), false, 'event') }));
   ann('call').slice(0, 3).forEach(a => s.push({ key: a.id, at: a.publishedAt, html: () => textScene('🔔', 'استدعاء', a.title, a.body || 'يُرجى المراجعة', false, 'call') }));
-  if (D && D.totals && D.totals.length) s.push({ key: 'rank', html: rankScene });
   if (D && D.prayers && D.prayers[ymd(t)]) s.push({ key: 'prayers', live: true, html: prayersScene });
-  const res = D && D.results || []; if (res.length) s.push({ key: 'pod-' + res[res.length - 1].competition, html: () => podiumScene(res[res.length - 1]) });
+  const res = D && D.results || [], fr = res.filter(g => freshAt['pod-' + g.competition]).sort((a, b) => freshAt['pod-' + b.competition] < freshAt['pod-' + a.competition] ? -1 : 1)[0] || res[res.length - 1];
+  if (fr) s.push({ key: 'pod-' + fr.competition, at: freshAt['pod-' + fr.competition], html: () => podiumScene(fr) });
+  if (D && D.totals && D.totals.length) s.push({ key: 'rank', at: freshAt.rank, html: rankScene });
   ann('wisdom').slice(0, 1).forEach(a => s.push({ key: a.id, at: a.publishedAt, html: () => textScene('📖', 'حكمة اليوم', a.title, a.body, true, 'wisdom') }));
   ann('kudos').slice(0, 3).forEach(a => s.push({ key: a.id, at: a.publishedAt, html: () => textScene('🤝', 'شكر وموقف طيب', a.title, a.body, false, 'kudos') }));
   ann('quote').slice(0, 3).forEach(a => s.push({ key: a.id, at: a.publishedAt, html: () => textScene('💬', 'قالوا عن المخيم', '«' + a.body + '»', a.title, false, 'quote') }));
   const fin = ann('finale')[0]; if (fin && fin.startsAt && new Date(fin.startsAt) - t > 60 * 60000) s.push({ key: 'finale', live: true, html: () => finaleScene(fin) });
   if (!s.length) s.push({ key: 'welcome', html: welcomeScene });
   return s;
+}
+
+// Celebration: paper pieces in the camp colours for about five seconds (not when the viewer asked for less motion).
+function confetti() {
+  if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const c = document.createElement('canvas'); c.id = 'confetti'; c.width = innerWidth; c.height = innerHeight; document.body.appendChild(c);
+  const x = c.getContext('2d'), cols = ['#EBBA4E', '#FBF3D7', '#A8D285', '#D39D66', '#A3A867', '#ECCA9C'], P = [];
+  for (let i = 0; i < 160; i++) P.push({ x: Math.random() * c.width, y: -Math.random() * c.height * .5, w: 6 + Math.random() * 8, h: 10 + Math.random() * 10, vx: -1.5 + Math.random() * 3, vy: 2 + Math.random() * 3.5, r: Math.random() * 6, vr: -.15 + Math.random() * .3, c: cols[i % cols.length] });
+  const t0 = performance.now();
+  (function step(t) { x.clearRect(0, 0, c.width, c.height); P.forEach(p => { p.x += p.vx; p.y += p.vy; p.vy += .03; p.r += p.vr; x.save(); x.translate(p.x, p.y); x.rotate(p.r); x.fillStyle = p.c; x.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); x.restore(); });
+    if (t - t0 < 5000) requestAnimationFrame(step); else c.remove(); })(t0);
 }
 
 /* ---------- full-screen moments (priority order) ---------- */
@@ -265,7 +311,11 @@ function paintTicker() {
   if (el.dataset.txt !== txt) { el.dataset.txt = txt; el.innerHTML = `<span style="animation-duration:${Math.max(22, txt.length * 0.25)}s">${esc(txt)}</span>`; }
 }
 let cur = null;
+// One timer for the slides: something shown out of turn gets its full time (a new podium a little longer, for the celebration).
+let slideT = null;
+function schedule(ms) { clearTimeout(slideT); slideT = setTimeout(showScene, ms); }
 function showScene() {
+  schedule(CONFIG.slideSeconds * 1000); // keeps the loop going even when nothing is drawn now
   const ov = override(); $('over').innerHTML = ov; if (ov) return;
   const s = scenes(programState()); if (!s.length) return;
   // something new (published in the last 3 minutes, not shown yet) jumps the queue
@@ -275,6 +325,9 @@ function showScene() {
   const st = $('stage').parentElement; st.dataset.tone = st.dataset.tone === 'light' ? 'dark' : 'light';
   $('stage').innerHTML = `<section class="sc">${fresh ? '<div style="text-align:center;margin-bottom:.6vw"><span class="new">جديد</span></div>' : ''}${cur.html()}</section>`;
   lastKey = cur.key;
+  if (cur.key === 'rank') { setTimeout(() => { document.querySelectorAll('#stage [data-w]').forEach(e => { e.style.width = e.dataset.w; }); prevTotals = null; }, 900); }
+  if (fresh && /^pod-/.test(cur.key)) setTimeout(confetti, 2600);
+  schedule(fresh && /^pod-/.test(cur.key) ? 16000 : CONFIG.slideSeconds * 1000);
   $('dots').innerHTML = s.map(x => `<i class="${x.key === cur.key ? 'on' : ''}"></i>`).join('');
 }
 function tick() {
@@ -298,7 +351,7 @@ if (!store.get('mk_feed_key')) setup();
 paintHeader(); paintRail(); paintTicker(); showScene();
 load().then(() => { idx = -1; paintHeader(); paintRail(); paintTicker(); showScene(); }); // start the loop from "now" once the data is in
 setInterval(tick, 1000);
-setInterval(showScene, CONFIG.slideSeconds * 1000);
+schedule(CONFIG.slideSeconds * 1000);
 setInterval(() => load().then(paintTicker), 20000);
 window.addEventListener('online', () => load().then(paintTicker));
 keepAwake();
