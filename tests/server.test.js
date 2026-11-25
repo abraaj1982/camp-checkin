@@ -82,6 +82,14 @@ assert(book.BusLive.rows[1][1]==='departed','status preserved when only location
 r=post({action:'busStatus',token:t1,status:'weird'});assert(!r.success,'invalid status rejected');
 r=post({action:'busStatus',token:t1,lat:999,lng:1});assert(r.success&&book.BusLive.rows[1][2]===23.6,'out-of-range coordinates ignored');
 r=post({action:'busLive',token:tl});assert(r.success&&r.buses.length===1&&r.buses[0].status==='departed'&&r.buses[0].ageSec>=0,'leader sees live buses');
+// the leader asks a supervisor to switch tracking on; the request ends when that bus sends a position
+r=post({action:'trackPing',token:t1,bus:'1'});assert(!r.success,'a supervisor cannot send the tracking request');
+r=post({action:'trackPingCheck',token:t1});assert(r.success&&!r.ping,'no request yet');
+r=post({action:'trackPing',token:tl,bus:'1'});assert(r.success,'leader asks bus 1 to switch tracking on');
+r=post({action:'trackPingCheck',token:t1});assert(r.success&&r.ping&&r.ping.by==='القائد','the bus 1 supervisor sees the request, with who asked');
+r=post({action:'trackPingCheck',token:t2});assert(r.success&&!r.ping,'another bus does not see it');
+r=post({action:'busStatus',token:t1,lat:23.61,lng:58.51});r=post({action:'trackPingCheck',token:t1});assert(!r.ping,'a position from the bus answers the request');
+r=post({action:'trackPingCheck',token:tl});assert(!r.success,'trackPingCheck is for bus supervisors');
 r=post({action:'busLive',token:t1});assert(!r.success,'supervisor cannot read live map');
 // ---- bags
 r=post({action:'bag',token:t1,studentId:'1001',mode:'load',count:2,clientId:'b1'});assert(r.success,'bag load');

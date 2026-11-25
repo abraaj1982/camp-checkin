@@ -45,6 +45,8 @@ const ACTIONS_ = {
   busStatus: function(d) { return handleBusStatus_(d); },
   bag: function(d) { return handleBag_(d); },
   busLive: function(d) { return handleBusLive_(d); },
+  trackPing: function(d) { return handleTrackPing_(d); },
+  trackPingCheck: function(d) { return handleTrackPingCheck_(d); },
   leaderSummary: function(d) { return handleLeaderSummary_(d); },
   leaderAll: function(d) { return handleLeaderAll_(d); },
   weather: function(d) { return handleWeather_(d); },
@@ -121,7 +123,7 @@ function doPost(e) {
     const fn = Object.prototype.hasOwnProperty.call(ACTIONS_, data.action) ? ACTIONS_[data.action] : null;
     if (!fn) return json_({ success: false, error: 'Invalid action' });
     const out = fn(data);
-    if (data.action !== 'leaderSummary' && data.action !== 'leaderAll' && data.action !== 'weather') { try { CacheService.getScriptCache().removeAll(['leader_v1', 'leader_x1']); } catch (e) { /* ignore */ } }
+    if (['leaderSummary', 'leaderAll', 'weather', 'trackPingCheck'].indexOf(data.action) === -1) { try { CacheService.getScriptCache().removeAll(['leader_v1', 'leader_x1']); } catch (e) { /* ignore */ } }
     return json_(out);
   } catch (error) {
     Logger.log('doPost error: ' + error + '\n' + (error && error.stack));
@@ -722,10 +724,31 @@ function handleBusStatus_(data) {
       const out = h.map(function(n) { return rec.hasOwnProperty(n) ? rec[n] : ''; });
       if (row === -1) appendSafe_(sheet, out); else sheet.getRange(row, 1, 1, out.length).setValues([out.map(cellSafe_)]);
       if (status === 'departed') writeAudit_(user.Username, 'BUS_DEPARTED', bus, 'boarded=' + c.boarded + '/' + c.total);
+      if (hasGeo) { try { CacheService.getScriptCache().remove('trackping_' + bus); } catch (e) { /* ignore */ } } // tracking is on: the leader's request is answered
     } finally {
       lock.releaseLock();
     }
     return { success: true, boarded: c.boarded, total: c.total, missing: c.missing.length };
+  });
+}
+
+// The leader asks a bus supervisor to switch tracking on. Kept 15 minutes in the cache (no sheet write);
+// it disappears as soon as that bus sends a position.
+function handleTrackPing_(data) {
+  return withAuth_(data, requirePerm_('dashboard'), function(user) {
+    const bus = String(data.bus || '').trim().slice(0, 10);
+    if (!bus) return { success: false, error: 'Invalid request' };
+    CacheService.getScriptCache().put('trackping_' + bus, JSON.stringify({ at: new Date().toISOString(), by: user.FullName || user.Username }), 900);
+    writeAudit_(user.Username, 'TRACK_PING', bus, '');
+    return { success: true };
+  });
+}
+function handleTrackPingCheck_(data) {
+  return withAuth_(data, requirePerm_('checkin'), function(user) {
+    const bus = String(user.AssignedBus).trim();
+    let ping = null;
+    if (bus) { try { const v = CacheService.getScriptCache().get('trackping_' + bus); if (v) ping = JSON.parse(v); } catch (e) { ping = null; } }
+    return { success: true, ping: ping };
   });
 }
 
