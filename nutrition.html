@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>التغذية — MUKHAYYAM</title>
+<title>لجنة التغذية — MUKHAYYAM</title>
 <link rel="stylesheet" href="theme.css">
 <script src="ui.js" defer></script>
 <style>
@@ -56,11 +56,11 @@ const errText = r => (r && L().codes && L().codes[r.code]) || (r && r.error) || 
 
 if (!token) location.href = 'login.html'; else if (!can('nutrition')) location.href = 'hub.html';
 const T = {
- ar: { dir: 'rtl', title: 'التغذية', sub: 'أعداد الوجبات والحساسية الغذائية', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
+ ar: { dir: 'rtl', title: 'لجنة التغذية', sub: 'أعداد الوجبات والحساسية الغذائية', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
   present: 'الحاضرون في المخيم', total: 'إجمالي الطلاب', staff: 'الكادر', nextMeal: 'الوجبة القادمة', noMeals: 'الوجبات الآن', after: 'بعد', staffToday: 'الكادر اليوم', students_: 'طلاب حاضرون', withAl: n => 'منهم ' + n + ' بحساسية غذائية', notArr: n => 'لم يصلوا بعد: ' + n, onTrip: n => 'في الرحلة: ' + n, gone: n => 'غادروا أو خرجوا بإذن: ' + n, comingMeals: 'الوجبات القادمة', mealsNote: 'العدد = من هو في المخيم الآن + الكادر. طلاب الرحلة والمغادرون لا يُحسبون، ويتحدث الرقم وحده.', printK: 'طباعة ورقة المطبخ', kTitle: 'ورقة المطبخ', staffAskDay: 'عدد الكادر لهذا اليوم (مشرفون، لجان، طباخون...)', staffKeep: 'إن لم تكتب رقمًا ليوم لاحق فيبقى آخر رقم كتبته.', staffEdit: 'تعديل', staffAsk: 'اكتب عدد الكادر (مشرفون، لجان، طباخون...)', staffAuto: 'تقدير: حسابات المشرفين. اكتب الرقم الفعلي.', expected: 'وجبات متوقعة (الكل)', byAllergen: 'حسب نوع الحساسية', students: 'طلاب', ackBtn: '✓ تأكيد استلام التفاصيل', ackOk: 'استُلمت التفاصيل', ackBy: 'بواسطة', ackNew: 'تفاصيل جديدة أو تغيّرت — بانتظار تأكيد لجنة التغذية', ackWait: 'بانتظار تأكيد لجنة التغذية', ackDone: 'تم',  of: 'من', sups: 'المشرفون', meals: 'وجبات للتحضير', note: 'الحاضرون = من سُجّل صعوده ولم يغادر. الكادر يُكتب يدويًا. الحساسية تأتي تلقائيًا من نموذج الأهل.',
   byTeam: 'الحاضرون حسب الفريق', allergies: 'الحساسية الغذائية', onlyPresent: 'الحاضرون فقط', all: 'الكل', presentB: 'حاضر', absentB: 'لم يصل', none: 'لا توجد حالات حساسية غذائية مسجّلة.',
   noCol: 'عمود «Food allergy» غير موجود في كشف الطلاب. أضِفه ليظهر هنا.', team: 'الفريق', updated: 'آخر تحديث', error: 'تعذّر تحميل البيانات.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.', print: 'طباعة' },
- en: { dir: 'ltr', title: 'Nutrition', sub: 'Meal counts and food allergies', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
+ en: { dir: 'ltr', title: 'Nutrition committee', sub: 'Meal counts and food allergies', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
   present: 'At camp', total: 'Total students', staff: 'Staff', nextMeal: 'Next meal', noMeals: 'Meals now', after: 'in', staffToday: 'Staff today', students_: 'students at camp', withAl: n => n + ' with a food allergy', notArr: n => 'Not arrived: ' + n, onTrip: n => 'On the trip: ' + n, gone: n => 'Left or withdrawn: ' + n, comingMeals: 'Coming meals', mealsNote: 'Count = who is at camp now + staff. Trip students and those who left are not counted; the number updates by itself.', printK: 'Print kitchen sheet', kTitle: 'Kitchen sheet', staffAskDay: 'Staff for this day (supervisors, committees, cooks...)', staffKeep: 'A later day keeps the last number you typed.', staffEdit: 'Edit', staffAsk: 'Enter the number of staff (supervisors, committees, cooks...)', staffAuto: 'Estimate: supervisor accounts. Enter the real number.', expected: 'Expected meals (everyone)', byAllergen: 'By allergen', students: 'students', ackBtn: '✓ Confirm details received', ackOk: 'Details received', ackBy: 'by', ackNew: 'New or changed details — waiting for the nutrition committee to confirm', ackWait: 'Waiting for the nutrition committee to confirm', ackDone: 'Done',  of: 'of', sups: 'Supervisors', meals: 'Meals to prepare', note: 'Present = checked in and not left. Staff is typed by hand. Allergies come automatically from the parents’ form.',
   byTeam: 'Present by team', allergies: 'Food allergies', onlyPresent: 'Present only', all: 'All', presentB: 'Present', absentB: 'Not arrived', none: 'No food allergies on record.',
   noCol: 'The “Food allergy” column is missing from the student sheet. Add it to show it here.', team: 'Team', updated: 'Updated', error: 'Could not load data.', sessionEnd: 'Session expired. Please log in again.', print: 'Print' }
