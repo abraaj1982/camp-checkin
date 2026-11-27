@@ -17,6 +17,13 @@
 .stk .s{font-size:28px;font-weight:700;text-align:center}.stk.ok{border-color:#4CC38A}.stk.low{border-color:#E8A33A}.stk.out,.stk.nostock{border-color:#E07A8A}
 .stk .rem{font-size:26px;font-weight:700}.stk .barw{height:8px;border-radius:9px;background:var(--soft);overflow:hidden;margin-top:6px}.stk .barw i{display:block;height:100%;background:#4CC38A}.stk.low .barw i{background:#E8A33A}.stk.out .barw i,.stk.nostock .barw i{background:#E07A8A}
 .sel{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.grp{border:1px solid var(--line);border-radius:16px;margin-top:8px;background:var(--card);overflow:hidden}
+.grp>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:10px 12px;font-weight:800}.grp>summary::-webkit-details-marker{display:none}
+.grp .zz{min-width:54px;text-align:center;font-size:22px;font-weight:800;border-radius:12px;background:var(--soft);padding:2px 8px}.grp .cc{margin-inline-start:auto;font-size:13px;color:var(--muted)}
+.grp .pr{display:flex;align-items:center;gap:8px;border-top:1px solid var(--line);padding:6px 12px}.grp .pr .nm{flex:1;min-width:0;font-weight:700;background:none;border:0;text-align:start;font:inherit;color:inherit;cursor:pointer;padding:6px 0}
+.grp .pr .btn{min-height:44px;font-size:14.5px;padding:0 14px}.grp .pr.dn .nm{opacity:.55}
+.short{color:var(--bad);font-weight:800;font-size:13px;margin-top:6px}
+.ex{display:flex;gap:8px;border-top:1px solid var(--line);padding:6px 12px;font-size:14px}.ex span:first-child{flex:1}
 </style>
 </head>
 <body>
@@ -41,22 +48,22 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const AUTH_ERR = /EXPIRED|IDLE_TIMEOUT|REVOKED|BAD_SIGNATURE|MALFORMED|USER_NOT_FOUND|ACCOUNT_DISABLED|BAD_PAYLOAD/;
 const T = {
- ar: { dir: 'rtl', title: 'القمصان', sub: 'توزيع القمصان والمخزون', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
-  tGive: 'التوزيع', tStock: 'المخزون', search: 'اسم الشخص أو رقمه', scan: '▣ مسح سوار الطالب', stopScan: 'إيقاف الكاميرا', none: 'لا نتائج', bus: n => 'باص ' + n,
+ ar: { dir: 'rtl', title: 'توزيع القمصان', sub: 'الكوادر أولًا، ثم الطلاب والمخزون', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح',
+  tGive: 'التوزيع', tStock: 'المخزون', search: 'اسم الشخص أو رقمه', scan: '▣ مسح QR (طالب أو كادر)', staffBySize: 'الكوادر حسب المقاس', staffNone: 'لا توجد أسماء كوادر. أضفها في تبويب Staff في الشيت أو بزر «＋ كادر».', addStaff: '＋ كادر', askName: 'اسم الشخص (الكادر)', askSz: 'مقاسه (مثل M أو XL)', staffAdded: 'أُضيف إلى القائمة', nosz: 'بدون مقاس', studentsBy: 'الطلاب حسب المقاس', commonIs: (z, n) => 'المقاس الشائع ' + z + ': ' + n + ' طالبًا', exN: n => 'مقاسات أخرى: ' + n + ' طالبًا', exNone: 'كل الطلاب بالمقاس الشائع.', short: n => '⚠ ينقص ' + n + ' عن المسجلين', gaveOne: 'تسليم', gotIt: '✓ استلم', stopScan: 'إيقاف الكاميرا', none: 'لا نتائج', bus: n => 'باص ' + n,
   kStudents: 'طلاب استلموا', kStaff: 'كادر استلموا', kLeft: 'بدون مقاس مسجّل', size: 'المقاس', noSize: 'لا يوجد مقاس مسجّل', give: s => 'تسليم قميص ' + s, giveOther: 'تسليم بمقاس آخر', chooseSize: 'اختر المقاس',
   got: 'استلم القميص', by: 'بواسطة', at: 'الساعة', undo: 'تراجع عن التسليم', confirmUndo: 'التراجع عن هذا التسليم؟', student: 'طالب', staff: 'كادر', done: 'تم التسليم ✓', undone: 'تم التراجع',
   total: 'المخزون', demand: 'المطلوب', given: 'سُلّم', remain: 'المتبقي', edit: 'تعديل الكمية', addSize: '＋ مقاس جديد', askSize: 'اكتب المقاس (مثل M أو XL)', askTotal: 'الكمية الإجمالية لهذا المقاس', ok: 'متوفر', low: 'يقارب النفاد', out: 'نفد', nostock: 'بلا مخزون', note: 'المطلوب = عدد من سجّلوا هذا المقاس (طلاب وكادر).',
   error: 'تعذّر الاتصال. حاول مرة أخرى.', sessionEnd: 'انتهت الجلسة. سجّل الدخول من جديد.', noCam: 'تعذّر تشغيل الكاميرا. اكتب الاسم أو الرقم.', camDenied: 'لم يُسمح بالكاميرا. اسمح بها من إعدادات المتصفح.',
   codes: { ALREADY_GIVEN: 'استلم القميص مسبقاً', NO_SIZE: 'لا يوجد مقاس مسجّل. اختر المقاس', NO_STOCK_ROW: 'لم يُسجَّل مخزون لهذا المقاس. اختر مقاساً آخر', OUT_OF_STOCK: 'نفد هذا المقاس. اختر مقاساً آخر', NOT_FOUND: 'غير موجود' } },
- en: { dir: 'ltr', title: 'Shirts', sub: 'Shirt distribution and stock', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
-  tGive: 'Give', tStock: 'Stock', search: 'Name or number', scan: '▣ Scan student wristband', stopScan: 'Stop camera', none: 'No results', bus: n => 'Bus ' + n,
+ en: { dir: 'ltr', title: 'Shirt distribution', sub: 'Staff first, then students and stock', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light',
+  tGive: 'Give', tStock: 'Stock', search: 'Name or number', scan: '▣ Scan QR (student or staff)', staffBySize: 'Staff by size', staffNone: 'No staff names. Add them in the Staff tab of the sheet or with «＋ Staff».', addStaff: '＋ Staff', askName: 'Person’s name (staff)', askSz: 'His size (e.g. M or XL)', staffAdded: 'Added to the list', nosz: 'No size', studentsBy: 'Students by size', commonIs: (z, n) => 'Common size ' + z + ': ' + n + ' students', exN: n => 'Other sizes: ' + n + ' students', exNone: 'All students have the common size.', short: n => '⚠ ' + n + ' short of the registered', gaveOne: 'Give', gotIt: '✓ Received', stopScan: 'Stop camera', none: 'No results', bus: n => 'Bus ' + n,
   kStudents: 'Students received', kStaff: 'Staff received', kLeft: 'No size on record', size: 'Size', noSize: 'No size on record', give: s => 'Give shirt ' + s, giveOther: 'Give another size', chooseSize: 'Choose size',
   got: 'Shirt received', by: 'by', at: 'at', undo: 'Undo hand-over', confirmUndo: 'Undo this hand-over?', student: 'Student', staff: 'Staff', done: 'Given ✓', undone: 'Undone',
   total: 'Stock', demand: 'Needed', given: 'Given', remain: 'Left', edit: 'Edit quantity', addSize: '＋ New size', askSize: 'Type the size (e.g. M or XL)', askTotal: 'Total quantity for this size', ok: 'In stock', low: 'Running low', out: 'Out', nostock: 'No stock', note: 'Needed = people who registered this size (students and staff).',
   error: 'Connection problem. Try again.', sessionEnd: 'Session expired. Please log in again.', noCam: 'Could not start the camera. Type the name or number.', camDenied: 'Camera not allowed. Allow it in the browser settings.',
   codes: { ALREADY_GIVEN: 'Already received a shirt', NO_SIZE: 'No size on record. Choose a size', NO_STOCK_ROW: 'No stock recorded for this size. Choose another', OUT_OF_STOCK: 'This size is out. Choose another', NOT_FOUND: 'Not found' } }
 };
-const st = { lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), tab: 'give', q: '', results: [], cur: null, pickSize: false, table: [], sum: null, msg: null, cam: false };
+const st = { staff: [], common: null, exceptions: [], lang: pref.get('lang', 'ar'), theme: pref.get('theme', 'light'), tab: 'give', q: '', results: [], cur: null, pickSize: false, table: [], sum: null, msg: null, cam: false };
 const L = () => T[st.lang];
 async function api(action, extra) {
   const r = await (await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(Object.assign({ action: action, token: token }, extra || {})) })).json();
@@ -68,7 +75,7 @@ const errText = r => (r && L().codes[r.code]) || (r && r.error) || L().error;
 const hhmm = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toTimeString().slice(0, 5); };
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2));
 
-async function load() { try { const r = await api('shirtStock'); if (r.success) { st.table = r.table; st.sum = r.summary; } } catch (e) {} render(); }
+async function load() { try { const r = await api('shirtStock'); if (r.success) { st.table = r.table; st.sum = r.summary; st.staff = r.staff || []; st.common = r.common || null; st.exceptions = r.exceptions || []; } } catch (e) {} render(); }
 let qTimer = null;
 function onQ(v) {
   st.q = v; st.cur = null; clearTimeout(qTimer);
@@ -90,6 +97,16 @@ async function give(size) {
     say('bad', errText(r)); if (/OUT_OF_STOCK|NO_STOCK_ROW|NO_SIZE/.test(r.code)) st.pickSize = true; if (r.code === 'ALREADY_GIVEN') await refreshCur();
   } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
   render();
+}
+async function giveStaff(id, size) {
+  try { const r = await api('shirtGive', { kind: 'staff', id: id, size: size || undefined, clientId: uid() });
+    if (r.success) say('ok', L().done + ' ' + (r.size || '') + ' · ' + L().remain + ' ' + r.remaining); else say('bad', errText(r)); } catch (e) { if (e.message !== 'auth') say('bad', L().error); }
+  await load();
+}
+async function addStaff() {
+  const l = L(), name = (prompt(l.askName) || '').trim(); if (!name) return; const sz = (prompt(l.askSz) || '').trim();
+  try { const r = await api('shirtAddStaff', { name: name, size: sz }); say(r.success ? 'ok' : 'bad', r.success ? l.staffAdded : errText(r)); } catch (e) { if (e.message !== 'auth') say('bad', l.error); }
+  await load();
 }
 async function undo() {
   const c = st.cur; if (!c || !confirm(L().confirmUndo)) return;
@@ -137,16 +154,32 @@ function resultsHtml() {
   return st.results.map(s => `<button class="res" data-pick="${esc(s.kind + ':' + s.id)}"><span><b>${esc(s.name)}</b> <span class="muted">· ${s.kind === 'staff' ? l.staff : esc(s.id)}</span></span><span class="pill ${s.given ? 'ok' : ''}">${s.given ? '✓' : esc(s.size || '—')}</span></button>`).join('');
 }
 function renderResults() { const e = $('qres'); if (e) e.innerHTML = resultsHtml(); }
+function staffGroups() {
+  const l = L(), by = {}; st.staff.forEach(x => { (by[x.size || ''] = by[x.size || ''] || []).push(x); });
+  const order = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '2XL', '3XL', 'XXXL', '4XL', '5XL'], keys = Object.keys(by).sort((a, b) => { const ia = order.indexOf(a), ib = order.indexOf(b); return (a === '') - (b === '') || (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b); });
+  const open = st.openSz || {};
+  const body = keys.length ? keys.map(k => { const arr = by[k], done = arr.filter(x => x.given).length;
+    return `<details class="grp" data-sz="${esc(k)}" ${open[k] !== false && (open[k] || done < arr.length) ? 'open' : ''}><summary><span class="zz">${k ? esc(k) : '—'}</span><span>${k ? '' : l.nosz}</span><span class="cc">${done} / ${arr.length}</span></summary>${arr.map(x => `<div class="pr ${x.given ? 'dn' : ''}"><button class="nm" data-pickstaff="${esc(x.id)}">${esc(x.name)}</button>${x.given ? `<span class="pill ok">${l.gotIt}${x.givenSize && x.givenSize !== x.size ? ' ' + esc(x.givenSize) : ''}</span>` : k ? `<button class="btn go" data-givestaff="${esc(x.id)}:${esc(k)}">${l.gaveOne}</button>` : `<button class="chip" data-pickstaff="${esc(x.id)}">${l.chooseSize}</button>`}</div>`).join('')}</details>`; }).join('')
+    : `<div class="muted" style="padding:6px 2px">${l.staffNone}</div>`;
+  return `<section class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2 class="h2">${l.staffBySize}</h2><button class="chip" data-addstaff="1">${l.addStaff}</button></div>${body}</section>`;
+}
+function studentsCard() {
+  const l = L(); if (!st.common || !st.common.size) return '';
+  const by = {}; st.exceptions.forEach(x => { (by[x.size] = by[x.size] || []).push(x); });
+  const keys = Object.keys(by).sort();
+  return `<section class="card"><h2 class="h2">${l.studentsBy}</h2><div class="muted" style="margin-top:4px">${esc(l.commonIs(st.common.size, st.common.count))}${st.exceptions.length ? ' · ' + esc(l.exN(st.exceptions.length)) : ''}</div>
+    ${keys.length ? keys.map(k => `<details class="grp"><summary><span class="zz">${esc(k)}</span><span class="cc">${by[k].length}</span></summary>${by[k].map(x => `<div class="ex"><span>${esc(x.name)}</span><span class="muted">${esc(x.team)}${x.bus ? ' · ' + l.bus(esc(x.bus)) : ''}</span>${x.given ? '<span class="pill ok">✓</span>' : ''}</div>`).join('')}</details>`).join('') : `<div class="muted" style="margin-top:6px">${l.exNone}</div>`}</section>`;
+}
 function giveView() {
   const l = L(), s = st.sum;
   const strip = s ? `<section class="card"><div class="strip"><div><div class="kv2">${s.studentsGiven}<span class="muted" style="font-size:14px"> / ${s.students}</span></div><div class="kl2">${l.kStudents}</div></div><div><div class="kv2">${s.staffGiven}<span class="muted" style="font-size:14px"> / ${s.staff}</span></div><div class="kl2">${l.kStaff}</div></div><div><div class="kv2">${s.noSize}</div><div class="kl2">${l.kLeft}</div></div></div></section>` : '';
   const scan = `${st.cam ? '<div class="scan"><div id="reader" style="width:100%"></div></div>' : ''}<button class="btn alt full" style="margin-top:8px" data-cam="1">${st.cam ? l.stopScan : l.scan}</button>`;
-  return `${strip}<section class="card"><label class="lbl" for="q">${l.search}</label><input id="q" type="search" value="${esc(st.q)}" autocomplete="off">${scan}<div id="qres" style="margin-top:6px">${resultsHtml()}</div></section>${personCard()}`;
+  return `${strip}${staffGroups()}<section class="card"><label class="lbl" for="q">${l.search}</label><input id="q" type="search" value="${esc(st.q)}" autocomplete="off">${scan}<div id="qres" style="margin-top:6px">${resultsHtml()}</div></section>${personCard()}${studentsCard()}`;
 }
 function stockView() {
   const l = L(), lab = { ok: l.ok, low: l.low, out: l.out, nostock: l.nostock };
   return `<div class="muted" style="font-size:12.5px;margin:2px 4px">${l.note}</div>` + (st.table.length ? st.table.map(r => `<div class="stk ${r.status}"><div class="s">${esc(r.size)}</div>
-    <div><div style="font-size:13px" class="muted">${l.total} ${r.total} · ${l.demand} ${r.demand} · ${l.given} ${r.given}</div><div class="barw"><i style="width:${r.total ? Math.max(0, Math.round(r.remaining / r.total * 100)) : 0}%"></i></div><span class="pill ${r.status === 'ok' ? 'ok' : 'bad'}" style="margin-top:6px;display:inline-block">${lab[r.status]}</span></div>
+    <div><div style="font-size:13px" class="muted">${l.total} ${r.total} · ${l.demand} ${r.demand} · ${l.given} ${r.given}</div><div class="barw"><i style="width:${r.total ? Math.max(0, Math.round(r.remaining / r.total * 100)) : 0}%"></i></div><span class="pill ${r.status === 'ok' ? 'ok' : 'bad'}" style="margin-top:6px;display:inline-block">${lab[r.status]}</span>${r.short ? `<div class="short">${l.short(r.short)}</div>` : ''}</div>
     <div style="text-align:center"><div class="rem">${r.remaining}</div><div class="muted" style="font-size:11px">${l.remain}</div><button class="chip" style="margin-top:4px" data-edit="${esc(r.size)}">${l.edit}</button></div></div>`).join('') : '') + `<button class="btn alt full" style="margin-top:12px" data-edit="">${l.addSize}</button>`;
 }
 function render() {
@@ -159,6 +192,7 @@ function render() {
   if (keepReader) { const ph = $('reader'); if (ph) ph.replaceWith(keepReader); }
   if (keep !== null && $('q')) { const q = $('q'); q.focus(); try { q.setSelectionRange(keep, keep); } catch (e) {} }
 }
+document.addEventListener('toggle', e => { const d = e.target; if (d && d.dataset && d.dataset.sz !== undefined) { st.openSz = st.openSz || {}; st.openSz[d.dataset.sz] = d.open; } }, true);
 document.addEventListener('input', e => { if (e.target.id === 'q') onQ(e.target.value); });
 document.addEventListener('click', e => {
   const b = e.target.closest && e.target.closest('button'); if (!b) return; const d = b.dataset;
@@ -166,6 +200,9 @@ document.addEventListener('click', e => {
   else if (d.cam !== undefined) { st.cam ? stopCam() : startCam(); }
   else if (d.give) give(d.give); else if (d.other) { st.pickSize = true; render(); }
   else if (d.undo) undo(); else if (d.edit !== undefined) editStock(d.edit);
+  else if (d.givestaff) { const i = d.givestaff.indexOf(':'); b.disabled = true; giveStaff(d.givestaff.slice(0, i), d.givestaff.slice(i + 1)); }
+  else if (d.addstaff) addStaff();
+  else if (d.pickstaff) { const x = st.staff.find(y => y.id === d.pickstaff); if (x) { st.q = x.name; st.results = []; api('shirtFind', { q: x.name }).then(r => { st.results = r.success ? r.results.filter(y => y.kind === 'staff') : []; st.cur = st.results.find(y => y.id === x.id) || st.results[0] || null; st.pickSize = false; render(); window.scrollTo(0, 0); }); } }
   else if (d.pick) { const [k, i] = [d.pick.split(':')[0], d.pick.split(':').slice(1).join(':')]; st.cur = st.results.find(x => x.kind === k && x.id === i) || null; st.pickSize = false; st.msg = null; render(); }
 });
 $('langBtn').onclick = () => { st.lang = st.lang === 'ar' ? 'en' : 'ar'; pref.set('lang', st.lang); render(); };

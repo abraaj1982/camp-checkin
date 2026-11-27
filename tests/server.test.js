@@ -319,6 +319,15 @@ r=post({action:'shirtStock',token:tsh});const M=r.table.find(x=>x.size==='M'),X=
 assert(M.total===3&&M.demand===3&&M.given===0&&M.remaining===3&&M.status==='ok','table: M stock 3, demand 3 (2 students + 1 staff)');
 assert(X&&X.total===0&&X.demand===1&&X.status==='nostock','size with demand but no stock is flagged');
 assert(r.summary.students===4&&r.summary.staff===3&&r.summary.noSize===1,'summary counts students/staff and people without size');
+assert(r.staff.length===3&&r.staff.every(x=>typeof x.given==='boolean')&&r.staff.some(x=>x.size==='M'),'the staff list is there, each with the size he chose');
+assert(!!r.common.size&&r.common.count>=1&&Array.isArray(r.exceptions)&&r.exceptions.every(x=>x.size!==r.common.size),'students: the common size, and only the others are listed as exceptions');
+assert(X.short===0||X.total===0,'no shortage figure for a size with no stock');
+{const q0=post({action:'shirtAddStaff',token:t1,name:'أستاذ جديد',size:'m'});assert(!q0.success,'a supervisor cannot add staff');
+ let q=post({action:'shirtAddStaff',token:tsh,name:'أستاذ جديد',size:'m'});assert(q.success,'staff added from the screen');
+ q=post({action:'shirtAddStaff',token:tsh,name:'أستاذ جديد',size:'L'});assert(!q.success&&q.code==='DUPLICATE','the same name twice is refused');
+ q=post({action:'shirtAddStaff',token:tsh,name:'x',size:'M'});assert(!q.success,'a one-letter name is refused');
+ q=post({action:'shirtStock',token:tsh});assert(q.staff.length===4&&q.staff.find(x=>x.name==='أستاذ جديد').size==='M','the new person is in the list with a normalised size');
+ book.Staff.rows.pop();}
 r=post({action:'shirtFind',token:tsh,q:'أحمد'});assert(r.results.length===1&&r.results[0].size==='M'&&r.results[0].given===false&&!JSON.stringify(r).includes('9999000'),'find student: size shown, no phone');
 r=post({action:'shirtFind',token:tsh,q:'أستاذ'});assert(r.results.length===3&&r.results.every(x=>x.kind==='staff'),'find staff by name');
 r=post({action:'shirtGive',token:tsh,kind:'student',id:'1001',clientId:'sg1'});assert(r.success&&r.size==='M'&&r.remaining===2,'give registered size, stock goes down');

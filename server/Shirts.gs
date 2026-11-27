@@ -48,7 +48,7 @@ function shirtTable_(people, log, stock) {
   people.forEach(function(p) { if (p.size) ensure(p.size).demand++; });
   log.filter(function(l) { return l.status === 'given'; }).forEach(function(l) { if (l.size) ensure(l.size).given++; });
   const order = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '2XL', '3XL', 'XXXL', '4XL', '5XL'];
-  return Object.keys(sizes).map(function(k) { const r = sizes[k]; r.remaining = r.total - r.given; r.status = r.total === 0 ? 'nostock' : r.remaining <= 0 ? 'out' : (r.lowAt ? r.remaining <= r.lowAt : r.remaining <= Math.max(2, Math.ceil(r.total * 0.1))) ? 'low' : 'ok'; return r; })
+  return Object.keys(sizes).map(function(k) { const r = sizes[k]; r.remaining = r.total - r.given; r.short = r.total > 0 ? Math.max(0, r.demand - r.total) : 0; r.status = r.total === 0 ? 'nostock' : r.remaining <= 0 ? 'out' : (r.lowAt ? r.remaining <= r.lowAt : r.remaining <= Math.max(2, Math.ceil(r.total * 0.1))) ? 'low' : 'ok'; return r; })
     .sort(function(a, b) { const ia = order.indexOf(a.size), ib = order.indexOf(b.size); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.size.localeCompare(b.size); });
 }
 function shirtSummary_(people, log) {
@@ -60,7 +60,34 @@ function shirtSummary_(people, log) {
 function handleShirtStock_(data) {
   return withAuth_(data, requireAnyPerm_(['shirts', 'manage']), function() {
     const people = shirtPeople_(), log = readShirtLog_();
-    return { success: true, table: shirtTable_(people, log, readShirtStock_()), summary: shirtSummary_(people, log) };
+    const table = shirtTable_(people, log, readShirtStock_()), given = activeGiven_(log);
+    // Staff are the focus: every name with the size he chose and whether he has his shirt (the screen groups them by size).
+    const staff = people.filter(function(p) { return p.kind === 'staff'; }).map(function(p) { const g = given['staff:' + p.id]; return { id: p.id, name: p.name, size: p.size, given: !!g, givenSize: g ? g.size : '' }; });
+    // Students mostly wear one size: the common one, and the exceptions (the few who need another) so their shirts are set apart.
+    const stu = people.filter(function(p) { return p.kind === 'student'; }), cnt = {};
+    stu.forEach(function(p) { if (p.size) cnt[p.size] = (cnt[p.size] || 0) + 1; });
+    const common = Object.keys(cnt).sort(function(a, b) { return cnt[b] - cnt[a] || (a < b ? -1 : 1); })[0] || '';
+    const exceptions = stu.filter(function(p) { return p.size && p.size !== common; }).map(function(p) { const g = given['student:' + p.id]; return { id: p.id, name: p.name, size: p.size, team: p.team || '', bus: p.bus || '', given: !!g }; });
+    return { success: true, table: table, summary: shirtSummary_(people, log), staff: staff, common: { size: common, count: common ? cnt[common] : 0 }, exceptions: exceptions };
+  });
+}
+// A person missing from the Staff tab can be added from the screen (name + size), so nobody needs to open the sheet.
+function handleShirtAddStaff_(data) {
+  return withAuth_(data, requirePerm_('shirts'), function(user) {
+    const name = String(data.name || '').trim().slice(0, 60), size = normSize_(data.size);
+    if (name.length < 2) return { success: false, error: 'اكتب الاسم' };
+    if (size.length > 8) return { success: false, error: 'المقاس غير صالح' };
+    let sh; try { sh = getSheetByName_(STAFF_SHEET_); } catch (e) { return { success: false, code: 'NEEDS_SETUP', error: 'شغّل SETUP_createTabs مرة واحدة' }; }
+    const lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    try {
+      if (readStaff_().some(function(x) { return x.name.toLowerCase() === name.toLowerCase(); })) return { success: false, code: 'DUPLICATE', error: 'هذا الاسم موجود في القائمة' };
+      appendSafe_(sh, [name, size, 'أُضيف من الشاشة']);
+      writeAudit_(user.Username, 'SHIRT_STAFF_ADDED', name, size);
+      return { success: true };
+    } finally {
+      lock.releaseLock();
+    }
   });
 }
 

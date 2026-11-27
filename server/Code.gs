@@ -105,6 +105,7 @@ const ACTIONS_ = {
   shirtGive: function(d) { return handleShirtGive_(d); },
   shirtUndo: function(d) { return handleShirtUndo_(d); },
   shirtStockSet: function(d) { return handleShirtStockSet_(d); },
+  shirtAddStaff: function(d) { return handleShirtAddStaff_(d); },
   nutritionSetStaff: function(d) { return handleNutritionSetStaff_(d); },
   mediaList: function(d) { return handleMediaList_(d); },
   annSave: function(d) { return handleAnnSave_(d); },
