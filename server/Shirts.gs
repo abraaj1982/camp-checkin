@@ -43,9 +43,10 @@ function activeGiven_(log) { const m = {}; log.filter(function(l) { return l.sta
 
 // Per size: stock, demand (registered), given, remaining.
 function shirtTable_(people, log, stock) {
-  const sizes = {}, ensure = function(s) { if (s && !sizes[s]) sizes[s] = { size: s, total: 0, lowAt: 0, demand: 0, given: 0 }; return sizes[s]; };
+  const sizes = {}, ensure = function(s) { if (s && !sizes[s]) sizes[s] = { size: s, total: 0, lowAt: 0, demand: 0, given: 0, studentsPending: 0, staffPending: 0 }; return sizes[s]; };
   Object.keys(stock).forEach(function(s) { const r = ensure(s); r.total = stock[s].total; r.lowAt = stock[s].lowAt; });
-  people.forEach(function(p) { if (p.size) ensure(p.size).demand++; });
+  const done = activeGiven_(log);
+  people.forEach(function(p) { if (p.size) { const r = ensure(p.size); r.demand++; if (!done[p.kind + ':' + p.id]) { if (p.kind === 'student') r.studentsPending++; else r.staffPending++; } } });
   log.filter(function(l) { return l.status === 'given'; }).forEach(function(l) { if (l.size) ensure(l.size).given++; });
   const order = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '2XL', '3XL', 'XXXL', '4XL', '5XL'];
   return Object.keys(sizes).map(function(k) { const r = sizes[k]; r.remaining = r.total - r.given; r.short = r.total > 0 ? Math.max(0, r.demand - r.total) : 0; r.status = r.total === 0 ? 'nostock' : r.remaining <= 0 ? 'out' : (r.lowAt ? r.remaining <= r.lowAt : r.remaining <= Math.max(2, Math.ceil(r.total * 0.1))) ? 'low' : 'ok'; return r; })

@@ -322,6 +322,7 @@ assert(r.summary.students===4&&r.summary.staff===3&&r.summary.noSize===1,'summar
 assert(r.staff.length===3&&r.staff.every(x=>typeof x.given==='boolean')&&r.staff.some(x=>x.size==='M'),'the staff list is there, each with the size he chose');
 assert(!!r.common.size&&r.common.count>=1&&Array.isArray(r.exceptions)&&r.exceptions.every(x=>x.size!==r.common.size),'students: the common size, and only the others are listed as exceptions');
 assert(X.short===0||X.total===0,'no shortage figure for a size with no stock');
+assert(M.studentsPending+M.staffPending===M.demand&&M.studentsPending===2&&M.staffPending===1,'demand split: students still waiting for the size and staff still waiting (what staff may take without starving the students)');
 {const q0=post({action:'shirtAddStaff',token:t1,name:'أستاذ جديد',size:'m'});assert(!q0.success,'a supervisor cannot add staff');
  let q=post({action:'shirtAddStaff',token:tsh,name:'أستاذ جديد',size:'m'});assert(q.success,'staff added from the screen');
  q=post({action:'shirtAddStaff',token:tsh,name:'أستاذ جديد',size:'L'});assert(!q.success&&q.code==='DUPLICATE','the same name twice is refused');
