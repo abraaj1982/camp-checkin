@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>طباعة الأساور والكشوف — MUKHAYYAM</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="lib/qrcode.js"></script> <!-- kept in the project: the QR codes must print even when the internet is down -->
 <link rel="stylesheet" href="theme.css">
 <script src="ui.js" defer></script>
 <style>
@@ -21,7 +21,7 @@
 .wb .num{font-weight:800;font-family:Tajawal,monospace;letter-spacing:.2mm}
 .wb .bus{font-weight:700}
 .wb .nm{font-size:2.6mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.wb .band{flex:none;align-self:stretch;width:9mm;border-radius:1mm;display:flex;align-items:center;justify-content:center;font-size:2.4mm;font-weight:700;color:#fff;text-shadow:0 0 1px #000}
+.wb .band{flex:none;align-self:stretch;width:9mm;border-radius:1mm;display:flex;align-items:center;justify-content:center;font-size:2.4mm;font-weight:800;color:#fff}
 /* paper list */
 .pl{break-after:page;page-break-after:always;margin-bottom:8mm}
 .pl:last-child{break-after:auto}
@@ -36,6 +36,12 @@
 /* qrcodejs makes a canvas + img at 2x pixels: force them to the real box size (this caused clipped / overlapping bands) */
 .wb .qr canvas{display:none!important}.wb .qr img{width:100%!important;height:100%!important;display:block}
 .qrc .q canvas{display:none!important}.qrc .q img{width:34mm!important;height:34mm!important;display:block}
+/* identity head of the paper lists */
+.pr-hd{display:flex;align-items:center;gap:4mm;padding-bottom:3mm;margin-bottom:4mm;border-bottom:.8mm solid #EBBA4E;color:#372A25}.pr-hd img{height:16mm}
+.pr-hd .n{font-weight:800;font-size:11pt}.pr-hd h2{font-family:Lalezar,Tajawal,sans-serif;font-weight:400;font-size:18pt;margin:0!important;line-height:1.2;color:#372A25!important}.pr-hd .w{margin-inline-start:auto;font-size:9.5pt;text-align:end}
+.pl th{background:#372A25!important;color:#FBF3D7!important}.pl tr:nth-child(even) td{background:#FBF3D7}
+.pr-ft{margin-top:5mm;height:8mm;background:url(brand/strip.png) repeat-x center/auto 100%}
+.wb .band,.pl th,.pl tr:nth-child(even) td,.pr-ft{-webkit-print-color-adjust:exact;print-color-adjust:exact} /* without this the browser drops the team colours when printing */
 @media print{
   @page{size:A4 landscape;margin:8mm} /* landscape so a 250 mm wristband fits the page */
   body{background:#fff}
@@ -85,11 +91,14 @@ if (!token) location.href = 'login.html';
 else if (perms.indexOf('*') === -1 && perms.indexOf('manage') === -1 && perms.indexOf('print') === -1) location.href = 'hub.html';
 try { document.documentElement.dataset.theme = localStorage.getItem('mk_pref_theme') || 'light'; } catch (e) {}
 const PALETTE = ['#1F6FA8', '#C2455A', '#2E7D4F', '#D4912A', '#7A5C99', '#2A9D8F', '#8D5524', '#555555'];
+// A team named after a colour wears that colour (the same colours as the big screen); other teams take the next palette colour.
+const NAMED = [['أحمر', '#D83A41'], ['أخضر', '#2E9B5E'], ['أزرق', '#2F73D9'], ['أصفر', '#E8B04B'], ['بنفسج', '#8A55D6'], ['برتقال', '#E8702F'], ['فيروز', '#1FA8A8'], ['وردي', '#D95C98']];
+const lum = hex => { const n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255; return (0.299 * r + 0.587 * g + 0.114 * b) / 255; };
 const $ = id => document.getElementById(id);
 const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 let ALL = [];
 let colors = {};
-try { colors = JSON.parse(localStorage.getItem('mk_team_colors') || '{}'); } catch (e) {}
+try { colors = JSON.parse(localStorage.getItem('mk_team_colors2') || '{}'); } catch (e) {} // only colours the user picked by hand (the old automatic ones were not kept)
 
 function qrInto(el, text, px) {
   if (typeof QRCode === 'undefined') { el.textContent = text; return; }
@@ -97,12 +106,18 @@ function qrInto(el, text, px) {
 }
 const mm2px = mm => Math.round(mm * 3.78 * 2); // 2x for sharper printing
 
-function colorOf(team) { if (!colors[team]) { const names = Object.keys(colors); colors[team] = PALETTE[names.length % PALETTE.length]; } return colors[team]; }
+const auto = {};
+function colorOf(team) {
+  if (colors[team]) return colors[team]; if (auto[team]) return auto[team];
+  const hit = NAMED.find(c => String(team).indexOf(c[0]) !== -1);
+  auto[team] = hit ? hit[1] : PALETTE[Object.keys(auto).filter(t => !NAMED.some(c => String(t).indexOf(c[0]) !== -1)).length % PALETTE.length];
+  return auto[team];
+}
 function buildTeams() {
   const teams = Array.from(new Set(ALL.map(s => s.team).filter(Boolean))).sort();
   teams.forEach(colorOf);
-  $('teams').innerHTML = teams.length ? teams.map(t => `<label class="tm"><input type="color" value="${colors[t]}" data-team="${esc(t)}" aria-label="لون ${esc(t)}"><span>${esc(t)}</span></label>`).join('') : '<span class="muted">لا توجد أسماء فرق في الشيت (عمود Team name).</span>';
-  $('teams').querySelectorAll('input').forEach(i => i.oninput = () => { colors[i.dataset.team] = i.value; try { localStorage.setItem('mk_team_colors', JSON.stringify(colors)); } catch (e) {} draw(); });
+  $('teams').innerHTML = teams.length ? teams.map(t => `<label class="tm"><input type="color" value="${colorOf(t)}" data-team="${esc(t)}" aria-label="لون ${esc(t)}"><span>${esc(t)}</span></label>`).join('') : '<span class="muted">لا توجد أسماء فرق في الشيت (عمود Team name).</span>';
+  $('teams').querySelectorAll('input').forEach(i => i.oninput = () => { colors[i.dataset.team] = i.value; try { localStorage.setItem('mk_team_colors2', JSON.stringify(colors)); } catch (e) {} draw(); });
 }
 function pick() {
   let list = ALL.slice();
@@ -111,6 +126,7 @@ function pick() {
   const lim = Number($('lim').value); if (lim) list = list.slice(0, lim);
   return list;
 }
+function head(title) { return `<div class="pr-hd"><img src="brand/logo-season.svg" alt=""><div><div class="n">${esc(document.getElementById('campT') ? document.getElementById('campT').textContent : '')}</div><h2>${esc(title)}</h2></div><div class="w">${esc(new Date().toLocaleString('ar'))}</div></div>`; }
 function draw() {
   const mode = $('mode').value, list = pick();
   document.querySelectorAll('.wbOpt').forEach(e => e.style.display = mode === 'wb' ? '' : 'none');
@@ -122,15 +138,16 @@ function draw() {
     const q = Math.max(20, h - 4); // QR side in mm (>= 20mm)
     list.forEach(s => { for (let c = 0; c < copies; c++) {
       const d = document.createElement('div'); d.className = 'wb'; d.style.width = w + 'mm'; d.style.minHeight = h + 'mm';
-      d.innerHTML = `<div class="qr" style="width:${q}mm;height:${q}mm"></div><div class="info"><div class="num" style="font-size:${Math.max(7, q * .38)}mm">${esc(s.id)}</div><div class="bus" style="font-size:${Math.max(5, q * .25)}mm">باص ${esc(s.bus)}</div>${showName ? `<div class="nm">${esc(s.name)}</div>` : ''}</div><div class="band" style="background:${colorOf(s.team)}">${esc((s.team || '').slice(0, 8))}</div>`;
+      d.innerHTML = `<div class="qr" style="width:${q}mm;height:${q}mm"></div><div class="info"><div class="num" style="font-size:${Math.max(7, q * .38)}mm">${esc(s.id)}</div><div class="bus" style="font-size:${Math.max(5, q * .25)}mm">باص ${esc(s.bus)}</div>${showName ? `<div class="nm">${esc(s.name)}</div>` : ''}</div><div class="band" style="background:${colorOf(s.team)};color:${lum(colorOf(s.team)) > 0.62 ? '#372A25' : '#fff'}">${esc((s.team || '').slice(0, 8))}</div>`;
       sheet.appendChild(d); qrInto(d.querySelector('.qr'), 'MKH:' + s.id, mm2px(q));
     } });
   } else {
     const byBus = {}; list.forEach(s => { (byBus[s.bus] = byBus[s.bus] || []).push(s); });
     Object.keys(byBus).sort((a, b) => a - b).forEach(bus => {
       const d = document.createElement('div'); d.className = 'pl';
-      if (mode === 'list') d.innerHTML = `<h2>كشف حضور · باص ${esc(bus)} · ${byBus[bus].length} طالباً</h2><table><thead><tr><th>#</th><th>رقم الطالب</th><th>الاسم</th><th>الفريق</th><th>الصف</th><th>حضر</th></tr></thead><tbody>${byBus[bus].map((s, i) => `<tr><td>${i + 1}</td><td><b>${esc(s.id)}</b></td><td>${esc(s.name)}</td><td>${esc(s.team)}</td><td>${esc(s.cls)}</td><td><span class="box"></span></td></tr>`).join('')}</tbody></table>`;
-      else { d.innerHTML = `<h2>ورقة QR احتياطية · باص ${esc(bus)}</h2><div class="qrgrid">${byBus[bus].map(s => `<div class="qrc"><div class="q" data-id="${esc(s.id)}"></div><b>${esc(s.id)}</b><br>${esc(s.name)}</div>`).join('')}</div>`; }
+      if (mode === 'list') d.innerHTML = `${head('كشف حضور · باص ' + bus + ' · ' + byBus[bus].length + ' طالباً')}<table><thead><tr><th>#</th><th>رقم الطالب</th><th>الاسم</th><th>الفريق</th><th>الصف</th><th>حضر</th></tr></thead><tbody>${byBus[bus].map((s, i) => `<tr><td>${i + 1}</td><td><b>${esc(s.id)}</b></td><td>${esc(s.name)}</td><td>${esc(s.team)}</td><td>${esc(s.cls)}</td><td><span class="box"></span></td></tr>`).join('')}</tbody></table>`;
+      else { d.innerHTML = `${head('ورقة QR احتياطية · باص ' + bus)}<div class="qrgrid">${byBus[bus].map(s => `<div class="qrc"><div class="q" data-id="${esc(s.id)}"></div><b>${esc(s.id)}</b><br>${esc(s.name)}</div>`).join('')}</div>`; }
+      d.insertAdjacentHTML('beforeend', '<div class="pr-ft"></div>');
       sheet.appendChild(d);
       d.querySelectorAll('.q').forEach(el => qrInto(el, 'MKH:' + el.dataset.id, 110));
     });
