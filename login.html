@@ -96,6 +96,18 @@ $('fgSend').onclick = async () => {
 };
 $('showPw').onclick = () => { const p = $('password'); p.type = p.type === 'password' ? 'text' : 'password'; paint(); p.focus(); };
 paint();
+// One screen only (check-in) -> straight to it; otherwise the home menu of that person's screens.
+function destOf(p) { return (p.length === 1 && p[0] === 'checkin') ? 'supervisor.html' : (p.length === 1 && p[0] === 'gate') ? 'gate.html' : 'hub.html'; }
+// Already signed in (a tab that came back with Back, or a second visit): go on to the screens instead of showing the form.
+// If the session has really ended, the screen sends him back here and clears it, so this cannot loop.
+function resume() {
+  let tok = null, p = []; try { tok = sessionStorage.getItem('mukhayyam_token'); p = JSON.parse(sessionStorage.getItem('mukhayyam_permissions') || '[]'); } catch (e) {}
+  if (tok) { location.replace(destOf(p)); return true; }
+  return false;
+}
+// A page restored by the Back button comes back exactly as it was left (button greyed, "signed in…"): redo it.
+window.addEventListener('pageshow', e => { if (e.persisted && !resume()) { $('btn').disabled = false; $('btn').textContent = T[S.lang].go; msg('', ''); $('password').value = ''; } });
+if (resume()) { /* leaving */ }
 // Why was he sent back here? (only when the app signed him out; a normal logout leaves nothing)
 try { const w = (localStorage.getItem('mk_logout_reason') || '').split('|'); if (w[0] && Date.now() - Number(w[1] || 0) < 6 * 3600e3) { const t = T[S.lang]; msg('warn', t.why[w[0]] || t.why.other(w[0])); } localStorage.removeItem('mk_logout_reason'); } catch (e) {}
 // Warn when Caps Lock is on while typing the password (a common reason for a refused password).
@@ -118,7 +130,7 @@ $('form').addEventListener('submit', async e => {
       msg('ok', t.ok);
       const p = data.permissions || [];
       // One screen only (check-in) -> straight to it; otherwise the home menu of that person's screens.
-      location.href = (p.length === 1 && p[0] === 'checkin') ? 'supervisor.html' : (p.length === 1 && p[0] === 'gate') ? 'gate.html' : 'hub.html';
+      location.replace(destOf(p)); // replace: the login page does not stay in the history, so Back does not return to it
       return;
     }
     const err = String(data.error || '');
