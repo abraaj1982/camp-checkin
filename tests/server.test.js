@@ -103,6 +103,10 @@ r=post({action:'trackPing',token:tl,bus:'1'});assert(r.success,'leader asks bus 
 r=post({action:'trackPingCheck',token:t1});assert(r.success&&r.ping&&r.ping.by==='القائد','the bus 1 supervisor sees the request, with who asked');
 r=post({action:'trackPingCheck',token:t2});assert(r.success&&!r.ping,'another bus does not see it');
 r=post({action:'busStatus',token:t1,lat:23.61,lng:58.51});r=post({action:'trackPingCheck',token:t1});assert(!r.ping,'a position from the bus answers the request');
+{const h=book.BusLive.rows[0],row=book.BusLive.rows[1],old=new Date(Date.now()-8*60e3);row[h.indexOf('UpdatedAt')]=old;row[h.indexOf('Supervisor')]='Colleague';for(const k of Object.keys(cache))delete cache[k];
+ const la=row[h.indexOf('Lat')];r=post({action:'busStatus',token:t1});assert(r.success,'check-in without a position works');
+ assert(+row[h.indexOf('UpdatedAt')]===+old&&row[h.indexOf('Supervisor')]==='Colleague'&&row[h.indexOf('Lat')]===la,'no position: last-seen time, supervisor name and location stay as they were');
+ r=post({action:'busStatus',token:t1,lat:23.62,lng:58.52});assert(+row[h.indexOf('UpdatedAt')]>+old&&row[h.indexOf('Supervisor')]!=='Colleague','with a position: time and name update');}
 r=post({action:'trackPingCheck',token:tl});assert(!r.success,'trackPingCheck is for bus supervisors');
 r=post({action:'busLive',token:t1});assert(!r.success,'supervisor cannot read live map');
 // ---- bags

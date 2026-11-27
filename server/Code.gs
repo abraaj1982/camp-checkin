@@ -708,7 +708,7 @@ function handleBusStatus_(data) {
       let row = -1;
       for (let r = 1; r < vals.length; r++) if (String(vals[r][h.indexOf('Bus')]) === bus) { row = r + 1; break; }
       const prev = row === -1 ? {} : {
-        Status: vals[row - 1][h.indexOf('Status')], Lat: vals[row - 1][h.indexOf('Lat')], Lng: vals[row - 1][h.indexOf('Lng')], Accuracy: vals[row - 1][h.indexOf('Accuracy')]
+        Status: vals[row - 1][h.indexOf('Status')], Supervisor: vals[row - 1][h.indexOf('Supervisor')], UpdatedAt: vals[row - 1][h.indexOf('UpdatedAt')], Lat: vals[row - 1][h.indexOf('Lat')], Lng: vals[row - 1][h.indexOf('Lng')], Accuracy: vals[row - 1][h.indexOf('Accuracy')]
       };
       // No manual "departed" button anymore: the bus is 'onway' automatically once its position moves (> ~7 km/h between two updates).
       let autoStatus = '', speed = '';
@@ -730,6 +730,9 @@ function handleBusStatus_(data) {
         Lat: hasGeo ? lat : (prev.Lat || ''), Lng: hasGeo ? lng : (prev.Lng || ''), Accuracy: hasGeo ? (Number(data.acc) || '') : (prev.Accuracy || ''),
         UpdatedAt: new Date(), Supervisor: user.FullName, Boarded: c.boarded, Total: c.total, Speed: speed
       };
+      // A check-in WITHOUT a position (a computer, or a phone with location off) only refreshes the counts: it must not change the
+      // supervisor's name or the "last seen" time, or it would hide a bus that is not really being tracked and overwrite a colleague's row.
+      if (!hasGeo && row !== -1) { rec.Supervisor = prev.Supervisor; rec.UpdatedAt = prev.UpdatedAt; rec.Speed = ''; }
       const out = h.map(function(n) { return rec.hasOwnProperty(n) ? rec[n] : ''; });
       if (row === -1) appendSafe_(sheet, out); else sheet.getRange(row, 1, 1, out.length).setValues([out.map(cellSafe_)]);
       if (status === 'departed') writeAudit_(user.Username, 'BUS_DEPARTED', bus, 'boarded=' + c.boarded + '/' + c.total);
