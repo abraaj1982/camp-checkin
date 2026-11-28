@@ -361,7 +361,7 @@ function buildRoster_(user, data) {
     const students = readStudents_().students;
     const all = hasPerm_(user, 'allbuses');
     const bus = all && data.bus ? String(data.bus) : String(user.AssignedBus).trim();
-    if (!bus) return { success: false, error: 'لا يوجد باص مخصَّص لحسابك' };
+    if (!bus) return { success: false, error: 'حسابك غير مرتبط بباص. يُرجى التواصل مع السكرتارية لتعيين باص لك' };
     const sc = scanStates_(), states = sc.states;
     const stages = readStages_(), nowMs = Date.now(), open = stages ? openStages_(stages, nowMs) : [];
     const list = students.filter(function(s) { return s.bus === bus; }).map(function(s) {
@@ -694,7 +694,7 @@ function distMeters_(lat1, lng1, lat2, lng2) {
 function handleBusStatus_(data) {
   return withAuth_(data, requirePerm_('checkin'), function(user) {
     const bus = String(user.AssignedBus).trim();
-    if (!bus) return { success: false, error: 'لا يوجد باص مخصَّص لحسابك' };
+    if (!bus) return { success: false, error: 'حسابك غير مرتبط بباص. يُرجى التواصل مع السكرتارية لتعيين باص لك' };
     const status = data.status ? String(data.status) : '';
     if (status && BUS_STATUSES.indexOf(status) === -1) return { success: false, error: 'Invalid status' };
     const lat = Number(data.lat), lng = Number(data.lng);
@@ -1182,7 +1182,7 @@ function handleRoundSave_(data) {
   return withAuth_(data, requirePerm_('checkin'), function(user) {
     const phase = data.phase === 'arrive' ? 'arrive' : 'depart';
     const bus = hasPerm_(user, 'allbuses') && data.bus ? String(data.bus) : String(user.AssignedBus || '').trim();
-    if (!bus) return { success: false, code: 'BAD_REQUEST', error: 'لا يوجد باص مخصَّص لحسابك' };
+    if (!bus) return { success: false, code: 'BAD_REQUEST', error: 'حسابك غير مرتبط بباص. يُرجى التواصل مع السكرتارية لتعيين باص لك' };
     const clientId = String(data.clientId || '').slice(0, 60);
     const students = readStudents_().students, states = scanStates_().states;
     const boarded = students.filter(function(s) { return s.bus === bus && states[s.id] && states[s.id].state === 'boarded' && !states[s.id].via; }).map(function(s) { return s.id; });
