@@ -27,10 +27,10 @@
 .rc-card.picked .tick{background:var(--gc)}
 .packbar{position:sticky;top:0;z-index:15;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:var(--card);border:2px solid var(--brand);border-radius:16px;padding:10px 12px;margin-top:10px}
 .canvas.pack .paper{margin-bottom:22px}
-.cover .cv{padding:60px 40px 50px;text-align:center}.cover .lg{width:80px;height:80px;border-radius:20px;background:#E8B04B;display:grid;place-items:center;font-size:46px;font-weight:800;margin:0 auto 18px;color:#1b2a1b}
-.cvn{font-size:20px;color:#5b6a60}.cvt{font-size:34px;font-weight:800;margin:6px 0}.cvd{font-size:13px;color:#5b6a60}
-.toc{max-width:440px;margin:34px auto 0;text-align:start;border:1px solid #dfe5e0;border-radius:12px;padding:14px 18px}.toc b{display:block;margin-bottom:8px}
-.toc div{display:flex;gap:10px;align-items:center;padding:6px 0;border-bottom:1px dashed #dfe5e0}.toc div:last-child{border-bottom:0}.toc div>span:first-child{width:24px;height:24px;border-radius:50%;background:#1F5E3B;color:#fff;display:grid;place-items:center;font-size:12px;flex:none}
+.cover .cv{padding:60px 40px 50px;text-align:center}.cover .lg{width:96px;height:108px;object-fit:contain;display:block;margin:0 auto 14px}
+.cvn{font-size:20px;color:#6B5A4E}.cvt{font-family:Lalezar,Tajawal,sans-serif;font-size:36px;font-weight:400;margin:6px 0}.cvd{font-size:13px;color:#6B5A4E}
+.toc{max-width:440px;margin:34px auto 0;text-align:start;border:1px solid #E6DAB8;border-radius:12px;padding:14px 18px}.toc b{display:block;margin-bottom:8px}
+.toc div{display:flex;gap:10px;align-items:center;padding:6px 0;border-bottom:1px dashed #E6DAB8}.toc div:last-child{border-bottom:0}.toc div>span:first-child{width:24px;height:24px;border-radius:50%;background:#1F5E3B;color:#fff;display:grid;place-items:center;font-size:12px;flex:none}
 @media print{.canvas.pack .paper{break-before:page;margin:0}.canvas.pack .paper.cover{break-before:auto}}
 .rc-meta .sec{border-color:#E07A8A;color:#B3261E;font-weight:700}
 /* ---------- report workspace ---------- */
@@ -54,40 +54,41 @@
 @media(max-width:640px){.tb .ti{flex-basis:100%}.tb .btn{flex:1 1 0;padding-inline:8px}.canvas{padding:10px 6px}.ph .doc{display:none}}
 .ws>div{min-width:0}
 @media screen{.tw{overflow-x:auto}.paper.land{max-width:1123px}}
-.canvas{background:#d9ded6;border-radius:16px;padding:22px 14px;margin-top:12px}
-[data-theme="dark"] .canvas{background:#0a120c}
+.canvas{background:#E8DFC2;border-radius:16px;padding:22px 14px;margin-top:12px}
+[data-theme="dark"] .canvas{background:#241b17}
 /* ---------- the A4 sheet (what is printed) ---------- */
-.paper{--pb:#1F5E3B;background:#fff;color:#16201a;max-width:794px;margin:0 auto;border-radius:4px;box-shadow:0 18px 40px rgba(0,0,0,.18);padding:0 0 18px;overflow:hidden;font-size:13px}
-.band{height:8px;background:linear-gradient(90deg,var(--pb),#2f8a55 60%,#E8B04B)}
+.paper{--pb:#372A25;background:#fff;color:#372A25;max-width:794px;margin:0 auto;border-radius:4px;box-shadow:0 18px 40px rgba(0,0,0,.18);padding:0 0 18px;overflow:hidden;font-size:13px}
+.band{height:8px;background:linear-gradient(90deg,#372A25 0 34%,#A3A867 34% 67%,#EBBA4E 67%)}
 .ph{display:flex;align-items:center;gap:14px;padding:16px 26px 12px}
-.ph .lg{width:52px;height:52px;border-radius:12px;background:#E8B04B;color:#1b2a1b;display:grid;place-items:center;font-size:28px;font-weight:700;flex:none}
-.ph .nm{font-size:18px;font-weight:700}.ph .sb{font-size:12.5px;color:#5b6a60}
-.ph .doc{margin-inline-start:auto;text-align:end;font-size:11px;color:#5b6a60;letter-spacing:.04em}
-.tblock{padding:4px 26px 0}.tblock .pt{font-size:24px;font-weight:800;color:#13261a;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ph .lg{width:56px;height:56px;flex:none;object-fit:contain}
+.ph .nm{font-size:18px;font-weight:700}.ph .sb{font-size:12.5px;color:#6B5A4E}
+.ph .doc{margin-inline-start:auto;text-align:end;font-size:11px;color:#6B5A4E;letter-spacing:.04em}
+.tblock{padding:4px 26px 0}.tblock .pt{font-family:Lalezar,Tajawal,sans-serif;font-size:26px;font-weight:400;color:#372A25;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .conf{display:inline-block;border:2px solid #B3261E;color:#B3261E;border-radius:6px;padding:1px 10px;font-weight:800;font-size:12px;letter-spacing:.05em}
-.meta{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin:12px 26px 0;border:1px solid #dfe5e0;border-radius:10px;overflow:hidden}
-.meta div{padding:8px 10px;border-inline-start:1px solid #dfe5e0}.meta div:first-child{border-inline-start:0}
-.meta span{display:block;font-size:10.5px;color:#6b7a70;font-weight:600}.meta b{font-size:12.5px;font-weight:700;color:#16201a;word-break:break-word}
+.meta{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin:12px 26px 0;border:1px solid #E6DAB8;border-radius:10px;overflow:hidden}
+.meta div{padding:8px 10px;border-inline-start:1px solid #E6DAB8}.meta div:first-child{border-inline-start:0}
+.meta span{display:block;font-size:10.5px;color:#7A6A5E;font-weight:600}.meta b{font-size:12.5px;font-weight:700;color:#372A25;word-break:break-word}
 .chips{display:flex;gap:8px;flex-wrap:wrap;margin:12px 26px 0}
-.chips div{border-radius:10px;padding:6px 12px;background:#f1f5f2;border:1px solid #dfe5e0;font-size:12px}.chips b{font-size:16px;margin-inline-end:6px;color:var(--pb)}
+.chips div{border-radius:10px;padding:6px 12px;background:#FBF3D7;border:1px solid #E6DAB8;font-size:12px}.chips b{font-size:16px;margin-inline-end:6px;color:var(--pb)}
 .tw{padding:14px 26px 0}
 table.rt{width:100%;border-collapse:separate;border-spacing:0;font-size:12.5px}
 table.rt th{background:var(--pb);color:#fff;padding:8px 9px;text-align:start;font-weight:700;white-space:nowrap;font-size:12px}
 table.rt th:first-child{border-start-start-radius:8px}table.rt th:last-child{border-start-end-radius:8px}
-table.rt td{padding:7px 9px;border-bottom:1px solid #e6ebe7;vertical-align:middle}
-table.rt tbody tr:nth-child(even) td{background:#f6f9f7}
-@media screen{table.rt tbody tr:hover td{background:#eaf3ec}}
+table.rt td{padding:7px 9px;border-bottom:1px solid #EDE3C6;vertical-align:middle}
+table.rt tbody tr:nth-child(even) td{background:#FFFAEB}
+@media screen{table.rt tbody tr:hover td{background:#F6EBC8}}
 table.rt .num{text-align:center;font-variant-numeric:tabular-nums}
-table.rt tr.tot td{font-weight:800;background:#e3eee6!important;border-top:2px solid var(--pb);border-bottom:0}
+table.rt tr.tot td{font-weight:800;background:#F3E4B0!important;border-top:2px solid var(--pb);border-bottom:0}
 th.sortable{cursor:pointer;user-select:none}
 .pill2{display:inline-block;border-radius:99px;padding:2px 10px;font-size:11.5px;font-weight:700;white-space:nowrap;background:#eef1ef;color:#3d4a42}
-.pill2.ok{background:#dcf2e3;color:#1d6b3b}.pill2.warn{background:#fdf0d5;color:#8a5a00}.pill2.bad{background:#fbe2e2;color:#9c1f1f}.pill2.mute{background:#eceff1;color:#5a6670}
+.pill2.ok{background:#E4EBC8;color:#4A5320}.pill2.warn{background:#fdf0d5;color:#8a5a00}.pill2.bad{background:#fbe2e2;color:#9c1f1f}.pill2.mute{background:#eceff1;color:#5a6670}
 .kp{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:8px 0 12px}
-.kp div{border:1px solid #dfe5e0;border-radius:12px;padding:10px 8px;text-align:center;background:linear-gradient(180deg,#fff,#f6f9f7)}
-.kp b{display:block;font-size:22px;color:var(--pb);font-variant-numeric:tabular-nums}.kp span{font-size:11.5px;color:#5b6a60}
+.kp div{border:1px solid #E6DAB8;border-radius:12px;padding:10px 8px;text-align:center;background:linear-gradient(180deg,#fff,#FFFAEB)}
+.kp b{display:block;font-size:22px;color:var(--pb);font-variant-numeric:tabular-nums}.kp span{font-size:11.5px;color:#6B5A4E}
 .sec{padding:6px 26px 0}.sec h3{font-size:15px;margin:14px 0 6px;display:flex;align-items:center;gap:8px}.sec h3:before{content:'';width:5px;height:18px;border-radius:3px;background:#E8B04B}
-.pfoot{margin:18px 26px 0;font-size:10.5px;color:#6b7a70;display:flex;justify-content:space-between;gap:10px;border-top:1px solid #dfe5e0;padding-top:8px}
-.empty{padding:34px 10px;text-align:center;color:#6b7a70}.empty div{font-size:34px}
+.pfoot{margin:18px 26px 0;font-size:10.5px;color:#7A6A5E;display:flex;justify-content:space-between;gap:10px;border-top:1px solid #E6DAB8;padding-top:8px}
+.pstrip{height:9mm;margin:14px 0 0;background:url(brand/strip.png) repeat-x center/auto 100%}
+.empty{padding:34px 10px;text-align:center;color:#7A6A5E}.empty div{font-size:34px}
 @media(max-width:640px){.kp{grid-template-columns:repeat(2,1fr)}.meta{grid-template-columns:repeat(2,1fr)}.meta div:nth-child(3){border-inline-start:0}.ph,.tblock,.tw,.sec{padding-inline:14px}.meta,.chips,.pfoot{margin-inline:14px}}
 @media print{
   html,body{background:#fff!important}
@@ -223,13 +224,13 @@ function paper(pd, pf, inPack) {
   const camp = ($('campT') && $('campT').textContent) || '', now = new Date();
   const when = now.toLocaleDateString(st.lang === 'en' ? 'en-GB' : 'ar-u-nu-latn', { timeZone: 'Asia/Muscat', day: 'numeric', month: 'long', year: 'numeric' }) + ' · ' + fmtTime(now.toISOString());
   const rows = d.kind === 'table' ? (inPack ? d.rows : sortedRows(d)) : [], ft = ftext(d, pf);
-  const head = `<div class="band"></div><div class="ph"><div class="lg">م</div><div><div class="nm">${esc(camp)}</div><div class="sb">${esc(tr(d.group))}</div></div><div class="doc">${esc(tr('تقرير'))} · ${esc(d.report.toUpperCase())}</div></div>
+  const head = `<div class="band"></div><div class="ph"><img class="lg" src="brand/logo-season.svg" alt=""><div><div class="nm">${esc(camp)}</div><div class="sb">${esc(tr(d.group))}</div></div><div class="doc">${esc(tr('تقرير'))} · ${esc(d.report.toUpperCase())}</div></div>
     <div class="tblock"><div class="pt">${esc(tr(d.title))}${d.confidential ? `<span class="conf">${esc(tr('سري'))}</span>` : ''}</div></div>
     <div class="meta"><div><span>${esc(tr('التاريخ'))}</span><b>${esc(when)}</b></div><div><span>${esc(tr('أعدّه'))}</span><b>${esc(d.generatedBy)}</b></div><div><span>${esc(tr('الفلاتر المطبّقة'))}</span><b>${esc(ft || tr('بدون فلاتر'))}</b></div><div><span>${esc(tr('عدد السجلات'))}</span><b>${d.kind === 'table' ? rows.length : '—'}</b></div></div>`;
   let body = '';
   if (d.kind === 'summary') body = d.sections.map(s => `<div class="sec"><h3>${esc(tr(s.title))}</h3>${s.kpis && s.kpis.length ? `<div class="kp">${s.kpis.map(k => `<div><b>${esc(k.value)}</b><span>${esc(tr(k.label))}</span></div>`).join('')}</div>` : ''}${s.table ? tableHtml(s.table.columns, s.table.rows, s.table.totalRow, false) : ''}</div>`).join('');
   else body = chipsHtml(d, rows) + `<div class="tw">${tableHtml(inPack ? d.columns : visibleCols(d), rows, (!inPack && st.q.trim()) ? null : d.totalRow, !inPack)}</div>`;
-  return `<section class="paper ${d.landscape ? 'land' : ''}" id="paper">${head}${body}<div class="pfoot"><span>${esc(camp)} — ${esc(tr(d.title))}</span><span>${d.confidential ? esc(tr('سري') + ' — ' + tr('للاستخدام الإداري')) : ''}</span></div></section>`;
+  return `<section class="paper ${d.landscape ? 'land' : ''}" id="paper">${head}${body}<div class="pfoot"><span>${esc(camp)} — ${esc(tr(d.title))}</span><span>${d.confidential ? esc(tr('سري') + ' — ' + tr('للاستخدام الإداري')) : ''}</span></div><div class="pstrip"></div></section>`;
 }
 async function buildPack() {
   const ids = st.cat.map(r => r.id).filter(id => st.pack.indexOf(id) !== -1);
@@ -243,7 +244,7 @@ async function buildPack() {
 function packView() {
   const items = st.packData || [], camp = ($('campT') && $('campT').textContent) || '';
   const when = new Date().toLocaleDateString(st.lang === 'en' ? 'en-GB' : 'ar-u-nu-latn', { timeZone: 'Asia/Muscat', day: 'numeric', month: 'long', year: 'numeric' });
-  const cover = `<section class="paper cover"><div class="band"></div><div class="cv"><div class="lg">م</div><div class="cvn">${esc(camp)}</div><div class="cvt">${esc(tr('حزمة تقارير'))}</div><div class="cvd">${esc(when)} · ${esc(tr('أعدّه'))}: ${esc(sessionStorage.getItem('mukhayyam_fullName') || '')}</div>
+  const cover = `<section class="paper cover"><div class="band"></div><div class="cv"><img class="lg" src="brand/logo-season.svg" alt=""><div class="cvn">${esc(camp)}</div><div class="cvt">${esc(tr('حزمة تقارير'))}</div><div class="cvd">${esc(when)} · ${esc(tr('أعدّه'))}: ${esc(sessionStorage.getItem('mukhayyam_fullName') || '')}</div>
     <div class="toc"><b>${esc(tr('المحتويات'))}</b>${items.map((x, i) => `<div><span>${i + 1}</span>${esc(tr(x.d.title))}${x.d.confidential ? ` <span class="conf">${esc(tr('سري'))}</span>` : ''}</div>`).join('')}</div></div></section>`;
   const tb = `<div class="tb noprint"><div class="ti"><b>📚 ${esc(tr('حزمة تقارير'))}</b><span>${items.length} ${esc(tr('تقارير'))}</span></div><button class="btn" data-print="1" ${items.length && !st.packBusy ? '' : 'disabled'}>🖨️ ${esc(tr('طباعة / PDF'))}</button><button class="btn alt" data-csv="1" ${items.length && !st.packBusy ? '' : 'disabled'}>⬇️ Excel</button><button class="btn alt" data-packexit="1">${esc(tr('← القائمة'))}</button></div>`;
   const body = st.packBusy ? `<div class="paper"><div class="empty"><div>⏳</div>${esc(tr('جارٍ تجهيز الحزمة…'))} (${items.length})</div></div>` : cover + items.map(x => paper(x.d, x.f, true)).join('');
