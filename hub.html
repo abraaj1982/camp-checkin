@@ -21,23 +21,26 @@ label.field{display:block;font-size:15px;font-weight:600;margin:16px 0 8px}
 .hint{font-size:12.5px;color:var(--muted);margin-top:6px}
 .who-badge{display:inline-flex;margin-top:8px;padding:4px 12px;border-radius:999px;background:var(--soft);color:var(--brand);font-weight:600;font-size:13px}
 /* tiles */
-.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
-.tile{display:flex;flex-direction:column;gap:6px;text-decoration:none;color:var(--ink);border:1px solid var(--line);border-radius:18px;padding:16px 14px;background:var(--card);min-height:116px;transition:border-color .15s,transform .05s}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+.tile{display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;gap:10px;text-decoration:none;color:var(--ink);border:1px solid var(--line);border-radius:16px;padding:10px 12px;background:var(--card);min-height:62px;transition:border-color .15s,transform .05s}
+.tile .pill{flex-basis:100%}
 .tile:hover{border-color:var(--brand)}.tile:active{transform:translateY(1px)}
-.tile .i{width:42px;height:42px;border-radius:12px;background:var(--soft);display:flex;align-items:center;justify-content:center;font-size:21px}
-.tile .t{font-weight:700;font-size:15px;line-height:1.35}
-.tile .s{font-size:12.5px;color:var(--brand);font-weight:600;margin-top:auto}
-.tile.soon{opacity:.55;cursor:default}.tile.soon .s{color:var(--muted)}
+.tile .i{width:40px;height:40px;flex:none;border-radius:12px;background:var(--soft);display:flex;align-items:center;justify-content:center;font-size:20px}
+.tile .t{font-weight:700;font-size:14.5px;line-height:1.35;flex:1;min-width:0}
+.tile.soon{opacity:.55;cursor:default}.tile.admin{border-style:dashed}
 /* users list: stacked cards (phone-first) */
-#usersListCard table,#usersListCard tbody,#usersListCard tr,#usersListCard td{display:block;width:100%}
+#usersListCard table,#usersListCard tbody{display:block;width:100%}
 #usersListCard thead{display:none}
-#usersListCard tr{border:1px solid var(--line);border-radius:16px;padding:12px 14px;margin-bottom:10px;background:var(--card)}
-#usersListCard td{padding:2px 0;border:0;text-align:start;font-size:14px}
-#usersListCard td:nth-child(1){font-weight:700;font-size:15.5px}
-#usersListCard td:nth-child(2){color:var(--muted);direction:ltr;text-align:end}
-html[dir=rtl] #usersListCard td:nth-child(2){text-align:right}
-#usersListCard td:nth-child(3){color:var(--muted);font-size:13px}
-#usersListCard td:nth-child(5){padding-top:8px}
+#usersListCard tr{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:14px;padding:9px 12px;margin-bottom:8px;background:var(--card)}
+#usersListCard td{border:0;padding:0;font-size:14px}
+#usersListCard td.who{flex:1;min-width:0}
+#usersListCard td.who b{display:block;font-size:15px}
+#usersListCard td.who span{display:block;color:var(--muted);font-size:12.5px;line-height:1.5}
+#usersListCard td.stt,#usersListCard td.act{flex:none}
+.ulHead{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}.ulHead input{flex:1 1 180px;min-width:0}.ulHead .btn{margin:0;width:auto;padding:0 16px;flex:none}
+details.adv{border:1px solid var(--line);border-radius:14px;padding:4px 12px 12px;margin-top:14px;background:var(--card)}
+details.adv summary{cursor:pointer;font-weight:700;padding:10px 0;font-size:14.5px}
+.qa{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
 .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600}
 .badge-active{background:var(--okbg);color:var(--ok)}.badge-locked{background:var(--badbg);color:var(--bad)}.badge-disabled{background:var(--bar);color:var(--muted)}
 .rowBtn{padding:0 12px;min-height:40px;border:1px solid var(--line);border-radius:12px;font-size:13px;cursor:pointer;background:var(--card);color:var(--ink);margin:0 0 6px 6px;font-family:inherit}
@@ -68,7 +71,7 @@ html[dir=rtl] #usersListCard td:nth-child(2){text-align:right}
   <div class="brand"><div class="logo">م</div><div style="min-width:0"><div class="t" id="campT"></div><div class="s" id="campS"></div></div></div>
   <div class="tools"><button class="tool" id="langBtn"></button><button class="tool" id="themeBtn"></button><button class="tool" id="logoutBtn">خروج</button></div>
 </header>
-<section class="hero"><div class="ic ic-logo" aria-hidden="true"></div><h1><span id="helloTxt">مرحباً،</span> <span id="whoName">...</span></h1><span class="who-badge" id="whoRole"></span></section>
+<section class="hero compact"><div class="ic ic-logo" aria-hidden="true"></div><h1><span id="helloTxt">مرحباً،</span> <span id="whoName">...</span></h1></section>
 
 <div class="container">
 
@@ -82,7 +85,7 @@ html[dir=rtl] #usersListCard td:nth-child(2){text-align:right}
   <div id="adminArea" style="display:none;">
     <button type="button" class="btn secondary" id="backBtn" style="margin-bottom:12px">→ رجوع إلى الشاشات</button>
 
-    <div class="card" id="createCard">
+    <div class="card" id="createCard" style="display:none">
       <h2>➕ إضافة مستخدم جديد</h2>
       <form id="createUserForm">
         <label class="field">اسم المستخدم (للدخول) <span class="req">*</span></label>
@@ -135,7 +138,8 @@ html[dir=rtl] #usersListCard td:nth-child(2){text-align:right}
     </div>
 
     <div class="card" id="usersListCard">
-      <h2>📋 المستخدمون الحاليون</h2>
+      <h2>📋 المستخدمون</h2>
+      <div class="ulHead"><input type="search" id="userSearch" placeholder="🔎 ابحث بالاسم أو اسم الدخول"><button type="button" class="btn" id="newUserBtn">➕ مستخدم جديد</button></div>
       <table>
         <thead>
           <tr>
@@ -279,13 +283,15 @@ function setMsg(el, text, cls) { el.textContent = text; el.className = 'msg' + (
 
 function renderHeader() {
   document.getElementById('whoName').textContent = fullName;
-  document.getElementById('whoRole').textContent = hlang === 'en' ? (ROLE_EN[role] || role) : (roleLabels[role] || role);
 }
 
 function renderTiles() {
   const box = document.getElementById('tiles');
   box.innerHTML = '';
-  const keys = Object.keys(SCREEN_NAMES).filter(k => k !== 'users' && HIDDEN_PERMS.indexOf(k) === -1 && can(k));
+  // Fixed order: daily work first, committees next, secretariat tools, then the display screen; user management is always last.
+  const ORDER = ['checkin', 'dashboard', 'stats', 'medical', 'nutrition', 'custody', 'gate', 'reception', 'addstudent', 'stages', 'lostfound', 'shirts', 'results', 'announce', 'verify', 'print', 'reports'];
+  const rank = k => { const i = ORDER.indexOf(k); return i === -1 ? 99 : i; };
+  const keys = Object.keys(SCREEN_NAMES).filter(k => k !== 'users' && HIDDEN_PERMS.indexOf(k) === -1 && can(k)).sort((a, b) => rank(a) - rank(b));
   const seen = {};
   keys.forEach(k => {
     if (SCREEN_LINKS[k]) { if (seen[SCREEN_LINKS[k]]) return; seen[SCREEN_LINKS[k]] = true; }
@@ -294,20 +300,20 @@ function renderTiles() {
     if (SCREEN_LINKS[k]) a.href = SCREEN_LINKS[k];
     const ic = document.createElement('div'); ic.className = 'i'; ic.textContent = SCREEN_ICONS[k] || '▣'; a.appendChild(ic);
     const t = document.createElement('div'); t.className = 't'; t.textContent = hlang === 'en' ? (SCREEN_NAMES_EN[k] || SCREEN_NAMES[k]) : SCREEN_NAMES[k];
-    const s = document.createElement('div'); s.className = 's'; s.textContent = SCREEN_LINKS[k] ? H().open : H().soon;
-    a.appendChild(t); a.appendChild(s);
+    a.appendChild(t);
+    if (!SCREEN_LINKS[k]) { const s = document.createElement('div'); s.className = 'pill'; s.style.cssText = 'font-size:11.5px;color:var(--muted)'; s.textContent = H().soon; a.appendChild(s); }
     box.appendChild(a);
   });
   if (can('announce') || can('results') || can('verify')) {
     const a = document.createElement('a');
     a.className = 'tile'; a.href = 'display.html'; a.target = '_blank'; a.rel = 'noopener';
-    a.innerHTML = '<div class="i">📺</div><div class="t">' + H().tv + '</div><div class="s">' + H().tvS + '</div>';
+    a.innerHTML = '<div class="i">📺</div><div class="t"></div>'; a.querySelector('.t').textContent = H().tv; a.title = H().tvS;
     box.appendChild(a);
   }
   if (can('manage') || can('support')) {
     const a = document.createElement('a');
-    a.className = 'tile'; a.href = '#users';
-    a.innerHTML = '<div class="i">👥</div><div class="t"></div><div class="s">' + H().manageS + '</div>';
+    a.className = 'tile admin'; a.href = '#users';
+    a.innerHTML = '<div class="i">👥</div><div class="t"></div>'; a.title = H().manageS;
     a.querySelector('.t').textContent = can('manage') ? H().manage : H().support;
     box.appendChild(a);
     // waiting "forgot password" requests show on the tile, so the secretariat sees them without opening the list
@@ -316,7 +322,7 @@ function renderTiles() {
   document.getElementById('noTiles').style.display = box.children.length ? 'none' : 'block';
   document.getElementById('adminArea').style.display = (can('manage') || can('support')) ? 'block' : 'none';
   // Support staff help with passwords/unlock only: no creating users, no editing permissions.
-  document.getElementById('createCard').style.display = can('manage') ? 'block' : 'none';
+  document.getElementById('newUserBtn').style.display = can('manage') ? '' : 'none';
   applyView();
 }
 
@@ -444,6 +450,15 @@ function permSummary(u) {
   return names.length ? names.join('، ') : '—';
 }
 
+document.getElementById('newUserBtn').addEventListener('click', async () => {
+  const c = document.getElementById('createCard'); const show = c.style.display === 'none';
+  c.style.display = show ? 'block' : 'none';
+  if (show) { try { await ensureCatalog(); applyPresetToNewForm(); renderTicks(newCommittees, committeeItems(), []); } catch (e) {} c.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+});
+document.getElementById('userSearch').addEventListener('input', e => {
+  const q = e.target.value.trim().toLowerCase();
+  usersListBody.querySelectorAll('tr[data-user]').forEach(tr => { tr.style.display = !q || (tr.dataset.find || '').indexOf(q) !== -1 ? '' : 'none'; });
+});
 function cell(text) { const td = document.createElement('td'); td.textContent = text; return td; }
 
 // Requests sent from "Forgot password?" on the login page.
@@ -485,52 +500,27 @@ async function loadUsersList() {
     }
     usersListBody.innerHTML = '';
     data.users.forEach(u => {
-      const tr = document.createElement('tr'); tr.dataset.user = u.username;
-      tr.appendChild(cell(u.fullName));
-      tr.appendChild(cell(u.username));
-      tr.appendChild(cell(permSummary(u) + (u.assignedBus ? ' — باص ' + u.assignedBus : '')));
+      const tr = document.createElement('tr'); tr.dataset.user = u.username; tr.dataset.find = (u.fullName + ' ' + u.username).toLowerCase();
+      const tdWho = document.createElement('td'); tdWho.className = 'who';
+      const nm = document.createElement('b'); nm.textContent = u.fullName; const sm = document.createElement('span'); sm.className = 'psum';
+      sm.textContent = u.username + ' · ' + permSummary(u) + (u.assignedBus ? ' — باص ' + u.assignedBus : '');
+      tdWho.appendChild(nm); tdWho.appendChild(sm); tr.appendChild(tdWho);
 
-      const tdStatus = document.createElement('td');
+      const tdStatus = document.createElement('td'); tdStatus.className = 'stt';
       const badge = document.createElement('span');
       if (!u.active) { badge.className = 'badge badge-disabled'; badge.textContent = 'معطَّل'; }
       else if (u.locked) { badge.className = 'badge badge-locked'; badge.textContent = 'مقفول'; }
       else { badge.className = 'badge badge-active'; badge.textContent = 'نشط'; }
-      tdStatus.appendChild(badge);
-      tr.appendChild(tdStatus);
+      tdStatus.appendChild(badge); tr.appendChild(tdStatus);
 
-      const tdActions = document.createElement('td');
-      if (can('manage')) {
-        const editBtn = document.createElement('button');
-        editBtn.className = 'rowBtn';
-        editBtn.textContent = '✏️ تعديل المستخدم';
-        editBtn.addEventListener('click', () => openEditor(u));
-        tdActions.appendChild(editBtn);
-      }
-
-      const resetBtn = document.createElement('button');
-      resetBtn.className = 'rowBtn';
-      resetBtn.textContent = '🔑 كلمة المرور';
-      resetBtn.addEventListener('click', () => openEditor(u, !can('manage')));
-      tdActions.appendChild(resetBtn);
-
-      if (can('manage')) {
-        const toggleBtn = document.createElement('button');
-        toggleBtn.className = 'rowBtn' + (u.active ? ' danger' : '');
-        toggleBtn.textContent = u.active ? '⛔ تعطيل' : '✅ تفعيل';
-        toggleBtn.addEventListener('click', () => setActiveFor(u, !u.active));
-        tdActions.appendChild(toggleBtn);
-      }
-
-      if (u.locked) {
-        const unlockBtn = document.createElement('button');
-        unlockBtn.className = 'rowBtn danger';
-        unlockBtn.textContent = '🔓 فك القفل';
-        unlockBtn.addEventListener('click', () => unlockAccountFor(u.username));
-        tdActions.appendChild(unlockBtn);
-      }
+      const tdActions = document.createElement('td'); tdActions.className = 'act';
+      const manageBtn = document.createElement('button'); manageBtn.className = 'rowBtn'; manageBtn.style.margin = '0'; manageBtn.textContent = '⚙️ إدارة';
+      manageBtn.addEventListener('click', () => openEditor(u, !can('manage')));
+      tdActions.appendChild(manageBtn);
       tr.appendChild(tdActions);
       usersListBody.appendChild(tr);
     });
+    { const q = document.getElementById('userSearch').value; if (q) document.getElementById('userSearch').dispatchEvent(new Event('input')); }
   } catch (err) {
     usersListBody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--sap-red);">تعذّر الاتصال بالخادم</td></tr>';
   }
@@ -573,6 +563,10 @@ async function openEditor(u, passwordOnly) {
   const t2 = document.createElement('div'); t2.appendChild(title); t2.appendChild(sub);
   head.appendChild(t2); head.appendChild(close); box.appendChild(head);
 
+  const qa = document.createElement('div'); qa.className = 'qa';
+  if (can('manage')) { const tg = document.createElement('button'); tg.type = 'button'; tg.className = 'rowBtn' + (u.active ? ' danger' : ''); tg.style.margin = '0'; tg.textContent = u.active ? '⛔ تعطيل الحساب' : '✅ تفعيل الحساب'; tg.addEventListener('click', () => setActiveFor(u, !u.active)); qa.appendChild(tg); }
+  if (u.locked) { const ul = document.createElement('button'); ul.type = 'button'; ul.className = 'rowBtn danger'; ul.style.margin = '0'; ul.textContent = '🔓 فك القفل'; ul.addEventListener('click', () => unlockAccountFor(u.username)); qa.appendChild(ul); }
+  if (qa.children.length) box.appendChild(qa);
   const status = document.createElement('div'); status.className = 'saved'; status.setAttribute('role', 'status');
   const flash = (text, bad) => { status.textContent = text; status.className = 'saved show' + (bad ? ' bad' : ''); };
 
@@ -596,6 +590,7 @@ async function openEditor(u, passwordOnly) {
 
   if (!passwordOnly) {
     const isAdmin = u.role === 'admin';
+    const adv = document.createElement('details'); adv.className = 'adv'; const sy = document.createElement('summary'); sy.textContent = '🛠 تعديل الصلاحيات يدويًا'; adv.appendChild(sy);
     // ---- name
     const hn = document.createElement('h3'); hn.textContent = '👤 الاسم الكامل'; box.appendChild(hn);
     const nameIn = document.createElement('input'); nameIn.type = 'text'; nameIn.value = u.fullName || ''; nameIn.maxLength = 60;
@@ -661,17 +656,18 @@ async function openEditor(u, passwordOnly) {
       });
       box.appendChild(presets);
 
-      const h1 = document.createElement('h3'); h1.textContent = '✅ الشاشات (علامة صح = تُضاف فوراً)'; box.appendChild(h1);
-      renderTicks(screensDiv, screenItems(), u.permissions || []); box.appendChild(screensDiv);
-      const h2 = document.createElement('h3'); h2.textContent = 'صلاحيات خاصة (حساسة: امنحها لأقل عدد ممكن)'; box.appendChild(h2);
-      renderTicks(powersDiv, powerItems(), u.permissions || []); box.appendChild(powersDiv);
       const h4 = document.createElement('h3'); h4.textContent = '🚌 رقم الباص (لمشرف الباص)'; box.appendChild(h4);
       box.appendChild(busInput);
+      const h1 = document.createElement('h3'); h1.textContent = '✅ الشاشات (علامة صح = تُضاف فوراً)'; adv.appendChild(h1);
+      renderTicks(screensDiv, screenItems(), u.permissions || []); adv.appendChild(screensDiv);
+      const h2 = document.createElement('h3'); h2.textContent = 'صلاحيات خاصة (حساسة: امنحها لأقل عدد ممكن)'; adv.appendChild(h2);
+      renderTicks(powersDiv, powerItems(), u.permissions || []); adv.appendChild(powersDiv);
       screensDiv.addEventListener('change', onTick); powersDiv.addEventListener('change', onTick);
       busInput.addEventListener('change', () => saveAccess('حُفظ رقم الباص'));
     }
-    const h3 = document.createElement('h3'); h3.textContent = 'اللجان'; box.appendChild(h3);
-    renderTicks(comsDiv, committeeItems(), u.committees || []); box.appendChild(comsDiv);
+    const h3 = document.createElement('h3'); h3.textContent = 'اللجان'; adv.appendChild(h3);
+    renderTicks(comsDiv, committeeItems(), u.committees || []); adv.appendChild(comsDiv);
+    box.appendChild(adv);
     comsDiv.addEventListener('change', onTick);
   }
 
@@ -685,8 +681,8 @@ async function openEditor(u, passwordOnly) {
 function refreshUserRow(u) {
   const i = (usersCache || []).findIndex(x => x.username === u.username);
   if (i !== -1) usersCache[i] = Object.assign({}, usersCache[i], u);
-  const row = document.querySelector('tr[data-user="' + CSS.escape(u.username) + '"] td:nth-child(3)');
-  if (row) row.textContent = permSummary(u) + (u.assignedBus ? ' — باص ' + u.assignedBus : '');
+  const row = document.querySelector('tr[data-user="' + CSS.escape(u.username) + '"] .psum');
+  if (row) row.textContent = u.username + ' · ' + permSummary(u) + (u.assignedBus ? ' — باص ' + u.assignedBus : '');
 }
 
 async function setActiveFor(u, active) {
