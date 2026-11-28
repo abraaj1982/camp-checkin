@@ -126,7 +126,7 @@ async function editStock(size) {
 let scanner = null, h5Promise = null;
 function loadScanner() {
   if (typeof Html5Qrcode !== 'undefined') return Promise.resolve();
-  if (!h5Promise) h5Promise = new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.4/html5-qrcode.min.js'; s.onload = res; s.onerror = () => { h5Promise = null; rej(new Error('library')); }; document.head.appendChild(s); });
+  if (!h5Promise) h5Promise = new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'lib/html5-qrcode.min.js'; s.onload = res; s.onerror = () => { h5Promise = null; rej(new Error('library')); }; document.head.appendChild(s); });
   return h5Promise;
 }
 async function startCam() {

@@ -150,10 +150,11 @@ function bytesToHex_(bytes) {
   return bytes.map(b => (('0' + ((b & 0xff).toString(16))).slice(-2))).join('');
 }
 
+// Cryptographically random bytes (Math.random is predictable): SHA-256 of two random UUIDs, repeated as needed.
 function randomBytes_(n) {
-  const out = [];
-  for (let i = 0; i < n; i++) out.push(Math.floor(Math.random() * 256));
-  return out;
+  let out = [];
+  while (out.length < n) out = out.concat(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, Utilities.getUuid() + Utilities.getUuid()).map(function(b) { return b & 0xff; }));
+  return out.slice(0, n);
 }
 
 function base64urlEncode_(bytes) {
@@ -200,28 +201,53 @@ function pbkdf2_(password, saltBytes, iterations, outputBytes) {
   return derived.slice(0, outputBytes);
 }
 
-function hashPassword_(password) {
-  const salt = randomBytes_(16);
-  const hash = pbkdf2_(password, salt, PBKDF2_ITERATIONS, HASH_OUTPUT_BYTES);
-  return {
-    saltB64: Utilities.base64Encode(salt),
-    hashHex: PBKDF2_ITERATIONS + '$' + bytesToHex_(hash)
-  };
+// "Pepper": a secret kept in Script Properties (never in the sheet, never in the code). Every new password is first mixed with it,
+// so a copy of the Users tab alone is useless for guessing passwords. Created once per Apps Script project.
+// WARNING: deleting the script property PW_PEPPER makes every password stop working (recover with ADMIN_resetPassword).
+function getPepper_() {
+  const props = PropertiesService.getScriptProperties();
+  let pepper = props.getProperty('PW_PEPPER');
+  if (!pepper) {
+    pepper = Utilities.base64Encode(randomBytes_(32));
+    props.setProperty('PW_PEPPER', pepper);
+  }
+  return pepper;
+}
+function pepperPassword_(password) {
+  return Utilities.base64Encode(Utilities.computeHmacSha256Signature(String(password), getPepper_()));
 }
 
+// Stored formats: 'p$<iterations>$<hex>' (current, peppered) · '<iterations>$<hex>' (older) · '<hex>' (oldest, 20000 iterations).
+// Older formats still sign in and are upgraded to the current one on the next good login.
+const CURRENT_HASH_PREFIX_ = 'p$';
+function hashPassword_(password) {
+  const salt = randomBytes_(16);
+  const hash = pbkdf2_(pepperPassword_(password), salt, PBKDF2_ITERATIONS, HASH_OUTPUT_BYTES);
+  return {
+    saltB64: Utilities.base64Encode(salt),
+    hashHex: CURRENT_HASH_PREFIX_ + PBKDF2_ITERATIONS + '$' + bytesToHex_(hash)
+  };
+}
+function hashIsCurrent_(storedHashField) { return String(storedHashField || '').indexOf(CURRENT_HASH_PREFIX_) === 0; }
+
 function verifyPassword_(password, saltB64, storedHashField) {
-  let iterations, expectedHashHex;
+  let iterations, expectedHashHex, input = password;
   const field = String(storedHashField || '');
-  if (field.indexOf('$') === -1) {
+  const parts = field.split('$');
+  if (parts.length === 1) {
     iterations = LEGACY_PBKDF2_ITERATIONS;
     expectedHashHex = field;
+  } else if (parts.length === 3 && parts[0] === 'p') {
+    iterations = Number(parts[1]);
+    expectedHashHex = parts[2];
+    input = pepperPassword_(password);
   } else {
-    const parts = field.split('$');
     iterations = Number(parts[0]);
     expectedHashHex = parts[1];
   }
+  if (!(iterations > 0) || !expectedHashHex || !saltB64) return false;
   const salt = Utilities.base64Decode(saltB64).map(b => b & 0xff);
-  const computed = bytesToHex_(pbkdf2_(password, salt, iterations, HASH_OUTPUT_BYTES));
+  const computed = bytesToHex_(pbkdf2_(input, salt, iterations, HASH_OUTPUT_BYTES));
   return constantTimeEquals_(computed, expectedHashHex);
 }
 
@@ -323,8 +349,8 @@ function handleLogin_(data) {
   }
 
   const passwordOk = verifyPassword_(data.password, user.Salt, user.PasswordHash);
-  // Old accounts store a slow legacy hash (login takes ~9 s): it is upgraded silently on the first good login.
-  const upgrade = passwordOk && String(user.PasswordHash || '').indexOf('$') === -1 ? hashPassword_(data.password) : null; // slow work: outside the lock
+  // Accounts stored in an older format (no pepper, or the slow 20000-iteration hash) are upgraded silently on the first good login.
+  const upgrade = passwordOk && !hashIsCurrent_(user.PasswordHash) ? hashPassword_(data.password) : null; // slow work: outside the lock
 
   // The security decision (count a failure / lock the account / accept the login) is taken under the lock, on a FRESH row:
   // simultaneous wrong guesses are all counted, and a login finishing at the same moment cannot erase a lock they caused.
@@ -460,6 +486,10 @@ function handleCreateUser_(data) {
     if (wantsAll && auth.user.Role !== 'admin') return { success: false, code: 'ADMIN_ONLY', error: 'إنشاء حساب إداري متاح للمدير فقط' };
   }
 
+  // Letters (any language), digits, dot, dash, underscore; 2-30 characters. Nothing that a sheet could read as a formula.
+  if (!/^[\p{L}\p{N}._-]{2,30}$/u.test(String(data.username || ''))) {
+    return { success: false, code: 'BAD_USERNAME', error: 'اسم الدخول: من 2 إلى 30 حرفًا أو رقمًا، بلا مسافات أو رموز (يُسمح بـ . و - و _ فقط)' };
+  }
   if (findUserRow_(data.username)) {
     return { success: false, error: 'Username already exists' };
   }

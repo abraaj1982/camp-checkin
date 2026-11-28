@@ -11,3 +11,14 @@
   new MutationObserver(paint).observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', paint); else paint();
 })();
+
+// Signing out removes the student data a screen keeps on this phone for offline use (the bus roster, the leader's last data).
+// Records not yet sent (the supervisor's queue) are kept, so nothing recorded without internet is lost.
+window.mkWipeLocal = function () {
+  try {
+    for (var i = localStorage.length - 1; i >= 0; i--) {
+      var k = localStorage.key(i);
+      if (k && ((k.indexOf('mk_sup_') === 0 && !/queue$/.test(k)) || k === 'mk_leader_cache_v2')) localStorage.removeItem(k);
+    }
+  } catch (e) { /* storage blocked: nothing to remove */ }
+};

@@ -23,7 +23,7 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4lEBGPNxghwq9
 const LOC_INTERVAL_MS = 45000; // C4: was 20 s. Every position update takes the shared write lock; 45 s keeps the leader map "fresh" (< 90 s, see ageClass in leader.html)
 
 /* ---------- session ---------- */
-function endSession(code) { try { localStorage.setItem('mk_logout_reason', code + '|' + Date.now()); } catch (e) {} sessionStorage.clear(); location.href = 'login.html'; } // only the REASON is kept (never the token), so the login page can say why
+function endSession(code) { try { localStorage.setItem('mk_logout_reason', code + '|' + Date.now()); } catch (e) {} if (window.mkWipeLocal) mkWipeLocal(); sessionStorage.clear(); location.href = 'login.html'; } // only the REASON is kept (never the token), so the login page can say why
 const token = sessionStorage.getItem('mukhayyam_token');
 let perms = [];
 const canUndoAny = () => perms.indexOf('*') !== -1 || perms.indexOf('undo') !== -1;
@@ -316,7 +316,7 @@ window.__onQr = onQr; // used by tests
 
 /* ---------- camera ---------- */
 let scanner = null;
-const H5_URL = 'https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.4/html5-qrcode.min.js';
+const H5_URL = 'lib/html5-qrcode.min.js';
 let h5Promise = null;
 function loadScanner() { // the QR library is only downloaded when the camera is first used (faster page load)
   if (typeof Html5Qrcode !== 'undefined') return Promise.resolve();
@@ -490,7 +490,7 @@ function curCard() {
   const chk = stageCheck(c), stg = chk.stage || null, anyBusOk = !c.mine && !!(stg && stg.anyBus);
   const dup = isDup(c, stg), wd = c.state === 'withdrawn';
   let act;
-  if (!c.mine && !anyBusOk) act = `<div class="banner bad">${l.other(c.bus, c.supervisor)}</div><button class="btn full" style="margin-top:12px" disabled>${l.board}</button>`;
+  if (!c.mine && !anyBusOk) act = `<div class="banner bad">${esc(l.other(c.bus, c.supervisor))}</div><button class="btn full" style="margin-top:12px" disabled>${l.board}</button>`;
   else if (wd) act = `<div class="banner bad">${l.withdrawn}</div><button class="btn full" style="margin-top:12px" disabled>${l.board}</button>`;
   else if (dup) act = `<div class="banner warn">${l.dup(c.at)}</div><button class="btn full" style="margin-top:12px" disabled>${l.board}</button>`;
   else if (!chk.ok) act = `<div class="banner bad">${esc(chk.msg)}</div><button class="btn full" style="margin-top:12px" disabled>${l.board}</button>`;
@@ -515,7 +515,7 @@ function setMethod(m) { if (m !== 'qr' && st.cam) stopCam(); st.method = m; st.q
 
 $('langBtn').onclick = () => { st.lang = st.lang === 'ar' ? 'en' : 'ar'; pref.set('lang', st.lang); render(); };
 $('themeBtn').onclick = () => { st.theme = st.theme === 'light' ? 'dark' : 'light'; pref.set('theme', st.theme); render(); };
-$('logoutBtn').onclick = () => { if (queue.length && !confirm(L().pending(queue.length) + '. ' + L().logout + '?')) return; sessionStorage.clear(); location.href = 'login.html'; };
+$('logoutBtn').onclick = () => { if (queue.length && !confirm(L().pending(queue.length) + '. ' + L().logout + '?')) return; if (window.mkWipeLocal) mkWipeLocal(); sessionStorage.clear(); location.href = 'login.html'; };
 window.addEventListener('online', () => { st.online = true; flush(); render(); });
 window.addEventListener('offline', () => { st.online = false; render(); });
 setInterval(() => { if (queue.length) flush(); }, 15000);

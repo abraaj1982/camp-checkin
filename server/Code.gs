@@ -401,6 +401,8 @@ function handleScan_(data) {
   return withAuth_(data, requirePerm_('checkin'), function(user) {
     const action = String(data.op); // sub-operation (data.action is the API route)
     if (['board', 'undo', 'withdraw'].indexOf(action) === -1) return { success: false, code: 'BAD_REQUEST', error: 'Invalid scan action' };
+    // "Left with permission" is approved by the secretariat (custody screen), never by a bus supervisor's scan.
+    if (action === 'withdraw' && !hasPerm_(user, 'custody')) return { success: false, code: 'FORBIDDEN', error: 'الخروج بإذن تعتمده السكرتارية من شاشة الاستئذان' };
     const student = findStudent_(data.studentId);
     if (!student) return { success: false, code: 'NOT_FOUND', error: 'الطالب غير موجود' };
     // Stages: once the Stages tab exists, a scan records the movement of the stage that is open NOW for this student (by date + time).

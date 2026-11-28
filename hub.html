@@ -89,7 +89,8 @@ details.adv summary{cursor:pointer;font-weight:700;padding:10px 0;font-size:14.5
       <h2>➕ إضافة مستخدم جديد</h2>
       <form id="createUserForm">
         <label class="field">اسم المستخدم (للدخول) <span class="req">*</span></label>
-        <input type="text" id="newUsername" required>
+        <input type="text" id="newUsername" required autocapitalize="none" autocomplete="off" spellcheck="false">
+        <div class="hint">حروف أو أرقام بلا مسافات (يُسمح بـ . و - و _). الأفضل اسم لا يسهل تخمينه، لا «admin» ولا «test».</div>
 
         <label class="field">كلمة المرور <span class="req">*</span></label>
         <div id="newPasswordBox"></div>
@@ -268,7 +269,7 @@ document.getElementById('langBtn').addEventListener('click', () => { hlang = hla
 function can(key) { return permissions.indexOf('*') !== -1 || permissions.indexOf(key) !== -1; }
 
 document.getElementById('logoutBtn').addEventListener('click', () => {
-  sessionStorage.clear();
+  if (window.mkWipeLocal) mkWipeLocal(); sessionStorage.clear();
   window.location.href = 'login.html';
 });
 
@@ -778,7 +779,7 @@ loadDocBadge(); setInterval(() => { if (!document.hidden) loadDocBadge(); }, 300
       renderHeader();
       renderTiles();
     } else if (/EXPIRED|IDLE_TIMEOUT|REVOKED|BAD_SIGNATURE|MALFORMED|USER_NOT_FOUND|ACCOUNT_DISABLED/.test(me.error || '')) {
-      sessionStorage.clear();
+      if (window.mkWipeLocal) mkWipeLocal(); sessionStorage.clear();
       window.location.href = 'login.html';
       return;
     }

@@ -499,11 +499,26 @@ post({action:'createUser',token:T,username:'old1',password:'oldpass-12345',fullN
  const legacy=run('(function(p,s){return bytesToHex_(pbkdf2_(p,s,LEGACY_PBKDF2_ITERATIONS,HASH_OUTPUT_BYTES));})')('oldpass-12345',[...salt].map(x=>x));
  row[1]=legacy;assert(!row[1].includes('$'),'old account simulated with a legacy hash');
  r=post({action:'login',username:'old1',password:'oldpass-12345'});assert(r.success,'legacy account can still log in');
- assert(row[1].includes('$')&&row[1].startsWith('1000$'),'legacy hash upgraded to the fast format');
+ assert(row[1].startsWith('p$1000$'),'legacy hash upgraded to the current (peppered) format');
  r=post({action:'login',username:'old1',password:'oldpass-12345'});assert(r.success,'upgraded account logs in again');
+ // the 1000-iteration format without pepper (accounts made before the pepper) also signs in and is upgraded
+ const mid=run('(function(p,s){return "1000$"+bytesToHex_(pbkdf2_(p,s,1000,HASH_OUTPUT_BYTES));})')('oldpass-12345',[...Buffer.from(row[2],'base64')]);
+ row[1]=mid;for(const k of Object.keys(cache))delete cache[k];
+ r=post({action:'login',username:'old1',password:'oldpass-12345'});assert(r.success&&row[1].startsWith('p$1000$'),'unpeppered 1000$ hash signs in and is upgraded');
+ r=post({action:'login',username:'old1',password:'wrong-12345'});assert(!r.success,'wrong password still refused after the upgrade');
+ assert(run('(function(r){return verifyPassword_("oldpass-12345",r[2],r[1]);})')(row),'peppered hash verifies with the pepper');
  r=post({action:'login',username:'old1',password:'wrong-pass-1'});assert(!r.success,'wrong password still refused after upgrade');}
 // ---- editor recovery function exists and refuses the placeholder
 {let threw=false;try{run('ADMIN_resetPassword')();}catch(e){threw=true;}assert(threw,'ADMIN_resetPassword refuses the placeholder password');}
+// ---- secure salt, pepper, username format
+{const a=run('hashPassword_')('same-pass-1'),b=run('hashPassword_')('same-pass-1');assert(a.saltB64!==b.saltB64&&a.hashHex!==b.hashHex&&/^p\$1000\$[0-9a-f]{64}$/.test(a.hashHex),'same password: different salt and hash; current format');
+ assert(run('(function(){var x=randomBytes_(40);return x.length===40&&x.every(function(v){return v>=0&&v<256;});})')(),'secure random bytes');
+ const props=run('PropertiesService').getScriptProperties(),pep=props.getProperty('PW_PEPPER');assert(!!pep&&pep.length>=40,'pepper kept in Script Properties');
+ props.setProperty('PW_PEPPER','another-pepper-'+pep);assert(!run('verifyPassword_')('same-pass-1',a.saltB64,a.hashHex),'without the right pepper the hash cannot be checked');
+ props.setProperty('PW_PEPPER',pep);assert(run('verifyPassword_')('same-pass-1',a.saltB64,a.hashHex),'with the pepper it verifies');}
+for(const [u,ok] of [['=cmd()',false],['ab c',false],['a',false],['x'.repeat(31),false],['+966',false],['@me',false],['أحمد.س',true],['sup_10',true]]){
+ r=post({action:'createUser',token:T,username:u,password:'abcd-12345',fullName:'فحص',role:'supervisor',permissions:['checkin'],assignedBus:'',committees:[]});
+ assert(!!r.success===ok,'username format '+JSON.stringify(u)+(ok?' accepted':' refused'));}
 book.Bus.rows.push(['6','طالب ت1','1','3001','أزرق','99990009','','','']);book.Bus.rows.push(['6','طالب ت2','1','3002','أحمر','99990010','','','']);for(const k of Object.keys(cache))delete cache[k];
 // ---- undo policy: supervisor = last own record within 2 minutes; 'undo' permission = any student, any time
 post({action:'createUser',token:T,username:'u1',password:'u1-12345',fullName:'مشرف تراجع',role:'supervisor',permissions:['checkin'],assignedBus:'1',committees:[]});
@@ -857,7 +872,8 @@ r=post({action:'scan',token:t1,studentId:'7001',op:'board',clientId:'s16'});asse
 r=post({action:'scan',token:t1,studentId:'7009',op:'board',clientId:'s17'});assert(r.success&&r.warn==='NO_ARRIVAL'&&r.student.state==='departed','leaving without an arrival record: recorded, flagged for the secretariat');
 r=post({action:'scan',token:t1,studentId:'7009',op:'undo'});assert(r.success&&r.student.state==='none','undo of a departure: back to before');
 r=post({action:'busState',token:t1});assert(!r.missing.some(x=>x.id==='7001'),'a departed student is not "missing"');
-r=post({action:'scan',token:t2,studentId:'7003',op:'withdraw'});r=post({action:'scan',token:t2,studentId:'7003',op:'board'});assert(!r.success&&r.code==='WITHDRAWN','withdrawn: refused in a stage');
+r=post({action:'scan',token:t2,studentId:'7003',op:'withdraw'});assert(!r.success&&r.code==='FORBIDDEN','a bus supervisor cannot mark a student as left with permission');
+r=post({action:'scan',token:T,studentId:'7003',op:'withdraw'});assert(r.success,'withdraw needs the custody permission (admin has it)');r=post({action:'scan',token:t2,studentId:'7003',op:'board'});assert(!r.success&&r.code==='WITHDRAWN','withdrawn: refused in a stage');
 r=post({action:'stages',token:T});const s6=r.stages.find(x=>x.id==='S6'),s3=r.stages.find(x=>x.id==='S3');
 assert(s6.status==='live'&&s6.done===1&&s6.perBus.length===2&&s3.status==='done'&&s3.done===2,'board: S6 live (progress per bus); S3 done with both trip exits counted (one arrived late)');
 // ---- the sheet check

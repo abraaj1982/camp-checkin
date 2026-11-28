@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>القائد — MUKHAYYAM</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" defer></script>
+<link rel="stylesheet" href="lib/leaflet/leaflet.css">
+<script src="lib/leaflet/leaflet.js" defer></script>
 <link rel="stylesheet" href="theme.css">
 <script src="ui.js" defer></script>
 <style>
@@ -117,7 +117,7 @@ try { const c = JSON.parse(localStorage.getItem(CK) || 'null'); if (c && c.sum) 
 async function poll() {
   try {
     const r = await api('leaderAll');                      // ONE request for the whole screen
-    if (r && r.code && AUTH_ERR.test(r.code)) { sessionStorage.clear(); location.href = 'login.html'; return; }
+    if (r && r.code && AUTH_ERR.test(r.code)) { if (window.mkWipeLocal) mkWipeLocal(); sessionStorage.clear(); location.href = 'login.html'; return; }
     if (r && r.success) {
       if (r.summary) st.sum = r.summary; if (r.buses) st.live = r.buses; if (r.cases) st.cases = r.cases;
       st.extra = r.extra || null; st.camp = r.camp || null; st.canSetCamp = !!r.canSetCamp;

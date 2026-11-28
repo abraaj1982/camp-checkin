@@ -141,7 +141,7 @@ async function load() {
 const dayList = () => Array.from(new Set(st.program.map(x => x.date))).filter(d => d >= SCREEN_FROM).sort();
 const dayName = d => { const x = new Date(d + 'T12:00:00'); return isNaN(x) ? d : x.toLocaleDateString(st.lang === 'ar' ? 'ar-u-nu-latn' : 'en', { weekday: 'long', day: 'numeric', month: 'long' }); };
 /* ---------- camp program: the Excel file is read here in the browser, checked, previewed, then sent ---------- */
-const XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+const XLSX_URL = 'lib/xlsx.full.min.js';
 let xlsxP = null;
 function loadXlsx() { if (window.XLSX) return Promise.resolve(); if (!xlsxP) xlsxP = new Promise((res, rej) => { const s = document.createElement('script'); s.src = XLSX_URL; s.onload = res; s.onerror = () => { xlsxP = null; rej(new Error('lib')); }; document.head.appendChild(s); }); return xlsxP; }
 function xDate(v) {
