@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>القائد — MUKHAYYAM</title>
+<title>لوحة المعلومات — MUKHAYYAM</title>
 <link rel="stylesheet" href="lib/leaflet/leaflet.css">
 <script src="lib/leaflet/leaflet.js" defer></script>
 <link rel="stylesheet" href="theme.css">
@@ -69,7 +69,7 @@ if (!token) location.href = 'login.html'; else if (!can('dashboard') && !can('li
 
 const pref = { get(k, d) { try { return localStorage.getItem('mk_pref_' + k) || d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('mk_pref_' + k, v); } catch (e) {} } };
 const T = {
- ar: { dir: 'rtl', title: 'القائد', sub: 'متابعة المخيم مباشرة', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح', of: 'من', bus: n => 'باص ' + n,
+ ar: { dir: 'rtl', title: 'لوحة المعلومات', sub: 'متابعة المخيم مباشرة', home: 'الرئيسية', lang: 'English', dark: '🌙 داكن', light: '☀ فاتح', of: 'من', bus: n => 'باص ' + n,
   present: 'الحضور', boardedCol: 'صعدوا الباص', viaBus: 'صعدوا الباص', direct: 'وصلوا مباشرة', remaining: 'لم يصعدوا بعد', arrivedBuses: 'باصات وصلت', withdrawn: 'خرجوا بإذن', withdrawnNote: 'غادروا المخيم قبل نهايته', meals: 'وجبات اليوم', mealsNote: 'طلاب + مشرفون',
   map: 'تتبع الباصات مباشرة', live: 'مباشر', byBus: 'الحضور حسب الباص', byTeam: 'الحضور حسب الفريق (كم صعد من كل فريق)', committees: 'اللجان الآن', withdrawals: 'الاستئذانات', noWd: 'لا استئذانات.', wdOpen: 'قيد التنفيذ', wdClosed: 'خرج', receiver: 'المستلِم', feed: 'آخر الأحداث', noFeed: 'لا أحداث بعد.',
   st: { boarding: 'يصعدون', departed: 'انطلق', onway: 'في الطريق', arrived: 'وصل' }, tone: { r: 'واقف', o: 'على وشك الانطلاق', g: 'يسير', d: 'وصل ✓' }, notStarted: 'لم يبدأ', noLoc: 'لا يوجد موقع بعد', lastSeen: s => 'آخر موقع منذ ' + durText(s, false),
@@ -79,7 +79,7 @@ const T = {
   sound: '🔔 صوت التنبيهات', soundOff: '🔕 الصوت متوقف', printReport: '🖨 طباعة التقرير', printAbsent: '🖨 كشف من لم يصعد', absentTitle: 'كشف من لم يصعد', reportTitle: 'تقرير حالة المخيم', at: 'في',
   noMap: 'تعذّر تحميل الخريطة. تظهر الحالة في القائمة.', offline: 'غير متصل. تُعرض آخر بيانات.', loading: 'جارٍ التحميل...', stale: 'هذه آخر بيانات محفوظة، جارٍ التحديث...', err: 'تعذّر تحميل البيانات.', note: 'الموقع من هاتف المشرف، ويتحدّث ما دامت شاشته مفتوحة.',
   withGuardian: '🚗 حضر مع ولي الأمر (ليس بالباص)', actions: { board: 'صعد', undo: 'تراجع', withdraw: 'استأذن للخروج', readmit: 'أُعيد للمخيم' }, num: '#', student: 'الطالب', team: 'الفريق', cls: 'الصف' },
- en: { dir: 'ltr', title: 'Camp leader', sub: 'Live camp overview', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light', of: 'of', bus: n => 'Bus ' + n,
+ en: { dir: 'ltr', title: 'Dashboard', sub: 'Live camp overview', home: 'Home', lang: 'العربية', dark: '🌙 Dark', light: '☀ Light', of: 'of', bus: n => 'Bus ' + n,
   present: 'Present', boardedCol: 'Boarded the bus', viaBus: 'boarded the bus', direct: 'came directly', remaining: 'Not boarded yet', arrivedBuses: 'Buses arrived', withdrawn: 'Left with permission', withdrawnNote: 'left the camp before it ended', meals: 'Meals today', mealsNote: 'students + supervisors',
   map: 'Live bus tracking', live: 'Live', byBus: 'Attendance by bus', byTeam: 'Attendance by team (how many of each team boarded)', committees: 'Committees now', withdrawals: 'Withdrawals', noWd: 'No withdrawals.', wdOpen: 'In progress', wdClosed: 'Left', receiver: 'Receiver', feed: 'Latest activity', noFeed: 'No activity yet.',
   st: { boarding: 'Boarding', departed: 'Departed', onway: 'On the way', arrived: 'Arrived' }, tone: { r: 'Standing', o: 'About to leave', g: 'Moving', d: 'Arrived ✓' }, notStarted: 'Not started', noLoc: 'No location yet', lastSeen: s => 'Last seen ' + durText(s, true) + ' ago',
